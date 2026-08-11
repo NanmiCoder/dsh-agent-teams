@@ -1,0 +1,47 @@
+{
+  "name": "dsh-agent-teams",
+  "version": "0.1.0",
+  "description": "AgentTeams for DeepSeek Harness: multi-agent team collaboration (captain, members, tasks with dependencies, messaging) driven by natural language",
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "license": "MIT",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "verify": "node scripts/verify.mjs"
+  },
+  "dependencies": {
+    "@deepseek-ai/schemastery": "^3.18.0"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.0",
+    "@deepseek-ai/dsh-agent": "^0.0.1",
+    "@deepseek-ai/dsh-llm": "^0.0.1",
+    "@deepseek-ai/dsh-session": "^0.0.1",
+    "@deepseek-ai/dsh-subagent": "^0.0.1",
+    "@deepseek-ai/dsh-system-prompt": "^0.0.1",
+    "@deepseek-ai/dsh-tools": "^0.0.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0"
+  }
+}

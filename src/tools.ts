@@ -15,6 +15,7 @@ import type { JsonValue } from '@deepseek-ai/dsh-session'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { ToolRunContext } from '@deepseek-ai/dsh-tools'
 import { join } from 'node:path'
+import { appendTeamEvent, captainSessionOf } from './events.ts'
 import {
   appendMailbox,
   CAPTAIN_KEY,
@@ -150,6 +151,11 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
           taskSeq: 0,
         }
         await createTeamDir(stateRoot, state)
+        appendTeamEvent(ctx, captain.session, 'agent-teams/team-created', {
+          teamId: state.id,
+          name: state.name,
+          ...state.description !== undefined ? { description: state.description } : {},
+        })
         return { team_id: state.id, team_name: state.name, state_dir: join(stateRoot, state.id) }
       })
     },
@@ -203,6 +209,12 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
         await spawnMember(ctx, memberRuntime(config), captain, fresh, member, config.stateDir, exec.signal)
         fresh.members.push(member)
         await writeTeam(stateRoot, fresh)
+        appendTeamEvent(ctx, captainSessionOf(ctx, fresh.captainSessionId, captain.session), 'agent-teams/member-added', {
+          teamId: fresh.id,
+          memberId: member.id,
+          name: member.name,
+          ...member.role !== undefined ? { role: member.role } : {},
+        })
         return { member_name: member.name, member_id: member.id, status: member.status }
       })
     },
@@ -239,6 +251,10 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
         if (member.id !== '') interruptMember(ctx, captain, member.id)
         member.status = 'removed'
         await writeTeam(stateRoot, fresh)
+        appendTeamEvent(ctx, captainSessionOf(ctx, fresh.captainSessionId, captain.session), 'agent-teams/member-removed', {
+          teamId: fresh.id,
+          memberId: member.id,
+        })
         return { member_name: member.name, status: member.status }
       })
     },
@@ -300,6 +316,13 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
         fresh.taskSeq += 1
         fresh.tasks.push(task)
         await writeTeam(stateRoot, fresh)
+        appendTeamEvent(ctx, captainSessionOf(ctx, fresh.captainSessionId, captain.session), 'agent-teams/task-created', {
+          teamId: fresh.id,
+          taskId: task.id,
+          subject: task.subject,
+          dependencies: task.dependencies,
+          ...task.assignee !== undefined ? { assignee: task.assignee } : {},
+        })
         return {
           task_id: task.id,
           subject: task.subject,
@@ -370,6 +393,12 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
         task.assignee = assignee
         task.updatedAt = Date.now()
         await writeTeam(stateRoot, fresh)
+        appendTeamEvent(ctx, captainSessionOf(ctx, fresh.captainSessionId, caller.session), 'agent-teams/task-updated', {
+          teamId: fresh.id,
+          taskId: task.id,
+          status: task.status,
+          assignee: task.assignee,
+        })
         return { task_id: task.id, status: task.status, assignee: task.assignee ?? '' }
       })
     },
@@ -425,6 +454,13 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
         if (args.output !== undefined) task.output = args.output
         task.updatedAt = Date.now()
         await writeTeam(stateRoot, fresh)
+        appendTeamEvent(ctx, captainSessionOf(ctx, fresh.captainSessionId, caller.session), 'agent-teams/task-updated', {
+          teamId: fresh.id,
+          taskId: task.id,
+          status: task.status,
+          ...task.assignee !== undefined ? { assignee: task.assignee } : {},
+          ...task.output !== undefined ? { output: task.output } : {},
+        })
         return {
           task_id: task.id,
           status: task.status,
@@ -577,6 +613,9 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
         for (const member of fresh.members) {
           if (member.status !== 'removed' && member.id !== '') interruptMember(ctx, captain, member.id)
         }
+        appendTeamEvent(ctx, captainSessionOf(ctx, fresh.captainSessionId, captain.session), 'agent-teams/team-deleted', {
+          teamId: fresh.id,
+        })
         await removeTeamDir(stateRoot, fresh.id)
       })
       return { deleted: true, team_name: team.name }

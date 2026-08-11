@@ -93,7 +93,55 @@ try {
   await rm(stateRoot, { recursive: true, force: true })
 }
 
-console.log('4/4 done')
+console.log('4/4 client tree fold (Conversation Node)')
+const { agentTeamsRunDefinition, projectTree } = await import('../lib/client/agent-teams-definition.js')
+const def = agentTeamsRunDefinition
+const startMatch = {
+  event: { type: 'agent-teams/team-created', data: { teamId: 'demo', name: 'Demo Team' } },
+  role: 'start',
+  location: { kind: 'turn' },
+}
+const update = (state, event) => def.update({ state }, { event, role: 'update', location: { kind: 'turn' } })
+let state = def.start({}, startMatch, undefined)
+check('start seeds empty team', state.members.length === 0 && state.tasks.length === 0)
+state = update(state, {
+  type: 'agent-teams/member-added',
+  data: { teamId: 'demo', memberId: 'sess-alice', name: 'alice', role: 'researcher' },
+})
+state = update(state, {
+  type: 'agent-teams/member-added',
+  data: { teamId: 'demo', memberId: 'sess-bob', name: 'bob' },
+})
+check('member-added folds two members', state.members.length === 2)
+state = update(state, {
+  type: 'agent-teams/task-created',
+  data: { teamId: 'demo', taskId: 't1', subject: '调研', dependencies: [], assignee: 'alice' },
+})
+state = update(state, {
+  type: 'agent-teams/task-created',
+  data: { teamId: 'demo', taskId: 't2', subject: '写报告', dependencies: ['t1'] },
+})
+state = update(state, {
+  type: 'agent-teams/task-updated',
+  data: { teamId: 'demo', taskId: 't1', status: 'in_progress', assignee: 'alice' },
+})
+const tree = projectTree(state)
+check('tree keeps the team name', tree.teamName === 'Demo Team')
+check('tree status running', tree.status === 'running')
+check('tree has two members', tree.members.length === 2)
+check('alice carries her in-progress task', tree.members[0]?.name === 'alice' && tree.members[0]?.currentTasks.length === 1 && tree.members[0]?.currentTasks[0]?.status === 'in_progress')
+check('bob has no current tasks', tree.members[1]?.name === 'bob' && tree.members[1]?.currentTasks.length === 0)
+state = update(state, {
+  type: 'agent-teams/task-updated',
+  data: { teamId: 'demo', taskId: 't1', status: 'completed', output: 'done' },
+})
+check('completed task leaves the member list', projectTree(state).members[0]?.currentTasks.length === 0)
+state = update(state, { type: 'agent-teams/member-removed', data: { teamId: 'demo', memberId: 'sess-bob' } })
+check('removed member leaves the tree', projectTree(state).members.length === 1)
+state = update(state, { type: 'agent-teams/team-deleted', data: { teamId: 'demo' } })
+check('team-deleted flips status', projectTree(state).status === 'deleted')
+
+console.log('5/5 done')
 if (failures > 0) {
   console.error(`\n${failures} check(s) FAILED`)
   process.exit(1)

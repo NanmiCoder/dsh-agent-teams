@@ -25,7 +25,7 @@ import type {} from '@deepseek-ai/dsh-system-prompt'
 import { registerAgentTeamsTools, type ToolsConfig } from './tools.ts'
 
 export const name = 'agent-teams'
-export const inject = ['tools', 'subagents', 'systemPrompt']
+export const inject = ['tools', 'subagents', 'systemPrompt', 'agents']
 
 /** Plugin configuration. */
 export interface Config {

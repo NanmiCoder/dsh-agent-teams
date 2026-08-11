@@ -104,6 +104,31 @@ bundle 行可在 profile 的 `cordis.patch.yml` 中覆盖：
 
 ## 验证
 
+### 0. 已在独立实例上真实验证（DeepSeek-V4-Flash）
+
+以下验证已在**独立 profile**（不触碰正在运行的 web 实例）上真实跑通：
+
+```sh
+# ① headless profile 端到端（真实 LLM）：建队「标题方案」→ 2 成员 → 2 任务
+#   （t2 依赖 t1）→ 消息唤醒 → 产出汇总 → 删队，全部成功
+dsh plugin --profile headless add /absolute/path/to/dsh-agent-teams
+cd /tmp && dsh run --profile headless "用 AgentTeams 帮我完成一个小任务：创建团队…"
+
+# ② 落盘验证：队长会话日志含完整事件流
+#   agent-teams/team-created ×1, member-added ×2, task-created ×2,
+#   task-updated ×2, team-deleted ×1（前端面板的数据源）
+
+# ③ 独立 web 组合（agent-teams-web = base + web-app + 本插件）端到端：
+dsh run --profile agent-teams-web "用 AgentTeams 创建团队 smoke，1 个成员 1 个任务…"   # 通过
+
+# ④ UI 加载链路（独立 web 实例，3081 端口，patch 改 webserver.port）：
+#    浏览器名册含 dsh-agent-teams（`dshClient` 旧格式兼容）
+#    GET /plugins/dsh-agent-teams/client.js → 200（closure-factory bundle）
+```
+
+> 兼容性说明：当前部署（staging 快照）的 `client-modules` 读取 package.json 顶层
+> `dshClient` 字段（新版本读 `dsh.client`），故 package.json 同时声明两种格式。
+
 ### 1. 离线验证（不需要启动任何服务）
 
 ```sh

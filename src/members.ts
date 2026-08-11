@@ -93,6 +93,22 @@ export async function spawnMember(
   stateDir: string,
   signal: AbortSignal,
 ): Promise<void> {
+  // Fail loud at the first use: provider registration is a sibling plugin's
+  // effect and may settle after this plugin mounts. Capability checks here
+  // mirror what startContinuable would reject, with an actionable error.
+  const provider = ctx.subagents.getProvider(config.provider)
+  if (provider === undefined) {
+    throw new Error(
+      `agent-teams: no subagent provider "${config.provider}" is registered (available: ${ctx.subagents.list().join(', ') || 'none'}) — `
+      + 'check that the subagent provider row (e.g. subagent-spawn) is mounted in the composition',
+    )
+  }
+  if (provider.prepareContinuable === undefined) {
+    throw new Error(`agent-teams: provider "${config.provider}" does not support continuable members`)
+  }
+  if (!provider.capabilities.persona) {
+    throw new Error(`agent-teams: provider "${config.provider}" cannot apply a member persona`)
+  }
   const start = await ctx.subagents.startContinuable({
     provider: config.provider,
     label: `agent-teams:${team.id}:${member.name}`,

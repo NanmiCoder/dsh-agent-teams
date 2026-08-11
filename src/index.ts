@@ -77,20 +77,11 @@ export function apply(ctx: Context, config: Config): void {
     maxMembers: config.maxMembers ?? 8,
   }
 
-  // Fail loud at mount: a provider without continuable/persona capabilities
-  // would reject every member spawn at runtime instead.
-  const provider = ctx.subagents.getProvider(resolved.memberProvider)
-  if (provider === undefined) {
-    throw new Error(
-      `agent-teams: no subagent provider "${resolved.memberProvider}" is registered — pick one of: ${ctx.subagents.list().join(', ')}`,
-    )
-  }
-  if (provider.prepareContinuable === undefined) {
-    throw new Error(`agent-teams: provider "${resolved.memberProvider}" does not support continuable members`)
-  }
-  if (!provider.capabilities.persona) {
-    throw new Error(`agent-teams: provider "${resolved.memberProvider}" cannot apply a member persona`)
-  }
+  // Provider registration is a sibling plugin's effect (`subagent-spawn` /
+  // `subagent-fork` rows), which can land after this mount under the Loader's
+  // concurrent activation — so capability validation happens at the first
+  // member spawn (`spawnMember`), the earliest point the provider list is
+  // settled, rather than here.
 
   const toolNames = [
     'agent_teams_create',

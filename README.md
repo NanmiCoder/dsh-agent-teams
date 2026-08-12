@@ -11,7 +11,13 @@ DeepSeek Harness 的 AgentTeams 插件：安装后，任何会话只需一句自
 ## 安装
 
 ```sh
-cd /path/to/dsh-agent-teams && pnpm build
+# 从 npm 安装（构建产物随包发布，无需 build）：
+dsh plugin --profile web add dsh-agent-teams
+
+# 或从 git 源码安装（需先构建）：
+cd /path/to/dsh-agent-teams
+pnpm install          # 公开依赖（tsdown/typescript/react…）；@deepseek-ai/* 为 DSH 环境提供的私有 peer，见 .npmrc
+pnpm build            # 产出 lib/ 与 lib/client.js
 dsh plugin --profile web add /absolute/path/to/dsh-agent-teams
 ```
 

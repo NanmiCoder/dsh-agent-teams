@@ -23,8 +23,8 @@ import z from '@deepseek-ai/schemastery'
 // and ctx.workspace visible.
 import type {} from '@deepseek-ai/dsh-subagent'
 import type {} from '@deepseek-ai/dsh-system-prompt'
-import type {} from '@deepseek-ai/dsh-host-webserver'
-import type {} from '@deepseek-ai/dsh-workspace'
+import type { HttpServerService } from '@deepseek-ai/dsh-host-webserver'
+import type { WorkspaceRegistry } from '@deepseek-ai/dsh-workspace'
 import { registerAgentTeamsTools, type ToolsConfig } from './tools.ts'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -32,7 +32,7 @@ import { fileURLToPath } from 'node:url'
 import { collectArchivedTeamsActivity, collectTeamsActivity } from './snapshot.ts'
 
 export const name = 'agent-teams'
-export const inject = ['tools', 'subagents', 'systemPrompt', 'agents', 'httpServer', 'workspace']
+export const inject = ['tools', 'subagents', 'systemPrompt', 'agents']
 
 /** Plugin configuration. */
 export interface Config {
@@ -109,15 +109,28 @@ export function apply(ctx: Context, config: Config): void {
 
   registerAgentTeamsTools(ctx, resolved)
 
-  // Activity panel data route: the browser floater polls this for team
-  // snapshots (disk truth + live subagent activity). Mirrors the Claude Code
-  // desktop watcher's server-side snapshot pattern.
-  ctx.effect(() => ctx.httpServer.register({
+  // The activity panel data/artwork routes need the Web host (`httpServer`)
+  // and the workspace registry, which headless profiles do not mount; under
+  // concurrent activation they may also bind after this plugin. Register the
+  // routes lazily: try now, then on each service binding event. In a webless
+  // profile the plugin stays tool-only and never blocks boot.
+  let webRegistered = false
+  const registerWebSurface = (): void => {
+    if (webRegistered) return
+    const httpServer = ctx.get('httpServer') as HttpServerService | undefined
+    const workspaceRegistry = ctx.get('workspace') as WorkspaceRegistry | undefined
+    if (httpServer === undefined || workspaceRegistry === undefined) return
+    webRegistered = true
+
+    // Activity panel data route: the browser floater polls this for team
+    // snapshots (disk truth + live subagent activity). Mirrors the Claude
+    // Code desktop watcher's server-side snapshot pattern.
+    ctx.effect(() => httpServer.register({
     kind: 'exact',
     path: '/plugins/dsh-agent-teams/state',
     handler: async (req, res) => {
       const url = new URL(req.url ?? '/', 'http://x')
-      const roots = ctx.workspace.list().map((workspace) => ({
+      const roots = workspaceRegistry.list().map((workspace) => ({
         workspace: workspace.title,
         stateRoot: join(workspace.path, resolved.stateDir),
       }))
@@ -145,9 +158,9 @@ export function apply(ctx: Context, config: Config): void {
     'action-reporting.png', 'action-celebrating.png', 'action-sleeping.png',
     'action-sending.png',
   ])
-  ctx.effect(() => ctx.httpServer.register({
-    kind: 'prefix',
-    path: '/plugins/dsh-agent-teams/assets',
+    ctx.effect(() => httpServer.register({
+      kind: 'prefix',
+      path: '/plugins/dsh-agent-teams/assets',
     handler: async (req, res) => {
       let name: string
       try {
@@ -175,6 +188,12 @@ export function apply(ctx: Context, config: Config): void {
         res.writeHead(404)
         res.end()
       }
-    },
-  }), 'agent-teams: artwork route')
+      },
+    }), 'agent-teams: artwork route')
+  }
+
+  registerWebSurface()
+  ctx.on('internal/service', (name) => {
+    if (name === 'httpServer' || name === 'workspace') registerWebSurface()
+  })
 }

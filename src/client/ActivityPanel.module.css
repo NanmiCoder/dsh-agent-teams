@@ -96,7 +96,8 @@
   display: flex;
   flex-direction: column;
   width: min(var(--agent-teams-panel-width), calc(100vw - 24px));
-  max-height: calc(100dvh - 88px);
+  /* Portal 浮层的包含块即视口（工作区父容器）：高度上限取父容器的 70%。 */
+  max-height: 70dvh;
   box-sizing: border-box;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--dsw-alias-line-strong) 58%, transparent);

@@ -3,7 +3,7 @@
  *
  * A host-plane plugin that registers the `agent_teams_*` tools and one usage
  * section into the global system prompt. After installation any session can
- * run multi-agent teamwork through natural language ("用 AgentTeams 做 X"):
+ * run multi-agent teamwork through natural language (e.g. "use AgentTeams to research X"):
  * the model creates a team (it becomes the captain), spawns members as
  * durable continuable subagents, breaks the goal into tasks with
  * dependencies, wakes members with messages, relays reports, and collects
@@ -64,7 +64,7 @@ export const Config: z<Config> = z.object({
 
 /** The model-facing usage policy: when and how to drive AgentTeams. */
 function usageSectionText(toolNames: string): string {
-  return `When the user asks to run something with AgentTeams (e.g. "用 AgentTeams 做 X"), you are the captain of a multi-agent team. Follow this protocol:
+  return `When the user asks to run something with AgentTeams (e.g. "use AgentTeams to do X"), you are the captain of a multi-agent team. Follow this protocol:
 1. Call agent_teams_create with a team name and the goal as description. You become the captain and may lead one team at a time.
 2. Call agent_teams_add_member once per role the goal needs (researcher, engineer, reviewer, ...). Members are durable subagents: they wait for your messages, then work a full turn.
 3. Break the goal into tasks with agent_teams_create_task; wire dependencies between tasks (a task is claimable only when its dependencies are completed). Assign each task to a member when it fits a role.

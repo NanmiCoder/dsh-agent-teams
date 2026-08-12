@@ -534,7 +534,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
         let delivered: 'wake' | 'mailbox' = 'mailbox'
         if (captain !== undefined && !isCaptain) {
           captain.send(createUserMessage({
-            content: [{ type: 'text', text: `AgentTeams 成员 ${from} 的消息：\n\n${args.content}` }],
+            content: [{ type: 'text', text: `AgentTeams message from member ${from}:\n\n${args.content}` }],
             source: { kind: 'plugin', plugin: 'dsh-agent-teams' },
           }), 'next-turn', true)
           delivered = 'wake'
@@ -560,7 +560,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
         if (captain !== undefined && recipient.id !== '') {
           const text = from === CAPTAIN_KEY
             ? args.content
-            : `来自团队成员 ${from} 的消息：\n\n${args.content}`
+            : `Message from team member ${from}:\n\n${args.content}`
           const accepted = await deliverToMember(ctx, captain, recipient.id, text, exec.signal)
           delivered = accepted ? 'wake' : 'mailbox'
         }

@@ -33,13 +33,23 @@ dsh plugin --profile web add /absolute/path/to/dsh-agent-teams
 
 插件内置提示段会指导模型按协议执行：建团队 → 按角色拉成员 → 拆任务声明依赖 → 领取并唤醒成员 → 轮询收集产出 → 汇报后删除（归档保留）。
 
+## 开发 Skill
+
+仓库按开放 Agent Skills 规范提供 [`dsh-plugin-development`](skills/dsh-plugin-development/SKILL.md)。当前私有内测阶段，只有拥有仓库访问权限的用户才能安装；仓库公开后可直接运行：
+
+```sh
+npx skills add NanmiCoder/dsh-agent-teams --skill dsh-plugin-development
+```
+
+`skills/dsh-plugin-development/` 是唯一权威源码；`.dsh/skills/` 中的相对链接让 DSH 在本仓库作为 cwd 时自动发现同一份 Skill，同时避免占用 `npx skills` 的 `.agents/skills/` 安装目标。
+
 ## 文档
 
 | 文档 | 内容 |
 |---|---|
 | [docs/usage.md](docs/usage.md) | 工作原理、Web UI 行为、工具一览、配置、已知限制、验证 |
 | [docs/verification-guide.md](docs/verification-guide.md) | 四层验证方法（离线 / 组合 / 真实 e2e / ego-browser GUI） |
-| [.dsh/skills/dsh-plugin-development/SKILL.md](.dsh/skills/dsh-plugin-development/SKILL.md) | 仓库级开发 Skill：在本仓库作为 cwd 时由 DSH 自动发现，可直接指导 Agent 开发插件 |
+| [skills/dsh-plugin-development/SKILL.md](skills/dsh-plugin-development/SKILL.md) | 可通过 `npx skills` 安装的 DSH 插件开发 Skill |
 | [docs/developing-dsh-plugins.md](docs/developing-dsh-plugins.md) | 面向人类阅读的开发指南（本插件为样例） |
 
 ## License

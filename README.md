@@ -38,8 +38,9 @@ dsh plugin --profile web add /absolute/path/to/dsh-agent-teams
 | 文档 | 内容 |
 |---|---|
 | [docs/usage.md](docs/usage.md) | 工作原理、Web UI 行为、工具一览、配置、已知限制、验证 |
-| [docs/verification-guide.md](docs/verification-guide.md) | 三层验证方法（离线 / 真实 e2e / ego-browser GUI） |
-| [docs/developing-dsh-plugins.md](docs/developing-dsh-plugins.md) | 开发者向：从零开发 DSH 插件（本插件为样例） |
+| [docs/verification-guide.md](docs/verification-guide.md) | 四层验证方法（离线 / 组合 / 真实 e2e / ego-browser GUI） |
+| [.dsh/skills/dsh-plugin-development/SKILL.md](.dsh/skills/dsh-plugin-development/SKILL.md) | 仓库级开发 Skill：在本仓库作为 cwd 时由 DSH 自动发现，可直接指导 Agent 开发插件 |
+| [docs/developing-dsh-plugins.md](docs/developing-dsh-plugins.md) | 面向人类阅读的开发指南（本插件为样例） |
 
 ## License
 

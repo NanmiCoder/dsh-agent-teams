@@ -7,7 +7,7 @@ DeepSeek Harness 的 AgentTeams 插件：安装后，任何会话都可以用一
 1. **创建团队** — 由“队长”（当前会话的 agent）创建团队；
 2. **成员** — 队长通过 `agent_teams_add_member` 拉成员进团队，每个成员是一个**可续聊的子代理**（continuable subagent，同一会话、跨轮次、跨重启持久）；
 3. **任务** — 队长拆解目标为任务，任务之间可声明依赖（依赖未完成的任务不可领取）；
-4. **消息** — 队长 ↔ 成员、成员 ↔ 成员都可以收发消息（文件邮箱 + 队长唤醒投递）。
+4. **消息** — 队长 ↔ 成员、成员 ↔ 成员都可以收发消息：消息**直达收件人邮箱并唤醒收件人**（与 Claude Code 邮箱模型一致，无队长中转；DSH 中唤醒由插件以队长身份代理，对成员透明）。
 
 ## 工作原理
 
@@ -24,7 +24,7 @@ DeepSeek Harness 的 AgentTeams 插件：安装后，任何会话都可以用一
 | `ctx.systemPrompt.section()` | 注册“AgentTeams 使用策略”提示段，让模型知道何时、如何用这套工具 |
 | 文件系统 | 团队状态持久化在 `<workspace>/.agent-teams/<teamId>/` |
 
-成员与 Claude Code 的 in-process teammate 一样“等待工作”：队长发消息 → 成员醒来跑完整一轮（用 `agent_teams_*` 工具更新任务状态、写结果）→ 进入 idle。成员的最终回复对插件不可编程读取，因此成员把报告写入队长邮箱（`inbox/captain.jsonl`）与任务记录，队长用 `agent_teams_status` 轮询读取。
+成员与 Claude Code 的 in-process teammate 一样“等待工作”：任何成员（含队长）发消息 → 收件成员醒来跑完整一轮（用 `agent_teams_*` 工具更新任务状态、写结果）→ 进入 idle。成员的最终回复对插件不可编程读取，因此成员把报告写入队长邮箱（`inbox/captain.jsonl`）与任务记录，队长用 `agent_teams_status` 轮询读取。
 
 ### Web UI：对话流里的团队树监测面板
 
@@ -57,7 +57,7 @@ UI 完全复刻 DSH workflow Web UI（`dsh-client-ui-workflow-run`）的实现�
 | `agent_teams_create_task` | 创建任务，支持 `dependencies` 依赖声明与 `assignee` 指派 |
 | `agent_teams_claim_task` | 领取任务（校验依赖；队长可代领，成员只能领自己的/未指派的） |
 | `agent_teams_update_task` | 推进任务状态并写入 `output` 结果 |
-| `agent_teams_send_message` | 队长→成员（投递并唤醒）；成员→队长/成员间（写入邮箱，队长转发） |
+| `agent_teams_send_message` | 任意成员→任意成员/队长：消息**直达对方邮箱并唤醒对方**（与 Claude Code 邮箱模型一致，无队长转发） |
 | `agent_teams_status` | 团队全景：成员活动状态、任务清单、队长邮箱、各成员待读消息 |
 | `agent_teams_delete` | 结束团队：打断成员、删除团队状态目录 |
 
@@ -100,7 +100,7 @@ bundle 行可在 profile 的 `cordis.patch.yml` 中覆盖：
 
 > 用 AgentTeams 帮我调研一下开源 RAG 框架的选型，输出对比报告
 
-插件内置的提示段会指导模型按协议执行：建团队 → 按角色拉成员 → 拆任务并声明依赖 → 领取并唤醒成员 → 轮询 `agent_teams_status`、转发消息、收集产出 → 汇报后 `agent_teams_delete`。
+插件内置的提示段会指导模型按协议执行：建团队 → 按角色拉成员 → 拆任务并声明依赖 → 领取并唤醒成员 → 轮询 `agent_teams_status`、收集产出 → 汇报后 `agent_teams_delete`。成员之间可以直接互发消息（`agent_teams_send_message` 直达对方邮箱并唤醒对方），无需队长中转。
 
 ## 验证
 
@@ -163,7 +163,7 @@ dsh run --profile headless "用 AgentTeams 帮我做一个 3 句话的网站标�
 
 ## 已知限制
 
-- 成员只有在被队长消息唤醒后才行动（没有常驻轮询）；成员之间没有直接的实时聊天，消息经邮箱 + 队长转发。
+- 成员只有在收到消息（被唤醒）后才行动，没有常驻轮询；成员间消息直达收件人邮箱并唤醒对方（队长在线时由插件以队长身份代理唤醒，队长不参与内容），队长离线时消息留在邮箱、待队长下次操作时投递。
 - 一个队长同时只能带一个团队（与 Claude Code AgentTeams 一致）。
 - 成员 persona 替换了部署默认 persona；成员仍拥有完整工具集（bash/fs/web 等）。
 - 团队状态为文件级持久化，多进程同时操作同一团队不保证一致（同一 dsh 进程内已用锁串行化）。

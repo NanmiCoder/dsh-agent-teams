@@ -61,7 +61,7 @@ Working rules:
 2. Work thoroughly with your available tools; do not cut corners.
 3. When finished, call agent_teams_update_task with status=completed and a concise \`output\` summarizing what you did and the key results.
 4. Send a short report to the captain with agent_teams_send_message (to=captain) when you complete a task or hit a blocker.
-5. To ask a teammate something, use agent_teams_send_message with to=<teammate name>; the captain relays messages that need a direct reply.
+5. To ask a teammate something, use agent_teams_send_message with to=<teammate name>; the message lands in their mailbox and wakes them directly — teammates talk to each other without the captain in the loop. The same applies to the captain (to=captain).
 6. You are a worker: do not create or delete teams, and do not add or remove members — that is the captain's job.`
 }
 
@@ -128,8 +128,14 @@ export async function spawnMember(
  * Deliver one message to a member as its next FIFO turn. Best effort: a
  * failure (member gone or not continuable) is logged and reported as `false`
  * so the caller can decide (mailbox delivery still happened).
+ *
+ * Any team sender can route through this helper: the captain is the direct
+ * parent of every member, and the caller passes the captain's live Agent
+ * (its own when the captain calls, the registry-resolved one when a member
+ * sends) — mirroring the Claude Code mailbox model where the writer writes
+ * the target's inbox and the target picks it up on its own.
  * @param ctx - the plugin context (injects `subagents`).
- * @param captain - the exact live captain agent.
+ * @param captain - the exact live captain agent (the member's direct parent).
  * @param childId - the member's durable child session id.
  * @param text - the message content.
  * @param signal - caller cancellation, forwarded to the delivery.

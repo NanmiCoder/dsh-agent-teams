@@ -11,7 +11,8 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import type { JsonValue } from '@deepseek-ai/dsh-session'
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import type { JsonValue, SessionId } from '@deepseek-ai/dsh-session'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { ToolRunContext } from '@deepseek-ai/dsh-tools'
 import { join } from 'node:path'
@@ -472,11 +473,11 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
 
   ctx.tools.register(defineTool({
     name: 'agent_teams_send_message',
-    description: 'Send a message to the captain or to a teammate. The captain may set `from` to a member name to relay that member\'s message. Captain → member messages wake the member (delivered into its next turn); member → captain and member → member messages land in the target\'s mailbox and appear in agent_teams_status.',
+    description: 'Send a message to the captain or to a teammate. Messages go straight into the recipient\'s mailbox; when the captain agent is online the plugin also wakes the recipient so it acts immediately (member recipients get the message as their next turn; the captain sees it at its next turn). No relay is involved: teammates talk to each other directly, exactly like the Claude Code AgentTeams mailbox model.',
     parameters: {
       to: { type: 'string', required: true, description: 'Recipient: "captain" or a member name.' },
       content: { type: 'string', required: true, description: 'The message text.' },
-      from: { type: 'string', description: 'Sender (defaults to the caller: the captain, or the calling member). Captain relays a teammate\'s message by naming that member.' },
+      from: { type: 'string', description: 'Sender (defaults to the caller: the captain, or the calling member).' },
     },
     output: {
       schema: {
@@ -486,7 +487,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
           message_id: { type: 'string', required: true },
           from: { type: 'string', required: true },
           to: { type: 'string', required: true },
-          delivered: { type: 'string', required: true, description: 'followup (woke the member) or mailbox (waiting in the inbox).' },
+          delivered: { type: 'string', required: true, description: 'wake (recipient woken) or mailbox (waiting in the inbox; captain offline).' },
         },
       },
       render: (args, value) => [{
@@ -502,25 +503,43 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
       const isCaptain = team.captainSessionId === caller.id
       const from = args.from ?? (isCaptain ? CAPTAIN_KEY : memberNameOf(team, caller.id) ?? CAPTAIN_KEY)
       const to = args.to.trim()
+      // The captain is the direct parent of every member, so only its Agent
+      // can wake a member (followup) or reach the main inbox. When the captain
+      // is online the plugin proxies the wake on its behalf; when it is not,
+      // the message stays in the mailbox until the captain's next operation.
+      const captain = ctx.agents.get(team.captainSessionId as SessionId)
       if (to === CAPTAIN_KEY) {
-        // Any sender may mail the captain; only the captain's status tool reads it.
+        // Any sender may mail the captain. Deliver into its inbox so the
+        // captain acts on it at its next turn (Claude Code equivalent: the
+        // captain polls its own mailbox).
         const message = createMessage(from, CAPTAIN_KEY, args.content)
         await withTeamLock(team.id, async () => {
           await appendMailbox(stateRoot, team.id, CAPTAIN_KEY, message)
         })
-        return { message_id: message.id, from, to: CAPTAIN_KEY, delivered: 'mailbox' }
+        let delivered: 'wake' | 'mailbox' = 'mailbox'
+        if (captain !== undefined && !isCaptain) {
+          captain.send(createUserMessage({
+            content: [{ type: 'text', text: `AgentTeams 成员 ${from} 的消息：\n\n${args.content}` }],
+            source: { kind: 'plugin', plugin: 'dsh-agent-teams' },
+          }), 'next-turn', true)
+          delivered = 'wake'
+        }
+        return { message_id: message.id, from, to: CAPTAIN_KEY, delivered }
       }
       return withTeamLock(team.id, async () => {
         const fresh = await readTeam(stateRoot, team.id) ?? team
         const recipient = requireMember(fresh, to)
         const message = createMessage(from, recipient.name, args.content)
         await appendMailbox(stateRoot, fresh.id, recipient.name, message)
-        let delivered: 'followup' | 'mailbox' = 'mailbox'
-        if (isCaptain && recipient.id !== '') {
-          const relayed = from !== CAPTAIN_KEY && from !== recipient.name
-          const content = relayed ? `Captain relaying a message from ${from}:\n\n${args.content}` : args.content
-          const accepted = await deliverToMember(ctx, caller, recipient.id, content, exec.signal)
-          delivered = accepted ? 'followup' : 'mailbox'
+        let delivered: 'wake' | 'mailbox' = 'mailbox'
+        // Any sender → member: write the mailbox (direct, like Claude Code),
+        // then wake the member through the captain's parent authority.
+        if (captain !== undefined && recipient.id !== '') {
+          const text = from === CAPTAIN_KEY
+            ? args.content
+            : `来自团队成员 ${from} 的消息：\n\n${args.content}`
+          const accepted = await deliverToMember(ctx, captain, recipient.id, text, exec.signal)
+          delivered = accepted ? 'wake' : 'mailbox'
         }
         return { message_id: message.id, from, to: recipient.name, delivered }
       })

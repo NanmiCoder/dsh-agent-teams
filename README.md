@@ -13,38 +13,15 @@ DeepSeek Harness 的 AgentTeams 插件：安装后，任何会话只需一句自
 ### 前置要求
 
 - Node.js `^22.19` 或 `>=24`；pnpm 11
-- DeepSeek Harness 内测环境：按官方内测说明配置 `@deepseek-ai` scope 的 npm 凭据，使 `npx @deepseek-ai/dsh web` 可用
-
-### 内测阶段（本仓库私有，插件未发布 npm）
+- 已安装或可通过 `npx` 使用 DeepSeek Harness
 
 ```sh
-# 1) 克隆并构建插件（需要仓库访问权限）
-git clone <本仓库地址>
-cd dsh-agent-teams
-pnpm install            # 公开依赖；@deepseek-ai/* 为内测 registry 提供的 peer
-pnpm build              # 产出 lib/ 与 lib/client.js
-
-# 2) 安装进目标 profile（本地路径；或 pnpm 支持的 git 地址）
-npx -p @deepseek-ai/dsh@0.0.1-rc.1 dsh plugin --profile web add /absolute/path/to/dsh-agent-teams
+npx -p @deepseek-ai/dsh dsh plugin --profile web add github:NanmiCoder/dsh-agent-teams
 ```
 
-`dsh plugin` 会把包装进 profile，并因包声明了 `dsh.bundle` 自动把它加入 `dsh.profile.bundles`；工具进全局 `tools` 注册表、使用策略进全局 system prompt、浏览器入口进 `window.__DSH_BOOT__` 名册——该 profile 下所有会话可用。也可以用 `--profile <自定义名>` 装进独立 profile 试运行。
+该命令直接从 GitHub 仓库安装插件，无需 npm 包。`dsh plugin` 会把插件加入 `web` profile，并根据包内的 `dsh.bundle` 声明自动启用它；工具、系统提示和 Web 客户端入口随该 profile 一起加载。
 
-> **版本对齐（重要）**：内测 npm 的 `latest` 与 `next` 通道目前不一致——`npx @deepseek-ai/dsh`（rc.2）与 `dsh plugin add` 默认装到的 bundle（rc.1）混装时，Web 会出现 "Failed to load plugins … waiting for service: settingsScope"（rc.2 才有的 `ui-plugin-config` 依赖 rc.2 才提供的 `settingsScope`）。请让 CLI 与 bundle 同版本：按上面示例把 CLI 固定为 `@0.0.1-rc.1`；或全部升级到 `next`（`dsh plugin … update @deepseek-ai/dsh-base@next @deepseek-ai/dsh-web-app@next` 且 CLI 用 rc.2）。
-
-> **重启生效**：新增插件行在启动时组合，需重启 dsh 服务。
-
-### 发布 npm 并开源后（未来）
-
-```sh
-npx -p @deepseek-ai/dsh dsh plugin --profile web add dsh-agent-teams
-```
-
-配套开发 Skill 可直接安装：
-
-```sh
-npx skills add NanmiCoder/dsh-agent-teams --skill dsh-plugin-development
-```
+> **重启生效**：安装完成后，重启正在运行的 DeepSeek Harness Web 服务并刷新页面。
 
 ## 使用
 
@@ -56,7 +33,7 @@ npx skills add NanmiCoder/dsh-agent-teams --skill dsh-plugin-development
 
 ## 开发 Skill
 
-仓库按开放 Agent Skills 规范提供 [`dsh-plugin-development`](skills/dsh-plugin-development/SKILL.md)。当前私有内测阶段，只有拥有仓库访问权限的用户才能安装；仓库公开后可直接运行：
+仓库按开放 Agent Skills 规范提供 [`dsh-plugin-development`](skills/dsh-plugin-development/SKILL.md)，可直接安装：
 
 ```sh
 npx skills add NanmiCoder/dsh-agent-teams --skill dsh-plugin-development

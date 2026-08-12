@@ -19,6 +19,7 @@
   },
   "files": [
     "lib",
+    "assets/agent-teams",
     "cordis.patch.yml",
     "README.md"
   ],

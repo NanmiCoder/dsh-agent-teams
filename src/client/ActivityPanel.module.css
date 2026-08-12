@@ -508,3 +508,110 @@
     right: 12px;
   }
 }
+
+/* ── whale artwork ─────────────────────────────────────────────────────── */
+
+.leadAvatar {
+  display: inline-block;
+  width: 22px;
+  height: 22px;
+  margin-right: 6px;
+  vertical-align: -5px;
+  border-radius: 50%;
+  border: 1px solid var(--dsw-alias-line-strong);
+  object-fit: cover;
+  background: #0B1D33;
+}
+
+.memberAvatar {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+}
+
+.memberAvatar[data-unread='true']::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 2px solid var(--dsw-alias-state-business-primary);
+  animation: agentTeamsRing 1.4s ease-out infinite;
+}
+
+@keyframes agentTeamsRing {
+  0% { opacity: 0.9; transform: scale(0.92); }
+  70% { opacity: 0; transform: scale(1.25); }
+  100% { opacity: 0; transform: scale(1.25); }
+}
+
+.memberArt {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--dsw-alias-line-strong);
+  object-fit: cover;
+  background: #0B1D33;
+}
+
+.memberInitial {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: var(--dsw-alias-label-on-fill);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.stateArt {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--dsw-alias-bg-module-platform);
+  object-fit: cover;
+  background: #0B1D33;
+}
+
+.stateArt[data-activity='working'] {
+  animation: agentTeamsFloat 2.4s ease-in-out infinite;
+}
+
+.stateArt[data-activity='idle'] {
+  animation: agentTeamsBreathe 4.2s ease-in-out infinite;
+}
+
+.stateArt[data-activity='unknown'] {
+  animation: agentTeamsThink 2.8s ease-in-out infinite;
+}
+
+@keyframes agentTeamsFloat {
+  0%, 100% { transform: translateY(0) rotate(-4deg); }
+  50% { transform: translateY(-3px) rotate(4deg); }
+}
+
+@keyframes agentTeamsBreathe {
+  0%, 100% { opacity: 0.85; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.08); }
+}
+
+@keyframes agentTeamsThink {
+  0%, 100% { transform: rotate(-8deg); }
+  50% { transform: rotate(8deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stateArt,
+  .memberAvatar[data-unread='true']::after {
+    animation: none;
+  }
+}

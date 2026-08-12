@@ -68,22 +68,41 @@ export interface ActivityTeam {
   readonly captainInbox: readonly ActivityMessage[]
 }
 
-/** Occupation glyph per role keyword. */
-const ROLE_ICONS: ReadonlyArray<readonly [RegExp, string]> = [
-  [/resear|analys|investig|explor|data|study|研究|分析|数据|调查|探索/, '🔬'],
-  [/engineer|dev\b|server|backend|\bapi\b|runtime|watcher|contract|工程|后端|服务|接口/, '🛠️'],
-  [/\bqa\b|test|verif|quality|测试|质量/, '🧪'],
-  [/design|\bui\b|\bux\b|front|theme|accessib|设计|前端|主题/, '🎨'],
-  [/secur|audit|risk|threat|review|安全|审计|审查|风险/, '🛡️'],
-  [/docs|writer|product|spec|coordin|撰写|文案|写作|文档|协调/, '📝'],
-  [/release|\bbuild\b|deploy|\bops\b|\bci\b|ship|发布|构建|部署/, '🚀'],
+/** Artwork route prefix served by the plugin host half. */
+const ART_BASE = '/plugins/dsh-agent-teams/assets/'
+
+/** Whale role artwork per role keyword (falls back to initial letter). */
+const ROLE_ART: ReadonlyArray<readonly [RegExp, string]> = [
+  [/resear|analys|investig|explor|data|study|研究|分析|数据|调查|探索/, 'researcher.png'],
+  [/engineer|dev\b|server|backend|\bapi\b|runtime|watcher|contract|工程|后端|服务|接口/, 'engineer.png'],
+  [/\bqa\b|test|verif|quality|测试|质量/, 'qa-engineer.png'],
+  [/design|\bui\b|\bux\b|front|theme|accessib|设计|前端|主题/, 'designer.png'],
+  [/secur|audit|risk|threat|review|安全|审计|审查|风险/, 'security-reviewer.png'],
+  [/docs|writer|product|spec|coordin|撰写|文案|写作|文档|协调/, 'docs-coordinator.png'],
+  [/release|\bbuild\b|deploy|\bops\b|\bci\b|ship|发布|构建|部署/, 'engineer.png'],
 ]
 
-function memberIcon(name: string, role: string): string {
+/** Member artwork URL, or null when no role matches (initial-letter fallback). */
+function memberArtUrl(name: string, role: string): string | null {
   const identity = `${name} ${role}`.toLowerCase()
-  for (const [pattern, icon] of ROLE_ICONS) {
-    if (pattern.test(identity)) return icon
+  for (const [pattern, art] of ROLE_ART) {
+    if (pattern.test(identity)) return `${ART_BASE}${art}`
   }
+  return null
+}
+
+/** Status action artwork per member activity. */
+const ACTION_ART: Record<ActivityMember['activity'], string> = {
+  working: `${ART_BASE}action-working.png`,
+  idle: `${ART_BASE}action-sleeping.png`,
+  unknown: `${ART_BASE}action-thinking.png`,
+}
+
+/** Captain artwork (always the lead whale). */
+const LEAD_ART = `${ART_BASE}team-lead.png`
+
+/** Initial-letter fallback for unmatched roles. */
+function memberInitial(name: string): string {
   return name.trim().slice(0, 1).toUpperCase() || '?'
 }
 
@@ -136,7 +155,7 @@ function TeamSection({ team, openSession }: {
   return (
     <section className={css.team} data-team-id={team.teamId}>
       <header className={css.teamHead}>
-        <span className={css.teamName} title={team.name}>👑 {team.name}</span>
+        <span className={css.teamName} title={team.name}><img className={css.leadAvatar} src={LEAD_ART} alt="" aria-hidden /> {team.name}</span>
         <span className={css.teamStats}>
           <span data-stat="members">{team.members.length} 成员</span>
           <span data-stat="tasks">{team.tasks.length} 任务</span>
@@ -154,8 +173,19 @@ function TeamSection({ team, openSession }: {
             data-activity={member.activity}
             onClick={() => { if (member.id !== '') openSession(member.id as SessionId) }}
           >
-            <span className={css.memberAvatar} style={{ background: accentOf(member.id) }}>
-              {memberIcon(member.name, member.role)}
+            <span className={css.memberAvatar} data-unread={member.unread > 0}>
+              {memberArtUrl(member.name, member.role) !== null ? (
+                <img className={css.memberArt} src={memberArtUrl(member.name, member.role) ?? ''} alt="" aria-hidden />
+              ) : (
+                <span className={css.memberInitial} style={{ background: accentOf(member.id) }}>{memberInitial(member.name)}</span>
+              )}
+              <img
+                className={css.stateArt}
+                data-activity={member.activity}
+                src={ACTION_ART[member.activity]}
+                alt=""
+                aria-hidden
+              />
             </span>
             <span className={css.memberInfo}>
               <span className={css.memberLine}>

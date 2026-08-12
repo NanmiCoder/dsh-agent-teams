@@ -26,7 +26,9 @@ import type {} from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-workspace'
 import { registerAgentTeamsTools, type ToolsConfig } from './tools.ts'
+import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { collectTeamsActivity } from './snapshot.ts'
 
 export const name = 'agent-teams'
@@ -127,4 +129,40 @@ export function apply(ctx: Context, config: Config): void {
       res.end(body)
     },
   }), 'agent-teams: activity route')
+
+  // Whale mascot artwork: serve the packaged role/action images to the
+  // activity panel. An explicit allowlist guards the route (no path
+  // traversal); the images ship with the bundle (files: assets/).
+  const artDir = fileURLToPath(new URL('../assets/agent-teams/', import.meta.url))
+  const ART_ALLOWLIST = new Set([
+    'team-lead.png', 'researcher.png', 'engineer.png', 'designer.png',
+    'qa-engineer.png', 'security-reviewer.png', 'data-analyst.png',
+    'docs-coordinator.png', 'action-working.png', 'action-thinking.png',
+    'action-reporting.png', 'action-celebrating.png', 'action-sleeping.png',
+    'action-sending.png',
+  ])
+  ctx.effect(() => ctx.httpServer.register({
+    kind: 'prefix',
+    path: '/plugins/dsh-agent-teams/assets',
+    handler: async (req, res) => {
+      const name = decodeURIComponent(new URL(req.url ?? '/', 'http://x').pathname.split('/').pop() ?? '')
+      if (!ART_ALLOWLIST.has(name)) {
+        res.writeHead(404)
+        res.end()
+        return
+      }
+      try {
+        const data = await readFile(join(artDir, name))
+        res.writeHead(200, {
+          'content-type': 'image/png',
+          'cache-control': 'public, max-age=86400',
+        })
+        res.end(data)
+      } catch (error: unknown) {
+        ctx.logger.warn(`agent-teams: artwork read failed for ${name}: ${String(error)}`)
+        res.writeHead(404)
+        res.end()
+      }
+    },
+  }), 'agent-teams: artwork route')
 }

@@ -33,6 +33,7 @@ DeepSeek Harness 的 AgentTeams 插件：安装后，任何会话都可以用一
 1. **host 侧**：每次团队状态变更仍向队长会话写入 `agent-teams/*` 会话事件（日志完整、可重放）；同时注册只读 HTTP 路由 `GET /plugins/dsh-agent-teams/state`（`src/snapshot.ts`），从**磁盘真相**（team.json / 任务 / 邮箱）组装快照并附上成员实时活动（`subagents.listChildren`）——与 Claude Code 桌面 watcher 一致，面板不受"模型跳过工具仪式"影响。
 2. **浏览器侧**（`src/client/ActivityPanel.tsx`，body-portal 挂载，因为 Web shell 无右上角槽位）：**fixed 右上角玻璃浮层**（top 64 / right 24 / 372px / blur 18px / hairline 边框），1s 轮询快照路由：
    - **收起态**：右上角小浮标（团队数 + 活动状态点脉冲），点开展开；
+   - **小鲸鱼形象**：队长/成员头像为 DeepSeek 小鲸鱼职业插画（`assets/agent-teams/`，host 路由 `/plugins/dsh-agent-teams/assets/<name>.png` 服务），按角色关键词匹配 8 张角色图（研究员/工程师/QA/设计/安全/数据分析/文档/队长），未匹配回退首字母；成员头像右下角叠加**状态动作小图**（工作中=敲键盘浮动动画 / 空闲=打盹呼吸 / 未知=思考摆动），收到未读消息时头像外圈光晕动画；全部动画遵循 `prefers-reduced-motion`。
    - **展开态**：`AgentTeams 活动` 面板——每个团队一节：👑 队名 + 统计（成员/任务/消息）+ `● n 工作中` live 徽章；成员行（职业图标头像 · 名字 · 角色 · 工作中/空闲 · 进度条 · 当前任务 · 未读角标，点击打开成员子会话）；任务列表（依赖深度缩进 + 状态色条：阻塞/待领取/进行中/已完成 + 负责人）；队长收件箱最近消息预览；
    - **自动行为**：出现团队时自动展开一次；团队全部消失后 2s 自动收起；`prefers-reduced-motion` 降级。
 

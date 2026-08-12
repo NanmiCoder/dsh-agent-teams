@@ -27,6 +27,7 @@ import {
   unsatisfiedDependencies,
   withTeamLock,
 } from '../lib/state.js'
+import { relatedTaskIds, taskStages } from '../lib/client/activity-model.js'
 
 let failures = 0
 function check(label, condition, detail = '') {
@@ -114,8 +115,8 @@ const vtasks = [
 ]
 check('completed -> completed visual state', taskVisualState('completed', [], vtasks) === 'completed')
 check('in_progress -> running visual state', taskVisualState('in_progress', [], vtasks) === 'running')
-check('pending with open dep -> blocked', taskVisualState('pending', ['t1'], vtasks) === 'open')
-check('pending with completed dep -> open', taskVisualState('pending', ['t2'], vtasks) === 'blocked')
+check('pending with completed dep -> open', taskVisualState('pending', ['t1'], vtasks) === 'open')
+check('pending with open dep -> blocked', taskVisualState('pending', ['t2'], vtasks) === 'blocked')
 check('missing dependency is ignored (not blocked)', taskVisualState('pending', ['t9'], vtasks) === 'open')
 const depths = taskDepthsById(vtasks)
 check('t1 depth 0', depths.get('t1') === 0)
@@ -123,7 +124,29 @@ check('t2 depth 1 (longest path)', depths.get('t2') === 1)
 check('t3 depth 2', depths.get('t3') === 2)
 check('missing dep contributes no depth', depths.get('t4') === 0)
 
-console.log('5/5 done')
+console.log('5/5 client relationship projections')
+const projectionTasks = [
+  { id: 't4', dependencies: ['t2'], depth: 2 },
+  { id: 't1', dependencies: [], depth: 0 },
+  { id: 't3', dependencies: ['t1'], depth: 1 },
+  { id: 't2', dependencies: ['t1'], depth: 1 },
+  { id: 't5', dependencies: [], depth: Number.NaN },
+]
+const stages = taskStages(projectionTasks)
+check('task stages sort by depth', stages.map(stage => stage.depth).join(',') === '0,1,2')
+check('task stages sort ids naturally', stages[1]?.tasks.map(task => task.id).join(',') === 't2,t3')
+check('non-finite depth falls back to stage 0', stages[0]?.tasks.some(task => task.id === 't5') === true)
+const chain = relatedTaskIds('t2', projectionTasks)
+check('relationship chain includes upstream dependency', chain.has('t1'))
+check('relationship chain includes focused task', chain.has('t2'))
+check('relationship chain includes downstream dependent', chain.has('t4'))
+check('relationship chain excludes sibling branch', !chain.has('t3'))
+const cyclic = [
+  { id: 'a', dependencies: ['b'], depth: 0 },
+  { id: 'b', dependencies: ['a'], depth: 1 },
+]
+check('relationship traversal is cycle-safe', relatedTaskIds('a', cyclic).size === 2)
+
 if (failures > 0) {
   console.error(`\n${failures} check(s) FAILED`)
   process.exit(1)

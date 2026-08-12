@@ -32,6 +32,12 @@ import css from './ActivityPanel.module.css'
 const POLL_MS = 1000
 /** Grace before the panel collapses once no team remains. */
 const AUTOCLOSE_GRACE_MS = 2000
+/**
+ * Page-settle window after mount: activity restored on page load only shows
+ * the collapsed badge, so the panel never yanks the conversation column
+ * right after load. New activity after this window auto-expands as usual.
+ */
+const AUTO_OPEN_SETTLE_MS = 4000
 /** Host route serving team snapshots. */
 const STATE_URL = '/plugins/dsh-agent-teams/state'
 /** Root marker shared with the panel CSS while the portal is expanded. */
@@ -438,6 +444,7 @@ export function ActivityPanel({ sessionsList, openSession }: {
   ).current
   const currentRef = useRef(current)
   useEffect(() => { currentRef.current = current }, [current])
+  const mountedAtRef = useRef(performance.now())
 
   // The activity panel is a body portal, so announce its open state on body.
   // CSS can then make the conversation column yield space without knowing the
@@ -537,7 +544,10 @@ export function ActivityPanel({ sessionsList, openSession }: {
   useEffect(() => {
     if (visibleCount > 0) {
       setWasActive(true)
-      if (!autoOpened) {
+      // Auto-expand only after the page-settle window: opening (and its
+      // main-column yield) right after load reads as a whole-page flicker.
+      const settled = performance.now() - mountedAtRef.current >= AUTO_OPEN_SETTLE_MS
+      if (!autoOpened && settled) {
         setOpen(true)
         setAutoOpened(true)
       }

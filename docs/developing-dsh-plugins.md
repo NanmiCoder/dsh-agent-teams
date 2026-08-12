@@ -500,6 +500,10 @@ npx -p @deepseek-ai/dsh dsh plugin --profile web add /absolute/path/to/dsh-agent
 - `dsh plugin` 在 profile 目录跑 pnpm + 把带 `dsh.bundle` 声明的依赖 reconcile 进 bundles 层。
 - 内测 registry：`@deepseek-ai` scope 需要官方只读 token（`.npmrc` scope 鉴权）；peer 范围必须写成
   rc 通道（如 `^0.0.1-rc.1`），普通 `^0.0.1` 不匹配 `0.0.1-rc.x`，安装会解析失败。
+- **CLI 与 bundle 版本必须同通道**：npx 默认 CLI 可能是 `next`（rc.2），而 `dsh plugin add` 默认装
+  `latest`（rc.1）——混装时 rc.2 独有的 client 条目（如 `ui-plugin-config`）等待 rc.2 才提供的服务
+  （`settingsScope`），页面报 "Failed to load plugins … waiting for service: settingsScope"。固定
+  `npx -p @deepseek-ai/dsh@0.0.1-rc.1`（与 latest 对齐），或全部升级 `next`。
 - 独立测试 profile 是安全的验证环境（不碰运行实例）：headless 模板自动初始化；自定义 profile 可用
   `npx -p @deepseek-ai/dsh dsh plugin --profile <name> add ...` 从零搭。
 

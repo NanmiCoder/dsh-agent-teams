@@ -25,10 +25,12 @@ pnpm install            # 公开依赖；@deepseek-ai/* 为内测 registry 提�
 pnpm build              # 产出 lib/ 与 lib/client.js
 
 # 2) 安装进目标 profile（本地路径；或 pnpm 支持的 git 地址）
-npx -p @deepseek-ai/dsh dsh plugin --profile web add /absolute/path/to/dsh-agent-teams
+npx -p @deepseek-ai/dsh@0.0.1-rc.1 dsh plugin --profile web add /absolute/path/to/dsh-agent-teams
 ```
 
 `dsh plugin` 会把包装进 profile，并因包声明了 `dsh.bundle` 自动把它加入 `dsh.profile.bundles`；工具进全局 `tools` 注册表、使用策略进全局 system prompt、浏览器入口进 `window.__DSH_BOOT__` 名册——该 profile 下所有会话可用。也可以用 `--profile <自定义名>` 装进独立 profile 试运行。
+
+> **版本对齐（重要）**：内测 npm 的 `latest` 与 `next` 通道目前不一致——`npx @deepseek-ai/dsh`（rc.2）与 `dsh plugin add` 默认装到的 bundle（rc.1）混装时，Web 会出现 "Failed to load plugins … waiting for service: settingsScope"（rc.2 才有的 `ui-plugin-config` 依赖 rc.2 才提供的 `settingsScope`）。请让 CLI 与 bundle 同版本：按上面示例把 CLI 固定为 `@0.0.1-rc.1`；或全部升级到 `next`（`dsh plugin … update @deepseek-ai/dsh-base@next @deepseek-ai/dsh-web-app@next` 且 CLI 用 rc.2）。
 
 > **重启生效**：新增插件行在启动时组合，需重启 dsh 服务。
 

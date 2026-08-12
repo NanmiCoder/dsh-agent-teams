@@ -78,6 +78,7 @@ client 插件的关键 `package.json` 形态：
 - exports 必须指向真实产物；发布 files 包含 `lib`、patch、README 和所需 assets。
 - DSH/React 运行时依赖优先声明为 peer，避免复制 runtime identity。
 - 内测 rc 通道：peer 范围要写成 rc 通道（如 `^0.0.1-rc.1`），普通 `^0.0.1` 不匹配 `0.0.1-rc.x`。
+- 内测版本对齐：npm `latest` 与 `next` 可能不同步，`npx @deepseek-ai/dsh` 拿到的 CLI 与 `dsh plugin add` 装到的 bundle 混装会缺服务（如 rc.2 的 `ui-plugin-config` 等待 rc.2 才提供的 `settingsScope`，页面报 "Failed to load plugins"）。CLI 与 bundle 必须同通道：固定同一版本，或全部对齐 `next`。
 
 `cordis.patch.yml` 必须是顶层数组：
 

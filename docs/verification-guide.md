@@ -154,16 +154,17 @@ zstdcat ~/.dsh/sessions/<ws>/session-<id>/session.jsonl.zstd \
 
 ```sh
 # 从零安装（内测 npm 流程，peer 从内测 registry 解析）：
-npx -p @deepseek-ai/dsh dsh plugin --profile agent-teams-beta add @deepseek-ai/dsh-base
-npx -p @deepseek-ai/dsh dsh plugin --profile agent-teams-beta add @deepseek-ai/dsh-web-app
-npx -p @deepseek-ai/dsh dsh plugin --profile agent-teams-beta add /abs/path/to/dsh-agent-teams
-# 启动（managed background task，保存 task id）：
-npx -p @deepseek-ai/dsh dsh --profile agent-teams-beta --host 127.0.0.1 --port 3081
+npx -p @deepseek-ai/dsh@0.0.1-rc.1 dsh plugin --profile agent-teams-beta add @deepseek-ai/dsh-base
+npx -p @deepseek-ai/dsh@0.0.1-rc.1 dsh plugin --profile agent-teams-beta add @deepseek-ai/dsh-web-app
+npx -p @deepseek-ai/dsh@0.0.1-rc.1 dsh plugin --profile agent-teams-beta add /abs/path/to/dsh-agent-teams
+# 启动（managed background task，保存 task id；CLI 与 bundle 同通道）：
+npx -p @deepseek-ai/dsh@0.0.1-rc.1 dsh --profile agent-teams-beta --host 127.0.0.1 --port 3081
 # 看到精确 URL 后再 curl
 curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:3081/
 ```
 
 - 组合了 web-app 的自定义 profile 可直接传 app-level `--host/--port`；也可用 `--patch` 固化 webserver config。
+- **版本对齐坑**：npx 默认 CLI 是 rc.2（next 通道），`dsh plugin add` 默认装 latest（rc.1）——混装时 rc.2 独有的 `ui-plugin-config` 等待 rc.2 才提供的 `settingsScope`，页面报 "Failed to load plugins"。固定 CLI 为 `@0.0.1-rc.1`（与 latest bundle 对齐），或全部升级 `next`。
 - 内测 registry 的 `latest`（rc.1）与 `next`（rc.2）服务键不同（`httpServer` vs `webServer`）——插件双键兼容，两个通道都要抽验。
 - client HMR 需要 watcher 持续重建 `lib/client.js`；否则 `pnpm build` 后刷新页面。host/package manifest/profile bundles 改动才重启。
 - apps/web shell/普通 packages 不走 client-plugin HMR；不要启动独立 Vite server 替代 DSH GUI。

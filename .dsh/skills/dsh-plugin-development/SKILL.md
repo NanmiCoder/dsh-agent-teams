@@ -77,6 +77,7 @@ client 插件的关键 `package.json` 形态：
 - 当前权威字段是 `dsh.client`；不要默认添加旧的顶层 `dshClient`。
 - exports 必须指向真实产物；发布 files 包含 `lib`、patch、README 和所需 assets。
 - DSH/React 运行时依赖优先声明为 peer，避免复制 runtime identity。
+- 内测 rc 通道：peer 范围要写成 rc 通道（如 `^0.0.1-rc.1`），普通 `^0.0.1` 不匹配 `0.0.1-rc.x`。
 
 `cordis.patch.yml` 必须是顶层数组：
 
@@ -103,6 +104,7 @@ client 插件的关键 `package.json` 形态：
 - 兄弟 provider 在第一次实际使用时校验，不在 `apply()` 阶段抢跑。
 - route、listener、timer、DOM 都要 effect-owned 并返回 disposer。
 - JSON route 使用 `no-store`；静态资源走白名单；状态读改写加 workspace/owner 维度的锁。
+- 过渡期服务键兼容：服务被重命名（如 `httpServer`→`webServer`、`workspace`→`workspaceRegistry`）时，用结构化最小接口做新键优先、旧键回退，并同时监听两组的 `internal/service` 事件，不要硬绑定单一键名。
 
 ### 事件与历史
 
@@ -153,6 +155,7 @@ git diff --check
 1. 组合：独立 scratch profile 执行 `dsh --profile <scratch> --dump-config`。
 2. 真实任务：`dsh --profile headless "一个小而可判定的插件任务"`；没有 `dsh run` 子命令。
 3. GUI：独立 web profile/端口，用真实浏览器验证名册、路由、交互、宽窄屏和无障碍。
+4. 从零安装：全新 profile 走 `npx -p @deepseek-ai/dsh dsh plugin --profile <name> add <本地路径|git 地址>`，再启动独立端口实例，确认名册、插件路由与面板闭环——保证用户照着 README 能装。
 
 纪律：
 

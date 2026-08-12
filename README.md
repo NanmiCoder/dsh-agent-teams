@@ -10,20 +10,39 @@ DeepSeek Harness 的 AgentTeams 插件：安装后，任何会话只需一句自
 
 ## 安装
 
-```sh
-# 从 npm 安装（构建产物随包发布，无需 build）：
-dsh plugin --profile web add dsh-agent-teams
+### 前置要求
 
-# 或从 git 源码安装（需先构建）：
-cd /path/to/dsh-agent-teams
-pnpm install          # 公开依赖（tsdown/typescript/react…）；@deepseek-ai/* 为 DSH 环境提供的私有 peer，见 .npmrc
-pnpm build            # 产出 lib/ 与 lib/client.js
-dsh plugin --profile web add /absolute/path/to/dsh-agent-teams
+- Node.js `^22.19` 或 `>=24`；pnpm 11
+- DeepSeek Harness 内测环境：按官方内测说明配置 `@deepseek-ai` scope 的 npm 凭据，使 `npx @deepseek-ai/dsh web` 可用
+
+### 内测阶段（本仓库私有，插件未发布 npm）
+
+```sh
+# 1) 克隆并构建插件（需要仓库访问权限）
+git clone <本仓库地址>
+cd dsh-agent-teams
+pnpm install            # 公开依赖；@deepseek-ai/* 为内测 registry 提供的 peer
+pnpm build              # 产出 lib/ 与 lib/client.js
+
+# 2) 安装进目标 profile（本地路径；或 pnpm 支持的 git 地址）
+npx -p @deepseek-ai/dsh dsh plugin --profile web add /absolute/path/to/dsh-agent-teams
 ```
 
-`dsh plugin` 安装包并加入 profile 的 bundle 层；工具注册进全局 `tools` 注册表、使用策略进全局 system prompt、浏览器入口进 `window.__DSH_BOOT__` 名册——该 profile 下所有会话可用。发布到 npm 后直接 `dsh plugin --profile web add dsh-agent-teams`。
+`dsh plugin` 会把包装进 profile，并因包声明了 `dsh.bundle` 自动把它加入 `dsh.profile.bundles`；工具进全局 `tools` 注册表、使用策略进全局 system prompt、浏览器入口进 `window.__DSH_BOOT__` 名册——该 profile 下所有会话可用。也可以用 `--profile <自定义名>` 装进独立 profile 试运行。
 
 > **重启生效**：新增插件行在启动时组合，需重启 dsh 服务。
+
+### 发布 npm 并开源后（未来）
+
+```sh
+npx -p @deepseek-ai/dsh dsh plugin --profile web add dsh-agent-teams
+```
+
+配套开发 Skill 可直接安装：
+
+```sh
+npx skills add NanmiCoder/dsh-agent-teams --skill dsh-plugin-development
+```
 
 ## 使用
 

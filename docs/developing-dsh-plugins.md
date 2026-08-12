@@ -144,7 +144,7 @@ import type {} from '@deepseek-ai/dsh-subagent'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 
 export const name = 'my-plugin'
-export const inject = ['tools', 'subagents', 'systemPrompt', 'agents', 'httpServer', 'workspace']
+export const inject = ['tools', 'subagents', 'systemPrompt', 'agents']
 
 export interface Config { stateDir?: string }
 export const Config: z<Config> = z.object({ stateDir: z.string().default('.agent-teams') })
@@ -153,6 +153,8 @@ export function apply(ctx: Context, config: Config): void {
   // 注册工具、prompt section、HTTP 路由……全部在 apply 里
 }
 ```
+
+> **内测版本兼容（webServer/httpServer）**：npm `latest`（`0.0.1-rc.1`）的 Web 服务键是 `ctx.httpServer`（`HttpServerService`），后续 `next`（`rc.2`）重命名为 `ctx.webServer`（`WebServer`）；工作区键同理 `workspace` → `workspaceRegistry`。过渡期不要硬绑定单一键名：`ctx.get('webServer') ?? ctx.get('httpServer')`（新键优先、旧键回退），`internal/service` 事件同时监听两组键再补注册。路由注册形状（`register({kind, path, handler})` 返回 disposer）两个版本一致。
 
 - `inject` 声明依赖的服务；`ctx.<name>` 只有在 inject 里声明的服务才可用。
 - `Config` 用 `@deepseek-ai/schemastery` 的 `z.object` 描述，Loader 负责默认值。
@@ -209,7 +211,9 @@ const provider = ctx.subagents.getProvider(config.memberProvider)   // ← 在 s
 ```ts
 import { readFile } from 'node:fs/promises'
 
-ctx.effect(() => ctx.httpServer.register({
+// 过渡期双键：新键优先、旧键回退（见 2.1 版本兼容说明）
+const web = (ctx.get('webServer') ?? ctx.get('httpServer')) as WebRouteHost
+ctx.effect(() => web.register({
   kind: 'exact',                       // 或 'prefix'
   path: '/plugins/my-plugin/state',
   handler: async (req, res) => {
@@ -219,7 +223,8 @@ ctx.effect(() => ctx.httpServer.register({
 }), 'my-plugin: state route')
 ```
 
-- `httpServer.register` 返回 disposer，必须包在 `ctx.effect(..., 'label')` 里（HMR 安全）。
+- `register` 返回 disposer，必须包在 `ctx.effect(..., 'label')` 里（HMR 安全）。
+- 服务可能在插件 apply 之后才绑定：首次注册失败时挂 `ctx.on('internal/service', name => ...)` 补注册。
 - 静态资源路由务必做**白名单**（防路径穿越）：`decodeURIComponent` 要包 try（畸形编码 404 而非 400），
   用 `split('/').pop()` 剥离路径后查 Set，再 `join`。
 - 客户端轮询是外部插件可用的朴素数据通道；使用 `cache: 'no-store'`、in-flight 防重叠、响应形状校验、
@@ -487,12 +492,16 @@ ln -sfn /path/to/DSH/packages/core/tools     node_modules/@deepseek-ai/dsh-tools
 
 ```sh
 pnpm build
-dsh plugin --profile web add /absolute/path/to/dsh-agent-teams   # 本地路径；npm 包名亦可
+# 内测阶段：dsh 来自官方 npm 包；本地路径或 git 地址安装插件（未发布 npm 前）
+npx -p @deepseek-ai/dsh dsh plugin --profile web add /absolute/path/to/dsh-agent-teams
 # 重启 dsh（web 或 headless）后生效
 ```
 
 - `dsh plugin` 在 profile 目录跑 pnpm + 把带 `dsh.bundle` 声明的依赖 reconcile 进 bundles 层。
-- 独立测试 profile 是安全的验证环境（不碰运行实例）：headless 模板自动初始化。
+- 内测 registry：`@deepseek-ai` scope 需要官方只读 token（`.npmrc` scope 鉴权）；peer 范围必须写成
+  rc 通道（如 `^0.0.1-rc.1`），普通 `^0.0.1` 不匹配 `0.0.1-rc.x`，安装会解析失败。
+- 独立测试 profile 是安全的验证环境（不碰运行实例）：headless 模板自动初始化；自定义 profile 可用
+  `npx -p @deepseek-ai/dsh dsh plugin --profile <name> add ...` 从零搭。
 
 ### 4.4 离线验证（不启动服务）
 

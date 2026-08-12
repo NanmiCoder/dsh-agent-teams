@@ -153,22 +153,20 @@ zstdcat ~/.dsh/sessions/<ws>/session-<id>/session.jsonl.zstd \
 #### 3.1 启动独立 web 实例（不触碰用户指定的运行实例）
 
 ```sh
-cat > /tmp/agent-teams-web.patch.yml <<'EOF'
-- id: webserver
-  config:
-    host: 127.0.0.1
-    port: 3081
-EOF
-dsh --profile agent-teams-web --patch /tmp/agent-teams-web.patch.yml
-# 用 managed background task 启动并读取启动输出；看到精确 URL 后再 curl
+# 从零安装（内测 npm 流程，peer 从内测 registry 解析）：
+npx -p @deepseek-ai/dsh dsh plugin --profile agent-teams-beta add @deepseek-ai/dsh-base
+npx -p @deepseek-ai/dsh dsh plugin --profile agent-teams-beta add @deepseek-ai/dsh-web-app
+npx -p @deepseek-ai/dsh dsh plugin --profile agent-teams-beta add /abs/path/to/dsh-agent-teams
+# 启动（managed background task，保存 task id）：
+npx -p @deepseek-ai/dsh dsh --profile agent-teams-beta --host 127.0.0.1 --port 3081
+# 看到精确 URL 后再 curl
 curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:3081/
 ```
 
-- 自定义 web profile 可直接传 app-level `--host 127.0.0.1 --port 3081`，也可用 `--patch` 固化 webserver config。
-- profile 组合：base + web-app + 插件；自定义 profile 默认只有 base，需加入 `@deepseek-ai/dsh-web-app`。
-- client HMR 需要两半同时成立：`dsh web` 的 host poll/SSE/browser receiver + 同一 checkout 的 `pnpm run dev:web` watcher 持续重建 `lib/client.js`。
-- watcher 未运行时，`pnpm build` 后刷新现有页面即可；host/package manifest/profile bundles 改动才重启。用户 patch 文件可走 config HMR。
-- apps/web shell/普通 packages 不走 client-plugin HMR；重建 Web artifacts 后刷新既有 DSH URL，不要启动独立 Vite server 替代它。
+- 组合了 web-app 的自定义 profile 可直接传 app-level `--host/--port`；也可用 `--patch` 固化 webserver config。
+- 内测 registry 的 `latest`（rc.1）与 `next`（rc.2）服务键不同（`httpServer` vs `webServer`）——插件双键兼容，两个通道都要抽验。
+- client HMR 需要 watcher 持续重建 `lib/client.js`；否则 `pnpm build` 后刷新页面。host/package manifest/profile bundles 改动才重启。
+- apps/web shell/普通 packages 不走 client-plugin HMR；不要启动独立 Vite server 替代 DSH GUI。
 
 #### 3.2 名册与路由探活
 

@@ -13,10 +13,12 @@
 | `ctx.subagents.followup()` | 唤醒收件成员（消息进入其下一轮次） |
 | `ctx.subagents.listChildren()` | 查询成员实时活动（running / inactive） |
 | `ctx.systemPrompt.section()` | 注册"AgentTeams 使用策略"提示段 |
-| `ctx.httpServer.register()` | 活动面板数据路由 `/plugins/dsh-agent-teams/state` + 鲸鱼图片静态服务 |
+| Web server 路由注册 | 活动面板数据路由 `/plugins/dsh-agent-teams/state` + 鲸鱼图片静态服务（`webServer`/`httpServer` 双键兼容，见下） |
 | 文件系统 | 团队状态持久化在 `<workspace>/.agent-teams/<teamId>/` |
 
 数据链路：工具执行 → 磁盘状态（真相源）→ host 快照路由 → 浮层 1s 轮询渲染；会话日志同时写入 `agent-teams/*` 事件（审计/重放/复盘）。
+
+> **内测版本兼容**：npm `latest`（`0.0.1-rc.1`）的服务键仍是 `ctx.httpServer` / `ctx.workspace`，后续 `next`（`rc.2`）重命名为 `ctx.webServer` / `ctx.workspaceRegistry`。插件对两组键都做了探测（新键优先、旧键回退，`internal/service` 事件同时监听两组），两个版本都能注册路由。
 
 ### Web UI
 

@@ -19,17 +19,36 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-// Declaration merge only: makes ctx.subagents, ctx.systemPrompt, ctx.httpServer
-// and ctx.workspace visible.
+// Declaration merge only: makes ctx.subagents and ctx.systemPrompt visible.
 import type {} from '@deepseek-ai/dsh-subagent'
 import type {} from '@deepseek-ai/dsh-system-prompt'
-import type { HttpServerService } from '@deepseek-ai/dsh-host-webserver'
 import type { WorkspaceRegistry } from '@deepseek-ai/dsh-workspace'
+import type { IncomingMessage, ServerResponse } from 'node:http'
 import { registerAgentTeamsTools, type ToolsConfig } from './tools.ts'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { collectArchivedTeamsActivity, collectTeamsActivity } from './snapshot.ts'
+
+/**
+ * Structural slice of the web server service, compatible with both the
+ * published `dsh-host-webserver@0.0.1-rc.1` (`ctx.httpServer` /
+ * `HttpServerService`) and the renamed `webServer` / `WebServer` in later
+ * builds: the beta transition renames the service without changing the route
+ * registration shape.
+ */
+interface WebRouteHost {
+  register(route: {
+    kind: 'exact' | 'prefix'
+    path: string
+    handler: (req: IncomingMessage, res: ServerResponse) => void | Promise<void>
+  }): () => void
+}
+
+/** Web-server service key candidates, newest first. */
+const WEB_SERVER_KEYS = ['webServer', 'httpServer'] as const
+/** Workspace registry service key candidates, newest first. */
+const WORKSPACE_KEYS = ['workspaceRegistry', 'workspace'] as const
 
 export const name = 'agent-teams'
 export const inject = ['tools', 'subagents', 'systemPrompt', 'agents']
@@ -109,23 +128,23 @@ export function apply(ctx: Context, config: Config): void {
 
   registerAgentTeamsTools(ctx, resolved)
 
-  // The activity panel data/artwork routes need the Web host (`httpServer`)
-  // and the workspace registry, which headless profiles do not mount; under
+  // The activity panel data/artwork routes need the Web server and the
+  // workspace registry, which headless profiles do not mount; under
   // concurrent activation they may also bind after this plugin. Register the
   // routes lazily: try now, then on each service binding event. In a webless
   // profile the plugin stays tool-only and never blocks boot.
   let webRegistered = false
   const registerWebSurface = (): void => {
     if (webRegistered) return
-    const httpServer = ctx.get('httpServer') as HttpServerService | undefined
-    const workspaceRegistry = ctx.get('workspace') as WorkspaceRegistry | undefined
-    if (httpServer === undefined || workspaceRegistry === undefined) return
+    const webServer = (ctx.get(WEB_SERVER_KEYS[0]) ?? ctx.get(WEB_SERVER_KEYS[1])) as WebRouteHost | undefined
+    const workspaceRegistry = (ctx.get(WORKSPACE_KEYS[0]) ?? ctx.get(WORKSPACE_KEYS[1])) as WorkspaceRegistry | undefined
+    if (webServer === undefined || workspaceRegistry === undefined) return
     webRegistered = true
 
     // Activity panel data route: the browser floater polls this for team
     // snapshots (disk truth + live subagent activity). Mirrors the Claude
     // Code desktop watcher's server-side snapshot pattern.
-    ctx.effect(() => httpServer.register({
+    ctx.effect(() => webServer.register({
     kind: 'exact',
     path: '/plugins/dsh-agent-teams/state',
     handler: async (req, res) => {
@@ -158,7 +177,7 @@ export function apply(ctx: Context, config: Config): void {
     'action-reporting.png', 'action-celebrating.png', 'action-sleeping.png',
     'action-sending.png',
   ])
-    ctx.effect(() => httpServer.register({
+    ctx.effect(() => webServer.register({
       kind: 'prefix',
       path: '/plugins/dsh-agent-teams/assets',
     handler: async (req, res) => {
@@ -194,6 +213,9 @@ export function apply(ctx: Context, config: Config): void {
 
   registerWebSurface()
   ctx.on('internal/service', (name) => {
-    if (name === 'httpServer' || name === 'workspace') registerWebSurface()
+    if (WEB_SERVER_KEYS.includes(name as (typeof WEB_SERVER_KEYS)[number])
+      || WORKSPACE_KEYS.includes(name as (typeof WORKSPACE_KEYS)[number])) {
+      registerWebSurface()
+    }
   })
 }

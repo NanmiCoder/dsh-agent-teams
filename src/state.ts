@@ -219,3 +219,55 @@ export async function readMailbox(
 export async function removeTeamDir(stateRoot: string, teamId: string): Promise<void> {
   await rm(join(stateRoot, teamId), { recursive: true, force: true })
 }
+
+// ── activity snapshot (server-side, like the Claude Code desktop watcher) ──
+
+/** Visual task state for the activity panel. */
+export type VisualTaskState = 'blocked' | 'open' | 'running' | 'completed'
+
+/**
+ * The visual state of one task: `running` while in_progress, `completed`
+ * when done, `blocked` while any dependency is unfinished, else `open`.
+ */
+export function taskVisualState(
+  status: string,
+  dependencies: readonly string[],
+  tasks: readonly TeamTask[],
+): VisualTaskState {
+  if (status === 'completed') return 'completed'
+  if (status === 'in_progress') return 'running'
+  const byId = new Map(tasks.map((task) => [task.id, task]))
+  const openDependency = dependencies.some((dependencyId) => {
+    const dependency = byId.get(dependencyId)
+    return dependency !== undefined && dependency.status !== 'completed'
+  })
+  return openDependency ? 'blocked' : 'open'
+}
+
+/**
+ * Longest dependency path depth per task id (each depth = one lane column).
+ */
+export function taskDepthsById(tasks: readonly TeamTask[]): Map<string, number> {
+  const byId = new Map(tasks.map((task) => [task.id, task]))
+  const depths = new Map<string, number>()
+  const visiting = new Set<string>()
+  const depthOf = (taskId: string): number => {
+    const cached = depths.get(taskId)
+    if (cached !== undefined) return cached
+    if (visiting.has(taskId)) return 0
+    const task = byId.get(taskId)
+    if (task === undefined) return 0
+    visiting.add(taskId)
+    const dependencies = task.dependencies
+      .filter((dependencyId) => byId.has(dependencyId))
+      .sort()
+    const depth = dependencies.length === 0
+      ? 0
+      : 1 + Math.max(...dependencies.map(depthOf))
+    visiting.delete(taskId)
+    depths.set(taskId, depth)
+    return depth
+  }
+  for (const task of tasks) depthOf(task.id)
+  return depths
+}

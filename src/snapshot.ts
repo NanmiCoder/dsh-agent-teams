@@ -1,0 +1,179 @@
+/**
+ * Team activity snapshot assembly for the activity panel.
+ *
+ * Server-side assembly mirrors the Claude Code desktop teamWatcher: read the
+ * durable team files (the truth source) and enrich with live subagent
+ * activity, so the panel always reflects the on-disk state even when a model
+ * skipped a tool "ritual" (e.g. not calling update_task on completion).
+ * @module dsh-agent-teams/snapshot
+ */
+
+import type { Context } from '@deepseek-ai/cordis'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import { readdir } from 'node:fs/promises'
+import { join } from 'node:path'
+import { CAPTAIN_KEY, readMailbox, readTeam, taskDepthsById, taskVisualState } from './state.ts'
+import type { TeamState, TeamTask } from './types.ts'
+
+/** Visual task state for the activity panel. */
+export type VisualTaskState = 'blocked' | 'open' | 'running' | 'completed'
+
+/** One member row of the activity snapshot. */
+export interface TeamActivityMember {
+  readonly id: string
+  readonly name: string
+  readonly role: string
+  readonly activity: 'working' | 'idle' | 'unknown'
+  readonly progress: number
+  readonly done: number
+  readonly total: number
+  readonly currentTask: string
+  readonly unread: number
+}
+
+/** One task row of the activity snapshot. */
+export interface TeamActivityTask {
+  readonly id: string
+  readonly subject: string
+  readonly status: string
+  readonly state: VisualTaskState
+  readonly assignee: string
+  readonly dependencies: readonly string[]
+  readonly depth: number
+}
+
+/** One captain-inbox preview row. */
+export interface TeamActivityMessage {
+  readonly from: string
+  readonly content: string
+}
+
+/** The full panel payload for one team. */
+export interface TeamActivitySnapshot {
+  readonly workspace: string
+  readonly teamId: string
+  readonly name: string
+  readonly description?: string
+  readonly captainSessionId: string
+  readonly members: readonly TeamActivityMember[]
+  readonly tasks: readonly TeamActivityTask[]
+  readonly messageCount: number
+  readonly captainInbox: readonly TeamActivityMessage[]
+}
+
+/** The current task of a member: its first unfinished owned task. */
+function currentTaskOf(memberName: string, tasks: readonly TeamTask[]): string {
+  for (const task of tasks) {
+    if (task.status === 'in_progress' && task.assignee === memberName) return task.id
+  }
+  return ''
+}
+
+/**
+ * Assemble one team snapshot from its durable files plus live activity.
+ * @param ctx - the plugin context (injects `subagents`, used for activity).
+ * @param stateRoot - resolved absolute state root of the owning workspace.
+ * @param workspace - display name of the owning workspace.
+ * @param state - the durable team record.
+ * @returns the panel snapshot.
+ */
+export async function assembleTeamSnapshot(
+  ctx: Context,
+  stateRoot: string,
+  workspace: string,
+  state: TeamState,
+): Promise<TeamActivitySnapshot> {
+  const tasks = state.tasks
+  const depths = taskDepthsById(tasks)
+  const byName = new Map(state.members.filter((m) => m.status !== 'removed').map((m) => [m.name, m]))
+  const activity = new Map<string, 'running' | 'inactive'>()
+  try {
+    const children = await ctx.subagents.listChildren(state.captainSessionId as SessionId)
+    for (const entry of children) {
+      if (entry.kind === 'child') activity.set(entry.id, entry.activity)
+    }
+  } catch (error: unknown) {
+    ctx.logger.warn(`agent-teams: activity listing failed for ${state.name}: ${String(error)}`)
+  }
+  const unreadByMember = new Map<string, number>()
+  for (const member of state.members.filter((candidate) => candidate.status !== 'removed')) {
+    try {
+      unreadByMember.set(member.name, (await readMailbox(stateRoot, state.id, member.name)).length)
+    } catch (error: unknown) {
+      ctx.logger.warn(`agent-teams: mailbox read failed for ${member.name}: ${String(error)}`)
+      unreadByMember.set(member.name, 0)
+    }
+  }
+  const members: TeamActivityMember[] = state.members
+    .filter((member) => member.status !== 'removed')
+    .map((member) => {
+      const owned = tasks.filter((task) => task.assignee === member.name)
+      const done = owned.filter((task) => task.status === 'completed').length
+      return {
+        id: member.id,
+        name: member.name,
+        role: member.role ?? '',
+        activity: member.id !== '' ? (activity.get(member.id) === 'running' ? 'working' : activity.get(member.id) === 'inactive' ? 'idle' : 'unknown') : 'unknown',
+        progress: owned.length === 0 ? 0 : Math.round((done / owned.length) * 100),
+        done,
+        total: owned.length,
+        currentTask: currentTaskOf(member.name, tasks),
+        unread: unreadByMember.get(member.name) ?? 0,
+      }
+    })
+  const captainInbox = await readMailbox(stateRoot, state.id, CAPTAIN_KEY)
+  return {
+    workspace,
+    teamId: state.id,
+    name: state.name,
+    ...state.description !== undefined ? { description: state.description } : {},
+    captainSessionId: state.captainSessionId,
+    members,
+    tasks: tasks.map((task) => ({
+      id: task.id,
+      subject: task.subject,
+      status: task.status,
+      state: taskVisualState(task.status, task.dependencies, tasks),
+      assignee: task.assignee ?? '',
+      dependencies: task.dependencies,
+      depth: depths.get(task.id) ?? 0,
+    })),
+    messageCount: captainInbox.length
+      + members.reduce((count, member) => count + member.unread, 0),
+    captainInbox: captainInbox.slice(-5).map((message) => ({
+      from: message.from,
+      content: message.content,
+    })),
+  }
+}
+
+/**
+ * Collect every team under the given workspace state roots.
+ * @param ctx - the plugin context.
+ * @param roots - `{ workspace, stateRoot }` pairs (resolved absolute roots).
+ * @returns the snapshots in stable order (workspace, then team id).
+ */
+export async function collectTeamsActivity(
+  ctx: Context,
+  roots: readonly { workspace: string; stateRoot: string }[],
+): Promise<TeamActivitySnapshot[]> {
+  const snapshots: TeamActivitySnapshot[] = []
+  for (const root of roots) {
+    let entries
+    try {
+      entries = await readdir(root.stateRoot, { withFileTypes: true })
+    } catch (error: unknown) {
+      if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+        continue
+      }
+      throw error
+    }
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue
+      const state = await readTeam(root.stateRoot, entry.name)
+      if (state === undefined) continue
+      snapshots.push(await assembleTeamSnapshot(ctx, root.stateRoot, root.workspace, state))
+    }
+  }
+  return snapshots
+}

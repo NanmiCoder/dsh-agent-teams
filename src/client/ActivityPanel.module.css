@@ -1,0 +1,510 @@
+/* AgentTeams top-right activity floater — glass panel per the Claude Code
+   desktop SessionActivityPanel recipe (fixed overlay, blur, hairline border). */
+
+.badge {
+  position: fixed;
+  top: 64px;
+  right: 24px;
+  z-index: 2147483000;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  box-sizing: border-box;
+  border: 1px solid var(--dsw-alias-line-normal);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--dsw-alias-bg-module-platform) 88%, transparent);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.14);
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 20px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.1s ease;
+}
+
+.badge:hover {
+  border-color: var(--dsw-alias-line-strong);
+  transform: translateY(-1px);
+}
+
+.badge:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 2px;
+}
+
+.badgeDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--dsw-alias-label-tertiary);
+}
+
+.badgeDot[data-busy='true'] {
+  background: var(--dsw-alias-state-business-primary);
+  animation: agentTeamsPulse 1.2s ease-in-out infinite;
+}
+
+.badgeCount {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── panel shell ────────────────────────────────────────────────────────── */
+
+.panel {
+  position: fixed;
+  top: 64px;
+  right: 24px;
+  z-index: 2147483000;
+  display: flex;
+  flex-direction: column;
+  width: 372px;
+  max-height: calc(100vh - 96px);
+  box-sizing: border-box;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--dsw-alias-line-strong) 55%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--dsw-alias-bg-module-platform) 92%, transparent);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 24px 64px rgba(0, 0, 0, 0.18);
+  animation: agentTeamsPanelIn 0.18s ease-out;
+}
+
+@keyframes agentTeamsPanelIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes agentTeamsPulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+.panelHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex: none;
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid var(--dsw-alias-line-normal);
+}
+
+.panelTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--dsw-alias-label-primary);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.panelDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--dsw-alias-label-tertiary);
+}
+
+.panelDot[data-busy='true'] {
+  background: var(--dsw-alias-state-business-primary);
+  animation: agentTeamsPulse 1.2s ease-in-out infinite;
+}
+
+.closeButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  font: inherit;
+  font-size: 12px;
+  line-height: 24px;
+  cursor: pointer;
+}
+
+.closeButton:hover {
+  background: var(--dsw-alias-bg-fill-neutral);
+  color: var(--dsw-alias-label-secondary);
+}
+
+.teams {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* ── team section ───────────────────────────────────────────────────────── */
+
+.team {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 14px 12px;
+  border-bottom: 1px solid var(--dsw-alias-line-normal);
+}
+
+.team:last-child {
+  border-bottom: 0;
+}
+
+.teamHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.teamName {
+  overflow: hidden;
+  flex: 0 1 auto;
+  color: var(--dsw-alias-label-primary);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.teamStats {
+  display: inline-flex;
+  gap: 8px;
+  margin-left: auto;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 10.5px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.livePill {
+  flex: none;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--dsw-alias-bg-fill-business);
+  color: var(--dsw-alias-label-on-fill);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 15px;
+  animation: agentTeamsPulse 1.4s ease-in-out infinite;
+}
+
+/* ── member rows ────────────────────────────────────────────────────────── */
+
+.members {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.memberRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 6px 8px;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.memberRow:hover {
+  background: var(--dsw-alias-bg-fill-neutral);
+}
+
+.memberRow:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: -1px;
+}
+
+.memberRow[data-activity='working'] {
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 7%, transparent);
+}
+
+.memberAvatar {
+  display: inline-flex;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: var(--dsw-alias-label-on-fill);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.memberInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+
+.memberLine {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.memberName {
+  overflow: hidden;
+  color: var(--dsw-alias-label-primary);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memberRole {
+  overflow: hidden;
+  max-width: 96px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 10.5px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memberState {
+  flex: none;
+  margin-left: auto;
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 16px;
+}
+
+.memberState[data-activity='working'] {
+  color: var(--dsw-alias-state-business-primary);
+}
+
+.memberState[data-activity='idle'] {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.memberProgress {
+  display: block;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--dsw-alias-bg-fill-neutral);
+}
+
+.memberProgressFill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.memberTask {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 10px;
+  line-height: 14px;
+}
+
+.memberTaskId {
+  color: var(--dsw-alias-label-secondary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9.5px;
+}
+
+.memberCount {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.unreadPill {
+  flex: none;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--dsw-alias-bg-fill-business);
+  color: var(--dsw-alias-label-on-fill);
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 14px;
+}
+
+/* ── task rows ──────────────────────────────────────────────────────────── */
+
+.tasks {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.taskRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 3px 6px;
+  border-radius: 6px;
+}
+
+.taskRow:hover {
+  background: var(--dsw-alias-bg-fill-neutral);
+}
+
+.taskStateBar {
+  flex: none;
+  width: 3px;
+  height: 16px;
+  border-radius: 999px;
+  background: var(--dsw-alias-label-tertiary);
+}
+
+.taskStateBar[data-state='running'] {
+  background: var(--dsw-alias-state-business-primary);
+}
+
+.taskStateBar[data-state='completed'] {
+  background: var(--dsw-alias-state-success);
+}
+
+.taskStateBar[data-state='blocked'] {
+  background: var(--dsw-alias-state-warning);
+}
+
+.taskId {
+  flex: none;
+  color: var(--dsw-alias-label-tertiary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9.5px;
+  font-weight: 600;
+}
+
+.taskBadge {
+  flex: none;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--dsw-alias-bg-fill-neutral);
+  color: var(--dsw-alias-label-secondary);
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 14px;
+}
+
+.taskBadge[data-state='running'] {
+  background: var(--dsw-alias-bg-fill-business);
+  color: var(--dsw-alias-label-on-fill);
+}
+
+.taskBadge[data-state='completed'] {
+  background: var(--dsw-alias-bg-fill-success);
+  color: var(--dsw-alias-label-on-fill);
+}
+
+.taskBadge[data-state='blocked'] {
+  background: var(--dsw-alias-bg-fill-warning);
+  color: var(--dsw-alias-label-on-fill);
+}
+
+.taskSubject {
+  overflow: hidden;
+  flex: 1;
+  min-width: 0;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.taskAssignee {
+  flex: none;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 9.5px;
+  line-height: 14px;
+}
+
+/* ── captain inbox preview ──────────────────────────────────────────────── */
+
+.inbox {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding: 5px 6px;
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-module);
+}
+
+.inboxRow {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.inboxFrom {
+  flex: none;
+  color: var(--dsw-alias-state-business-primary);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 14px;
+}
+
+.inboxContent {
+  overflow: hidden;
+  min-width: 0;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 10.5px;
+  line-height: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.emptyHint {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11.5px;
+  line-height: 16px;
+  padding: 4px 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel,
+  .badge,
+  .livePill,
+  .badgeDot,
+  .panelDot {
+    animation: none;
+    transition: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .panel {
+    right: 12px;
+    left: 12px;
+    width: auto;
+  }
+  .badge {
+    right: 12px;
+  }
+}

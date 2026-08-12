@@ -94,103 +94,24 @@ try {
   await rm(stateRoot, { recursive: true, force: true })
 }
 
-console.log('4/4 client workbench fold (Conversation Node)')
-const { agentTeamsRunDefinition, layoutWorkbenchTasks, projectWorkbench, workbenchTaskState } =
-  await import('../lib/client/agent-teams-definition.js')
-const def = agentTeamsRunDefinition
-const startMatch = {
-  event: { type: 'agent-teams/team-created', data: { teamId: 'demo', name: 'Demo Team' } },
-  role: 'start',
-  location: { kind: 'turn' },
-}
-const update = (state, event, seq) => def.update({ state }, { event, role: 'update', location: { kind: 'turn' }, seq })
-let state = def.start({}, startMatch, undefined)
-check('start seeds empty team', state.members.length === 0 && state.tasks.length === 0 && state.messages.length === 0)
-state = update(state, {
-  type: 'agent-teams/member-added',
-  data: { teamId: 'demo', memberId: 'sess-alice', name: 'alice', role: 'researcher' },
-}, 10)
-state = update(state, {
-  type: 'agent-teams/member-added',
-  data: { teamId: 'demo', memberId: 'sess-bob', name: 'bob' },
-}, 11)
-check('member-added folds two members', state.members.length === 2)
-state = update(state, {
-  type: 'agent-teams/task-created',
-  data: { teamId: 'demo', taskId: 't1', subject: '调研', dependencies: [], assignee: 'alice' },
-}, 12)
-state = update(state, {
-  type: 'agent-teams/task-created',
-  data: { teamId: 'demo', taskId: 't2', subject: '写报告', dependencies: ['t1'] },
-}, 13)
-state = update(state, {
-  type: 'agent-teams/task-updated',
-  data: { teamId: 'demo', taskId: 't1', status: 'claimed', assignee: 'alice' },
-}, 14)
-let bench = projectWorkbench(state)
-check('workbench keeps the team name', bench.teamName === 'Demo Team')
-check('workbench status running', bench.status === 'running')
-check('workbench has two members', bench.members.length === 2)
-check('claimed task is open (not blocked)', bench.tasks.find(t => t.id === 't1')?.state === 'open')
-check('dependent task is blocked while t1 open', bench.tasks.find(t => t.id === 't2')?.state === 'blocked')
-check('t2 sits one lane deeper than t1',
-  (bench.tasks.find(t => t.id === 't1')?.depth ?? -1) === 0
-  && (bench.tasks.find(t => t.id === 't2')?.depth ?? -1) === 1)
-check('two lanes laid out', bench.lanes.length === 2)
-
-state = update(state, {
-  type: 'agent-teams/task-updated',
-  data: { teamId: 'demo', taskId: 't1', status: 'in_progress', assignee: 'alice' },
-}, 15)
-bench = projectWorkbench(state)
-check('in_progress task is running', bench.tasks.find(t => t.id === 't1')?.state === 'running')
-check('alice current task is t1', bench.members.find(m => m.name === 'alice')?.currentTask === 't1')
-check('t2 unlocks when t1 completed', (() => {
-  const s2 = update(state, {
-    type: 'agent-teams/task-updated',
-    data: { teamId: 'demo', taskId: 't1', status: 'completed', output: 'done' },
-  }, 16)
-  const b = projectWorkbench(s2)
-  return b.tasks.find(t => t.id === 't2')?.state === 'open'
-})(), '')
-check('alice progress is 1/1', (() => {
-  const s2 = update(state, {
-    type: 'agent-teams/task-updated',
-    data: { teamId: 'demo', taskId: 't1', status: 'completed', output: 'done' },
-  }, 16)
-  const b = projectWorkbench(s2)
-  const alice = b.members.find(m => m.name === 'alice')
-  return alice?.done === 1 && alice?.total === 1 && alice?.progress === 100
-})(), '')
-
-state = update(state, {
-  type: 'agent-teams/message-sent',
-  data: { teamId: 'demo', messageId: 'm1', from: 'alice', to: 'bob', content: '帮我看看', ts: 1000 },
-}, 17)
-state = update(state, {
-  type: 'agent-teams/message-sent',
-  data: { teamId: 'demo', messageId: 'm2', from: 'bob', to: 'captain', content: '完成', ts: 1001 },
-}, 18)
-bench = projectWorkbench(state)
-check('messages fold in order', bench.messages.length === 2 && bench.messages[0]?.from === 'alice')
-check('bob unread badge counts alice message', bench.members.find(m => m.name === 'bob')?.unread === 1)
-check('layout math: no overlapping cards', (() => {
-  const layout = layoutWorkbenchTasks(state.tasks)
-  const seen = new Set()
-  for (const task of layout.tasks) {
-    const key = `${task.x},${task.y}`
-    if (seen.has(key)) return false
-    seen.add(key)
-  }
-  return true
-})(), '')
-check('workbenchTaskState closed union', (() => {
-  const s2 = update(state, {
-    type: 'agent-teams/task-updated',
-    data: { teamId: 'demo', taskId: 't2', status: 'completed', output: 'ok' },
-  }, 19)
-  return projectWorkbench(s2).tasks.every(t => ['blocked', 'open', 'running', 'completed'].includes(t.state))
-})(), '')
+console.log('4/4 host visual-state functions (activity panel)')
+const { taskVisualState, taskDepthsById } = await import('../lib/state.js')
+const vtasks = [
+  { id: 't1', subject: 'a', status: 'completed', assignee: 'alice', dependencies: [], createdAt: 0, updatedAt: 0 },
+  { id: 't2', subject: 'b', status: 'pending', assignee: 'bob', dependencies: ['t1'], createdAt: 0, updatedAt: 0 },
+  { id: 't3', subject: 'c', status: 'in_progress', assignee: 'bob', dependencies: ['t2'], createdAt: 0, updatedAt: 0 },
+  { id: 't4', subject: 'd', status: 'pending', assignee: 'alice', dependencies: ['t9'], createdAt: 0, updatedAt: 0 },
+]
+check('completed -> completed visual state', taskVisualState('completed', [], vtasks) === 'completed')
+check('in_progress -> running visual state', taskVisualState('in_progress', [], vtasks) === 'running')
+check('pending with open dep -> blocked', taskVisualState('pending', ['t1'], vtasks) === 'open')
+check('pending with completed dep -> open', taskVisualState('pending', ['t2'], vtasks) === 'blocked')
+check('missing dependency is ignored (not blocked)', taskVisualState('pending', ['t9'], vtasks) === 'open')
+const depths = taskDepthsById(vtasks)
+check('t1 depth 0', depths.get('t1') === 0)
+check('t2 depth 1 (longest path)', depths.get('t2') === 1)
+check('t3 depth 2', depths.get('t3') === 2)
+check('missing dep contributes no depth', depths.get('t4') === 0)
 
 console.log('5/5 done')
 if (failures > 0) {

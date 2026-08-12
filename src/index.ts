@@ -19,13 +19,18 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-// Declaration merge only: makes ctx.subagents and ctx.systemPrompt visible.
+// Declaration merge only: makes ctx.subagents, ctx.systemPrompt, ctx.httpServer
+// and ctx.workspace visible.
 import type {} from '@deepseek-ai/dsh-subagent'
 import type {} from '@deepseek-ai/dsh-system-prompt'
+import type {} from '@deepseek-ai/dsh-host-webserver'
+import type {} from '@deepseek-ai/dsh-workspace'
 import { registerAgentTeamsTools, type ToolsConfig } from './tools.ts'
+import { join } from 'node:path'
+import { collectTeamsActivity } from './snapshot.ts'
 
 export const name = 'agent-teams'
-export const inject = ['tools', 'subagents', 'systemPrompt', 'agents']
+export const inject = ['tools', 'subagents', 'systemPrompt', 'agents', 'httpServer', 'workspace']
 
 /** Plugin configuration. */
 export interface Config {
@@ -101,4 +106,25 @@ export function apply(ctx: Context, config: Config): void {
   })
 
   registerAgentTeamsTools(ctx, resolved)
+
+  // Activity panel data route: the browser floater polls this for team
+  // snapshots (disk truth + live subagent activity). Mirrors the Claude Code
+  // desktop watcher's server-side snapshot pattern.
+  ctx.effect(() => ctx.httpServer.register({
+    kind: 'exact',
+    path: '/plugins/dsh-agent-teams/state',
+    handler: async (_req, res) => {
+      const roots = ctx.workspace.list().map((workspace) => ({
+        workspace: workspace.title,
+        stateRoot: join(workspace.path, resolved.stateDir),
+      }))
+      const snapshots = await collectTeamsActivity(ctx, roots)
+      const body = JSON.stringify({ teams: snapshots })
+      res.writeHead(200, {
+        'content-type': 'application/json; charset=utf-8',
+        'cache-control': 'no-store',
+      })
+      res.end(body)
+    },
+  }), 'agent-teams: activity route')
 }

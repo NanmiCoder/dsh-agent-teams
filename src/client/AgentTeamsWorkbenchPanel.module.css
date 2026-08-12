@@ -1,0 +1,510 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  padding: 12px;
+  box-sizing: border-box;
+  border-radius: 10px;
+  background: var(--dsw-alias-bg-module-platform);
+}
+
+.root[data-team-status='deleted'] {
+  opacity: 0.72;
+}
+
+/* ── formation ─────────────────────────────────────────────────────────── */
+
+.formation {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  min-width: 0;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.captainCard {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 10px;
+  width: 168px;
+  padding: 10px 12px;
+  box-sizing: border-box;
+  border: 1px solid var(--dsw-alias-line-normal);
+  border-radius: 10px;
+  background: var(--dsw-alias-bg-module-strong);
+}
+
+.captainBody,
+.memberBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.captainName {
+  overflow: hidden;
+  color: var(--dsw-alias-label-primary);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.captainMeta,
+.memberMeta {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.separator {
+  flex: none;
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: var(--dsw-alias-label-tertiary);
+}
+
+.membersRow {
+  display: flex;
+  flex: 1;
+  gap: 10px;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.memberCard {
+  position: relative;
+  display: flex;
+  flex: 1 1 200px;
+  align-items: center;
+  gap: 8px;
+  min-width: 168px;
+  max-width: 240px;
+  padding: 10px 12px;
+  box-sizing: border-box;
+  border: 1px solid var(--dsw-alias-line-normal);
+  border-radius: 10px;
+  background: var(--dsw-alias-bg-module);
+  transition: border-color 0.15s ease;
+}
+
+.memberCard[data-member-running='true'] {
+  border-color: var(--dsw-alias-state-business-primary);
+}
+
+.avatar {
+  display: inline-flex;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: var(--dsw-alias-label-on-fill);
+  font-size: 16px;
+  line-height: 20px;
+}
+
+.memberName {
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.memberName:hover {
+  color: var(--dsw-alias-state-business-primary);
+  text-decoration: underline;
+  text-underline-position: from-font;
+}
+
+.memberName:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.memberRole {
+  overflow: hidden;
+  max-width: 120px;
+  text-overflow: ellipsis;
+}
+
+.memberProgress {
+  display: block;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--dsw-alias-bg-fill-neutral);
+}
+
+.memberProgressFill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--dsw-alias-state-business-primary);
+  transition: width 0.3s ease;
+}
+
+.memberTaskLine {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 10.5px;
+  line-height: 14px;
+}
+
+.memberTaskLabel {
+  flex: none;
+}
+
+.memberTaskId {
+  color: var(--dsw-alias-label-secondary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+}
+
+.memberTaskCount {
+  flex: none;
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.unreadBadge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--dsw-alias-state-business-primary);
+  box-shadow: 0 0 0 2px var(--dsw-alias-bg-module);
+}
+
+/* ── task lanes ────────────────────────────────────────────────────────── */
+
+.taskArea {
+  position: relative;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.lane {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1px dashed var(--dsw-alias-line-normal);
+  border-radius: 12px;
+  background: var(--dsw-alias-bg-module);
+  opacity: 0.55;
+}
+
+.laneLabel {
+  position: absolute;
+  top: 2px;
+  right: 8px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 14px;
+}
+
+.edges {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.edge {
+  fill: none;
+  stroke: var(--dsw-alias-line-strong);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+}
+
+.edge[data-satisfied='true'] {
+  stroke: var(--dsw-alias-state-success);
+  stroke-dasharray: none;
+}
+
+.taskCard {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 152px;
+  height: 62px;
+  padding: 6px 8px;
+  box-sizing: border-box;
+  border: 1px solid var(--dsw-alias-line-normal);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-module-strong);
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: opacity 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+.taskCard:hover {
+  border-color: var(--dsw-alias-line-strong);
+  transform: translateY(-1px);
+}
+
+.taskCard:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 1px;
+}
+
+.taskCard[data-task-state='running'] {
+  border-color: var(--dsw-alias-state-business-primary);
+  background: var(--dsw-alias-bg-module-strong);
+}
+
+.taskCard[data-task-state='completed'] {
+  border-color: var(--dsw-alias-state-success);
+}
+
+.taskHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  min-width: 0;
+}
+
+.taskId {
+  flex: none;
+  color: var(--dsw-alias-label-tertiary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9.5px;
+  font-weight: 700;
+}
+
+.taskBadge {
+  flex: none;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--dsw-alias-bg-fill-neutral);
+  color: var(--dsw-alias-label-secondary);
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 14px;
+}
+
+.taskBadge[data-task-state='running'] {
+  background: var(--dsw-alias-bg-fill-business);
+  color: var(--dsw-alias-label-on-fill);
+}
+
+.taskBadge[data-task-state='completed'] {
+  background: var(--dsw-alias-bg-fill-success);
+  color: var(--dsw-alias-label-on-fill);
+}
+
+.taskBadge[data-task-state='blocked'] {
+  background: var(--dsw-alias-bg-fill-warning);
+  color: var(--dsw-alias-label-on-fill);
+}
+
+.taskSubject {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  min-height: 30px;
+  color: var(--dsw-alias-label-primary);
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 15px;
+}
+
+.taskFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  min-width: 0;
+  margin-top: auto;
+}
+
+.taskOwner {
+  overflow: hidden;
+  min-width: 0;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 9.5px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.taskDeps {
+  flex: none;
+  color: var(--dsw-alias-label-tertiary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9px;
+}
+
+.taskProgress {
+  display: block;
+  height: 2px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--dsw-alias-bg-fill-business);
+  animation: agentTeamsProgress 1.1s ease-in-out infinite;
+}
+
+@keyframes agentTeamsProgress {
+  0% { opacity: 0.35; }
+  50% { opacity: 1; }
+  100% { opacity: 0.35; }
+}
+
+.empty {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+/* ── message feed ──────────────────────────────────────────────────────── */
+
+.feedToggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  box-sizing: border-box;
+  border: 1px solid var(--dsw-alias-line-normal);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-module);
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 16px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.feedToggle:hover {
+  border-color: var(--dsw-alias-line-strong);
+}
+
+.feedToggle:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 1px;
+}
+
+.feedToggleAction {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 10.5px;
+  font-weight: 500;
+}
+
+.feed {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 220px;
+  min-width: 0;
+  overflow-y: auto;
+}
+
+.feedRow {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  padding: 3px 4px;
+  border-radius: 6px;
+}
+
+.feedRow:hover {
+  background: var(--dsw-alias-bg-module);
+}
+
+.feedBadge {
+  flex: none;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--dsw-alias-bg-fill-neutral);
+  color: var(--dsw-alias-label-secondary);
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 14px;
+}
+
+.feedBadge[data-feed-category='assignment'] {
+  background: var(--dsw-alias-bg-fill-business);
+  color: var(--dsw-alias-label-on-fill);
+}
+
+.feedBadge[data-feed-category='report'] {
+  background: var(--dsw-alias-bg-fill-success);
+  color: var(--dsw-alias-label-on-fill);
+}
+
+.feedBadge[data-feed-category='peer'] {
+  background: var(--dsw-alias-bg-fill-warning);
+  color: var(--dsw-alias-label-on-fill);
+}
+
+.feedRoute {
+  flex: none;
+  color: var(--dsw-alias-label-tertiary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9.5px;
+}
+
+.feedContent {
+  overflow: hidden;
+  min-width: 0;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11.5px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.feedEmpty {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11.5px;
+  line-height: 16px;
+  padding: 2px 4px;
+}
+
+@media (max-width: 560px) {
+  .formation {
+    flex-direction: column;
+  }
+  .captainCard {
+    width: 100%;
+  }
+  .memberCard {
+    min-width: 0;
+  }
+}

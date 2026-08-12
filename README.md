@@ -26,14 +26,27 @@ DeepSeek Harness 的 AgentTeams 插件：安装后，任何会话都可以用一
 
 成员与 Claude Code 的 in-process teammate 一样“等待工作”：任何成员（含队长）发消息 → 收件成员醒来跑完整一轮（用 `agent_teams_*` 工具更新任务状态、写结果）→ 进入 idle。成员的最终回复对插件不可编程读取，因此成员把报告写入队长邮箱（`inbox/captain.jsonl`）与任务记录，队长用 `agent_teams_status` 轮询读取。
 
-### Web UI：对话流里的团队树监测面板
+### Web UI：对话流里的团队工作台面板
 
-UI 完全复刻 DSH workflow Web UI（`dsh-client-ui-workflow-run`）的实现链路，包是同一个 dual-face 插件：
+UI 实现链路复刻 DSH workflow Web UI（`dsh-client-ui-workflow-run`），**面板形态参考 Claude Code 桌面端 AgentTeams 工作台**（desktop/src/components/agentTeams/：AgentTeamsCanvas/Workbench/CommunicationFeed，未提交分支）：
 
-1. **host 侧**（`src/events.ts`）：每次团队状态变更（建队/加人/移除/建任务/任务流转/删队），向**队长会话**写入一条 `agent-teams/*` 会话事件（`src/event-types.ts` 声明合并 `SessionEventMap`）。成员执行的操作也统一落回队长会话，所以监测面始终是队长的对话流。
-2. **浏览器侧**（`src/client/`，通过 package.json 的 `dsh.client` manifest 进入 `window.__DSH_BOOT__` 浏览器名册）：一个 Conversation Node（`agent-teams-definition.ts`）按 `seq` 确定性重放这些事件，fold 出团队状态；`AgentTeamsTreePanel.tsx` 把状态投影成横向树渲染到 `conversation.chat.node` 槽位——顶部是队长（Team Lead）卡片，树线往下挂一排成员卡片，每个成员卡片列出它当前未完成的任务（带状态徽章，进行中置顶），成员正在工作时状态点高亮（复用 `useSessions` 会话快照判断子代理是否 running）。
+1. **host 侧**（`src/events.ts`）：每次团队状态变更（建队/加人/移除/建任务/任务流转/收发消息/删队）向**队长会话**写入一条 `agent-teams/*` 会话事件（`src/event-types.ts` 声明合并 `SessionEventMap`，含 `agent-teams/message-sent`）。成员执行的操作也统一落回队长会话，所以监测面始终是队长的对话流。
+2. **浏览器侧**（`src/client/`，通过 `dsh.client` manifest 进入浏览器名册）：一个 Conversation Node（`agent-teams-definition.ts`）按 `seq` 确定性重放事件，fold 出团队状态并投影为**紧凑工作台**（`AgentTeamsWorkbenchPanel.tsx`）渲染到 `conversation.chat.node` 槽位：
 
-数据流与 workflow 面板完全一致：工具执行 → `session.append` → 会话日志（可持久化、可重放）→ 前端 Conversation Node 折叠 → 树状渲染。没有任何独立 RPC 通道。
+```
+┌ 队长卡（👑 团队名 · 运行中 · n 名成员）┐  ┌ 成员卡×n（职业图标 · 名字 · 角色 ┐
+└──────────────────────────────┘  │ 工作中/空闲 · 进度条 · 当前任务 · 未读角标）
+    ┌────────┬────────┐
+    │ lane Ⅰ │ lane Ⅱ │     ← 任务 DAG：依赖深度 → 从左到右的泳道
+    │ [t1]   │ [t2]   │       任务卡：#id · 状态徽章（阻塞/待领取/进行中/已完成）
+    │        │   ↑SVG │       · 标题 · 负责人 · 依赖指示 · 进行中进度动画
+    └────────┴────────┘       依赖边：实线=已解锁，虚线=未完成
+┌ 消息流（可展开：分派/成员/汇报 分类 · from→to · 内容）────────────┐
+```
+
+   布局模型（依赖深度计算、泳道摆放、blocked/running/completed 状态派生、成员"当前任务"推断）移植自桌面端 `agentTeamsModel.ts`；成员实时活动复用 `useSessions` 会话快照。
+
+数据流与 workflow 面板完全一致：工具执行 → `session.append` → 会话日志（可持久化、可重放）→ 前端 Conversation Node 折叠 → 工作台渲染。没有任何独立 RPC 通道。
 
 ### 团队状态文件
 
@@ -178,6 +191,7 @@ dsh run --profile headless "用 AgentTeams 帮我做一个 3 句话的网站标�
 - 成员 persona 替换了部署默认 persona；成员仍拥有完整工具集（bash/fs/web 等）。
 - 团队状态为文件级持久化，多进程同时操作同一团队不保证一致（同一 dsh 进程内已用锁串行化）。
 - 浏览器端面板依赖会话日志事件（`agent-teams/*`）重放；旧会话若在插件安装前已存在，其历史事件不可回溯。
+- 成员（模型）不总是严格走工具"仪式"（如完成时不调 `agent_teams_update_task`、用 bash 直接读文件确认产出）——面板如实反映事件流，可能与磁盘真相有短暂偏差；队长以 `agent_teams_status`/文件为准汇总。
 
 ## License
 

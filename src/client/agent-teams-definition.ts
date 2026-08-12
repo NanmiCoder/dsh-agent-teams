@@ -1,11 +1,17 @@
 /**
  * AgentTeams Conversation Node: folds the durable `agent-teams/*` session
- * events into one keyed chat node and projects a horizontal tree
- * (captain → members → current tasks) for the renderer.
+ * events into one keyed chat node and projects a compact workbench — the
+ * captain formation, members with progress, and a dependency-lane DAG of
+ * tasks — for the renderer.
+ *
+ * The layout model is ported from the Claude Code desktop AgentTeams
+ * workbench (AgentTeamsCanvas/agentTeamsModel): task depth is its longest
+ * dependency path, each depth owns one left-to-right lane, and a task's
+ * visual state derives from status plus dependencies (blocked while any
+ * dependency is unfinished).
  *
  * The fold is deterministic replay of the session log: `match` reads one
- * event, `start`/`update` fold in ascending `seq` order, exactly like the
- * workflow-run node.
+ * event, `start`/`update` fold in ascending `seq` order.
  * @module dsh-agent-teams/client/definition
  */
 
@@ -15,45 +21,88 @@ import type {
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
   AgentTeamsMemberAddedData, AgentTeamsMemberRemovedData,
-  AgentTeamsTaskCreatedData, AgentTeamsTaskUpdatedData,
-  AgentTeamsTeamCreatedData,
+  AgentTeamsMessageSentData, AgentTeamsTaskCreatedData,
+  AgentTeamsTaskUpdatedData, AgentTeamsTeamCreatedData,
 } from '../event-types.ts'
 
 /** Team tree lifecycle status shown in the panel. */
 export type AgentTeamsTreeStatus = 'running' | 'deleted'
 
-/** One task as displayed under a member. */
-export interface AgentTeamsTreeTask {
+/** Visual task state: derives from status plus dependency completion. */
+export type WorkbenchTaskState = 'blocked' | 'open' | 'running' | 'completed'
+
+/** One positioned task card in the DAG lanes. */
+export interface WorkbenchTaskData {
   readonly id: string
   readonly subject: string
+  readonly state: WorkbenchTaskState
+  /** Raw task status (`pending`/`claimed`/`in_progress`/`completed`/…). */
   readonly status: string
+  readonly assignee: string
+  readonly dependencies: readonly string[]
+  readonly depth: number
+  readonly x: number
+  readonly y: number
+  /** Sequence of the event that started this task (current-task tiebreak). */
+  readonly startedSeq: number
 }
 
-/** One member as displayed under the captain. */
-export interface AgentTeamsTreeMember {
+/** One dependency lane (one depth column). */
+export interface WorkbenchLaneData {
+  readonly depth: number
+  readonly x: number
+  readonly y: number
+  readonly width: number
+  readonly height: number
+  readonly count: number
+}
+
+/** One member card in the formation row. */
+export interface WorkbenchMemberData {
   readonly id: string
   readonly name: string
   readonly role: string
-  /** Tasks currently assigned to this member and not yet finished. */
-  readonly currentTasks: readonly AgentTeamsTreeTask[]
+  /** Completed ÷ owned tasks, 0..100. */
+  readonly progress: number
+  readonly done: number
+  readonly total: number
+  /** The task the member is on right now ('' when idle). */
+  readonly currentTask: string
+  /** Unread messages addressed to this member. */
+  readonly unread: number
 }
 
-/** Final keyed Chat payload for one team. */
-export interface AgentTeamsTreeData {
+/** One mailbox message (from the `agent-teams/message-sent` events). */
+export interface WorkbenchMessageData {
+  readonly id: string
+  readonly from: string
+  readonly to: string
+  readonly content: string
+  readonly ts: number
+}
+
+/** Final keyed Chat payload for one team workbench. */
+export interface AgentTeamsWorkbenchData {
   readonly teamName: string
   readonly status: AgentTeamsTreeStatus
-  readonly members: readonly AgentTeamsTreeMember[]
+  readonly members: readonly WorkbenchMemberData[]
+  readonly lanes: readonly WorkbenchLaneData[]
+  readonly tasks: readonly WorkbenchTaskData[]
+  readonly messages: readonly WorkbenchMessageData[]
+  readonly width: number
+  readonly height: number
+  readonly taskAreaY: number
 }
 
 declare module '@deepseek-ai/dsh-client-ui-conversation/client' {
   interface ChatNodeDataMap {
-    /** Durable team tree: captain, members, and their current tasks. */
-    'agent-teams': AgentTeamsTreeData
+    /** Durable team workbench: captain formation, members, task DAG, messages. */
+    'agent-teams': AgentTeamsWorkbenchData
   }
 }
 
 /** Folded member record. */
-interface AgentTeamsMemberState {
+export interface AgentTeamsMemberState {
   readonly id: string
   readonly name: string
   readonly role?: string
@@ -61,13 +110,23 @@ interface AgentTeamsMemberState {
 }
 
 /** Folded task record. */
-interface AgentTeamsTaskState {
+export interface AgentTeamsTaskState {
   readonly id: string
   readonly subject: string
   readonly status: string
   readonly assignee?: string
   readonly dependencies: readonly string[]
   readonly output?: string
+  readonly startedSeq: number
+}
+
+/** Folded message record. */
+export interface AgentTeamsMessageState {
+  readonly id: string
+  readonly from: string
+  readonly to: string
+  readonly content: string
+  readonly ts: number
 }
 
 /** Folded team record (the node's business state). */
@@ -77,52 +136,186 @@ export interface AgentTeamsNodeState {
   readonly description?: string
   readonly members: readonly AgentTeamsMemberState[]
   readonly tasks: readonly AgentTeamsTaskState[]
+  readonly messages: readonly AgentTeamsMessageState[]
   readonly deleted?: boolean
 }
 
-/** Task statuses that keep a task visible under its member. */
-const ACTIVE_TASK_STATUSES: readonly string[] = ['pending', 'claimed', 'in_progress']
+// ── layout constants (compact workbench, conversation-card scale) ─────────
 
-function taskProjection(task: AgentTeamsTaskState): AgentTeamsTreeTask {
-  return { id: task.id, subject: task.subject, status: task.status }
-}
+/** Task card size (shared with the renderer's edge math). */
+export const TASK_WIDTH = 152
+export const TASK_HEIGHT = 62
 
-/** Rank active statuses so in_progress tasks lead a member's list. */
-function activeRank(status: string): number {
-  switch (status) {
-    case 'in_progress': return 0
-    case 'claimed': return 1
-    default: return 2
-  }
+const LANE_WIDTH = 168
+const LANE_GAP = 12
+const HORIZONTAL_PADDING = 16
+const TASK_TOP = 10
+const ROW_GAP = 10
+const AREA_TOP_PADDING = 6
+
+const TASK_ID_COLLATOR = new Intl.Collator('en', { numeric: true, sensitivity: 'base' })
+
+function compareTaskIds(left: string, right: string): number {
+  const naturalOrder = TASK_ID_COLLATOR.compare(left, right)
+  if (naturalOrder !== 0) return naturalOrder
+  return left < right ? -1 : left > right ? 1 : 0
 }
 
 /**
- * Project the folded state into the renderer tree: one captain root and one
- * member node per live member, each carrying its unfinished assigned tasks.
+ * The visual state of one task: `running` while in_progress, `completed`
+ * when done, `blocked` while any dependency is unfinished, else `open`.
  */
-export function projectTree(state: AgentTeamsNodeState): AgentTeamsTreeData {
+export function workbenchTaskState(
+  task: Pick<AgentTeamsTaskState, 'status' | 'dependencies'>,
+  tasksById: ReadonlyMap<string, AgentTeamsTaskState>,
+): WorkbenchTaskState {
+  if (task.status === 'completed') return 'completed'
+  if (task.status === 'in_progress') return 'running'
+  const openDependency = task.dependencies.some((dependencyId) => {
+    const dependency = tasksById.get(dependencyId)
+    return dependency !== undefined && dependency.status !== 'completed'
+  })
+  return openDependency ? 'blocked' : 'open'
+}
+
+/** Longest dependency path depth per task, with cycle/缺失 guards. */
+function taskDepths(tasks: readonly AgentTeamsTaskState[]): Map<string, number> {
+  const byId = new Map(tasks.map((task) => [task.id, task]))
+  const depths = new Map<string, number>()
+  const visiting = new Set<string>()
+  const depthOf = (taskId: string): number => {
+    const cached = depths.get(taskId)
+    if (cached !== undefined) return cached
+    if (visiting.has(taskId)) return 0
+    const task = byId.get(taskId)
+    if (task === undefined) return 0
+    visiting.add(taskId)
+    const dependencies = task.dependencies
+      .filter((dependencyId) => byId.has(dependencyId))
+      .sort(compareTaskIds)
+    const depth = dependencies.length === 0
+      ? 0
+      : 1 + Math.max(...dependencies.map(depthOf))
+    visiting.delete(taskId)
+    depths.set(taskId, depth)
+    return depth
+  }
+  for (const task of tasks) depthOf(task.id)
+  return depths
+}
+
+/** Position every task into dependency lanes (depth → left-to-right column). */
+export function layoutWorkbenchTasks(
+  tasks: readonly AgentTeamsTaskState[],
+): {
+  readonly tasks: readonly WorkbenchTaskData[]
+  readonly lanes: readonly WorkbenchLaneData[]
+  readonly width: number
+  readonly height: number
+} {
+  const sorted = [...tasks].sort((left, right) => compareTaskIds(left.id, right.id))
+  const depths = taskDepths(sorted)
+  const byLayer = new Map<number, AgentTeamsTaskState[]>()
+  for (const task of sorted) {
+    const depth = depths.get(task.id) ?? 0
+    const layer = byLayer.get(depth)
+    if (layer !== undefined) layer.push(task)
+    else byLayer.set(depth, [task])
+  }
+  const columns = byLayer.size
+  const maxRows = Math.max(0, ...Array.from(byLayer.values(), (layer) => layer.length))
+  const width = HORIZONTAL_PADDING * 2
+    + columns * LANE_WIDTH
+    + Math.max(0, columns - 1) * LANE_GAP
+  const stackHeight = maxRows === 0 ? 0 : maxRows * TASK_HEIGHT + (maxRows - 1) * ROW_GAP
+  const laneHeight = TASK_TOP + stackHeight + AREA_TOP_PADDING
+  const tasksById = new Map(sorted.map((task) => [task.id, task]))
+  const lanes: WorkbenchLaneData[] = Array.from({ length: columns }, (_, depth) => ({
+    depth,
+    x: HORIZONTAL_PADDING + depth * (LANE_WIDTH + LANE_GAP),
+    y: 0,
+    width: LANE_WIDTH,
+    height: laneHeight,
+    count: byLayer.get(depth)?.length ?? 0,
+  }))
+  const positioned: WorkbenchTaskData[] = []
+  for (const lane of lanes) {
+    const layer = byLayer.get(lane.depth) ?? []
+    layer.forEach((task, row) => {
+      positioned.push({
+        id: task.id,
+        subject: task.subject,
+        state: workbenchTaskState(task, tasksById),
+        status: task.status,
+        assignee: task.assignee ?? '',
+        dependencies: task.dependencies,
+        depth: lane.depth,
+        x: lane.x + (LANE_WIDTH - TASK_WIDTH) / 2,
+        y: TASK_TOP + row * (TASK_HEIGHT + ROW_GAP),
+        startedSeq: task.startedSeq,
+      })
+    })
+  }
+  return { tasks: positioned, lanes, width, height: laneHeight }
+}
+
+/** The current task of a member: the most recently started `in_progress`. */
+function currentTaskOf(
+  memberName: string,
+  tasks: readonly AgentTeamsTaskState[],
+): string {
+  let latest: AgentTeamsTaskState | undefined
+  for (const task of tasks) {
+    if (task.status !== 'in_progress' || task.assignee !== memberName) continue
+    if (latest === undefined || task.startedSeq > latest.startedSeq) latest = task
+  }
+  return latest?.id ?? ''
+}
+
+/**
+ * Project the folded state into the renderer workbench: formation members
+ * with progress, dependency lanes, positioned tasks, and the message feed.
+ */
+export function projectWorkbench(state: AgentTeamsNodeState): AgentTeamsWorkbenchData {
   const members = state.members
     .filter(member => member.removed !== true)
     .map(member => {
-      const currentTasks = state.tasks
-        .filter(task => task.assignee === member.name && ACTIVE_TASK_STATUSES.includes(task.status))
-        .sort((a, b) => activeRank(a.status) - activeRank(b.status))
-        .map(taskProjection)
+      const owned = state.tasks.filter(task => task.assignee === member.name)
+      const done = owned.filter(task => task.status === 'completed').length
+      const unread = state.messages.filter(message => message.to === member.name).length
       return {
         id: member.id,
         name: member.name,
         role: member.role ?? '',
-        currentTasks,
+        progress: owned.length === 0 ? 0 : Math.round((done / owned.length) * 100),
+        done,
+        total: owned.length,
+        currentTask: currentTaskOf(member.name, state.tasks),
+        unread,
       }
     })
+  const layout = layoutWorkbenchTasks(state.tasks)
   return {
     teamName: state.name,
     status: state.deleted === true ? 'deleted' : 'running',
     members,
+    lanes: layout.lanes,
+    tasks: layout.tasks,
+    messages: state.messages.map(message => ({
+      id: message.id,
+      from: message.from,
+      to: message.to,
+      content: message.content,
+      ts: message.ts,
+    })),
+    width: layout.width,
+    height: layout.height,
+    taskAreaY: 0,
   }
 }
 
-/** Start event must be the team creation. */
+// ── fold ──────────────────────────────────────────────────────────────────
+
 function startState(data: AgentTeamsTeamCreatedData): AgentTeamsNodeState {
   return {
     teamId: data.teamId,
@@ -130,6 +323,7 @@ function startState(data: AgentTeamsTeamCreatedData): AgentTeamsNodeState {
     ...data.description !== undefined ? { description: data.description } : {},
     members: [],
     tasks: [],
+    messages: [],
   }
 }
 
@@ -164,11 +358,16 @@ function updateTaskCreated(state: AgentTeamsNodeState, data: AgentTeamsTaskCreat
       status: 'pending',
       dependencies: data.dependencies,
       ...data.assignee !== undefined ? { assignee: data.assignee } : {},
+      startedSeq: 0,
     }],
   }
 }
 
-function updateTaskUpdated(state: AgentTeamsNodeState, data: AgentTeamsTaskUpdatedData): AgentTeamsNodeState {
+function updateTaskUpdated(
+  state: AgentTeamsNodeState,
+  data: AgentTeamsTaskUpdatedData,
+  seq: number,
+): AgentTeamsNodeState {
   return {
     ...state,
     tasks: state.tasks.map(task => task.id === data.taskId
@@ -177,8 +376,25 @@ function updateTaskUpdated(state: AgentTeamsNodeState, data: AgentTeamsTaskUpdat
         status: data.status,
         ...data.assignee !== undefined ? { assignee: data.assignee } : {},
         ...data.output !== undefined ? { output: data.output } : {},
+        // A task that (re)enters in_progress gets the current fold sequence
+        // so the renderer can tell which task the member is on right now.
+        ...data.status === 'in_progress' ? { startedSeq: seq } : {},
       }
       : task),
+  }
+}
+
+function updateMessageSent(state: AgentTeamsNodeState, data: AgentTeamsMessageSentData): AgentTeamsNodeState {
+  if (state.messages.some(message => message.id === data.messageId)) return state
+  return {
+    ...state,
+    messages: [...state.messages, {
+      id: data.messageId,
+      from: data.from,
+      to: data.to,
+      content: data.content,
+      ts: data.ts,
+    }],
   }
 }
 
@@ -192,6 +408,7 @@ export const agentTeamsRunDefinition: ConversationNodeDefinition<AgentTeamsNodeS
       || event.type === 'agent-teams/member-removed'
       || event.type === 'agent-teams/task-created'
       || event.type === 'agent-teams/task-updated'
+      || event.type === 'agent-teams/message-sent'
       || event.type === 'agent-teams/team-deleted') {
       return { id: String(event.data.teamId), role: 'update' }
     }
@@ -204,10 +421,12 @@ export const agentTeamsRunDefinition: ConversationNodeDefinition<AgentTeamsNodeS
     return startState(match.event.data)
   },
   update: (context, match) => {
+    const seq = match.event.seq
     if (match.event.type === 'agent-teams/member-added') return updateMemberAdded(context.state, match.event.data)
     if (match.event.type === 'agent-teams/member-removed') return updateMemberRemoved(context.state, match.event.data)
     if (match.event.type === 'agent-teams/task-created') return updateTaskCreated(context.state, match.event.data)
-    if (match.event.type === 'agent-teams/task-updated') return updateTaskUpdated(context.state, match.event.data)
+    if (match.event.type === 'agent-teams/task-updated') return updateTaskUpdated(context.state, match.event.data, seq)
+    if (match.event.type === 'agent-teams/message-sent') return updateMessageSent(context.state, match.event.data)
     if (match.event.type === 'agent-teams/team-deleted') {
       return { ...context.state, deleted: true }
     }
@@ -224,7 +443,7 @@ export const agentTeamsRunDefinition: ConversationNodeDefinition<AgentTeamsNodeS
       anchorSeq: context.start.event.seq,
       location: context.start.location,
       visibility: 'visible',
-      data: projectTree(state),
+      data: projectWorkbench(state),
     }
   },
 }

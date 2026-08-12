@@ -54,6 +54,18 @@ export interface AgentTeamsTeamDeletedData {
   readonly teamId: string
 }
 
+/** Records one mailbox message sent between team agents. */
+export interface AgentTeamsMessageSentData {
+  readonly teamId: string
+  readonly messageId: string
+  /** `captain` or a member name. */
+  readonly from: string
+  /** `captain` or a member name. */
+  readonly to: string
+  readonly content: string
+  readonly ts: number
+}
+
 declare module '@deepseek-ai/dsh-session/types' {
   interface SessionEventMap {
     /**
@@ -82,6 +94,11 @@ declare module '@deepseek-ai/dsh-session/types' {
      */
     'agent-teams/task-updated': AgentTeamsTaskUpdatedData
     /**
+     * Records one mailbox message.
+     * @param data - team identity, sender, recipient, and content.
+     */
+    'agent-teams/message-sent': AgentTeamsMessageSentData
+    /**
      * Closes one team record after deletion.
      * @param data - stable team identity.
      */
@@ -96,4 +113,5 @@ export type AgentTeamsEventType =
   | 'agent-teams/member-removed'
   | 'agent-teams/task-created'
   | 'agent-teams/task-updated'
+  | 'agent-teams/message-sent'
   | 'agent-teams/team-deleted'

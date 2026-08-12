@@ -516,6 +516,14 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
         await withTeamLock(team.id, async () => {
           await appendMailbox(stateRoot, team.id, CAPTAIN_KEY, message)
         })
+        appendTeamEvent(ctx, captainSessionOf(ctx, team.captainSessionId, caller.session), 'agent-teams/message-sent', {
+          teamId: team.id,
+          messageId: message.id,
+          from,
+          to: CAPTAIN_KEY,
+          content: args.content,
+          ts: message.ts,
+        })
         let delivered: 'wake' | 'mailbox' = 'mailbox'
         if (captain !== undefined && !isCaptain) {
           captain.send(createUserMessage({
@@ -531,6 +539,14 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
         const recipient = requireMember(fresh, to)
         const message = createMessage(from, recipient.name, args.content)
         await appendMailbox(stateRoot, fresh.id, recipient.name, message)
+        appendTeamEvent(ctx, captainSessionOf(ctx, fresh.captainSessionId, caller.session), 'agent-teams/message-sent', {
+          teamId: fresh.id,
+          messageId: message.id,
+          from,
+          to: recipient.name,
+          content: args.content,
+          ts: message.ts,
+        })
         let delivered: 'wake' | 'mailbox' = 'mailbox'
         // Any sender → member: write the mailbox (direct, like Claude Code),
         // then wake the member through the captain's parent authority.

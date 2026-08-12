@@ -725,3 +725,19 @@
   font-weight: 600;
   line-height: 15px;
 }
+
+/* ── archived team restore (post-delete review) ─────────────────────────── */
+
+.archivedWrap {
+  opacity: 0.88;
+}
+
+.archivedWrap::before {
+  content: '已结束 · 历史归档';
+  display: block;
+  padding: 4px 8px 2px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 14px;
+}

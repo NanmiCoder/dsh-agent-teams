@@ -29,7 +29,7 @@ import { registerAgentTeamsTools, type ToolsConfig } from './tools.ts'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { collectTeamsActivity } from './snapshot.ts'
+import { collectArchivedTeamsActivity, collectTeamsActivity } from './snapshot.ts'
 
 export const name = 'agent-teams'
 export const inject = ['tools', 'subagents', 'systemPrompt', 'agents', 'httpServer', 'workspace']
@@ -115,12 +115,16 @@ export function apply(ctx: Context, config: Config): void {
   ctx.effect(() => ctx.httpServer.register({
     kind: 'exact',
     path: '/plugins/dsh-agent-teams/state',
-    handler: async (_req, res) => {
+    handler: async (req, res) => {
+      const url = new URL(req.url ?? '/', 'http://x')
       const roots = ctx.workspace.list().map((workspace) => ({
         workspace: workspace.title,
         stateRoot: join(workspace.path, resolved.stateDir),
       }))
-      const snapshots = await collectTeamsActivity(ctx, roots)
+      // ?archived=1 serves teams moved to archive/ (post-delete review).
+      const snapshots = url.searchParams.get('archived') === '1'
+        ? await collectArchivedTeamsActivity(ctx, roots)
+        : await collectTeamsActivity(ctx, roots)
       const body = JSON.stringify({ teams: snapshots })
       res.writeHead(200, {
         'content-type': 'application/json; charset=utf-8',

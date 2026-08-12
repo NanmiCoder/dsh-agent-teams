@@ -12,7 +12,10 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import { CAPTAIN_KEY, readMailbox, readTeam, taskDepthsById, taskVisualState } from './state.ts'
+import {
+  CAPTAIN_KEY, listArchivedTeamIds, readArchivedTeam, readMailbox, readTeam,
+  taskDepthsById, taskVisualState,
+} from './state.ts'
 import type { TeamState, TeamTask } from './types.ts'
 
 /** Visual task state for the activity panel. */
@@ -173,6 +176,29 @@ export async function collectTeamsActivity(
       const state = await readTeam(root.stateRoot, entry.name)
       if (state === undefined) continue
       snapshots.push(await assembleTeamSnapshot(ctx, root.stateRoot, root.workspace, state))
+    }
+  }
+  return snapshots
+}
+
+/**
+ * Collect every archived team under the given workspace state roots (the
+ * `archive/` subdirectory of each state root). Used by the historic panel
+ * path to restore full team detail after deletion.
+ * @param ctx - the plugin context.
+ * @param roots - `{ workspace, stateRoot }` pairs.
+ * @returns the archived snapshots in stable order.
+ */
+export async function collectArchivedTeamsActivity(
+  ctx: Context,
+  roots: readonly { workspace: string; stateRoot: string }[],
+): Promise<TeamActivitySnapshot[]> {
+  const snapshots: TeamActivitySnapshot[] = []
+  for (const root of roots) {
+    for (const teamId of await listArchivedTeamIds(root.stateRoot)) {
+      const state = await readArchivedTeam(root.stateRoot, teamId)
+      if (state === undefined) continue
+      snapshots.push(await assembleTeamSnapshot(ctx, join(root.stateRoot, 'archive'), root.workspace, state))
     }
   }
   return snapshots

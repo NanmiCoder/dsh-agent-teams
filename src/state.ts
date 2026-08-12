@@ -14,7 +14,7 @@
  */
 
 import { randomUUID } from 'node:crypto'
-import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { TaskStatus, TeamMessage, TeamState, TeamTask } from './types.ts'
 
@@ -218,6 +218,48 @@ export async function readMailbox(
  */
 export async function removeTeamDir(stateRoot: string, teamId: string): Promise<void> {
   await rm(join(stateRoot, teamId), { recursive: true, force: true })
+}
+
+/**
+ * Archive a team instead of deleting it: the whole directory (team.json with
+ * tasks and dependency graph, plus the mailboxes) moves under
+ * `<stateRoot>/archive/<teamId>/` so later sessions can review how tasks were
+ * planned and rebuild dependency relationships. The archive directory has no
+ * team.json of its own, so the live activity scan skips it naturally.
+ * @param stateRoot - resolved absolute state root directory.
+ * @param teamId - the team id.
+ */
+export async function archiveTeamDir(stateRoot: string, teamId: string): Promise<void> {
+  const archiveRoot = join(stateRoot, 'archive')
+  await mkdir(archiveRoot, { recursive: true })
+  await rename(join(stateRoot, teamId), join(archiveRoot, teamId))
+}
+
+/**
+ * Read one archived team (already moved under `archive/`), or undefined when
+ * it was never archived.
+ * @param stateRoot - resolved absolute state root directory.
+ * @param teamId - the team id.
+ */
+export async function readArchivedTeam(stateRoot: string, teamId: string): Promise<TeamState | undefined> {
+  return readTeam(join(stateRoot, 'archive'), teamId)
+}
+
+/**
+ * List every archived team id under the state root.
+ * @param stateRoot - resolved absolute state root directory.
+ * @returns the archived team ids, empty when the archive does not exist.
+ */
+export async function listArchivedTeamIds(stateRoot: string): Promise<string[]> {
+  try {
+    const entries = await readdir(join(stateRoot, 'archive'), { withFileTypes: true })
+    return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name)
+  } catch (error: unknown) {
+    if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return []
+    }
+    throw error
+  }
 }
 
 // ── activity snapshot (server-side, like the Claude Code desktop watcher) ──

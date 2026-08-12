@@ -90,6 +90,16 @@ try {
 
   await removeTeamDir(stateRoot, team.id)
   check('removeTeamDir removes the team', await readTeam(stateRoot, team.id) === undefined)
+
+  // Archive keeps the team data for post-delete review.
+  const archiveTeam = { ...team, id: sanitizeKey('Archive Team') }
+  await createTeamDir(stateRoot, archiveTeam)
+  const { archiveTeamDir, readArchivedTeam, listArchivedTeamIds } = await import('../lib/state.js')
+  await archiveTeamDir(stateRoot, archiveTeam.id)
+  check('archive moves the team out of live scan', await readTeam(stateRoot, archiveTeam.id) === undefined)
+  check('archive keeps team.json readable', (await readArchivedTeam(stateRoot, archiveTeam.id))?.id === archiveTeam.id)
+  check('archive lists the team id', (await listArchivedTeamIds(stateRoot)).includes(archiveTeam.id))
+  check('archive dir skips live readTeam', await readTeam(stateRoot, 'archive') === undefined)
 } finally {
   await rm(stateRoot, { recursive: true, force: true })
 }

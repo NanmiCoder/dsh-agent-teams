@@ -310,6 +310,7 @@ export function ActivityPanel({ sessionsList, openSession }: {
   const [autoOpened, setAutoOpened] = useState(false)
   const [wasActive, setWasActive] = useState(false)
   const [historic, setHistoric] = useState<ReadonlyMap<string, { data: AgentTeamsCardData; owner: string }>>(new Map())
+  const [archived, setArchived] = useState<ReadonlyMap<string, ActivityTeam>>(new Map())
   const current = useSyncExternalStore(
     sessionsList.subscribe,
     sessionsList.getSnapshot,
@@ -355,6 +356,22 @@ export function ActivityPanel({ sessionsList, openSession }: {
           next.set(detail.teamId, { data: detail, owner })
           return next
         })
+        // Restore the archived team detail (tasks with their dependency
+        // graph, members, mailboxes) so the panel shows the full planning.
+        void fetch(`${STATE_URL}?archived=1`, { cache: 'no-store' })
+          .then((response) => (response.ok ? response.json() : null))
+          .then((body: { teams?: readonly ActivityTeam[] } | null) => {
+            if (body === null || !Array.isArray(body.teams)) return
+            const found = body.teams.find((team) => team.teamId === detail?.teamId)
+            if (found !== undefined) {
+              setArchived((previous) => {
+                const next = new Map(previous)
+                next.set(found.teamId, found)
+                return next
+              })
+            }
+          })
+          .catch(() => { /* archive route unavailable; member-only fallback */ })
       }
     }
     window.addEventListener(OPEN_PANEL_EVENT, onOpenPanel)
@@ -435,7 +452,16 @@ export function ActivityPanel({ sessionsList, openSession }: {
                   {visibleTeams.map((team) => (
                     <TeamSection key={team.teamId} team={team} onNavigate={navigateToSession} />
                   ))}
-                  {visibleHistoric.map(({ data: team }) => (
+                  {visibleHistoric.map(({ data: team }) => {
+                    const archivedTeam = archived.get(team.teamId)
+                    if (archivedTeam !== undefined) {
+                      return (
+                        <div key={team.teamId} data-team-id={team.teamId} data-historic className={css.archivedWrap}>
+                          <TeamSection team={archivedTeam} onNavigate={navigateToSession} />
+                        </div>
+                      )
+                    }
+                    return (
                     <section key={team.teamId} className={css.team} data-team-id={team.teamId} data-historic>
                       <header className={css.teamHead}>
                         <span className={css.teamName} title={team.teamName}>
@@ -469,7 +495,8 @@ export function ActivityPanel({ sessionsList, openSession }: {
                         ))}
                       </div>
                     </section>
-                  ))}
+                    )
+                  })}
                 </>
               )}
           </div>

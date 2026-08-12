@@ -19,13 +19,13 @@ import { join } from 'node:path'
 import { appendTeamEvent, captainSessionOf } from './events.ts'
 import {
   appendMailbox,
+  archiveTeamDir,
   CAPTAIN_KEY,
   createMessage,
   createTeamDir,
   findTeamByCaptain,
   readMailbox,
   readTeam,
-  removeTeamDir,
   sanitizeKey,
   transitionError,
   unsatisfiedDependencies,
@@ -658,7 +658,9 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
         appendTeamEvent(ctx, captainSessionOf(ctx, fresh.captainSessionId, captain.session), 'agent-teams/team-deleted', {
           teamId: fresh.id,
         })
-        await removeTeamDir(stateRoot, fresh.id)
+        // Archive, not delete: tasks (with their dependency graph) and the
+        // mailboxes stay on disk for later review and dependency rebuilds.
+        await archiveTeamDir(stateRoot, fresh.id)
       })
       return { deleted: true, team_name: team.name }
     },

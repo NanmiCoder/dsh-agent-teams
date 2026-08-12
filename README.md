@@ -41,7 +41,7 @@ dsh plugin --profile web add /absolute/path/to/dsh-agent-teams
 npx skills add NanmiCoder/dsh-agent-teams --skill dsh-plugin-development
 ```
 
-`skills/dsh-plugin-development/` 是唯一权威源码；`.dsh/skills/` 中的相对链接让 DSH 在本仓库作为 cwd 时自动发现同一份 Skill，同时避免占用 `npx skills` 的 `.agents/skills/` 安装目标。
+`skills/dsh-plugin-development/` 是唯一权威源码；`.dsh/skills/` 保存供 DSH 在本仓库作为 cwd 时自动发现的跨平台镜像。修改 Skill 后运行 `pnpm sync:skill`，`pnpm verify` 会检查镜像没有漂移。
 
 ## 文档
 

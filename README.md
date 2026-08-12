@@ -124,6 +124,16 @@ dsh run --profile agent-teams-web "用 AgentTeams 创建团队 smoke，1 个成�
 # ④ UI 加载链路（独立 web 实例，3081 端口，patch 改 webserver.port）：
 #    浏览器名册含 dsh-agent-teams（`dshClient` 旧格式兼容）
 #    GET /plugins/dsh-agent-teams/client.js → 200（closure-factory bundle）
+
+# ⑤ GUI 端到端（ego-browser 驱动真实浏览器 + DeepSeek-V4-Flash）：
+#    独立实例上新建会话 → 输入"用 AgentTeams 做网站标题方案…" → 会话侧栏
+#    实时显示"2 个子代理运行中" → 对话流中出现树状面板（DOM 探针确认）：
+#       [队 标题方案 运行中 2 名成员]
+#       ├─ A alice [researcher] 空闲    已领取 t1 研究网站定位与标题方向
+#       ├─ B bob   [writer]    运行中   已领取 t2 撰写最终网站标题方案
+#    → 任务完成后面板转"已删除"终态，主会话日志含完整事件流
+#      （team-created ×1 / member-added ×2 / task-created ×2（t2 依赖 t1）/
+#       task-updated ×2 / team-deleted ×1），队长汇总两个任务产出
 ```
 
 > 兼容性说明：当前部署（staging 快照）的 `client-modules` 读取 package.json 顶层

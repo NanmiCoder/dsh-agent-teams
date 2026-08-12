@@ -21,7 +21,8 @@
     "lib",
     "assets/agent-teams",
     "cordis.patch.yml",
-    "README.md"
+    "README.md",
+    "assets/ui.png"
   ],
   "license": "MIT",
   "dsh": {

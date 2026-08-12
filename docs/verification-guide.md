@@ -49,7 +49,7 @@ tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit   # 两个
 - `tsdown` 把 `lib/client/index.js` 打包成浏览器 bundle `lib/client.js`（协议：CJS closure-factory，`window.__ModuleLoader__.load({ id, factory })`；外部化平台模块 react / `@deepseek-ai/dsh-client-*`；CSS Modules 经 lightningcss 内联并注入 `<style data-plugin>`）
 - 构建后冒烟：`node -e "import('./lib/index.js').then(m => console.log(Object.keys(m)))"` 应看到 `name/inject/Config/apply`
 
-坑：tsdown 的 CSS 插件把 `lib/` 路径回退映射到 `src/`（`sourceAssetPath` 的 `lib → src` rebase），抄仓库 `tsdown.client.ts` 时别漏；`noExternal` 已弃用（`deps.alwaysBundle` 是替代），warning 可忽略。
+坑：当前 DSH preset 从 `lib/types/...` rebase 到 `src/...`；外部插件应按自己的 emitted 布局实现，不能机械写死任意 `/lib/`。tsdown 0.22 已弃用 `external/noExternal`，但当前 checkout preset 仍在使用；迁移 `deps.neverBundle/alwaysBundle` 前先验证函数匹配语义，不要只把 warning 当成永久可忽略。
 
 #### 1.3 冒烟脚本（scripts/verify.mjs）
 
@@ -78,7 +78,7 @@ if (failures > 0) { console.error(`\n${failures} check(s) FAILED`); process.exit
 console.log('\nall checks passed')
 ```
 
-要求：**断言可读**（`check('t2 depth 1 (longest path)', ...)`）、覆盖边界（缺失依赖、空目录、终态拒绝迁移）、临时目录一定清理（`finally`）。`pnpm verify` 进 CI/提交前。
+要求：断言 label 必须与输入和条件一致；覆盖缺失依赖、空目录、终态拒绝迁移并在 `finally` 清理临时目录。关系 UI 的纯投影还要断言 stage 顺序、自然 id 排序、非有限 depth 回退、上下游包含、sibling 排除和 cycle safety。`pnpm verify` 进 CI/提交前。
 
 #### 1.4 组合验证：dump-config（不 boot、不碰实例）
 
@@ -99,7 +99,7 @@ dsh --profile agent-teams-check --dump-config | grep -A 4 "id: agent-teams"
 
 - `--dump-config` **离线组合**（`composeEntries` 应用 patch 层），不 boot 服务、不动运行实例
 - 输出应看到 `- id: <插件行>` 与其 config
-- 坑：`cordis.patch.yml` 不是顶层数组会报 "must be a top-level YAML array"；`--port` 等 flag 只挂在 `dsh web` 子命令（固定 web profile），对自定义 profile 必须用 `--patch` 覆盖
+- 坑：`cordis.patch.yml` 不是顶层数组会报 "must be a top-level YAML array"。组合了 web-app 的自定义 profile 可直接接收 app-level `--host/--port`；`--patch` 是可审计的固化方式，但不是唯一入口。
 
 ---
 
@@ -119,7 +119,7 @@ dsh --profile headless --dump-config   # 确认组合树含插件行
 
 ```sh
 mkdir -p /tmp/agent-teams-e2e && cd /tmp/agent-teams-e2e
-dsh run --profile headless "用 AgentTeams 完成一个小任务：创建团队'标题方案'，加 2 个成员（alice 负责研究，bob 负责撰写），创建 2 个任务（t2 依赖 t1）分配给他们，唤醒他们完成，最后汇总产出。任务要小，每个成员只做一个简单任务。"
+dsh --profile headless "用 AgentTeams 完成一个小任务：创建团队'标题方案'，加 2 个成员（alice 负责研究，bob 负责撰写），创建 2 个任务（t2 依赖 t1）分配给他们，唤醒他们完成，最后汇总产出。任务要小，每个成员只做一个简单任务。"
 ```
 
 设计要点（控制 token 与可判定性）：
@@ -150,7 +150,7 @@ zstdcat ~/.dsh/sessions/<ws>/session-<id>/session.jsonl.zstd \
 
 ### 3. GUI 验证（ego-browser + 独立 web 实例）
 
-#### 3.1 启动独立 web 实例（绝不碰 3080）
+#### 3.1 启动独立 web 实例（不触碰用户指定的运行实例）
 
 ```sh
 cat > /tmp/agent-teams-web.patch.yml <<'EOF'
@@ -159,20 +159,21 @@ cat > /tmp/agent-teams-web.patch.yml <<'EOF'
     host: 127.0.0.1
     port: 3081
 EOF
-dsh --profile agent-teams-web --patch /tmp/agent-teams-web.patch.yml > /tmp/agent-teams-web.log 2>&1 &
-sleep 10
+dsh --profile agent-teams-web --patch /tmp/agent-teams-web.patch.yml
+# 用 managed background task 启动并读取启动输出；看到精确 URL 后再 curl
 curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:3081/
 ```
 
-- `--port` flag 只在 `dsh web` 子命令（固定 web profile）——自定义 profile 必须用 `--patch` 覆盖 `webserver` 行的 port（patch 替换整个 config，需 restate 原字段）
-- profile 组合：base + web-app + 插件（自定义 profile 默认只有 base，需手动把 `@deepseek-ai/dsh-web-app` 加进 bundles）
-- 每次改代码后：**重建 bundle（tsdown）→ pkill 实例 → 重启**
-- 浏览器端若之前打开过页面，**必须 `location.reload()`**，否则跑旧 bundle（改的代码不生效且现象诡异）
+- 自定义 web profile 可直接传 app-level `--host 127.0.0.1 --port 3081`，也可用 `--patch` 固化 webserver config。
+- profile 组合：base + web-app + 插件；自定义 profile 默认只有 base，需加入 `@deepseek-ai/dsh-web-app`。
+- client HMR 需要两半同时成立：`dsh web` 的 host poll/SSE/browser receiver + 同一 checkout 的 `pnpm run dev:web` watcher 持续重建 `lib/client.js`。
+- watcher 未运行时，`pnpm build` 后刷新现有页面即可；host/package manifest/profile bundles 改动才重启。用户 patch 文件可走 config HMR。
+- apps/web shell/普通 packages 不走 client-plugin HMR；重建 Web artifacts 后刷新既有 DSH URL，不要启动独立 Vite server 替代它。
 
 #### 3.2 名册与路由探活
 
 ```sh
-# 浏览器名册必须包含插件（client-modules 扫描组合树中声明 dsh.client/dshClient 的包）
+# 浏览器名册必须包含插件（client-modules 扫描组合树中声明 dsh.client 的包）
 curl -s http://127.0.0.1:3081/ | python3 -c "
 import sys, json, re
 html = sys.stdin.read()
@@ -186,7 +187,7 @@ curl -s http://127.0.0.1:3081/plugins/<pkg>/state
 curl -s "http://127.0.0.1:3081/plugins/<pkg>/state?archived=1"
 ```
 
-坑：**当前部署（staging 快照）的 client-modules 读 package.json 顶层 `dshClient` 字段**，新代码用 `dsh.client`——`package.json` 必须双格式声明，否则名册永远不收（且无报错）；名册收录后 `/plugins/<id>/client.js` 才 200。
+坑：当前源码读取 package.json `dsh.client`，并要求合法的 `exports["./client"]` 与实际 bundle；声明畸形或 bundle 缺失会 fail loud。包元数据负结论不自动过期，修正 manifest/export 后重启 host。
 
 #### 3.3 DOM 探针（ego-browser）
 
@@ -202,11 +203,12 @@ const probe = await js(String.raw`(() => {
   return {
     panel: true,
     teamName: panel.querySelector('[class*="teamName"]')?.textContent ?? '',
-    memberStates: [...panel.querySelectorAll('[class*="memberRow"]')].map(r => r.getAttribute('data-activity')),
-    // 图片加载成功：naturalWidth > 0
+    delegationMap: !!panel.querySelector('[data-delegation-map]'),
+    dependencyMap: !!panel.querySelector('[data-dependency-map]'),
+    focusedTasks: [...panel.querySelectorAll('[data-task-id][data-focused="true"]')].map(n => n.getAttribute('data-task-id')),
+    pinnedTasks: [...panel.querySelectorAll('[data-task-id][aria-pressed="true"]')].map(n => n.getAttribute('data-task-id')),
     artLoaded: [...panel.querySelectorAll('img')].every(img => img.complete && img.naturalWidth > 0),
-    // 布局：getComputedStyle 验证 padding/动画
-    padding: getComputedStyle(panel.querySelector('[class*="taskRow"]')).padding,
+    mainShift: getComputedStyle(document.querySelector('[data-phase="active"]')).paddingRight,
   }
 })()`)
 cliLog(JSON.stringify(probe, null, 1))
@@ -215,9 +217,10 @@ cliLog(JSON.stringify(probe, null, 1))
 坑：
 - **snapshotText 的 `@N` ref 每次快照都会失效**：填输入框/点按钮前先重新 `snapshotText()` 取 ref；找不到精确 ref 用 `aria-label` 或按钮文本兜底（`.match(/\[ref=(\d+), loc=[^\]]*发送[^\]]*\]/)`）
 - **composer 选择器会变**：placeholder 可能从"描述你想要构建的内容"变成"给智能体发消息"——先列出所有 textbox 再精确定位
-- **`[class*="member"]` 这类子串选择器过宽**（CSS modules hash 里 member/memberRow/memberName 都含子串）——探针优先用 `data-*` 属性，其次用更独特的 class 子串
-- 验证交互闭环（如"卡片激活面板"）可**直接 `window.dispatchEvent(new CustomEvent(...))` 模拟**，避免依赖真实会话时序
-- 面板数据是 1s 轮询：探针后若预期变化（任务完成/删除），`sleep` 后重探
+- CSS module 子串选择器容易过宽；探针优先使用稳定 `data-*`、role 和 aria 属性。
+- 验证 hover preview、click pin、第二次 click/`Escape` unpin；`aria-pressed` 只落在 pin 源任务，focused chain 排除 sibling。
+- 宽屏断言 main padding 非 0 且 panel/composer overlap 为 0；≤960px padding 回 0、无 body 横向溢出；关闭时采样中间帧确认不是瞬移。
+- 卡片激活事件可用 CustomEvent 模拟，但至少保留一次真实按钮路径。轮询状态用 browser wait/re-probe，不用 shell sleep 忙等。
 
 #### 3.4 截图存档
 
@@ -231,17 +234,11 @@ await captureScreenshot('/tmp/agent-teams-panel.png')   // 返回文件路径
 
 ### 4. 验证纪律
 
-- **绝不碰运行中的实例**：`~/.dsh/profiles/web/cordis.patch.yml` 一行都不改；所有验证用独立 profile（`agent-teams-check` / `headless` / `agent-teams-web`）与独立端口（3081）
-- **每次改动后全链路重跑**：构建 → verify →（需要时）重启独立实例；改 bundle 后浏览器必须 reload
-- **测完清理**：
-  ```sh
-  pkill -f "profile agent-teams-web"          # 停独立 web 实例
-  # ego-browser：完成即关闭任务空间
-  await completeTaskSpace(task.id, { keep: false })
-  rm -rf /tmp/agent-teams-e2e /tmp/*.patch.yml /tmp/*.log
-  ```
-- **运行实例健康检查**：验证前后各 curl 一次 `http://127.0.0.1:3080/`（应恒 200），确认全程未受影响
-- **不 push**：本地仓库即可，`git remote -v` 应为空；提交信息如实记录验证范围
+- **不碰用户指定的运行实例**：先明确其 profile/URL；用户说“不要管某实例”时，不做 curl、重启或旁路检查。
+- **全链路重跑**：typecheck → build → verify → diff check；按 HMR 条件决定热换或 page reload，host/package manifest/profile bundles 改动才重启。
+- **后台任务可追踪**：用 managed background task 启动并保存 task id；若用户未要求保留，用该 id 精确停止，避免宽泛 `pkill -f`。
+- ego-browser task space 按目标复用，完成后关闭；仅删除本任务创建的精确临时路径。
+- commit/push 按用户授权；用户要求 commit 就报告 hash，未要求 push 就不 push。
 
 ---
 
@@ -259,21 +256,22 @@ await captureScreenshot('/tmp/agent-teams-panel.png')   // 返回文件路径
 
 ### 真实端到端（独立 headless profile）
 - [ ] dsh plugin --profile headless add /abs/path/<pkg>
-- [ ] dsh run --profile headless "<小任务，明确要求走插件流程>"
+- [ ] dsh --profile headless "<小任务，明确要求走插件流程>"
 - [ ] 任务输出含完整流程叙述（建队/成员/任务/产出/删队）
 - [ ] 落盘：.agent-teams 状态文件存在（或按预期归档）
 - [ ] zstdcat 会话日志：agent-teams/* 事件数量与流程一一对应
 
 ### GUI（独立 web 实例 3081 + ego-browser）
 - [ ] dsh --profile agent-teams-web --patch port.patch.yml 启动，index 200
-- [ ] window.__DSH_BOOT__ 名册含插件（无则查 dshClient 双格式声明）
+- [ ] window.__DSH_BOOT__ 名册含插件（无则查 dsh.client + ./client export + bundle）
 - [ ] /plugins/<pkg>/client.js 200；自定义路由（state/assets）200 且内容正确
 - [ ] 新建会话跑任务 → 面板/卡片出现（DOM 探针 data-* 断言通过）
 - [ ] 关键交互闭环（跳转隐藏/会话跟随/归档复盘）逐项探针验证
 - [ ] 截图存档（运行中/终态/复盘）
 
 ### 清理与收尾
-- [ ] pkill 独立实例；completeTaskSpace(keep: false)；rm 临时目录
-- [ ] 运行实例 3080 验证前后均 200
-- [ ] git commit（remote 为空，未 push）
+- [ ] 用保存的 background task id 停止独立实例（若用户未要求保留）
+- [ ] completeTaskSpace(keep: false)；仅删除本任务创建的临时路径
+- [ ] 未操作用户指定的其他运行实例
+- [ ] 按用户授权 commit；未要求则未 push
 ```

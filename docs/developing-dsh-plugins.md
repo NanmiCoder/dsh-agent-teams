@@ -15,15 +15,15 @@
   `window.__DSH_BOOT__` 名册，在浏览器里作为 cordis 插件跑 `apply(ctx)`，渲染 UI。
 
 安装 = `dsh plugin --profile <profile> add <包路径或包名>`：pnpm 装进 profile，并把包加入
-profile manifest 的 `dsh.profile.bundles` 层列表；启动时 bundle 的 `cordis.patch.yml` 作为补丁层
-把插件行插进组合树。**安装后必须重启服务**（补丁在启动时组合；`cordis.patch.yml` 的用户层 HMR 只热更
-配置，不加载新插件行）。
+profile manifest 的 `dsh.profile.bundles` 层列表；bundle 的 `cordis.patch.yml` 作为补丁层把插件行插进组合树。
+**plugin add 后需要重启该 profile**，因为 package manifest/bundles 层和 client package metadata 在进程内缓存；
+但服务已启动后的用户 `cordis.patch.yml` 由 boot HMR 事务性重读，能够更新配置并挂载/移除 patch 行。
 
 ## 1. 插件形态与项目骨架
 
 ```
 dsh-my-plugin/
-├── package.json          # bundle 声明 + 双 manifest + exports
+├── package.json          # dsh.bundle + dsh.client + exports
 ├── cordis.patch.yml      # 向 host 组合插入插件行
 ├── tsconfig.json         # host 编译（排除 src/client）
 ├── tsconfig.client.json  # client 编译（jsx: react-jsx）
@@ -61,9 +61,8 @@ dsh-my-plugin/
   "files": ["lib", "assets", "cordis.patch.yml", "README.md"],
   "dsh": {
     "bundle": { "patch": "./cordis.patch.yml" },   // bundle 声明：patch 挂 host 行
-    "client": { "inject": ["@deepseek-ai/dsh-client-runtime"], "platform": "web" } // 新格式 manifest
+    "client": { "inject": ["@deepseek-ai/dsh-client-runtime"], "platform": "web" }
   },
-  "dshClient": { "inject": ["@deepseek-ai/dsh-client-runtime"], "platform": "web" },          // 旧格式（兼容！见 5.2）
   "scripts": {
     "build": "tsc -p tsconfig.json && tsc -p tsconfig.client.json && tsdown",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit"
@@ -72,10 +71,10 @@ dsh-my-plugin/
 ```
 
 - `exports["./client"]` 是名册扫描的硬要求：`client-modules` 读 `exports["./client"]` 找浏览器 bundle
-  （`clientExportOf` 支持 string 或 `{types, default}` 两种形态），缺失直接拒绝该包。
+  （支持 string 或带 string `default` 的一层条件对象；`types` 不参与运行时解析），缺失直接拒绝该包。
 - `dsh.bundle.patch` 让 `dsh plugin add` 的 reconcile 认出这是 bundle 并加入 bundles 层。
-- **`dsh.client` 与 `dshClient` 必须双声明**：新版本读 `dsh.client`（嵌套），当前部署的
-  `client-modules` 读顶层 `dshClient`——只声明一种，名册扫描直接判 null（见踩坑 5.2）。
+- `dsh.client` 是当前源码的权威 client manifest；`platform` 必须是 `"web"`。包元数据和负结论按名称缓存，
+  因此新增/删除 client 声明、修正 export 后必须重启 host。旧部署若不同，先核对其源码再做兼容声明。
 - `peerDependencies`：host 侧依赖（`@deepseek-ai/dsh-tools`、`dsh-session`、`dsh-subagent`…）+ 浏览器侧
   （`@deepseek-ai/dsh-client-runtime`、`dsh-client-ui-slots`、`react`）全部 peer，运行时从 profile 的
   `node_modules`（healProfilesModuleFallback 扁平目录）解析，不重复安装。
@@ -223,7 +222,8 @@ ctx.effect(() => ctx.httpServer.register({
 - `httpServer.register` 返回 disposer，必须包在 `ctx.effect(..., 'label')` 里（HMR 安全）。
 - 静态资源路由务必做**白名单**（防路径穿越）：`decodeURIComponent` 要包 try（畸形编码 404 而非 400），
   用 `split('/').pop()` 剥离路径后查 Set，再 `join`。
-- 客户端 1s 轮询是外部插件的标准数据通道（dsh-external 先例）；无需自造推送帧。
+- 客户端轮询是外部插件可用的朴素数据通道；使用 `cache: 'no-store'`、in-flight 防重叠、响应形状校验、
+  unmount/cancelled 防护，并在 host 暂时重启或请求失败时保留最后一份成功快照。
 
 ### 2.5 状态持久化（文件 + 进程内锁）
 
@@ -331,17 +331,19 @@ export default {
 }
 ```
 
-- `CLIENT_EXTERNALS` = 平台模块表（react、react-dom、react/jsx-runtime、@deepseek-ai/cordis、
-  dsh-client-ui-slots、dsh-client-web-react、dsh-client-ui-primitives 等）+ 运行时 store 豁免
-  `@deepseek-ai/dsh-client-runtime/client`。这些由浏览器加载器的模块表解析，绝不内联。
-- 浏览器端只能 import：平台模块（external）+ 类型（编译期擦除）+ 内联安全包
-  （`@deepseek-ai/dsh-(session|llm|tools|brand|host-apiproxy)`）。
+- `CLIENT_EXTERNALS` = 平台模块表 + `@deepseek-ai/dsh-client-runtime/client` 临时豁免；平台列表会演进，
+  应从目标 checkout 的 `packages/client/web/src/platform.ts`/`tsdown.client.ts` 复制。
+- 浏览器端只能 import 平台模块、类型和当前 preset 允许的 inline-safe 包；跨插件值协作走 cordis service。
+- `dsh.client.inject` 是 package graph/prefetch/HMR 元数据，不保证 apply 顺序；等待 slot declaration 用
+  `ctx.slots.inject()`，等待 service 用 client plugin 的 `export const inject`。
 - 依赖 `tsdown@0.22` + `lightningcss`，pnpm 安装即可。
 
-### 3.4 挂载：body-portal 浮层（没有右上角 slot）
+### 3.4 选择正确的 UI 接缝：slot 优先，body portal 兜底
 
-Web shell 没有右上角槽位（调研结论：最接近的是 `conversation.input.dock`），外部插件做
-右上角活动面板走 body portal + fixed 定位自管几何（dsh-external 的 whale-girl 等先例）：
+先读当前 `packages/client/ui-*/src/client/contract/slots.ts`。当前已有
+`conversation.session.header.actions`、`conversation.input.dock`、`conversation.composer.dock`、
+`conversation.input.left/right`、`conversation.chat.node` 等稳定接缝。能落入语义正确 slot 就优先注册；
+只有跨会话、固定在 shell 角落且没有对应 seat 的全局面板，才使用 body portal + fixed 定位：
 
 ```tsx
 // src/client/index.tsx
@@ -360,10 +362,54 @@ export function apply(ctx: ClientContext): void {
 }
 ```
 
-- `ctx.sessions.list` 是 `ObservableSnapshot<SessionListState>`（含 `current` 当前会话 id）——
-  浮层组件用 `useSyncExternalStore(sessionsList.subscribe, sessionsList.getSnapshot)` 订阅
-  （非 slot 组件没有框架 hook，这是唯一途径）。
-- 数据用 1s 轮询 host 路由（fetch），注意 in-flight 防重叠、响应形状校验、`document.hidden` 暂停。
+- `ctx.sessions.list` 是 `ObservableSnapshot<SessionListState>`；portal 组件用 `useSyncExternalStore` 订阅。
+- portal host、React root、window/document 监听器和全局 attribute 都必须 effect-owned 并在 HMR 卸载时清理。
+- 自动展开/宽限收起要显式建模；用户导航时同步关闭，不依赖轮询延迟。
+
+#### 3.4.1 浮层与主工作区协作
+
+宽屏固定浮层会遮住 transcript/composer 时，让对话列礼让空间，但保持侧边栏不动。portal 用全局 attribute
+广播 open state，CSS 只依赖 host 的稳定 data 属性，不依赖 hashed class：
+
+```tsx
+useEffect(() => {
+  const root = document.documentElement
+  if (open) root.setAttribute('data-my-plugin-panel-open', '')
+  else root.removeAttribute('data-my-plugin-panel-open')
+  return () => { root.removeAttribute('data-my-plugin-panel-open') }
+}, [open])
+```
+
+```css
+:global(html) {
+  --my-panel-width: 388px;
+  --my-panel-shift: calc(var(--my-panel-width) + 18px + 14px);
+}
+:global(html[data-my-plugin-panel-open]) :global([data-phase='active']) {
+  box-sizing: border-box;
+  padding-right: var(--my-panel-shift);
+}
+:global([data-phase='active']) {
+  transition: padding-right 360ms cubic-bezier(.22, 1, .36, 1);
+}
+@media (max-width: 960px) {
+  :global(html[data-my-plugin-panel-open]) :global([data-phase='active']) { padding-right: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  :global([data-phase='active']) { transition: none; }
+}
+```
+
+宽屏断言 panel 与 composer overlap 为 0；窄屏安全退化成 overlay。
+
+#### 3.4.2 关系 UI 与无障碍
+
+- captain→member 派工与 task dependency stage 同时用连线、文字和状态表达，不能只靠颜色。
+- 把 stage grouping、上下游 chain 提取为纯函数：自然排序 id、非有限 depth 回退 0、遍历 cycle-safe。
+- hover 只做 preview；click 单独 pin，`aria-pressed` 只落在 pin 源节点，二次 click 或 `Escape` 取消；
+  focus/blur 与 mouse enter/leave 行为对等。
+- icon-only button 有 `aria-label`，section 有 label，装饰图 `alt="" aria-hidden`，交互有 `:focus-visible`，
+  动画和过渡覆盖 `prefers-reduced-motion`。
 
 ### 3.5 对话流节点（Conversation Node，模板：ui-workflow-run）
 
@@ -468,13 +514,13 @@ dsh --profile <scratch> --dump-config   # 验证组合树里出现插件行（�
 - **解决**：不在 apply 校验 provider；在首次 `spawnMember` 时 `getProvider` 校验并抛可操作错误
   （"最早可解析点 fail-loud"）。
 
-### 5.2 浏览器名册不收录插件（manifest 格式兼容）
+### 5.2 浏览器名册不收录插件（manifest / export / bundle）
 
-- **现象**：`window.__DSH_BOOT__` 里没有你的条目，`/plugins/<id>/client.js` 404；而包名解析、
-  exports、manifest 看起来都对。
-- **根因**：当前部署（staging 快照）的 `client-modules` 读 package.json **顶层 `dshClient`** 字段；
-  新版本读嵌套 `dsh.client`。只声明新格式 → 旧版扫描判 null（负缓存永久生效）。
-- **解决**：package.json 同时声明 `dsh.client` 与 `dshClient`（内容一致）。
+- **现象**：`window.__DSH_BOOT__` 没有条目，或 host 启动时报 client bundle composition error。
+- **当前契约**：`client-modules` 读取 `package.json.dsh.client`，要求 `platform: "web"`、合法的
+  `exports["./client"]` 和真实存在的 bundle；声明畸形或 bundle 缺失会 fail loud。
+- **缓存边界**：包元数据和负结论不失效；修正 manifest/export 后重启 host。仅 `lib/client.js` 内容变化
+  才进入 client HMR 重建链。
 
 ### 5.3 `declare module` 合并不生效（TS2664 / 类型 union 不含你的事件）
 
@@ -522,19 +568,19 @@ dsh --profile <scratch> --dump-config   # 验证组合树里出现插件行（�
 
 - **轮询竞态**：1s setInterval + fetch 可能重叠乱序——in-flight 标志或序号，只应用最新。
 - **响应形状校验**：`body.teams ?? []` 不够——`Array.isArray(body.teams)` 防 200 但形状异常时闪烁。
-- **闭包内 setState 与事件监听**：window 事件监听器里读"最新 current"用 ref（useEffect [] 闭包
-  捕获初始值）。
-- **导航即收起**：点击跳转子会话时要同步 `setOpen(false)`，不要等自动收起宽限（用户感知 1s 延迟）。
-- **删除即归档**：复盘类数据（任务/依赖/消息）删除时归档（`archive/` 子目录），不要物理删除；
-  归档目录天然被活动扫描跳过（没有 team.json 在根级），另开 `?archived=1` 查询。
-- **会话跟随**：全局浮层必须按"当前会话"过滤（`SessionListState.current` + `captainSessionId`），
-  否则新建会话会残留上一个会话的活动；`current === undefined`（初始）时不显示任何团队。
+- **闭包内 setState 与事件监听**：window 监听器读最新 current 用 ref，并在 effect 中同步；不要 render-phase 写 ref。
+- **导航即收起**：点击跳转子会话时同步 `setOpen(false)`，不要等自动收起宽限。
+- **删除即归档**：复盘数据删除时归档，由 live scan 排除，另开 `?archived=1` 查询。
+- **会话跟随**：按 `SessionListState.current + captainSessionId` 过滤；`current === undefined` 时不显示团队。
+- **历史数据复合身份**：可重复业务 id 不能单独作为 historic/archived key；使用
+  `${ownerSessionId}:${businessId}`，restore/dedup 同样匹配 owner。旧事件缺 owner 时在卡片激活时用当前会话固化归属。
+- **异步卸载防护**：轮询、归档 fetch、timeout 和事件监听都要 cancelled/disposer。
 
 ## 6. 验证金字塔（从快到慢）
 
 1. `pnpm typecheck`（双 program）→ 2. `pnpm build` → 3. `node scripts/verify.mjs`（纯逻辑/文件往返）
    → 4. `dsh --profile <scratch> --dump-config`（组合树含插件行）→ 5. headless 真实任务
-   （`dsh run --profile headless "…"`，需 DEEPSEEK_API_KEY）→ 6. 独立 web 实例
+   （`dsh --profile headless "…"`，需 DEEPSEEK_API_KEY）→ 6. 独立 web 实例
    （`dsh --profile <web+插件> --patch <port>` + curl 探名册/路由）→ 7. ego-browser 驱动真实浏览器
    GUI 端到端（跑任务、DOM 探针断言面板/卡片/动画）。
 

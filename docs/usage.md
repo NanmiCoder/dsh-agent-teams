@@ -77,11 +77,11 @@
 - 成员 persona 替换部署默认 persona；成员仍拥有完整工具集（bash/fs/web 等）。
 - 团队状态为文件级持久化，多进程同时操作同一团队不保证一致（同一 dsh 进程内已用锁串行化）。
 - 活动面板读磁盘真相（1s 轮询），与会话日志事件流相互独立。
-- 右上角浮层为 body portal 自管几何（Web shell 无右上角槽位），不参与 shell 布局系统。
+- 右上角浮层通过 body portal 挂载；宽屏展开时主对话列平滑向左礼让空间，窄屏退回 overlay 模式，左侧导航保持不动。
 - 成员（模型）不总是严格走工具"仪式"（如完成时不调 `agent_teams_update_task`）——面板如实反映磁盘真相，队长以 `agent_teams_status`/文件为准汇总。
 
 ## 验证
 
 - 离线冒烟：`pnpm build && pnpm typecheck && node scripts/verify.mjs`；组合验证 `dsh --profile agent-teams-check --dump-config`
-- 真实 e2e：`dsh plugin --profile headless add <path>` 后 `dsh run --profile headless "用 AgentTeams …"`，核对 `.agent-teams/` 状态文件与会话日志事件流
+- 真实 e2e：`dsh plugin --profile headless add <path>` 后 `dsh --profile headless "用 AgentTeams …"`，核对 `.agent-teams/` 状态文件与会话日志事件流
 - GUI：独立实例 + ego-browser（详见 `verification-guide.md`）

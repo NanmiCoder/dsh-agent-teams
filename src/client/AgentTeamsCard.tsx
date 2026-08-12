@@ -30,9 +30,17 @@ export type AgentTeamsCardProps =
   & PropsLocale<'agentTeams'>
   & AgentTeamsCardInjected
 
-/** Re-activate the top-right activity panel. */
-function openActivityPanel(): void {
-  window.dispatchEvent(new CustomEvent(OPEN_PANEL_EVENT))
+/** Re-activate the top-right activity panel, carrying this team's summary
+ * so the panel can show it even when the team no longer exists on disk
+ * (historical session review). */
+function openActivityPanel(data: AgentTeamsCardData): void {
+  window.dispatchEvent(new CustomEvent(OPEN_PANEL_EVENT, {
+    detail: {
+      teamId: data.teamId,
+      teamName: data.teamName,
+      members: data.members,
+    },
+  }))
 }
 
 /** Render one durable team as a compact conversation card. */
@@ -47,7 +55,7 @@ export function AgentTeamsCard({ node, openSession }: AgentTeamsCardProps) {
         <button
           type="button"
           className={css.panelButton}
-          onClick={openActivityPanel}
+          onClick={() => { openActivityPanel(data) }}
           aria-label="打开活动面板"
           title="打开活动面板"
         >

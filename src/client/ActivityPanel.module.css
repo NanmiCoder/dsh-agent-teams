@@ -484,7 +484,7 @@
   color: var(--dsw-alias-label-tertiary);
   font-size: 11.5px;
   line-height: 16px;
-  padding: 4px 2px;
+  padding: 8px 14px;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -614,4 +614,22 @@
   .memberAvatar[data-unread='true']::after {
     animation: none;
   }
+}
+
+/* ── historic (ended) team sections ─────────────────────────────────────── */
+
+.team[data-historic] {
+  opacity: 0.78;
+}
+
+.historicPill {
+  flex: none;
+  margin-left: auto;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--dsw-alias-bg-fill-neutral);
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 15px;
 }

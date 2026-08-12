@@ -18,6 +18,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { ACTION_ART, LEAD_ART, memberArtUrl } from './artwork.ts'
 import { OPEN_PANEL_EVENT } from './AgentTeamsCard.tsx'
+import type { AgentTeamsCardData } from './agent-teams-card-definition.ts'
 import css from './ActivityPanel.module.css'
 
 /** Poll cadence for the host snapshot route. */
@@ -215,6 +216,7 @@ export function ActivityPanel({ openSession }: {
   const [open, setOpen] = useState(false)
   const [autoOpened, setAutoOpened] = useState(false)
   const [wasActive, setWasActive] = useState(false)
+  const [historic, setHistoric] = useState<ReadonlyMap<string, AgentTeamsCardData>>(new Map())
 
   useEffect(() => {
     let cancelled = false
@@ -237,7 +239,17 @@ export function ActivityPanel({ openSession }: {
   }, [])
 
   useEffect(() => {
-    const onOpenPanel = (): void => { setOpen(true) }
+    const onOpenPanel = (event: Event): void => {
+      setOpen(true)
+      const detail = (event as CustomEvent<AgentTeamsCardData>).detail
+      if (detail?.teamId !== undefined) {
+        setHistoric((previous) => {
+          const next = new Map(previous)
+          next.set(detail.teamId, detail)
+          return next
+        })
+      }
+    }
     window.addEventListener(OPEN_PANEL_EVENT, onOpenPanel)
     return () => { window.removeEventListener(OPEN_PANEL_EVENT, onOpenPanel) }
   }, [])
@@ -289,11 +301,50 @@ export function ActivityPanel({ openSession }: {
             </button>
           </header>
           <div className={css.teams}>
-            {teams.length === 0
+            {teams.length === 0 && historic.size === 0
               ? <span className={css.emptyHint}>暂无团队活动</span>
-              : teams.map((team) => (
-                <TeamSection key={team.teamId} team={team} openSession={openSession} />
-              ))}
+              : (
+                <>
+                  {teams.map((team) => (
+                    <TeamSection key={team.teamId} team={team} openSession={openSession} />
+                  ))}
+                  {[...historic.values()].filter((team) => !teams.some((live) => live.teamId === team.teamId)).map((team) => (
+                    <section key={team.teamId} className={css.team} data-team-id={team.teamId} data-historic>
+                      <header className={css.teamHead}>
+                        <span className={css.teamName} title={team.teamName}>
+                          <img className={css.leadAvatar} src={LEAD_ART} alt="" aria-hidden /> {team.teamName}
+                        </span>
+                        <span className={css.historicPill}>已结束</span>
+                      </header>
+                      <div className={css.members}>
+                        {team.members.map((member) => (
+                          <button
+                            type="button"
+                            key={member.id}
+                            className={css.memberRow}
+                            data-activity="idle"
+                            onClick={() => { if (member.id !== '') openSession(member.id as SessionId) }}
+                          >
+                            <span className={css.memberAvatar}>
+                              {memberArtUrl(member.name, member.role) !== null ? (
+                                <img className={css.memberArt} src={memberArtUrl(member.name, member.role) ?? ''} alt="" aria-hidden />
+                              ) : (
+                                <span className={css.memberInitial} style={{ background: accentOf(member.id) }}>{memberInitial(member.name)}</span>
+                              )}
+                            </span>
+                            <span className={css.memberInfo}>
+                              <span className={css.memberLine}>
+                                <span className={css.memberName}>{member.name}</span>
+                                {member.role !== '' && <span className={css.memberRole}>{member.role}</span>}
+                              </span>
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                  ))}
+                </>
+              )}
           </div>
         </aside>
       )}

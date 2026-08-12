@@ -23,7 +23,10 @@ export function apply(ctx: ClientContext): void {
   host.dataset.agentTeamsHost = ''
   document.body.appendChild(host)
   const root = createRoot(host)
-  root.render(<ActivityPanel openSession={(id: SessionId) => { ctx.sessions.open(id) }} />)
+  root.render(<ActivityPanel
+    sessionsList={ctx.sessions.list}
+    openSession={(id: SessionId) => { ctx.sessions.open(id) }}
+  />)
   ctx.effect(() => () => {
     root.unmount()
     host.remove()

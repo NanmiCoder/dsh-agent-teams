@@ -154,6 +154,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
         await createTeamDir(stateRoot, state)
         appendTeamEvent(ctx, captain.session, 'agent-teams/team-created', {
           teamId: state.id,
+          captainSessionId: captain.id,
           name: state.name,
           ...state.description !== undefined ? { description: state.description } : {},
         })

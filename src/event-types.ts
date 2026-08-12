@@ -13,6 +13,8 @@
 /** Opens one team record: the captain created the team. */
 export interface AgentTeamsTeamCreatedData {
   readonly teamId: string
+  /** The captain session that owns this team (UI follows it). */
+  readonly captainSessionId: string
   readonly name: string
   readonly description?: string
 }

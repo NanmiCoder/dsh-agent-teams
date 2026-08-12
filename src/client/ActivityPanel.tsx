@@ -14,8 +14,9 @@
  * @module dsh-agent-teams/client/activity
  */
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import type { ObservableSnapshot, SessionListState } from '@deepseek-ai/dsh-client-runtime/client'
 import { ACTION_ART, LEAD_ART, memberArtUrl } from './artwork.ts'
 import { OPEN_PANEL_EVENT } from './AgentTeamsCard.tsx'
 import type { AgentTeamsCardData } from './agent-teams-card-definition.ts'
@@ -208,15 +209,24 @@ function TeamSection({ team, openSession }: {
   )
 }
 
-/** The top-right activity floater. */
-export function ActivityPanel({ openSession }: {
+/** The top-right activity floater. Teams follow the current session: live
+ * snapshots and historic card summaries are only shown while their captain
+ * session is the one currently open. */
+export function ActivityPanel({ sessionsList, openSession }: {
+  readonly sessionsList: ObservableSnapshot<SessionListState>
   readonly openSession: (id: SessionId) => void
 }) {
   const [teams, setTeams] = useState<readonly ActivityTeam[]>([])
   const [open, setOpen] = useState(false)
   const [autoOpened, setAutoOpened] = useState(false)
   const [wasActive, setWasActive] = useState(false)
-  const [historic, setHistoric] = useState<ReadonlyMap<string, AgentTeamsCardData>>(new Map())
+  const [historic, setHistoric] = useState<ReadonlyMap<string, { data: AgentTeamsCardData; owner: string }>>(new Map())
+  const current = useSyncExternalStore(
+    sessionsList.subscribe,
+    sessionsList.getSnapshot,
+  ).current
+  const currentRef = useRef(current)
+  currentRef.current = current
 
   useEffect(() => {
     let cancelled = false
@@ -243,9 +253,12 @@ export function ActivityPanel({ openSession }: {
       setOpen(true)
       const detail = (event as CustomEvent<AgentTeamsCardData>).detail
       if (detail?.teamId !== undefined) {
+        // A card from a log that predates captainSessionId belongs to the
+        // session that activated it (the current one at injection time).
+        const owner = detail.captainSessionId !== '' ? detail.captainSessionId : currentRef.current ?? ''
         setHistoric((previous) => {
           const next = new Map(previous)
-          next.set(detail.teamId, detail)
+          next.set(detail.teamId, { data: detail, owner })
           return next
         })
       }
@@ -254,8 +267,23 @@ export function ActivityPanel({ openSession }: {
     return () => { window.removeEventListener(OPEN_PANEL_EVENT, onOpenPanel) }
   }, [])
 
+  // Teams follow the current session: live snapshots and historic card
+  // summaries are visible only while their captain session is current.
+  const visibleTeams = useMemo(
+    () => (current === undefined ? teams : teams.filter((team) => team.captainSessionId === current)),
+    [teams, current],
+  )
+  const visibleHistoric = useMemo(
+    () => [...historic.values()].filter(({ data, owner }) =>
+      (current === undefined || owner === current)
+      && !teams.some((live) => live.teamId === data.teamId),
+    ),
+    [historic, current, teams],
+  )
+  const visibleCount = visibleTeams.length + visibleHistoric.length
+
   useEffect(() => {
-    if (teams.length > 0) {
+    if (visibleCount > 0) {
       setWasActive(true)
       if (!autoOpened) {
         setOpen(true)
@@ -269,13 +297,13 @@ export function ActivityPanel({ openSession }: {
       setWasActive(false)
     }, AUTOCLOSE_GRACE_MS)
     return () => { clearTimeout(timer) }
-  }, [teams, autoOpened, wasActive])
+  }, [visibleCount, autoOpened, wasActive])
 
   const busy = useMemo(
-    () => teams.some((team) => team.members.some((member) => member.activity === 'working')),
-    [teams],
+    () => visibleTeams.some((team) => team.members.some((member) => member.activity === 'working')),
+    [visibleTeams],
   )
-  const hasTeams = teams.length > 0
+  const hasTeams = visibleCount > 0
 
   if (!hasTeams && !open) return null
 
@@ -301,14 +329,14 @@ export function ActivityPanel({ openSession }: {
             </button>
           </header>
           <div className={css.teams}>
-            {teams.length === 0 && historic.size === 0
+            {visibleCount === 0
               ? <span className={css.emptyHint}>暂无团队活动</span>
               : (
                 <>
-                  {teams.map((team) => (
+                  {visibleTeams.map((team) => (
                     <TeamSection key={team.teamId} team={team} openSession={openSession} />
                   ))}
-                  {[...historic.values()].filter((team) => !teams.some((live) => live.teamId === team.teamId)).map((team) => (
+                  {visibleHistoric.map(({ data: team }) => (
                     <section key={team.teamId} className={css.team} data-team-id={team.teamId} data-historic>
                       <header className={css.teamHead}>
                         <span className={css.teamName} title={team.teamName}>

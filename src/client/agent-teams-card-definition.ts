@@ -26,6 +26,8 @@ import type { AgentTeamsMemberAddedData } from '../event-types.ts'
 /** Final keyed Chat payload for the team summary card. */
 export interface AgentTeamsCardData {
   readonly teamId: string
+  /** The captain session that owns this team (panel follows it). */
+  readonly captainSessionId: string
   readonly teamName: string
   readonly members: readonly {
     readonly id: string
@@ -52,6 +54,7 @@ interface AgentTeamsMemberState {
 /** Folded team record (the node's business state). */
 export interface AgentTeamsNodeState {
   readonly teamId: string
+  readonly captainSessionId: string
   readonly name: string
   readonly members: readonly AgentTeamsMemberState[]
 }
@@ -83,7 +86,9 @@ export const agentTeamsCardDefinition: ConversationNodeDefinition<AgentTeamsNode
     if (match.event.type !== 'agent-teams/team-created') {
       throw new Error('agent-teams card start requires agent-teams/team-created')
     }
-    return { teamId: match.event.data.teamId, name: match.event.data.name, members: [] }
+    // Older logs predate captainSessionId on the event; the card then has no
+    // owner and only shows for a matching historic injection.
+    return { teamId: match.event.data.teamId, captainSessionId: match.event.data.captainSessionId ?? '', name: match.event.data.name, members: [] }
   },
   update: (context, match) => {
     if (match.event.type === 'agent-teams/member-added') return updateMemberAdded(context.state, match.event.data)
@@ -111,6 +116,7 @@ export const agentTeamsCardDefinition: ConversationNodeDefinition<AgentTeamsNode
       visibility: 'visible',
       data: {
         teamId: state.teamId,
+        captainSessionId: state.captainSessionId,
         teamName: state.name,
         members: state.members
           .filter((member) => member.removed !== true)

@@ -37,6 +37,7 @@ function openActivityPanel(data: AgentTeamsCardData): void {
   window.dispatchEvent(new CustomEvent(OPEN_PANEL_EVENT, {
     detail: {
       teamId: data.teamId,
+      captainSessionId: data.captainSessionId,
       teamName: data.teamName,
       members: data.members,
     },

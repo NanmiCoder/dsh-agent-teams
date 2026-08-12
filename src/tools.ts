@@ -502,7 +502,13 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
       const stateRoot = stateRootOf(workspace, config)
       const team = await requireTeam(workspace, config, caller)
       const isCaptain = team.captainSessionId === caller.id
-      const from = args.from ?? (isCaptain ? CAPTAIN_KEY : memberNameOf(team, caller.id) ?? CAPTAIN_KEY)
+      const callerIdentity = isCaptain ? CAPTAIN_KEY : memberNameOf(team, caller.id) ?? CAPTAIN_KEY
+      // `from` may only be the caller's own identity: impersonating another
+      // member (or the captain) would poison the mailbox and event records.
+      if (args.from !== undefined && args.from !== callerIdentity) {
+        throw new Error(`agent_teams_send_message: "from" must be your own identity ("${callerIdentity}"), not "${args.from}"`)
+      }
+      const from = callerIdentity
       const to = args.to.trim()
       // The captain is the direct parent of every member, so only its Agent
       // can wake a member (followup) or reach the main inbox. When the captain

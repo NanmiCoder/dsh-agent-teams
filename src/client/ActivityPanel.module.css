@@ -208,16 +208,32 @@
   min-width: 0;
 }
 
+.memberBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 6px 8px 8px 6px;
+  border: 1px solid var(--dsw-alias-line-normal);
+  border-left: 3px solid var(--dsw-alias-line-strong);
+  border-radius: 10px;
+  background: var(--dsw-alias-bg-module);
+}
+
+.memberBlock[data-activity='working'] {
+  border-color: var(--dsw-alias-state-business-primary);
+}
+
 .memberRow {
   display: flex;
   align-items: center;
   gap: 8px;
   width: 100%;
   min-width: 0;
-  padding: 6px 8px;
+  padding: 4px 4px 4px 2px;
   box-sizing: border-box;
   border: 0;
-  border-radius: 10px;
+  border-radius: 8px;
   background: transparent;
   color: inherit;
   font: inherit;
@@ -322,9 +338,18 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
   color: var(--dsw-alias-label-tertiary);
   font-size: 10px;
   line-height: 14px;
+}
+
+.memberStatusLine {
+  overflow: hidden;
+  min-width: 0;
+  color: var(--dsw-alias-label-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .memberTaskId {
@@ -367,6 +392,10 @@
   border-radius: 6px;
 }
 
+.taskRow[data-current='true'] {
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 8%, transparent);
+}
+
 .taskRow:hover {
   background: var(--dsw-alias-bg-fill-neutral);
 }
@@ -389,6 +418,58 @@
 
 .taskStateBar[data-state='blocked'] {
   background: var(--dsw-alias-state-warning);
+}
+
+.taskStateBar[data-state='failed'] {
+  background: var(--dsw-alias-state-danger);
+}
+
+.taskStateBar[data-state='cancelled'] {
+  background: var(--dsw-alias-label-tertiary);
+}
+
+.memberTasks {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  margin-top: 2px;
+  padding-left: 2px;
+}
+
+.currentPill {
+  flex: none;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--dsw-alias-bg-fill-business);
+  color: var(--dsw-alias-label-on-fill);
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 14px;
+}
+
+.taskEmpty {
+  padding: 2px 6px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 10px;
+  line-height: 14px;
+}
+
+.unclaimed {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: var(--dsw-alias-bg-fill-neutral);
+}
+
+.unclaimedTitle {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 14px;
 }
 
 .taskId {
@@ -423,6 +504,17 @@
 .taskBadge[data-state='blocked'] {
   background: var(--dsw-alias-bg-fill-warning);
   color: var(--dsw-alias-label-on-fill);
+}
+
+.taskBadge[data-state='failed'] {
+  background: var(--dsw-alias-bg-fill-danger);
+  color: var(--dsw-alias-label-on-fill);
+}
+
+.taskBadge[data-state='cancelled'] {
+  background: var(--dsw-alias-bg-fill-neutral);
+  color: var(--dsw-alias-label-tertiary);
+  text-decoration: line-through;
 }
 
 .taskSubject {

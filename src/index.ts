@@ -145,7 +145,15 @@ export function apply(ctx: Context, config: Config): void {
     kind: 'prefix',
     path: '/plugins/dsh-agent-teams/assets',
     handler: async (req, res) => {
-      const name = decodeURIComponent(new URL(req.url ?? '/', 'http://x').pathname.split('/').pop() ?? '')
+      let name: string
+      try {
+        name = decodeURIComponent(new URL(req.url ?? '/', 'http://x').pathname.split('/').pop() ?? '')
+      } catch {
+        // Malformed percent-encoding: treat as an unknown asset, not a 400.
+        res.writeHead(404)
+        res.end()
+        return
+      }
       if (!ART_ALLOWLIST.has(name)) {
         res.writeHead(404)
         res.end()

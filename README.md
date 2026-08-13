@@ -16,10 +16,12 @@ DeepSeek Harness 的 AgentTeams 插件：安装后，任何会话只需一句自
 - 已安装或可通过 `npx` 使用 DeepSeek Harness
 
 ```sh
-npx -p @deepseek-ai/dsh dsh plugin --profile web add github:NanmiCoder/dsh-agent-teams
+npx -p @deepseek-ai/dsh dsh plugin --profile web add github:dsh-external/dsh-agent-teams
 ```
 
 该命令直接从 GitHub 仓库安装插件，无需 npm 包。`dsh plugin` 会把插件加入 `web` profile，并根据包内的 `dsh.bundle` 声明自动启用它；工具、系统提示和 Web 客户端入口随该 profile 一起加载。
+
+> **私有仓库凭证**：本仓库不公开，`github:` 安装依赖本机 git 对 `dsh-external/dsh-agent-teams` 的读取权限（已配置的 SSH key，或带 `repo` 权限的 HTTPS token），否则拉取时认证会失败。
 
 > **重启生效**：安装完成后，重启正在运行的 DeepSeek Harness Web 服务并刷新页面。
 
@@ -36,7 +38,7 @@ npx -p @deepseek-ai/dsh dsh plugin --profile web add github:NanmiCoder/dsh-agent
 仓库按开放 Agent Skills 规范提供 [`dsh-plugin-development`](skills/dsh-plugin-development/SKILL.md)，可直接安装：
 
 ```sh
-npx skills add NanmiCoder/dsh-agent-teams --skill dsh-plugin-development
+npx skills add dsh-external/dsh-agent-teams --skill dsh-plugin-development
 ```
 
 `skills/dsh-plugin-development/` 是唯一权威源码；`.dsh/skills/` 保存供 DSH 在本仓库作为 cwd 时自动发现的跨平台镜像。修改 Skill 后运行 `pnpm sync:skill`，`pnpm verify` 会检查镜像没有漂移。

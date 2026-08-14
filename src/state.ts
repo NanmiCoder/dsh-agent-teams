@@ -13,7 +13,7 @@
  * @module dsh-agent-teams/state
  */
 
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { TaskStatus, TeamMember, TeamMessage, TeamState, TeamTask } from './types.ts'
@@ -43,14 +43,42 @@ export async function withTeamLock<T>(key: string, fn: () => Promise<T>): Promis
   }
 }
 
+/** Longest key emitted before truncating and appending a digest. */
+const MAX_KEY_LENGTH = 48
+
+/** Short stable digest, used to keep otherwise-colliding keys distinct. */
+function keyDigest(name: string): string {
+  return createHash('sha256').update(name).digest('hex').slice(0, 8)
+}
+
 /**
  * Fold a free-form name into a safe path/key segment.
+ *
+ * Unicode letters and digits survive, so CJK/Cyrillic/Greek names stay
+ * distinct and readable; everything else — spaces, punctuation, path
+ * separators, control characters — folds to `-`. An ASCII-only whitelist
+ * mapped *every* non-Latin name onto one shared fallback, which silently
+ * merged their mailboxes and rejected the second such member as a duplicate.
+ *
+ * A name with no letters or digits at all (pure emoji or punctuation) cannot
+ * yield a readable key, so it gets a digest rather than a shared constant.
+ * Over-long names are truncated with a digest appended, so names sharing a
+ * long prefix stay distinct and the result stays within filesystem limits
+ * (CJK costs 3 bytes per character in UTF-8).
+ *
  * @param name - any user-supplied name.
- * @returns lowercase `[a-z0-9-]` key, never empty.
+ * @returns a non-empty key safe as a single path segment.
  */
 export function sanitizeKey(name: string): string {
-  const cleaned = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
-  return cleaned === '' ? 'team' : cleaned
+  const cleaned = name.normalize('NFC').trim().toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, '-')
+    .replace(/^-+|-+$/g, '')
+  if (cleaned === '') return `k-${keyDigest(name)}`
+  const points = [...cleaned]
+  if (points.length > MAX_KEY_LENGTH) {
+    return `${points.slice(0, MAX_KEY_LENGTH).join('')}-${keyDigest(name)}`
+  }
+  return cleaned
 }
 
 /**

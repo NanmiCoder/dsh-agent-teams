@@ -85,7 +85,32 @@ check(
 
 console.log('2/6 pure rules')
 check("sanitizeKey('My Team!') -> 'my-team'", sanitizeKey('My Team!') === 'my-team')
-check("sanitizeKey('!!!') falls back to 'team'", sanitizeKey('!!!') === 'team')
+// #15: an ASCII-only whitelist folded every non-Latin name onto one constant,
+// so distinct members shared a mailbox file and the second one was rejected as
+// a duplicate. Keys must stay distinct for distinct names, in any script.
+check("CJK names survive folding", sanitizeKey('研究员') === '研究员')
+check(
+  'distinct non-Latin names stay distinct',
+  sanitizeKey('研究员') !== sanitizeKey('工程师')
+    && sanitizeKey('データ分析') !== sanitizeKey('Данные'),
+)
+check(
+  'names with no letters or digits get distinct keys, not a shared constant',
+  sanitizeKey('!!!') !== sanitizeKey('🐳') && sanitizeKey('🐳') !== '',
+)
+check('folding is deterministic', sanitizeKey('🐳') === sanitizeKey('🐳'))
+check(
+  'long names stay inside the filesystem name limit',
+  Buffer.byteLength(`${sanitizeKey('研'.repeat(300))}.jsonl`) < 255,
+)
+check(
+  'long names sharing a prefix stay distinct',
+  sanitizeKey(`${'研'.repeat(60)}a`) !== sanitizeKey(`${'研'.repeat(60)}b`),
+)
+check(
+  'keys stay a single safe path segment',
+  !/[\\/:*?"<>|]/.test(sanitizeKey('a/b\\c:d*e?f"g<h>i|j')) && !sanitizeKey('../../etc').includes('.'),
+)
 check('pending -> claimed allowed', transitionError('pending', 'claimed') === undefined)
 check('pending -> in_progress denied', transitionError('pending', 'in_progress') !== undefined)
 check('in_progress -> completed allowed', transitionError('in_progress', 'completed') === undefined)

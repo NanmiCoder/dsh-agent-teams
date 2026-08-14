@@ -24,8 +24,21 @@ export declare const CAPTAIN_KEY = "captain";
 export declare function withTeamLock<T>(key: string, fn: () => Promise<T>): Promise<T>;
 /**
  * Fold a free-form name into a safe path/key segment.
+ *
+ * Unicode letters and digits survive, so CJK/Cyrillic/Greek names stay
+ * distinct and readable; everything else — spaces, punctuation, path
+ * separators, control characters — folds to `-`. An ASCII-only whitelist
+ * mapped *every* non-Latin name onto one shared fallback, which silently
+ * merged their mailboxes and rejected the second such member as a duplicate.
+ *
+ * A name with no letters or digits at all (pure emoji or punctuation) cannot
+ * yield a readable key, so it gets a digest rather than a shared constant.
+ * Over-long names are truncated with a digest appended, so names sharing a
+ * long prefix stay distinct and the result stays within filesystem limits
+ * (CJK costs 3 bytes per character in UTF-8).
+ *
  * @param name - any user-supplied name.
- * @returns lowercase `[a-z0-9-]` key, never empty.
+ * @returns a non-empty key safe as a single path segment.
  */
 export declare function sanitizeKey(name: string): string;
 /**

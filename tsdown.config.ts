@@ -47,7 +47,16 @@ const GENERATED_REMOTE = /^@deepseek-ai\/dsh-[a-z0-9]+(?:-[a-z0-9]+)*\/remote$/
 const CSS_VIRTUAL_PREFIX = '\0dsh-css:'
 const CSS_VIRTUAL_SUFFIX = '.mjs'
 
-const PLUGIN_ID = 'dsh-agent-teams'
+/**
+ * Module id this bundle registers under via `__ModuleLoader__.load`. The host
+ * looks the bundle up by the plugin's package name, so this must BE the
+ * package name — read it from package.json rather than restating it, so a
+ * rename cannot leave the client half registering a stale id (a mismatch
+ * fails only in the browser, after the host half has already loaded fine).
+ */
+const PLUGIN_ID: string = JSON.parse(
+  readFileSync(new URL('./package.json', import.meta.url), 'utf8'),
+).name
 
 const config: UserConfig = {
   name: `${PLUGIN_ID}/client`,

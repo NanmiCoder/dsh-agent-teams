@@ -72,6 +72,16 @@ check(
   !pkg.name.startsWith('@') || pkg.publishConfig?.access === 'public',
   'scoped packages default to restricted without publishConfig.access = "public"',
 )
+// The browser half registers itself with __ModuleLoader__ under an id the host
+// resolves by package name. A stale id here fails only in the browser — the
+// host half loads fine, so every server-side check still passes.
+const clientBundle = await readFile(new URL('../lib/client.js', import.meta.url), 'utf8')
+const registeredId = clientBundle.match(/__ModuleLoader__\.load\(\{\s*id:\s*"([^"]*)"/)?.[1]
+check(
+  'client bundle registers under the package name',
+  registeredId === pkg.name,
+  `bundle registers ${JSON.stringify(registeredId)}, package.json has ${JSON.stringify(pkg.name)}`,
+)
 
 console.log('2/6 pure rules')
 check("sanitizeKey('My Team!') -> 'my-team'", sanitizeKey('My Team!') === 'my-team')

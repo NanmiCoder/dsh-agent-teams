@@ -18,12 +18,12 @@ DeepSeek Harness 的 AgentTeams 插件：安装后，任何会话只需一句自
 插件已发布到 npm（`@nanmicoder` scope），一条命令装好：
 
 ```sh
-npx -p @deepseek-ai/dsh dsh plugin --profile web add @nanmicoder/dsh-agent-teams@0.1.0
+npx -p @deepseek-ai/dsh dsh plugin --profile web add @nanmicoder/dsh-agent-teams@0.1.1
 ```
 
 `dsh plugin` 会把插件加入 `web` profile，并根据包内的 `dsh.bundle` 声明自动启用它；工具、系统提示和 Web 客户端入口随该 profile 一起加载。
 
-建议带版本号安装：`latest` 的解析可能受 registry 缓存影响（国内镜像源同步新版本通常有延迟）。升级时把 `@0.1.0` 换成新版本号即可。
+建议带版本号安装：`latest` 的解析可能受 registry 缓存影响（国内镜像源同步新版本通常有延迟）。升级时把 `@0.1.1` 换成新版本号即可。
 
 > **重启生效**：安装完成后，重启正在运行的 DeepSeek Harness Web 服务并刷新页面。
 

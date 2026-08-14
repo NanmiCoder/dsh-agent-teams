@@ -4,9 +4,14 @@
 
 :global(html) {
   --agent-teams-panel-width: 388px;
-  --agent-teams-panel-right: 18px;
+  /* Follow the better-sidebar plugin's width variable (0 when collapsed or
+     when the plugin is absent), so the panel shifts left of that sidebar
+     instead of overlapping it. The layout shift (--agent-teams-panel-shift)
+     stays constant: both the panel and the conversation column move by the
+     same amount, so their relative position is unchanged. */
+  --agent-teams-panel-right: calc(18px + var(--dsh-sidebar-width, 0px));
   --agent-teams-panel-gap: 14px;
-  --agent-teams-panel-shift: calc(var(--agent-teams-panel-width) + var(--agent-teams-panel-right) + var(--agent-teams-panel-gap));
+  --agent-teams-panel-shift: calc(var(--agent-teams-panel-width) + 18px + var(--agent-teams-panel-gap));
 }
 
 /* The web shell owns no top-right slot. While this body-portal panel is open,
@@ -927,7 +932,8 @@
 
 @media (max-width: 640px) {
   :global(html) {
-    --agent-teams-panel-right: 10px;
+    /* Keep the narrow-screen inset while still clearing the better-sidebar. */
+    --agent-teams-panel-right: calc(10px + var(--dsh-sidebar-width, 0px));
   }
 
   .panel {

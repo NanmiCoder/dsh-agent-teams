@@ -1,93 +1,126 @@
-# @nanmicoder/dsh-agent-teams
+<p align="right">
+  <strong>English</strong> · <a href="./README_ZH.md">简体中文</a>
+</p>
 
-[![npm](https://img.shields.io/npm/v/@nanmicoder/dsh-agent-teams.svg)](https://www.npmjs.com/package/@nanmicoder/dsh-agent-teams)
-[![license](https://img.shields.io/npm/l/@nanmicoder/dsh-agent-teams.svg)](LICENSE)
+<p align="center">
+  <img src="./assets/readme/hero.svg" width="100%" alt="dsh-agent-teams turns one DeepSeek Harness session into a coordinated multi-agent team">
+</p>
 
-DeepSeek Harness 的 AgentTeams 插件：安装后，任何会话只需一句自然语言（例如"用 AgentTeams 调研一下 XX"），即可驱动一个**多智能体团队**协作完成目标，并在 Web GUI 右上角实时看到团队活动面板。
+<p align="center">
+  <a href="https://www.npmjs.com/package/@nanmicoder/dsh-agent-teams"><img src="https://img.shields.io/npm/v/@nanmicoder/dsh-agent-teams.svg" alt="npm version"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/npm/l/@nanmicoder/dsh-agent-teams.svg" alt="MIT license"></a>
+  <img src="https://img.shields.io/badge/DeepSeek%20Harness-plugin-202724" alt="DeepSeek Harness plugin">
+</p>
 
-核心语义移植自 Claude Code 的 AgentTeams：**创建团队**（队长 = 当前会话 agent）→ **拉成员**（可续聊子代理）→ **拆任务并声明依赖** → **成员间直接收发消息**（邮箱直达 + 唤醒，无队长中转）。
+## One prompt. A working team.
 
-## 界面预览
+`dsh-agent-teams` turns the current DeepSeek Harness session into a captain that can assemble durable sub-agents, split a goal into dependency-aware tasks, and coordinate work through direct messages.
 
-![AgentTeams 活动面板](https://raw.githubusercontent.com/NanmiCoder/dsh-agent-teams/main/assets/ui.png)
+Ask in natural language. The plugin provides the team protocol, nine coordination tools, persistent state, and a live Web UI—without requiring a separate workflow engine.
 
-## 安装
+<p align="center">
+  <img src="./assets/ui.png" width="100%" alt="DeepSeek Harness conversation with the AgentTeams live activity panel, members, tasks, dependencies, and reports">
+</p>
 
-**前置要求**：已安装 [DeepSeek Harness](https://github.com/deepseek-ai/DeepSeek-Harness)（`dsh` 命令可用）；Node.js `^22.19` 或 `>=24`；pnpm 11。
+## Why AgentTeams?
 
-插件已发布到 npm（`@nanmicoder` scope），一条命令装好：
+| Capability | What it changes |
+| --- | --- |
+| **Captain-led delegation** | The current session creates the team, assigns roles, and consolidates the final result. |
+| **Durable members** | Members are continuable DSH sub-agents that can be woken for focused follow-up turns. |
+| **Dependency-aware tasks** | Tasks move through explicit states and cannot be claimed before their dependencies finish. |
+| **Direct messaging** | Members send durable mailbox messages directly to teammates or the captain—no relay required. |
+| **Live activity panel** | The Web UI shows roles, current work, unread messages, task dependencies, and archived team history. |
+
+## Install
+
+> [!NOTE]
+> Requires an existing [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) installation.
+
+Choose either plugin source.
+
+### npm
 
 ```sh
 dsh plugin --profile web add @nanmicoder/dsh-agent-teams
 ```
 
-`dsh plugin` 会把插件加入 `web` profile，并根据包内的 `dsh.bundle` 声明自动启用它；工具、系统提示和 Web 客户端入口随该 profile 一起加载。
-
-> **重启生效**：安装完成后，重启正在运行的 DeepSeek Harness Web 服务并刷新页面。
-
-装好后可以用 `dsh plugin --profile web list` 确认插件在列表里。升级用同一条 add 命令即可。
-
-### 其他安装方式
-
-**指定版本**——`latest` 的解析可能受 registry 缓存影响（国内镜像源同步新版本通常有延迟），想钉死版本时：
+### GitHub `main`
 
 ```sh
-dsh plugin --profile web add @nanmicoder/dsh-agent-teams@<version>
+dsh plugin --profile web add 'git+https://github.com/NanmiCoder/dsh-agent-teams.git#main'
 ```
 
-版本号见 [npm 发布页](https://www.npmjs.com/package/@nanmicoder/dsh-agent-teams?activeTab=versions)。
-
-**还没装 DSH，或不想全局安装**——用 `npx` 直接跑，无需预装：
+Validate the composed profile, restart DSH, and refresh the Web UI:
 
 ```sh
-npx -p @deepseek-ai/dsh dsh plugin --profile web add @nanmicoder/dsh-agent-teams
+dsh --profile web --dump-config
+dsh web
 ```
 
-**从 GitHub 安装**——想用尚未发布到 npm 的最新提交：
+Then ask for a team directly:
 
-```sh
-dsh plugin --profile web add github:NanmiCoder/dsh-agent-teams
+> Use AgentTeams to review the commits after v0.5.3 from performance, security, and product perspectives. Return one consolidated report.
+
+## How it works
+
+1. The current session creates a team and becomes its captain.
+2. The captain adds role-specific members backed by continuable sub-agents.
+3. The goal becomes tasks with owners and explicit dependencies.
+4. Claimed tasks are dispatched through durable mailbox messages that wake each member.
+5. Members work, update task state, and report directly to the captain or one another.
+6. The captain presents the combined result, then archives the complete team record.
+
+Team state is stored under `<workspace>/.agent-teams/`; the Web panel reads that disk truth and combines it with live sub-agent activity.
+
+## Configuration
+
+Defaults work without extra setup. A trusted profile can override member behavior:
+
+```yaml
+- id: agent-teams
+  config:
+    stateDir: .agent-teams
+    memberProvider: spawn
+    memberModel: deepseek-v4
+    memberMaxDepth: 1
+    maxMembers: 8
 ```
 
-**从源码安装**——要改插件本身，或参与开发：
+## Boundaries
 
-```sh
-git clone https://github.com/NanmiCoder/dsh-agent-teams.git
-cd dsh-agent-teams
-pnpm install
-pnpm build
-dsh plugin --profile web add "link:$(pwd)"
-```
+- One captain leads one active team at a time.
+- Members act only after they are woken; mail remains durable while a participant is idle.
+- State is file-backed and serialized within one DSH process; concurrent processes editing the same team are not coordinated.
+- The activity panel reports persisted state as-is. Models may occasionally finish work without performing the expected task-state update.
 
-`link:` 安装后，改完代码跑 `pnpm build` 即时生效，不必重装插件（客户端改动需刷新页面，host 侧改动需重启 dsh 服务）。提交前跑 `pnpm verify` 做离线校验。
+See [docs/usage.md](./docs/usage.md) for the full tool reference, state model, Web UI behavior, configuration, and known limits.
 
-## 使用
+## Plugin development Skill
 
-安装并重启后，直接对助手说：
-
-> 用 AgentTeams 帮我调研一下开源 RAG 框架的选型，输出对比报告
-
-插件内置提示段会指导模型按协议执行：建团队 → 按角色拉成员 → 拆任务声明依赖 → 领取并唤醒成员 → 轮询收集产出 → 汇报后删除（归档保留）。
-
-## 开发 Skill
-
-仓库按开放 Agent Skills 规范提供 [`dsh-plugin-development`](skills/dsh-plugin-development/SKILL.md)，可直接安装：
+The repository also ships the open Agent Skills package [`dsh-plugin-development`](./skills/dsh-plugin-development/SKILL.md):
 
 ```sh
 npx skills add NanmiCoder/dsh-agent-teams --skill dsh-plugin-development
 ```
 
-`skills/dsh-plugin-development/` 是唯一权威源码；`.dsh/skills/` 保存供 DSH 在本仓库作为 cwd 时自动发现的跨平台镜像。修改 Skill 后运行 `pnpm sync:skill`，`pnpm verify` 会检查镜像没有漂移。
+## Documentation
 
-## 文档
+| Guide | Covers |
+| --- | --- |
+| [Usage](./docs/usage.md) | Architecture, UI behavior, tools, configuration, limits, and validation |
+| [Verification](./docs/verification-guide.md) | Offline, composition, real e2e, and GUI verification |
+| [Plugin development](./docs/developing-dsh-plugins.md) | Human-readable guide built from this plugin |
+| [README writing](./docs/readme-writing-guide.md) | Repository documentation conventions |
 
-| 文档 | 内容 |
-|---|---|
-| [docs/usage.md](docs/usage.md) | 工作原理、Web UI 行为、工具一览、配置、已知限制、验证 |
-| [docs/verification-guide.md](docs/verification-guide.md) | 四层验证方法（离线 / 组合 / 真实 e2e / ego-browser GUI） |
-| [skills/dsh-plugin-development/SKILL.md](skills/dsh-plugin-development/SKILL.md) | 可通过 `npx skills` 安装的 DSH 插件开发 Skill |
-| [docs/developing-dsh-plugins.md](docs/developing-dsh-plugins.md) | 面向人类阅读的开发指南（本插件为样例） |
+## Development
+
+```sh
+pnpm install
+pnpm build
+pnpm verify
+```
 
 ## License
 
-MIT
+[MIT](./LICENSE)

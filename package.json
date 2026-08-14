@@ -20,8 +20,10 @@
   "files": [
     "lib",
     "assets/agent-teams",
+    "assets/readme",
     "cordis.patch.yml",
-    "README.md"
+    "README.md",
+    "README_ZH.md"
   ],
   "license": "MIT",
   "author": {

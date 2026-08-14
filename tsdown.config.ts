@@ -104,8 +104,12 @@ const config: UserConfig = {
         cssModules: { pattern: '[hash]_[local]' },
         minify: true,
       })
+      // Sorted so the emitted map is byte-stable: lightningcss does not promise
+      // an export order, and an unstable one rewrites lib/client.js on every
+      // build, producing diff noise in a repo that commits its build output.
       const classMap: Record<string, string> = {}
-      for (const [local, exp] of Object.entries(cssExports ?? {})) classMap[local] = exp.name
+      const sorted = Object.entries(cssExports ?? {}).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      for (const [local, exp] of sorted) classMap[local] = exp.name
       return [
         `const css = ${JSON.stringify(code.toString())};`,
         `const tagId = ${JSON.stringify(`${PLUGIN_ID}/${basename(fileId)}`)};`,

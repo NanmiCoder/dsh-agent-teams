@@ -29,6 +29,8 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { collectArchivedTeamsActivity, collectTeamsActivity } from './snapshot.ts'
+import * as dshSession from '@deepseek-ai/dsh-session'
+import type { AgentTeamsEventType } from './event-types.ts'
 
 /**
  * Structural slice of the web server service, compatible with both the
@@ -52,6 +54,58 @@ const WORKSPACE_KEYS = ['workspaceRegistry', 'workspace'] as const
 
 export const name = 'agent-teams'
 export const inject = ['tools', 'subagents', 'systemPrompt', 'agents']
+
+/**
+ * Register the `agent-teams/*` session event vocabulary with the harness's
+ * known-event set.
+ *
+ * The harness's session reader (`dsh-session-persistence`) refuses to load a
+ * session log containing an event type outside `KNOWN_SESSION_EVENT_TYPES`
+ * unless the event is marked `ignorable` (`SessionFormatUnsupportedError`).
+ * Out-of-repo plugin event types are outside that list by construction, and
+ * the harness exposes no registration surface for them yet — so without this
+ * call, any session that used AgentTeams becomes unreadable for every harness
+ * build that does not bundle the plugin.
+ *
+ * The runtime set is a plain `Set`, so plugins can extend it. The types are
+ * purely informational monitor records (the client re-folds them for the
+ * activity tree), so registering them does not change how the harness
+ * interprets the rest of the log. The registration is idempotent and
+ * version-independent: harness builds that later add a registration surface
+ * (or a set of known plugin types) keep accepting this call.
+ *
+ * @param ctx - the plugin context (for logging).
+ */
+function registerSessionEventTypes(ctx: Context): void {
+  const AGENT_TEAMS_EVENT_TYPES: readonly AgentTeamsEventType[] = [
+    'agent-teams/team-created',
+    'agent-teams/member-added',
+    'agent-teams/member-removed',
+    'agent-teams/task-created',
+    'agent-teams/task-updated',
+    'agent-teams/message-sent',
+    'agent-teams/team-deleted',
+  ]
+  // The known-event set export only exists on harness builds that read it
+  // (`dsh-session` >= rc.5); older builds have no reader-side guard and need
+  // no registration. Feature-detect instead of importing the named export,
+  // so the plugin stays loadable across harness versions. The runtime value
+  // is a plain mutable `Set` (the `ReadonlySet` typing is a compile-time
+  // guard, not a runtime freeze); the `add` capability check below keeps the
+  // mutation conditional on the type actually being writable.
+  const known = (dshSession as { KNOWN_SESSION_EVENT_TYPES?: Set<string> })
+    .KNOWN_SESSION_EVENT_TYPES
+  if (known === undefined || typeof known.has !== 'function' || typeof known.add !== 'function') {
+    ctx.logger.debug('agent-teams: harness exposes no KNOWN_SESSION_EVENT_TYPES; skipping event type registration')
+    return
+  }
+  for (const type of AGENT_TEAMS_EVENT_TYPES) {
+    if (!known.has(type)) {
+      known.add(type)
+      ctx.logger.debug(`agent-teams: registered session event type "${type}"`)
+    }
+  }
+}
 
 /** Plugin configuration. */
 export interface Config {
@@ -95,6 +149,8 @@ Tools: ${toolNames}`
 }
 
 export function apply(ctx: Context, config: Config): void {
+  registerSessionEventTypes(ctx)
+
   const resolved: ToolsConfig = {
     stateDir: config.stateDir ?? '.agent-teams',
     memberProvider: config.memberProvider ?? 'spawn',

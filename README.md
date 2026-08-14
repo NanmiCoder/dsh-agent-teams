@@ -69,6 +69,20 @@ dsh plugin --profile web add "link:$(pwd)"
 
 插件内置提示段会指导模型按协议执行：建团队 → 按角色拉成员 → 拆任务声明依赖 → 领取并唤醒成员 → 轮询收集产出 → 汇报后删除（归档保留）。
 
+## 存量日志迁移（0.1.0 及更早版本）
+
+0.1.0 及更早版本写入会话日志的 `agent-teams/*` 事件未携带 `ignorable` 标记，导致这些会话在重启后历史无法加载（`SessionFormatUnsupportedError: ... not marked ignorable`）。自 0.1.0 起新写入的事件已不再触发该问题，但**存量会话日志**需要用本仓库提供的迁移工具修复一次：
+
+```sh
+# 找到所有会话日志并原地修补（幂等，可重复执行）
+find "$HOME/.dsh/sessions" -name session.jsonl.zstd   -exec node scripts/migrate-session-logs.mjs {} +
+
+# 或指定单个日志
+node scripts/migrate-session-logs.mjs "$HOME/.dsh/sessions/--Volumes-aigo-work--/session-xxx/session.jsonl.zstd"
+```
+
+工具零依赖（仅 Node 内置 zstd），只给缺失标记的 `agent-teams/*` 事件插入 `"ignorable": true`，其余字节原样保留；执行前建议先备份日志目录。自检：`node scripts/migrate-session-logs.mjs --self-test`。
+
 ## 开发 Skill
 
 仓库按开放 Agent Skills 规范提供 [`dsh-plugin-development`](skills/dsh-plugin-development/SKILL.md)，可直接安装：

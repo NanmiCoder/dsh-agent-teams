@@ -303,7 +303,7 @@ TS 只在 `.tsx` 文件里解析 JSX。插件入口一旦包含 `root.render(<Xx
 
 ```js
 window.__ModuleLoader__.load({
-  id: "dsh-my-plugin",
+  id: "@scope/dsh-my-plugin",   // ⚠️ 必须是 package.json 的 name（完整包名），不能用短名
   factory: (require) => { /* ... */ return module.exports }
 })
 ```
@@ -329,7 +329,7 @@ export default {
   ],
   outputOptions: {
     entryFileNames: 'client.js',
-    banner: 'window.__ModuleLoader__.load({ id: "dsh-my-plugin", factory: (require) => {',
+    banner: 'window.__ModuleLoader__.load({ id: "@scope/dsh-my-plugin", factory: (require) => {', // id 必须等于包名
     footer: 'return module.exports; } });',
     intro: 'var module = { exports: {} }; var exports = module.exports;',
   },

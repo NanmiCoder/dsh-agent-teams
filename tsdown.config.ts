@@ -49,6 +49,15 @@ const CSS_VIRTUAL_SUFFIX = '.mjs'
 
 const PLUGIN_ID = 'dsh-agent-teams'
 
+/**
+ * The module id a client bundle must register with
+ * (`window.__ModuleLoader__.load({ id, factory })`). client-modules keys its
+ * boot graph by the package name and fails a bundle that registers any other
+ * id ("loaded without registering <package-name>"), so this must equal
+ * package.json `name` — never a short alias.
+ */
+const CLIENT_MODULE_ID = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')).name
+
 const config: UserConfig = {
   name: `${PLUGIN_ID}/client`,
   entry: { client: 'lib/client/index.js' },
@@ -113,7 +122,7 @@ const config: UserConfig = {
   }],
   outputOptions: {
     entryFileNames: 'client.js',
-    banner: `window.__ModuleLoader__.load({ id: ${JSON.stringify(PLUGIN_ID)}, factory: (require) => {`,
+    banner: `window.__ModuleLoader__.load({ id: ${JSON.stringify(CLIENT_MODULE_ID)}, factory: (require) => {`,
     footer: 'return module.exports; } });',
     intro: 'var module = { exports: {} }; var exports = module.exports;',
   },

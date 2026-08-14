@@ -173,9 +173,13 @@ export async function collectTeamsActivity(
     }
     for (const entry of entries) {
       if (!entry.isDirectory()) continue
-      const state = await readTeam(root.stateRoot, entry.name)
-      if (state === undefined) continue
-      snapshots.push(await assembleTeamSnapshot(ctx, root.stateRoot, root.workspace, state))
+      try {
+        const state = await readTeam(root.stateRoot, entry.name)
+        if (state === undefined) continue
+        snapshots.push(await assembleTeamSnapshot(ctx, root.stateRoot, root.workspace, state))
+      } catch {
+        ctx.logger.warn(`agent-teams: skipped unreadable team state "${entry.name}" in workspace "${root.workspace}"`)
+      }
     }
   }
   return snapshots
@@ -196,9 +200,13 @@ export async function collectArchivedTeamsActivity(
   const snapshots: TeamActivitySnapshot[] = []
   for (const root of roots) {
     for (const teamId of await listArchivedTeamIds(root.stateRoot)) {
-      const state = await readArchivedTeam(root.stateRoot, teamId)
-      if (state === undefined) continue
-      snapshots.push(await assembleTeamSnapshot(ctx, join(root.stateRoot, 'archive'), root.workspace, state))
+      try {
+        const state = await readArchivedTeam(root.stateRoot, teamId)
+        if (state === undefined) continue
+        snapshots.push(await assembleTeamSnapshot(ctx, join(root.stateRoot, 'archive'), root.workspace, state))
+      } catch {
+        ctx.logger.warn(`agent-teams: skipped unreadable archived team "${teamId}" in workspace "${root.workspace}"`)
+      }
     }
   }
   return snapshots

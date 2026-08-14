@@ -16,7 +16,7 @@
 import { randomUUID } from 'node:crypto'
 import { mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import type { TaskStatus, TeamMessage, TeamState, TeamTask } from './types.ts'
+import type { TaskStatus, TeamMember, TeamMessage, TeamState, TeamTask } from './types.ts'
 
 /** Mailbox key of the captain. */
 export const CAPTAIN_KEY = 'captain'
@@ -100,7 +100,7 @@ export function transitionError(current: TaskStatus, next: TaskStatus): string |
 export async function createTeamDir(stateRoot: string, state: TeamState): Promise<void> {
   const dir = join(stateRoot, state.id)
   await mkdir(join(dir, 'inbox'), { recursive: true })
-  await writeFile(join(dir, 'team.json'), JSON.stringify(state, null, 2), 'utf8')
+  await atomicWriteText(join(dir, 'team.json'), JSON.stringify(state, null, 2))
 }
 
 /**
@@ -111,7 +111,11 @@ export async function createTeamDir(stateRoot: string, state: TeamState): Promis
 export async function readTeam(stateRoot: string, teamId: string): Promise<TeamState | undefined> {
   try {
     const raw = await readFile(join(stateRoot, teamId, 'team.json'), 'utf8')
-    return JSON.parse(raw) as TeamState
+    const value: unknown = JSON.parse(stripLeadingBom(raw))
+    if (!isTeamState(value, teamId)) {
+      throw new Error(`invalid AgentTeams state in team "${teamId}"`)
+    }
+    return value
   } catch (error: unknown) {
     if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
       return undefined
@@ -126,7 +130,7 @@ export async function readTeam(stateRoot: string, teamId: string): Promise<TeamS
  * @param state - the record to persist.
  */
 export async function writeTeam(stateRoot: string, state: TeamState): Promise<void> {
-  await writeFile(join(stateRoot, state.id, 'team.json'), JSON.stringify(state, null, 2), 'utf8')
+  await atomicWriteText(join(stateRoot, state.id, 'team.json'), JSON.stringify(state, null, 2))
 }
 
 /**
@@ -152,7 +156,47 @@ export async function findTeamByCaptain(
   for (const entry of entries) {
     if (!entry.isDirectory()) continue
     const team = await readTeam(stateRoot, entry.name)
-    if (team?.captainSessionId === captainSessionId && (found === undefined || team.createdAt > found.createdAt)) {
+    if (team?.captainSessionId === captainSessionId) {
+      if (found !== undefined && found.id !== team.id) {
+        throw new Error(`captain session leads multiple active teams ("${found.id}", "${team.id}"); archive one before continuing`)
+      }
+      found = team
+    }
+  }
+  return found
+}
+
+/**
+ * Find the team in which one session is an active participant.
+ * Captains match `captainSessionId`; members match their durable child session
+ * id. Removed members no longer have access to team-scoped tools.
+ * @param stateRoot - resolved absolute state root directory.
+ * @param agentSessionId - calling captain/member session id.
+ * @returns the team record, or undefined when the caller belongs to no team.
+ */
+export async function findTeamByParticipant(
+  stateRoot: string,
+  agentSessionId: string,
+): Promise<TeamState | undefined> {
+  let entries
+  try {
+    entries = await readdir(stateRoot, { withFileTypes: true })
+  } catch (error: unknown) {
+    if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return undefined
+    }
+    throw error
+  }
+  let found: TeamState | undefined
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue
+    const team = await readTeam(stateRoot, entry.name)
+    const participates = team?.captainSessionId === agentSessionId
+      || team?.members.some((member) => member.id === agentSessionId && member.status !== 'removed') === true
+    if (participates && team !== undefined) {
+      if (found !== undefined && found.id !== team.id) {
+        throw new Error(`agent session belongs to multiple active teams ("${found.id}", "${team.id}"); the target team is ambiguous`)
+      }
       found = team
     }
   }
@@ -179,7 +223,16 @@ export async function appendMailbox(
 ): Promise<void> {
   const file = join(stateRoot, teamId, 'inbox', `${sanitizeKey(agentKey)}.jsonl`)
   await mkdir(join(stateRoot, teamId, 'inbox'), { recursive: true })
-  await writeFile(file, `${JSON.stringify(message)}\n`, { encoding: 'utf8', flag: 'a' })
+  let existing = ''
+  try {
+    existing = await readFile(file, 'utf8')
+  } catch (error: unknown) {
+    if (!(error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT')) {
+      throw error
+    }
+  }
+  const separator = existing !== '' && !existing.endsWith('\n') ? '\n' : ''
+  await atomicWriteText(file, `${existing}${separator}${JSON.stringify(message)}\n`)
 }
 
 /**
@@ -187,20 +240,35 @@ export async function appendMailbox(
  * @param stateRoot - resolved absolute state root directory.
  * @param teamId - the team id.
  * @param agentKey - `captain` or a member name.
+ * @param onMalformedLine - optional diagnostic hook; malformed records are
+ * skipped so one manually damaged line cannot make the whole team unreadable.
  * @returns the messages, empty when the mailbox does not exist yet.
  */
 export async function readMailbox(
   stateRoot: string,
   teamId: string,
   agentKey: string,
+  onMalformedLine?: (lineNumber: number, error: unknown) => void,
 ): Promise<TeamMessage[]> {
   const file = join(stateRoot, teamId, 'inbox', `${sanitizeKey(agentKey)}.jsonl`)
   try {
     const raw = await readFile(file, 'utf8')
     const messages: TeamMessage[] = []
-    for (const line of raw.split('\n')) {
+    for (const [index, rawLine] of raw.split('\n').entries()) {
+      const line = stripLeadingBom(rawLine)
       if (line.trim() === '') continue
-      messages.push(JSON.parse(line) as TeamMessage)
+      let value: unknown
+      try {
+        value = JSON.parse(line)
+      } catch {
+        onMalformedLine?.(index + 1, new Error('invalid JSON'))
+        continue
+      }
+      if (!isTeamMessage(value)) {
+        onMalformedLine?.(index + 1, new Error('invalid message shape'))
+        continue
+      }
+      messages.push(value)
     }
     return messages
   } catch (error: unknown) {
@@ -209,6 +277,116 @@ export async function readMailbox(
     }
     throw error
   }
+}
+
+/** Remove the optional UTF-8 BOM some editors prepend to JSON text. */
+function stripLeadingBom(value: string): string {
+  return value.charCodeAt(0) === 0xFEFF ? value.slice(1) : value
+}
+
+/** Atomically replace one UTF-8 state file from a same-directory temp file. */
+async function atomicWriteText(file: string, content: string): Promise<void> {
+  const temporary = `${file}.${process.pid}.${randomUUID()}.tmp`
+  try {
+    await writeFile(temporary, content, { encoding: 'utf8', flag: 'wx' })
+    await rename(temporary, file)
+  } catch (error: unknown) {
+    await rm(temporary, { force: true }).catch(() => undefined)
+    throw error
+  }
+}
+
+/** Whether a parsed JSON value is a plain record. */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+/** Whether a value is an optional string. */
+function isOptionalString(value: unknown): value is string | undefined {
+  return value === undefined || typeof value === 'string'
+}
+
+/** Whether a value is a finite timestamp/counter number. */
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value)
+}
+
+/** Validate one member record at the durable JSON boundary. */
+function isTeamMember(value: unknown): value is TeamMember {
+  if (!isRecord(value)) return false
+  return typeof value['id'] === 'string'
+    && typeof value['name'] === 'string'
+    && value['name'].trim() !== ''
+    && isOptionalString(value['role'])
+    && isOptionalString(value['model'])
+    && isFiniteNumber(value['joinedAt'])
+    && (value['status'] === 'idle' || value['status'] === 'working' || value['status'] === 'removed')
+}
+
+/** Validate one task record at the durable JSON boundary. */
+function isTeamTask(value: unknown): value is TeamTask {
+  if (!isRecord(value)) return false
+  return typeof value['id'] === 'string'
+    && typeof value['subject'] === 'string'
+    && isOptionalString(value['description'])
+    && (value['status'] === 'pending'
+      || value['status'] === 'claimed'
+      || value['status'] === 'in_progress'
+      || value['status'] === 'completed'
+      || value['status'] === 'failed'
+      || value['status'] === 'cancelled')
+    && isOptionalString(value['assignee'])
+    && Array.isArray(value['dependencies'])
+    && value['dependencies'].every((dependency) => typeof dependency === 'string')
+    && isOptionalString(value['output'])
+    && isFiniteNumber(value['createdAt'])
+    && isFiniteNumber(value['updatedAt'])
+}
+
+/** Validate the full team record before it can participate in authorization. */
+function isTeamState(value: unknown, expectedId: string): value is TeamState {
+  if (!isRecord(value)) return false
+  const validShape = value['id'] === expectedId
+    && typeof value['name'] === 'string'
+    && value['name'].trim() !== ''
+    && isOptionalString(value['description'])
+    && typeof value['captainSessionId'] === 'string'
+    && value['captainSessionId'] !== ''
+    && isFiniteNumber(value['createdAt'])
+    && Array.isArray(value['members'])
+    && value['members'].every(isTeamMember)
+    && Array.isArray(value['tasks'])
+    && value['tasks'].every(isTeamTask)
+    && Number.isSafeInteger(value['taskSeq'])
+    && (value['taskSeq'] as number) >= 0
+  if (!validShape) return false
+
+  const members = value['members'] as TeamMember[]
+  const tasks = value['tasks'] as TeamTask[]
+  const memberIds = new Set<string>()
+  const memberKeys = new Set<string>()
+  for (const member of members) {
+    const key = sanitizeKey(member.name)
+    if (member.id === '' || key === CAPTAIN_KEY || memberIds.has(member.id) || memberKeys.has(key)) return false
+    memberIds.add(member.id)
+    memberKeys.add(key)
+  }
+  const taskIds = new Set<string>()
+  for (const task of tasks) {
+    if (task.id === '' || taskIds.has(task.id)) return false
+    taskIds.add(task.id)
+  }
+  return true
+}
+
+/** Validate a mailbox record so later rendering cannot crash on `{}`/`null`. */
+function isTeamMessage(value: unknown): value is TeamMessage {
+  if (!isRecord(value)) return false
+  return typeof value['id'] === 'string'
+    && typeof value['from'] === 'string'
+    && typeof value['to'] === 'string'
+    && typeof value['content'] === 'string'
+    && isFiniteNumber(value['ts'])
 }
 
 /**

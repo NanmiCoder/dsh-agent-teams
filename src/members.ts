@@ -19,6 +19,15 @@ import type {} from '@deepseek-ai/dsh-subagent'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import type { TeamMember, TeamState } from './types.ts'
 
+/** Captain-only AgentTeams tools hidden from newly spawned members. */
+const MEMBER_DENIED_TOOLS = [
+  'agent_teams_create',
+  'agent_teams_add_member',
+  'agent_teams_remove_member',
+  'agent_teams_create_task',
+  'agent_teams_delete',
+] as const
+
 /**
  * Restore the SessionId brand on a value that round-tripped through the
  * durable team file. The brand is erased by JSON serialization; the value
@@ -53,7 +62,7 @@ export function memberPersona(team: TeamState, member: TeamMember, stateDir: str
 Team context:
 - Team id: ${team.id}
 - Your name inside the team (use it as \`from\`/identity): ${member.name}
-- The team state lives under ${stateDir}/${team.id}/ (team.json and inbox/*.jsonl). You may read and write these files with your file tools, but prefer the agent_teams_* tools, which keep the state consistent.
+- The team state lives under ${stateDir}/${team.id}/ (team.json and inbox/*.jsonl). You may inspect these files read-only for diagnostics, but never edit them directly; use the agent_teams_* tools so JSON escaping and concurrent updates stay safe.
 - The captain and your teammates reach you through messages. Each message you receive is a new turn: act on it and end your turn with a concise reply.
 
 Working rules:
@@ -109,6 +118,9 @@ export async function spawnMember(
   if (!provider.capabilities.persona) {
     throw new Error(`agent-teams: provider "${config.provider}" cannot apply a member persona`)
   }
+  if (!provider.capabilities.toolFilter) {
+    throw new Error(`agent-teams: provider "${config.provider}" cannot restrict captain-only tools for members`)
+  }
   const start = await ctx.subagents.startContinuable({
     provider: config.provider,
     label: `agent-teams:${team.id}:${member.name}`,
@@ -116,6 +128,7 @@ export async function spawnMember(
       prompt: [{ type: 'text', text: memberWelcome(team) }],
       parent: captain,
       persona: memberPersona(team, member, stateDir),
+      toolFilter: { deny: [...MEMBER_DENIED_TOOLS] },
       ...config.model !== undefined ? { agentOptions: { model: config.model } } : {},
       ...config.maxDepth !== undefined ? { maxDepth: config.maxDepth } : {},
     },

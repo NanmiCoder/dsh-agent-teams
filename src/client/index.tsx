@@ -38,6 +38,7 @@ export function apply(ctx: ClientContext): void {
     key: 'agent-teams',
     inject: (): AgentTeamsCardInjected => ({
       openSession: (id: SessionId) => { ctx.sessions.open(id) },
+      currentSessionId: () => ctx.sessions.list.getSnapshot().current,
     }),
   }, AgentTeamsCard))
 }

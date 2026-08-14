@@ -73,6 +73,15 @@ export declare function writeTeam(stateRoot: string, state: TeamState): Promise<
  * @returns the team record, or undefined when the captain leads no team.
  */
 export declare function findTeamByCaptain(stateRoot: string, captainSessionId: string): Promise<TeamState | undefined>;
+/**
+ * Find the team in which one session is an active participant.
+ * Captains match `captainSessionId`; members match their durable child session
+ * id. Removed members no longer have access to team-scoped tools.
+ * @param stateRoot - resolved absolute state root directory.
+ * @param agentSessionId - calling captain/member session id.
+ * @returns the team record, or undefined when the caller belongs to no team.
+ */
+export declare function findTeamByParticipant(stateRoot: string, agentSessionId: string): Promise<TeamState | undefined>;
 /** Build a fresh message record. */
 export declare function createMessage(from: string, to: string, content: string): TeamMessage;
 /**
@@ -88,9 +97,11 @@ export declare function appendMailbox(stateRoot: string, teamId: string, agentKe
  * @param stateRoot - resolved absolute state root directory.
  * @param teamId - the team id.
  * @param agentKey - `captain` or a member name.
+ * @param onMalformedLine - optional diagnostic hook; malformed records are
+ * skipped so one manually damaged line cannot make the whole team unreadable.
  * @returns the messages, empty when the mailbox does not exist yet.
  */
-export declare function readMailbox(stateRoot: string, teamId: string, agentKey: string): Promise<TeamMessage[]>;
+export declare function readMailbox(stateRoot: string, teamId: string, agentKey: string, onMalformedLine?: (lineNumber: number, error: unknown) => void): Promise<TeamMessage[]>;
 /**
  * Remove a team's whole directory (members should be interrupted first).
  * @param stateRoot - resolved absolute state root directory.

@@ -6,8 +6,8 @@
  * conversation column yield space; narrow viewports keep overlay mode. It
  * polls the host `/plugins/dsh-agent-teams/state` route for
  * server-side snapshots (durable files + live subagent activity), with a
- * collapsed badge that auto-expands once when activity appears and collapses
- * 2s after the last team disappears.
+ * collapsed badge that auto-expands once when activity appears. Archived
+ * teams stay available for the owning conversation after live work ends.
  *
  * The floater mounts through a body portal (no top-right slot exists in the
  * web shell); it is not a conversation node — the in-conversation panel was

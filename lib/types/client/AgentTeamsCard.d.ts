@@ -16,8 +16,9 @@ export declare const OPEN_PANEL_EVENT = "agent-teams:open-panel";
 /** Navigation action injected from the plugin's own SessionsService access. */
 export interface AgentTeamsCardInjected {
     readonly openSession: (id: SessionId) => void;
+    readonly currentSessionId: () => SessionId | undefined;
 }
 /** Complete keyed Chat renderer props. */
 export type AgentTeamsCardProps = PropsRuntime<'conversation.chat.node', 'agent-teams'> & PropsLocale<'agentTeams'> & AgentTeamsCardInjected;
 /** Render one durable team as a compact conversation card. */
-export declare function AgentTeamsCard({ node, openSession }: AgentTeamsCardProps): import("react").JSX.Element;
+export declare function AgentTeamsCard({ node, openSession, currentSessionId }: AgentTeamsCardProps): import("react").JSX.Element;

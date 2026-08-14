@@ -6,8 +6,8 @@
  * conversation column yield space; narrow viewports keep overlay mode. It
  * polls the host `/plugins/dsh-agent-teams/state` route for
  * server-side snapshots (durable files + live subagent activity), with a
- * collapsed badge that auto-expands once when activity appears and collapses
- * 2s after the last team disappears.
+ * collapsed badge that auto-expands once when activity appears. Archived
+ * teams stay available for the owning conversation after live work ends.
  *
  * The floater mounts through a body portal (no top-right slot exists in the
  * web shell); it is not a conversation node — the in-conversation panel was
@@ -288,10 +288,11 @@ function DependencyMap({ tasks }: { readonly tasks: readonly ActivityTask[] }) {
   )
 }
 
-function TeamSection({ team, onNavigate }: {
+function TeamSection({ team, onNavigate, historic = false }: {
   readonly team: ActivityTeam
   /** Navigate to a member transcript (floater hides immediately). */
   readonly onNavigate: (id: SessionId) => void
+  readonly historic?: boolean
 }) {
   const busyCount = team.members.filter((member) => member.activity === 'working').length
   const assignedCount = team.tasks.filter((task) => task.assignee !== '').length
@@ -306,6 +307,7 @@ function TeamSection({ team, onNavigate }: {
     <section className={css.team} data-team-id={team.teamId}>
       <header className={css.teamHead}>
         <span className={css.teamName} title={team.name}>{team.name}</span>
+        {historic && <span className={css.historicPill}>已结束</span>}
         <span className={css.teamStats}>
           <span data-stat="members">{team.members.length} 成员</span>
           <span data-stat="tasks">{completedCount}/{team.tasks.length} 完成</span>
@@ -433,11 +435,11 @@ export function ActivityPanel({ sessionsList, openSession }: {
     openSession(id)
   }
   const [teams, setTeams] = useState<readonly ActivityTeam[]>([])
+  const [archivedTeams, setArchivedTeams] = useState<readonly ActivityTeam[]>([])
   const [open, setOpen] = useState(false)
   const [autoOpened, setAutoOpened] = useState(false)
   const [wasActive, setWasActive] = useState(false)
   const [historic, setHistoric] = useState<ReadonlyMap<string, { data: AgentTeamsCardData; owner: string }>>(new Map())
-  const [archived, setArchived] = useState<ReadonlyMap<string, ActivityTeam>>(new Map())
   const current = useSyncExternalStore(
     sessionsList.subscribe,
     sessionsList.getSnapshot,
@@ -463,10 +465,18 @@ export function ActivityPanel({ sessionsList, openSession }: {
       if (inFlight || cancelled) return
       inFlight = true
       try {
-        const response = await fetch(STATE_URL, { cache: 'no-store' })
-        if (!response.ok) return
-        const body = (await response.json()) as { teams?: unknown }
-        if (!cancelled && Array.isArray(body.teams)) setTeams(body.teams as readonly ActivityTeam[])
+        const [liveResponse, archivedResponse] = await Promise.all([
+          fetch(STATE_URL, { cache: 'no-store' }),
+          fetch(`${STATE_URL}?archived=1`, { cache: 'no-store' }),
+        ])
+        if (liveResponse.ok) {
+          const body = (await liveResponse.json()) as { teams?: unknown }
+          if (!cancelled && Array.isArray(body.teams)) setTeams(body.teams as readonly ActivityTeam[])
+        }
+        if (archivedResponse.ok) {
+          const body = (await archivedResponse.json()) as { teams?: unknown }
+          if (!cancelled && Array.isArray(body.teams)) setArchivedTeams(body.teams as readonly ActivityTeam[])
+        }
       } catch {
         // Host restarting; keep the last snapshot.
       } finally {
@@ -482,7 +492,6 @@ export function ActivityPanel({ sessionsList, openSession }: {
   }, [])
 
   useEffect(() => {
-    let cancelled = false
     const onOpenPanel = (event: Event): void => {
       setOpen(true)
       const detail = (event as CustomEvent<AgentTeamsCardData>).detail
@@ -496,29 +505,10 @@ export function ActivityPanel({ sessionsList, openSession }: {
           next.set(teamKey, { data: detail, owner })
           return next
         })
-        // Restore the archived team detail (tasks with their dependency
-        // graph, members, mailboxes) so the panel shows the full planning.
-        void fetch(`${STATE_URL}?archived=1`, { cache: 'no-store' })
-          .then((response) => (response.ok ? response.json() : null))
-          .then((body: { teams?: readonly ActivityTeam[] } | null) => {
-            if (cancelled || body === null || !Array.isArray(body.teams)) return
-            const found = body.teams.find((team) =>
-              team.teamId === detail?.teamId && team.captainSessionId === owner,
-            )
-            if (found !== undefined) {
-              setArchived((previous) => {
-                const next = new Map(previous)
-                next.set(teamKey, found)
-                return next
-              })
-            }
-          })
-          .catch(() => { /* archive route unavailable; member-only fallback */ })
       }
     }
     window.addEventListener(OPEN_PANEL_EVENT, onOpenPanel)
     return () => {
-      cancelled = true
       window.removeEventListener(OPEN_PANEL_EVENT, onOpenPanel)
     }
   }, [])
@@ -535,11 +525,21 @@ export function ActivityPanel({ sessionsList, openSession }: {
     () => (current === undefined ? [] : [...historic.values()].filter(({ data, owner }) =>
       owner === current && !teams.some((live) =>
         live.captainSessionId === current && live.teamId === data.teamId,
+      ) && !archivedTeams.some((archived) =>
+        archived.captainSessionId === current && archived.teamId === data.teamId,
       ),
     )),
-    [historic, current, teams],
+    [historic, current, teams, archivedTeams],
   )
-  const visibleCount = visibleTeams.length + visibleHistoric.length
+  const visibleArchived = useMemo(
+    () => (current === undefined ? [] : archivedTeams.filter((team) =>
+      team.captainSessionId === current && !teams.some((live) =>
+        live.captainSessionId === current && live.teamId === team.teamId,
+      ),
+    )),
+    [archivedTeams, current, teams],
+  )
+  const visibleCount = visibleTeams.length + visibleArchived.length + visibleHistoric.length
 
   useEffect(() => {
     if (visibleCount > 0) {
@@ -601,16 +601,13 @@ export function ActivityPanel({ sessionsList, openSession }: {
                   {visibleTeams.map((team) => (
                     <TeamSection key={team.teamId} team={team} onNavigate={navigateToSession} />
                   ))}
+                  {visibleArchived.map((team) => (
+                    <div key={`${team.captainSessionId}:${team.teamId}`} data-team-id={team.teamId} data-historic className={css.archivedWrap}>
+                      <TeamSection team={team} onNavigate={navigateToSession} historic />
+                    </div>
+                  ))}
                   {visibleHistoric.map(({ data: team, owner }) => {
                     const teamKey = `${owner}:${team.teamId}`
-                    const archivedTeam = archived.get(teamKey)
-                    if (archivedTeam !== undefined) {
-                      return (
-                        <div key={teamKey} data-team-id={team.teamId} data-historic className={css.archivedWrap}>
-                          <TeamSection team={archivedTeam} onNavigate={navigateToSession} />
-                        </div>
-                      )
-                    }
                     return (
                     <section key={teamKey} className={css.team} data-team-id={team.teamId} data-historic>
                       <header className={css.teamHead}>

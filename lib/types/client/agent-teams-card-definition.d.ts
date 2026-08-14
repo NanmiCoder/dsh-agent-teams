@@ -5,10 +5,9 @@
  * panel (useful after the floater was closed, or when re-opening an old
  * session for review).
  *
- * The fold replays the durable `agent-teams/*` session events (the same
- * event family the activity panel's server snapshots are derived from), so
- * the card survives restarts and appears in any session whose log carries
- * the team's events.
+ * The fold anchors to the Harness's durable `tool/call` + `tool/result`
+ * records for `agent_teams_create`. Those are first-party session events, so
+ * the card survives restarts without writing an out-of-repo event type.
  * @module dsh-agent-teams/client/card
  */
 import type { ConversationNodeDefinition } from '@deepseek-ai/dsh-client-runtime/client';
@@ -30,20 +29,16 @@ declare module '@deepseek-ai/dsh-client-ui-conversation/client' {
         'agent-teams': AgentTeamsCardData;
     }
 }
-/** Folded member record. */
-interface AgentTeamsMemberState {
-    readonly id: string;
-    readonly name: string;
-    readonly role?: string;
-    readonly removed?: boolean;
-}
 /** Folded team record (the node's business state). */
 export interface AgentTeamsNodeState {
     readonly teamId: string;
-    readonly captainSessionId: string;
     readonly name: string;
-    readonly members: readonly AgentTeamsMemberState[];
+    readonly accepted: boolean;
 }
-/** Durable `agent-teams/*` events folded into one keyed Chat node. */
+/** Parse the only create-call fields the historic card owns. */
+export declare function parseAgentTeamsCreateArgs(value: string): {
+    teamId: string;
+    name: string;
+} | undefined;
+/** Durable first-party tool events folded into one keyed Chat node. */
 export declare const agentTeamsCardDefinition: ConversationNodeDefinition<AgentTeamsNodeState>;
-export {};

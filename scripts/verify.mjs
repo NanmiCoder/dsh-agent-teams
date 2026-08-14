@@ -10,7 +10,7 @@
  * Usage: node scripts/verify.mjs
  */
 
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
@@ -19,6 +19,7 @@ import {
   createMessage,
   createTeamDir,
   findTeamByCaptain,
+  findTeamByParticipant,
   readMailbox,
   readTeam,
   removeTeamDir,
@@ -28,6 +29,8 @@ import {
   withTeamLock,
 } from '../lib/state.js'
 import { relatedTaskIds, taskStages } from '../lib/client/activity-model.js'
+import { parseAgentTeamsCreateArgs } from '../lib/client/agent-teams-card-definition.js'
+import { steerCaptainReport } from '../lib/tools.js'
 
 let failures = 0
 function check(label, condition, detail = '') {
@@ -40,7 +43,7 @@ function check(label, condition, detail = '') {
 }
 
 console.log('dsh-agent-teams offline verification')
-console.log('1/4 pure rules')
+console.log('1/5 pure rules')
 check("sanitizeKey('My Team!') -> 'my-team'", sanitizeKey('My Team!') === 'my-team')
 check("sanitizeKey('!!!') falls back to 'team'", sanitizeKey('!!!') === 'team')
 check('pending -> claimed allowed', transitionError('pending', 'claimed') === undefined)
@@ -49,7 +52,7 @@ check('in_progress -> completed allowed', transitionError('in_progress', 'comple
 check('completed -> in_progress denied', transitionError('completed', 'in_progress') !== undefined)
 check('same status is a no-op', transitionError('failed', 'failed') === undefined)
 
-console.log('2/4 dependency gating')
+console.log('2/5 dependency gating')
 const tasks = [
   { id: 't1', status: 'completed' },
   { id: 't2', status: 'pending' },
@@ -59,7 +62,7 @@ check('all-done deps satisfied', unsatisfiedDependencies(tasks, ['t1']).length =
 check('pending dep blocks', unsatisfiedDependencies(tasks, ['t2']).length === 1)
 check('failed dep blocks too', unsatisfiedDependencies(tasks, ['t3']).length === 1)
 
-console.log('3/4 on-disk team flow (temp dir)')
+console.log('3/5 on-disk team flow (temp dir)')
 const stateRoot = await mkdtemp(join(tmpdir(), 'dsh-agent-teams-verify-'))
 try {
   const team = {
@@ -68,7 +71,10 @@ try {
     description: 'smoke',
     captainSessionId: 'sess-captain',
     createdAt: Date.now(),
-    members: [],
+    members: [
+      { id: 'sess-member', name: 'alice', joinedAt: Date.now(), status: 'idle' },
+      { id: 'sess-removed', name: 'former', joinedAt: Date.now(), status: 'removed' },
+    ],
     tasks: [],
     taskSeq: 0,
   }
@@ -77,17 +83,73 @@ try {
   const reread = await readTeam(stateRoot, team.id)
   check('team.json round-trips', reread?.id === team.id && reread.captainSessionId === 'sess-captain')
 
+  await writeFile(join(stateRoot, team.id, 'team.json'), `\uFEFF${JSON.stringify(team, null, 2)}`, 'utf8')
+  check('team.json accepts a UTF-8 BOM', (await readTeam(stateRoot, team.id))?.id === team.id)
+
   const found = await findTeamByCaptain(stateRoot, 'sess-captain')
   check('findTeamByCaptain finds the team', found?.id === team.id)
   check('findTeamByCaptain ignores other captains', await findTeamByCaptain(stateRoot, 'sess-other') === undefined)
+  check('findTeamByParticipant finds the captain', (await findTeamByParticipant(stateRoot, 'sess-captain'))?.id === team.id)
+  check('findTeamByParticipant finds an active member', (await findTeamByParticipant(stateRoot, 'sess-member'))?.id === team.id)
+  check('findTeamByParticipant rejects a removed member', await findTeamByParticipant(stateRoot, 'sess-removed') === undefined)
 
-  const message = createMessage('alice', CAPTAIN_KEY, 'hello captain')
+  const escapedContent = String.raw`save to notes\foo.md`
+  const message = createMessage('alice', CAPTAIN_KEY, escapedContent)
   await withTeamLock(team.id, async () => {
     await appendMailbox(stateRoot, team.id, CAPTAIN_KEY, message)
   })
-  const inbox = await readMailbox(stateRoot, team.id, CAPTAIN_KEY)
-  check('mailbox append/read round-trips', inbox.length === 1 && inbox[0].content === 'hello captain')
+  const second = createMessage('bob', CAPTAIN_KEY, 'valid after BOM')
+  const mailboxFile = join(stateRoot, team.id, 'inbox', `${CAPTAIN_KEY}.jsonl`)
+  await writeFile(
+    mailboxFile,
+    `\uFEFF${JSON.stringify(second)}\n${String.raw`{"broken":"notes\q.md"}`}\n{}\n`,
+    { encoding: 'utf8', flag: 'a' },
+  )
+  const malformedLines = []
+  const inbox = await readMailbox(
+    stateRoot,
+    team.id,
+    CAPTAIN_KEY,
+    (lineNumber) => malformedLines.push(lineNumber),
+  )
+  check('mailbox append/read preserves backslashes', inbox[0]?.content === escapedContent)
+  check('mailbox accepts BOM-prefixed JSONL records', inbox[1]?.content === second.content)
+  check('mailbox skips malformed JSON and malformed shapes', inbox.length === 2 && malformedLines.join(',') === '3,4')
   check('missing mailbox reads empty', (await readMailbox(stateRoot, team.id, 'nobody')).length === 0)
+
+  const duplicateCaptain = { ...team, id: 'duplicate-captain', members: [] }
+  await createTeamDir(stateRoot, duplicateCaptain)
+  let duplicateCaptainRejected = false
+  try {
+    await findTeamByCaptain(stateRoot, 'sess-captain')
+  } catch {
+    duplicateCaptainRejected = true
+  }
+  check('multiple teams for one captain fail as ambiguous', duplicateCaptainRejected)
+  await removeTeamDir(stateRoot, duplicateCaptain.id)
+
+  const duplicateMember = { ...team, id: 'duplicate-member', captainSessionId: 'sess-other-captain' }
+  await createTeamDir(stateRoot, duplicateMember)
+  let duplicateMemberRejected = false
+  try {
+    await findTeamByParticipant(stateRoot, 'sess-member')
+  } catch {
+    duplicateMemberRejected = true
+  }
+  check('multiple teams for one member fail as ambiguous', duplicateMemberRejected)
+  await removeTeamDir(stateRoot, duplicateMember.id)
+
+  const invalidId = 'invalid-shape'
+  await mkdir(join(stateRoot, invalidId), { recursive: true })
+  await writeFile(join(stateRoot, invalidId, 'team.json'), '{}', 'utf8')
+  let invalidShapeRejected = false
+  try {
+    await readTeam(stateRoot, invalidId)
+  } catch {
+    invalidShapeRejected = true
+  }
+  check('invalid team.json shape is rejected at the durable boundary', invalidShapeRejected)
+  await removeTeamDir(stateRoot, invalidId)
 
   await removeTeamDir(stateRoot, team.id)
   check('removeTeamDir removes the team', await readTeam(stateRoot, team.id) === undefined)
@@ -105,7 +167,7 @@ try {
   await rm(stateRoot, { recursive: true, force: true })
 }
 
-console.log('4/4 host visual-state functions (activity panel)')
+console.log('4/5 host visual-state functions (activity panel)')
 const { taskVisualState, taskDepthsById } = await import('../lib/state.js')
 const vtasks = [
   { id: 't1', subject: 'a', status: 'completed', assignee: 'alice', dependencies: [], createdAt: 0, updatedAt: 0 },
@@ -146,6 +208,30 @@ const cyclic = [
   { id: 'b', dependencies: ['a'], depth: 1 },
 ]
 check('relationship traversal is cycle-safe', relatedTaskIds('a', cyclic).size === 2)
+check(
+  'agent team cards derive a stable id from the standard create tool call',
+  JSON.stringify(parseAgentTeamsCreateArgs('{"name":" Repo Review 2W! "}'))
+    === JSON.stringify({ teamId: 'repo-review-2w', name: 'Repo Review 2W!' }),
+)
+check('malformed create tool arguments do not create a card', parseAgentTeamsCreateArgs('{bad') === undefined)
+
+const captainDeliveries = []
+const captainSteered = steerCaptainReport(
+  { steer: message => captainDeliveries.push(message) },
+  'alice',
+  'finished t1',
+)
+check(
+  'member report delivery calls the live captain steer API',
+  captainSteered
+    && captainDeliveries.length === 1
+    && captainDeliveries[0]?.content[0]?.type === 'text'
+    && captainDeliveries[0]?.content[0]?.text === 'AgentTeams message from member alice:\n\nfinished t1',
+)
+check(
+  'failed live captain delivery falls back to the durable mailbox',
+  steerCaptainReport({ steer: () => { throw new Error('offline') } }, 'alice', 'finished t1') === false,
+)
 
 if (failures > 0) {
   console.error(`\n${failures} check(s) FAILED`)

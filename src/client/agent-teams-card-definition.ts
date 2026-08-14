@@ -5,10 +5,9 @@
  * panel (useful after the floater was closed, or when re-opening an old
  * session for review).
  *
- * The fold replays the durable `agent-teams/*` session events (the same
- * event family the activity panel's server snapshots are derived from), so
- * the card survives restarts and appears in any session whose log carries
- * the team's events.
+ * The fold anchors to the Harness's durable `tool/call` + `tool/result`
+ * records for `agent_teams_create`. Those are first-party session events, so
+ * the card survives restarts without writing an out-of-repo event type.
  * @module dsh-agent-teams/client/card
  */
 
@@ -21,7 +20,6 @@ import type {
 // erased from the bundle.
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-session/types'
-import type { AgentTeamsMemberAddedData } from '../event-types.ts'
 
 /** Final keyed Chat payload for the team summary card. */
 export interface AgentTeamsCardData {
@@ -43,69 +41,63 @@ declare module '@deepseek-ai/dsh-client-ui-conversation/client' {
   }
 }
 
-/** Folded member record. */
-interface AgentTeamsMemberState {
-  readonly id: string
-  readonly name: string
-  readonly role?: string
-  readonly removed?: boolean
-}
-
 /** Folded team record (the node's business state). */
 export interface AgentTeamsNodeState {
   readonly teamId: string
-  readonly captainSessionId: string
   readonly name: string
-  readonly members: readonly AgentTeamsMemberState[]
+  readonly accepted: boolean
 }
 
-function updateMemberAdded(state: AgentTeamsNodeState, data: AgentTeamsMemberAddedData): AgentTeamsNodeState {
-  if (state.members.some((member) => member.id === data.memberId)) return state
-  return {
-    ...state,
-    members: [...state.members, {
-      id: data.memberId,
-      name: data.name,
-      ...data.role !== undefined ? { role: data.role } : {},
-    }],
+/** Parse the only create-call fields the historic card owns. */
+export function parseAgentTeamsCreateArgs(value: string): { teamId: string; name: string } | undefined {
+  try {
+    const parsed: unknown = JSON.parse(value)
+    if (typeof parsed !== 'object' || parsed === null || !('name' in parsed) || typeof parsed.name !== 'string') {
+      return undefined
+    }
+    const name = parsed.name.trim()
+    if (name === '') return undefined
+    const cleaned = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+    return { teamId: cleaned === '' ? 'team' : cleaned, name }
+  } catch {
+    return undefined
   }
 }
 
-/** Durable `agent-teams/*` events folded into one keyed Chat node. */
+/** Durable first-party tool events folded into one keyed Chat node. */
 export const agentTeamsCardDefinition: ConversationNodeDefinition<AgentTeamsNodeState> = {
   kind: 'agent-teams',
   target: 'chat',
   match: (event) => {
-    if (event.type === 'agent-teams/team-created') return { id: String(event.data.teamId), role: 'start' }
-    if (event.type === 'agent-teams/member-added' || event.type === 'agent-teams/member-removed') {
-      return { id: String(event.data.teamId), role: 'update' }
+    if (event.type === 'tool/call' && event.data.name === 'agent_teams_create') {
+      return parseAgentTeamsCreateArgs(event.data.arguments) === undefined
+        ? null
+        : { id: String(event.data.callId), role: 'start' }
+    }
+    if (event.type === 'tool/result' && event.data.message.source.kind === 'tool') {
+      return { id: String(event.data.message.source.callId), role: 'update' }
     }
     return null
   },
   start: (_context, match) => {
-    if (match.event.type !== 'agent-teams/team-created') {
-      throw new Error('agent-teams card start requires agent-teams/team-created')
+    if (match.event.type !== 'tool/call') {
+      throw new Error('agent-teams card start requires agent_teams_create tool/call')
     }
-    // Older logs predate captainSessionId on the event; the card then has no
-    // owner and only shows for a matching historic injection.
-    return { teamId: match.event.data.teamId, captainSessionId: match.event.data.captainSessionId ?? '', name: match.event.data.name, members: [] }
+    const parsed = parseAgentTeamsCreateArgs(match.event.data.arguments)
+    if (parsed === undefined) throw new Error('agent-teams card start requires valid create arguments')
+    return { ...parsed, accepted: false }
   },
   update: (context, match) => {
-    if (match.event.type === 'agent-teams/member-added') return updateMemberAdded(context.state, match.event.data)
-    if (match.event.type === 'agent-teams/member-removed') {
-      const removedMemberId = match.event.data.memberId
-      return {
-        ...context.state,
-        members: context.state.members.map((member) => member.id === removedMemberId
-          ? { ...member, removed: true }
-          : member),
-      }
-    }
-    return context.state
+    if (match.event.type !== 'tool/result') return context.state
+    const failed = match.event.data.error !== undefined
+      || match.event.data.message.content.some((block) => block.type === 'tool-result' && block.isError === true)
+    if (failed) return context.state
+    return { ...context.state, accepted: true }
   },
   buildViewNode: (context): ChatConversationViewNode | null => {
     if (context.start === undefined) return null
     const state = context.state as AgentTeamsNodeState
+    if (!state.accepted) return null
     return {
       key: context.key,
       kind: 'agent-teams',
@@ -116,15 +108,9 @@ export const agentTeamsCardDefinition: ConversationNodeDefinition<AgentTeamsNode
       visibility: 'visible',
       data: {
         teamId: state.teamId,
-        captainSessionId: state.captainSessionId,
+        captainSessionId: '',
         teamName: state.name,
-        members: state.members
-          .filter((member) => member.removed !== true)
-          .map((member) => ({
-            id: member.id,
-            name: member.name,
-            role: member.role ?? '',
-          })),
+        members: [],
       },
     }
   },

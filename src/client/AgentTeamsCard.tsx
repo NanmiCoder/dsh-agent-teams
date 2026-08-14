@@ -10,8 +10,10 @@
  * @module dsh-agent-teams/client/card
  */
 
+import { useEffect, useMemo, useState } from 'react'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import type { ActivityTeam } from './ActivityPanel.tsx'
 import type { AgentTeamsCardData } from './agent-teams-card-definition.ts'
 import { LEAD_ART, memberArtUrl } from './artwork.ts'
 import css from './AgentTeamsCard.module.css'
@@ -22,6 +24,7 @@ export const OPEN_PANEL_EVENT = 'agent-teams:open-panel'
 /** Navigation action injected from the plugin's own SessionsService access. */
 export interface AgentTeamsCardInjected {
   readonly openSession: (id: SessionId) => void
+  readonly currentSessionId: () => SessionId | undefined
 }
 
 /** Complete keyed Chat renderer props. */
@@ -45,27 +48,62 @@ function openActivityPanel(data: AgentTeamsCardData): void {
 }
 
 /** Render one durable team as a compact conversation card. */
-export function AgentTeamsCard({ node, openSession }: AgentTeamsCardProps) {
+export function AgentTeamsCard({ node, openSession, currentSessionId }: AgentTeamsCardProps) {
   const data = node.data as AgentTeamsCardData
+  const owner = data.captainSessionId || currentSessionId() || ''
+  const [snapshot, setSnapshot] = useState<ActivityTeam | undefined>()
+  useEffect(() => {
+    let cancelled = false
+    const tick = async (): Promise<void> => {
+      for (const url of ['/plugins/dsh-agent-teams/state', '/plugins/dsh-agent-teams/state?archived=1']) {
+        try {
+          const response = await fetch(url, { cache: 'no-store' })
+          if (!response.ok) continue
+          const body = (await response.json()) as { teams?: readonly ActivityTeam[] }
+          const found = Array.isArray(body.teams)
+            ? body.teams.find((team) => team.teamId === data.teamId && (owner === '' || team.captainSessionId === owner))
+            : undefined
+          if (found !== undefined) {
+            if (!cancelled) setSnapshot(found)
+            return
+          }
+        } catch {
+          // Host restarting; retry on the next poll.
+        }
+      }
+    }
+    void tick()
+    const timer = setInterval(() => { void tick() }, 1500)
+    return () => {
+      cancelled = true
+      clearInterval(timer)
+    }
+  }, [data.teamId, owner])
+  const resolved = useMemo<AgentTeamsCardData>(() => ({
+    ...data,
+    captainSessionId: snapshot?.captainSessionId ?? owner,
+    teamName: snapshot?.name ?? data.teamName,
+    members: snapshot?.members.map((member) => ({ id: member.id, name: member.name, role: member.role })) ?? data.members,
+  }), [data, owner, snapshot])
   return (
-    <section className={css.root} data-agent-teams-card data-team-id={data.teamId}>
+    <section className={css.root} data-agent-teams-card data-team-id={resolved.teamId}>
       <header className={css.head}>
         <img className={css.leadAvatar} src={LEAD_ART} alt="" aria-hidden />
-        <span className={css.teamName} title={data.teamName}>{data.teamName}</span>
-        <span className={css.memberCount}>{data.members.length} 名成员</span>
+        <span className={css.teamName} title={resolved.teamName}>{resolved.teamName}</span>
+        <span className={css.memberCount}>{resolved.members.length} 名成员</span>
         <button
           type="button"
           className={css.panelButton}
-          onClick={() => { openActivityPanel(data) }}
+          onClick={() => { openActivityPanel(resolved) }}
           aria-label="打开活动面板"
           title="打开活动面板"
         >
           活动面板
         </button>
       </header>
-      {data.members.length > 0 && (
+      {resolved.members.length > 0 && (
         <div className={css.members}>
-          {data.members.map((member) => (
+          {resolved.members.map((member) => (
             <button
               type="button"
               key={member.id}

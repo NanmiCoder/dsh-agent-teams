@@ -14,9 +14,13 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
+import * as dshSession from '@deepseek-ai/dsh-session'
 import type { Session } from '@deepseek-ai/dsh-session'
 import type { SessionEventMap, SessionId } from '@deepseek-ai/dsh-session/types'
 import type { AgentTeamsEventType } from './event-types.ts'
+
+/** Event types already reported as unsupported, to avoid repetitive logs. */
+const skippedEventTypes = new Set<AgentTeamsEventType>()
 
 /**
  * Append one AgentTeams event to a Session, containing failures (a broken
@@ -32,6 +36,22 @@ export function appendTeamEvent(
   type: AgentTeamsEventType,
   data: SessionEventMap[AgentTeamsEventType],
 ): void {
+  // Out-of-repo events are not in the harness's generated vocabulary today.
+  // Mutating that ReadonlySet would make readability depend on which plugins
+  // happen to be loaded. Until Session.append exposes the official
+  // `ignorable: true` writer surface, omit these informational records unless
+  // the running harness already recognizes them. Disk state remains the
+  // authoritative source for the activity panel.
+  const known = (dshSession as unknown as {
+    KNOWN_SESSION_EVENT_TYPES?: ReadonlySet<string>
+  }).KNOWN_SESSION_EVENT_TYPES
+  if (known?.has(type) !== true) {
+    if (!skippedEventTypes.has(type)) {
+      skippedEventTypes.add(type)
+      ctx.logger.debug(`agent-teams: session event "${type}" omitted because this harness does not recognize it`)
+    }
+    return
+  }
   try {
     session.append(type, data)
   } catch (error: unknown) {

@@ -9,6 +9,7 @@
  * @module dsh-agent-teams/tools
  */
 import type { Context } from '@deepseek-ai/cordis';
+import type { Agent } from '@deepseek-ai/dsh-agent';
 /** Resolved plugin config consumed by the tools. */
 export interface ToolsConfig {
     /** State directory name under the captain's workspace. */
@@ -22,6 +23,15 @@ export interface ToolsConfig {
     /** Team size cap (members). */
     maxMembers: number;
 }
+/**
+ * Deliver a durable member report at the captain's nearest model boundary.
+ *
+ * `Agent.steer()` targets the next step while the captain is running, wakes a
+ * new turn when it is idle, and lets the Agent runtime reclassify an aborted
+ * activity to `next-turn`. This prevents reports from waiting behind the
+ * captain's entire orchestration turn.
+ */
+export declare function steerCaptainReport(captain: Pick<Agent, 'steer'>, from: string, content: string): boolean;
 /**
  * Register every `agent_teams_*` tool into the shared tools registry.
  * @param ctx - the plugin context (injects `tools`).

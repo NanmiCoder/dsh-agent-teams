@@ -24,7 +24,11 @@
     "README.md"
   ],
   "license": "MIT",
-  "author": "程序员阿江(Relakkes) <relakkes@gmail.com>",
+  "author": {
+    "name": "程序员阿江 (Relakkes)",
+    "email": "relakkes@gmail.com",
+    "url": "https://github.com/NanmiCoder"
+  },
   "homepage": "https://github.com/NanmiCoder/dsh-agent-teams#readme",
   "repository": {
     "type": "git",

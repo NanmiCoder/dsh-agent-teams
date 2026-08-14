@@ -53,7 +53,6 @@
     "verify:skill": "node scripts/sync-skill.mjs --check",
     "verify": "node scripts/verify.mjs && pnpm verify:skill"
   },
-  "dependencies": {},
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1-rc.1",
     "@deepseek-ai/dsh-agent": "^0.0.1-rc.1",
@@ -67,16 +66,18 @@
     "@deepseek-ai/dsh-subagent": "^0.0.1-rc.1",
     "@deepseek-ai/dsh-system-prompt": "^0.0.1-rc.1",
     "@deepseek-ai/dsh-tools": "^0.0.1-rc.1",
-    "react": "^18.2.0",
-    "@deepseek-ai/schemastery": "^3.18.1-rc.1"
+    "@deepseek-ai/schemastery": "^3.18.1-rc.1",
+    "react": "^18.2.0"
   },
   "devDependencies": {
+    "@types/node": "^26.2.0",
     "@types/react": "~18.3.1",
     "@types/react-dom": "^19.2.4",
     "lightningcss": "^1.33.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
     "tsdown": "0.22.2",
     "typescript": "^5.9.3",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "unrun": "^0.3.1"
   }
 }

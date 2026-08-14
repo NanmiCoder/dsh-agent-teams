@@ -14,20 +14,6 @@
   --agent-teams-panel-shift: calc(var(--agent-teams-panel-width) + 18px + var(--agent-teams-panel-gap));
 }
 
-/* The web shell owns no top-right slot. While this body-portal panel is open,
-   its global marker lets only the center conversation column yield room. The
-   sidebar stays anchored; the transcript and sticky composer share one smooth
-   width transition because both live under the same conversation root. */
-:global(html[data-agent-teams-panel-open]) :global([data-phase='active']) {
-  box-sizing: border-box;
-  padding-right: var(--agent-teams-panel-shift);
-}
-
-:global([data-phase='active']) {
-  transition: padding-right 360ms cubic-bezier(0.22, 1, 0.36, 1);
-  will-change: padding-right;
-}
-
 .badge {
   position: fixed;
   top: 64px;
@@ -917,16 +903,6 @@
   .memberAvatar[data-unread='true']::after {
     animation: none;
     transition: none;
-  }
-}
-
-@media (max-width: 960px) {
-  :global(html) {
-    --agent-teams-main-shift: 0px;
-  }
-
-  :global(html[data-agent-teams-panel-open]) :global([data-phase='active']) {
-    padding-right: 0;
   }
 }
 

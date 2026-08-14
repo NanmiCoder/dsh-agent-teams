@@ -10,7 +10,7 @@
  * Usage: node scripts/verify.mjs
  */
 
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
@@ -43,7 +43,37 @@ function check(label, condition, detail = '') {
 }
 
 console.log('dsh-agent-teams offline verification')
-console.log('1/5 pure rules')
+
+// The bundle patch's `name` is the specifier Node resolves when a profile
+// loads this plugin, so it must equal the published package name. A mismatch
+// only surfaces after someone installs the package (the row fails to load),
+// never in local link-installed development — hence this pre-publish gate.
+console.log('1/6 packaging contract')
+const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'))
+const patchText = await readFile(new URL('../cordis.patch.yml', import.meta.url), 'utf8')
+const patchName = patchText
+  .split('\n')
+  .filter(line => !/^\s*#/.test(line))
+  .find(line => /^\s*name:\s*\S/.test(line))
+  ?.match(/^\s*name:\s*(.+?)\s*$/)?.[1]
+  ?.replace(/^(['"])(.*)\1$/, '$2')
+check(
+  'cordis.patch.yml name matches the published package name',
+  patchName === pkg.name,
+  `patch has ${JSON.stringify(patchName)}, package.json has ${JSON.stringify(pkg.name)}`,
+)
+check(
+  'files[] ships the bundle patch and lib',
+  ['lib', 'cordis.patch.yml'].every(entry => pkg.files?.includes(entry)),
+  `files = ${JSON.stringify(pkg.files)}`,
+)
+check(
+  'scoped package publishes publicly',
+  !pkg.name.startsWith('@') || pkg.publishConfig?.access === 'public',
+  'scoped packages default to restricted without publishConfig.access = "public"',
+)
+
+console.log('2/6 pure rules')
 check("sanitizeKey('My Team!') -> 'my-team'", sanitizeKey('My Team!') === 'my-team')
 check("sanitizeKey('!!!') falls back to 'team'", sanitizeKey('!!!') === 'team')
 check('pending -> claimed allowed', transitionError('pending', 'claimed') === undefined)
@@ -52,7 +82,7 @@ check('in_progress -> completed allowed', transitionError('in_progress', 'comple
 check('completed -> in_progress denied', transitionError('completed', 'in_progress') !== undefined)
 check('same status is a no-op', transitionError('failed', 'failed') === undefined)
 
-console.log('2/5 dependency gating')
+console.log('3/6 dependency gating')
 const tasks = [
   { id: 't1', status: 'completed' },
   { id: 't2', status: 'pending' },
@@ -62,7 +92,7 @@ check('all-done deps satisfied', unsatisfiedDependencies(tasks, ['t1']).length =
 check('pending dep blocks', unsatisfiedDependencies(tasks, ['t2']).length === 1)
 check('failed dep blocks too', unsatisfiedDependencies(tasks, ['t3']).length === 1)
 
-console.log('3/5 on-disk team flow (temp dir)')
+console.log('4/6 on-disk team flow (temp dir)')
 const stateRoot = await mkdtemp(join(tmpdir(), 'dsh-agent-teams-verify-'))
 try {
   const team = {
@@ -167,7 +197,7 @@ try {
   await rm(stateRoot, { recursive: true, force: true })
 }
 
-console.log('4/5 host visual-state functions (activity panel)')
+console.log('5/6 host visual-state functions (activity panel)')
 const { taskVisualState, taskDepthsById } = await import('../lib/state.js')
 const vtasks = [
   { id: 't1', subject: 'a', status: 'completed', assignee: 'alice', dependencies: [], createdAt: 0, updatedAt: 0 },
@@ -186,7 +216,7 @@ check('t2 depth 1 (longest path)', depths.get('t2') === 1)
 check('t3 depth 2', depths.get('t3') === 2)
 check('missing dep contributes no depth', depths.get('t4') === 0)
 
-console.log('5/5 client relationship projections')
+console.log('6/6 client relationship projections')
 const projectionTasks = [
   { id: 't4', dependencies: ['t2'], depth: 2 },
   { id: 't1', dependencies: [], depth: 0 },

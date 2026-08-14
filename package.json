@@ -1,5 +1,5 @@
 {
-  "name": "dsh-agent-teams",
+  "name": "@nanmicoder/dsh-agent-teams",
   "version": "0.1.0",
   "description": "AgentTeams for DeepSeek Harness: multi-agent team collaboration (captain, members, tasks with dependencies, messaging) driven by natural language, with a tree monitor in the web GUI",
   "type": "module",
@@ -21,10 +21,35 @@
     "lib",
     "assets/agent-teams",
     "cordis.patch.yml",
-    "README.md",
-    "assets/ui.png"
+    "README.md"
   ],
   "license": "MIT",
+  "author": "程序员阿江(Relakkes) <relakkes@gmail.com>",
+  "homepage": "https://github.com/NanmiCoder/dsh-agent-teams#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NanmiCoder/dsh-agent-teams.git"
+  },
+  "bugs": {
+    "url": "https://github.com/NanmiCoder/dsh-agent-teams/issues"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "agent-teams",
+    "multi-agent",
+    "subagent",
+    "ai-agent",
+    "llm"
+  ],
+  "engines": {
+    "node": "^22.19.0 || >=24"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
@@ -51,7 +76,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit",
     "sync:skill": "node scripts/sync-skill.mjs",
     "verify:skill": "node scripts/sync-skill.mjs --check",
-    "verify": "node scripts/verify.mjs && pnpm verify:skill"
+    "verify": "node scripts/verify.mjs && pnpm verify:skill",
+    "prepublishOnly": "pnpm build && pnpm verify"
   },
   "dependencies": {},
   "peerDependencies": {

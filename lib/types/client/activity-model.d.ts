@@ -10,6 +10,15 @@ export interface RelationshipStage<T extends RelationshipTask> {
     readonly depth: number;
     readonly tasks: readonly T[];
 }
+/**
+ * Whether an expanded activity panel still belongs to the current session.
+ *
+ * The panel is mounted through a body portal, so React does not remount it
+ * when the conversation route changes. Ownership keeps an expanded panel
+ * from leaking onto the new-session screen (or another conversation) while
+ * its local open state is being reset.
+ */
+export declare function activityPanelExpandedForSession(open: boolean, owner: string | undefined, current: string | undefined): boolean;
 /** Group tasks by their precomputed dependency depth. */
 export declare function taskStages<T extends RelationshipTask>(tasks: readonly T[]): readonly RelationshipStage<T>[];
 /**

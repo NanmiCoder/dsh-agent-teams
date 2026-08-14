@@ -28,7 +28,7 @@ import {
   unsatisfiedDependencies,
   withTeamLock,
 } from '../lib/state.js'
-import { relatedTaskIds, taskStages } from '../lib/client/activity-model.js'
+import { activityPanelExpandedForSession, relatedTaskIds, taskStages } from '../lib/client/activity-model.js'
 import { parseAgentTeamsCreateArgs } from '../lib/client/agent-teams-card-definition.js'
 import { steerCaptainReport } from '../lib/tools.js'
 
@@ -208,6 +208,12 @@ const cyclic = [
   { id: 'b', dependencies: ['a'], depth: 1 },
 ]
 check('relationship traversal is cycle-safe', relatedTaskIds('a', cyclic).size === 2)
+check(
+  'expanded activity panel belongs only to its current session',
+  activityPanelExpandedForSession(true, 'session-a', 'session-a')
+    && !activityPanelExpandedForSession(true, 'session-a', 'session-b')
+    && !activityPanelExpandedForSession(true, 'session-a', undefined),
+)
 check(
   'agent team cards derive a stable id from the standard create tool call',
   JSON.stringify(parseAgentTeamsCreateArgs('{"name":" Repo Review 2W! "}'))

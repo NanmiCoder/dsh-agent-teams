@@ -15,14 +15,14 @@
  * @module dsh-agent-teams/client/activity
  */
 
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import {
   IconBranchOutline16, IconChevronRightOutline14, IconCloseOutline16,
   StateDot, type StateDotState,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { ObservableSnapshot, SessionListState } from '@deepseek-ai/dsh-client-runtime/client'
-import { relatedTaskIds, taskStages } from './activity-model.ts'
+import { activityPanelExpandedForSession, relatedTaskIds, taskStages } from './activity-model.ts'
 import { ACTION_ART, LEAD_ART, memberArtUrl } from './artwork.ts'
 import { OPEN_PANEL_EVENT } from './AgentTeamsCard.tsx'
 import type { AgentTeamsCardData } from './agent-teams-card-definition.ts'
@@ -437,6 +437,7 @@ export function ActivityPanel({ sessionsList, openSession }: {
   const [teams, setTeams] = useState<readonly ActivityTeam[]>([])
   const [archivedTeams, setArchivedTeams] = useState<readonly ActivityTeam[]>([])
   const [open, setOpen] = useState(false)
+  const [openOwner, setOpenOwner] = useState<SessionId | undefined>()
   const [autoOpened, setAutoOpened] = useState(false)
   const [wasActive, setWasActive] = useState(false)
   const [historic, setHistoric] = useState<ReadonlyMap<string, { data: AgentTeamsCardData; owner: string }>>(new Map())
@@ -447,16 +448,29 @@ export function ActivityPanel({ sessionsList, openSession }: {
   const currentRef = useRef(current)
   useEffect(() => { currentRef.current = current }, [current])
   const mountedAtRef = useRef(performance.now())
+  const expanded = activityPanelExpandedForSession(open, openOwner, current)
+
+  // This portal survives conversation route changes. Gate expansion by its
+  // owning session during render, then clear stale state before paint. This
+  // removes the old panel immediately instead of waiting for the no-team
+  // autoclose grace period on the destination page.
+  useLayoutEffect(() => {
+    if (openOwner === undefined || openOwner === current) return
+    setOpen(false)
+    setOpenOwner(undefined)
+    setWasActive(false)
+    setAutoOpened(false)
+  }, [current, openOwner])
 
   // The activity panel is a body portal, so announce its open state on body.
   // CSS can then make the conversation column yield space without knowing the
   // host shell's hashed module class names. Narrow viewports keep overlay mode.
-  useEffect(() => {
+  useLayoutEffect(() => {
     const root = document.documentElement
-    if (open) root.setAttribute(PANEL_OPEN_ATTRIBUTE, '')
+    if (expanded) root.setAttribute(PANEL_OPEN_ATTRIBUTE, '')
     else root.removeAttribute(PANEL_OPEN_ATTRIBUTE)
     return () => { root.removeAttribute(PANEL_OPEN_ATTRIBUTE) }
-  }, [open])
+  }, [expanded])
 
   useEffect(() => {
     let cancelled = false
@@ -493,6 +507,9 @@ export function ActivityPanel({ sessionsList, openSession }: {
 
   useEffect(() => {
     const onOpenPanel = (event: Event): void => {
+      const activeSession = currentRef.current
+      if (activeSession === undefined) return
+      setOpenOwner(activeSession)
       setOpen(true)
       const detail = (event as CustomEvent<AgentTeamsCardData>).detail
       if (detail?.teamId !== undefined) {
@@ -548,6 +565,7 @@ export function ActivityPanel({ sessionsList, openSession }: {
       // main-column yield) right after load reads as a whole-page flicker.
       const settled = performance.now() - mountedAtRef.current >= AUTO_OPEN_SETTLE_MS
       if (!autoOpened && settled) {
+        setOpenOwner(current)
         setOpen(true)
         setAutoOpened(true)
       }
@@ -556,6 +574,7 @@ export function ActivityPanel({ sessionsList, openSession }: {
     if (!wasActive) return
     const timer = setTimeout(() => {
       setOpen(false)
+      setOpenOwner(undefined)
       setWasActive(false)
       // Re-arm auto-expand: a later activity (new team, new session) may
       // open the panel on its own again.
@@ -570,14 +589,18 @@ export function ActivityPanel({ sessionsList, openSession }: {
   )
   const hasTeams = visibleCount > 0
 
-  if (!hasTeams && !open) return null
+  if (!hasTeams && !expanded) return null
 
   return (
     <>
-      {!open && (
-        <CollapsedBadge count={visibleCount} busy={busy} onClick={() => { setOpen(true) }} />
+      {!expanded && (
+        <CollapsedBadge count={visibleCount} busy={busy} onClick={() => {
+          if (current === undefined) return
+          setOpenOwner(current)
+          setOpen(true)
+        }} />
       )}
-      {open && (
+      {expanded && (
         <aside className={css.panel} data-agent-teams-activity>
           <header className={css.panelHead}>
             <span className={css.panelTitle}>
@@ -587,7 +610,10 @@ export function ActivityPanel({ sessionsList, openSession }: {
             <button
               type="button"
               className={css.closeButton}
-              onClick={() => { setOpen(false) }}
+              onClick={() => {
+                setOpen(false)
+                setOpenOwner(undefined)
+              }}
               aria-label="关闭"
             >
               <IconCloseOutline16 />

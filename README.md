@@ -13,19 +13,53 @@ DeepSeek Harness 的 AgentTeams 插件：安装后，任何会话只需一句自
 
 ## 安装
 
-**前置要求**：Node.js `^22.19` 或 `>=24`；pnpm 11；已安装或可通过 `npx` 使用 DeepSeek Harness。
+**前置要求**：已安装 [DeepSeek Harness](https://github.com/deepseek-ai/DeepSeek-Harness)（`dsh` 命令可用）；Node.js `^22.19` 或 `>=24`；pnpm 11。
 
 插件已发布到 npm（`@nanmicoder` scope），一条命令装好：
 
 ```sh
-npx -p @deepseek-ai/dsh dsh plugin --profile web add @nanmicoder/dsh-agent-teams@0.1.2
+dsh plugin --profile web add @nanmicoder/dsh-agent-teams
 ```
 
 `dsh plugin` 会把插件加入 `web` profile，并根据包内的 `dsh.bundle` 声明自动启用它；工具、系统提示和 Web 客户端入口随该 profile 一起加载。
 
-建议带版本号安装：`latest` 的解析可能受 registry 缓存影响（国内镜像源同步新版本通常有延迟）。升级时把 `@0.1.2` 换成新版本号即可。
-
 > **重启生效**：安装完成后，重启正在运行的 DeepSeek Harness Web 服务并刷新页面。
+
+装好后可以用 `dsh plugin --profile web list` 确认插件在列表里。升级用同一条 add 命令即可。
+
+### 其他安装方式
+
+**指定版本**——`latest` 的解析可能受 registry 缓存影响（国内镜像源同步新版本通常有延迟），想钉死版本时：
+
+```sh
+dsh plugin --profile web add @nanmicoder/dsh-agent-teams@<version>
+```
+
+版本号见 [npm 发布页](https://www.npmjs.com/package/@nanmicoder/dsh-agent-teams?activeTab=versions)。
+
+**还没装 DSH，或不想全局安装**——用 `npx` 直接跑，无需预装：
+
+```sh
+npx -p @deepseek-ai/dsh dsh plugin --profile web add @nanmicoder/dsh-agent-teams
+```
+
+**从 GitHub 安装**——想用尚未发布到 npm 的最新提交：
+
+```sh
+dsh plugin --profile web add github:NanmiCoder/dsh-agent-teams
+```
+
+**从源码安装**——要改插件本身，或参与开发：
+
+```sh
+git clone https://github.com/NanmiCoder/dsh-agent-teams.git
+cd dsh-agent-teams
+pnpm install
+pnpm build
+dsh plugin --profile web add "link:$(pwd)"
+```
+
+`link:` 安装后，改完代码跑 `pnpm build` 即时生效，不必重装插件（客户端改动需刷新页面，host 侧改动需重启 dsh 服务）。提交前跑 `pnpm verify` 做离线校验。
 
 ## 使用
 

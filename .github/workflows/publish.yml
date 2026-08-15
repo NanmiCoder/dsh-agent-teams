@@ -34,8 +34,8 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
           package-manager-cache: false
 
-      - name: Set up npm with trusted publishing support
-        run: npm install --global npm@11.19.0
+      - name: Set up package managers
+        run: npm install --global npm@11.19.0 pnpm@10.33.0
 
       - name: Verify release version
         env:
@@ -49,9 +49,13 @@ jobs:
             test "${RELEASE_VERSION}" = "${package_version}"
           fi
 
-      - name: Verify committed package
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build and verify package
         run: |
-          node scripts/verify-package.mjs
+          pnpm build
+          pnpm verify
           npm pack --dry-run --ignore-scripts
 
       - name: Publish to npm

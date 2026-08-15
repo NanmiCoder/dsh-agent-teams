@@ -37,19 +37,23 @@ Ask in natural language. The plugin provides the team protocol, nine coordinatio
 > [!NOTE]
 > Requires an existing [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) installation.
 
-Choose either plugin source.
-
 ### npm
 
 ```sh
 dsh plugin --profile web add @nanmicoder/dsh-agent-teams
 ```
 
-### GitHub `main`
+### Build from source
 
 ```sh
-dsh plugin --profile web add 'git+https://github.com/NanmiCoder/dsh-agent-teams.git#main'
+git clone https://github.com/NanmiCoder/dsh-agent-teams.git
+cd dsh-agent-teams
+pnpm install
+pnpm build
+dsh plugin --profile web add .
 ```
+
+Run `pnpm build` again after changing the source. The local plugin install remains linked to this checkout.
 
 Validate the composed profile, restart DSH, and refresh the Web UI:
 

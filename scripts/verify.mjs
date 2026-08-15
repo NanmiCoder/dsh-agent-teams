@@ -31,6 +31,11 @@ import {
 import { activityPanelExpandedForSession, relatedTaskIds, taskStages } from '../lib/client/activity-model.js'
 import { parseAgentTeamsCreateArgs } from '../lib/client/agent-teams-card-definition.js'
 import { steerCaptainReport } from '../lib/tools.js'
+import {
+  installMemberSelectionRuntime,
+  resolveMemberLlmSelection,
+  spawnMember,
+} from '../lib/members.js'
 
 let failures = 0
 function check(label, condition, detail = '') {
@@ -48,7 +53,7 @@ console.log('dsh-agent-teams offline verification')
 // loads this plugin, so it must equal the published package name. A mismatch
 // only surfaces after someone installs the package (the row fails to load),
 // never in local link-installed development — hence this pre-publish gate.
-console.log('1/6 packaging contract')
+console.log('1/7 packaging contract')
 const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'))
 const patchText = await readFile(new URL('../cordis.patch.yml', import.meta.url), 'utf8')
 const patchName = patchText
@@ -83,7 +88,7 @@ check(
   `bundle registers ${JSON.stringify(registeredId)}, package.json has ${JSON.stringify(pkg.name)}`,
 )
 
-console.log('2/6 pure rules')
+console.log('2/7 pure rules')
 check("sanitizeKey('My Team!') -> 'my-team'", sanitizeKey('My Team!') === 'my-team')
 // #15: an ASCII-only whitelist folded every non-Latin name onto one constant,
 // so distinct members shared a mailbox file and the second one was rejected as
@@ -117,7 +122,7 @@ check('in_progress -> completed allowed', transitionError('in_progress', 'comple
 check('completed -> in_progress denied', transitionError('completed', 'in_progress') !== undefined)
 check('same status is a no-op', transitionError('failed', 'failed') === undefined)
 
-console.log('3/6 dependency gating')
+console.log('3/7 dependency gating')
 const tasks = [
   { id: 't1', status: 'completed' },
   { id: 't2', status: 'pending' },
@@ -127,7 +132,7 @@ check('all-done deps satisfied', unsatisfiedDependencies(tasks, ['t1']).length =
 check('pending dep blocks', unsatisfiedDependencies(tasks, ['t2']).length === 1)
 check('failed dep blocks too', unsatisfiedDependencies(tasks, ['t3']).length === 1)
 
-console.log('4/6 on-disk team flow (temp dir)')
+console.log('4/7 on-disk team flow (temp dir)')
 const stateRoot = await mkdtemp(join(tmpdir(), 'dsh-agent-teams-verify-'))
 try {
   const team = {
@@ -232,7 +237,7 @@ try {
   await rm(stateRoot, { recursive: true, force: true })
 }
 
-console.log('5/6 host visual-state functions (activity panel)')
+console.log('5/7 host visual-state functions (activity panel)')
 const { taskVisualState, taskDepthsById } = await import('../lib/state.js')
 const vtasks = [
   { id: 't1', subject: 'a', status: 'completed', assignee: 'alice', dependencies: [], createdAt: 0, updatedAt: 0 },
@@ -251,7 +256,7 @@ check('t2 depth 1 (longest path)', depths.get('t2') === 1)
 check('t3 depth 2', depths.get('t3') === 2)
 check('missing dep contributes no depth', depths.get('t4') === 0)
 
-console.log('6/6 client relationship projections')
+console.log('6/7 client relationship projections')
 const projectionTasks = [
   { id: 't4', dependencies: ['t2'], depth: 2 },
   { id: 't1', dependencies: [], depth: 0 },
@@ -303,6 +308,230 @@ check(
   'failed live captain delivery falls back to the durable mailbox',
   steerCaptainReport({ steer: () => { throw new Error('offline') } }, 'alice', 'finished t1') === false,
 )
+
+console.log('7/7 member model selection and continuation restore')
+const captain = {
+  id: 'captain-session',
+  options: { provider: 'birth-provider', model: 'birth-model' },
+  session: {
+    requestHeader: () => ({
+      config: {
+        provider: 'captain-provider',
+        model: 'captain-model',
+        reasoningEffort: 'max',
+      },
+    }),
+  },
+}
+const resolvedCalls = []
+const selectionContext = {
+  llm: {
+    resolveCallConfig: async (config) => {
+      resolvedCalls.push(config)
+      return config
+    },
+  },
+}
+const inheritedSelection = await resolveMemberLlmSelection(selectionContext, captain, {})
+check(
+  'ordinary member snapshots the captain current route and effort',
+  inheritedSelection.provider === 'captain-provider'
+    && inheritedSelection.model === 'captain-model'
+    && inheritedSelection.reasoningEffort === 'max',
+)
+const overriddenSelection = await resolveMemberLlmSelection(selectionContext, captain, {
+  provider: 'other-provider',
+  model: 'other-model',
+})
+check(
+  'explicit cross-provider route keeps and validates captain effort',
+  overriddenSelection.provider === 'other-provider'
+    && overriddenSelection.model === 'other-model'
+    && resolvedCalls.at(-1)?.reasoningEffort === 'max',
+)
+const defaultedSelection = await resolveMemberLlmSelection(selectionContext, captain, {
+  defaultModel: 'configured-member-model',
+})
+check(
+  'plugin memberModel overrides only the model on the current provider',
+  defaultedSelection.provider === 'captain-provider'
+    && defaultedSelection.model === 'configured-member-model',
+)
+let providerWithoutModelRejected = false
+try {
+  await resolveMemberLlmSelection(selectionContext, captain, { provider: 'other-provider' })
+} catch {
+  providerWithoutModelRejected = true
+}
+check('explicit provider without model is rejected', providerWithoutModelRejected)
+
+let startSpec
+const spawnMemberRecord = {
+  id: '',
+  name: 'backend',
+  role: 'engineer',
+  provider: overriddenSelection.provider,
+  model: overriddenSelection.model,
+  reasoningEffort: overriddenSelection.reasoningEffort,
+  joinedAt: Date.now(),
+  status: 'idle',
+}
+const spawnTeam = {
+  name: 'Spawn Verify',
+  id: 'spawn-verify',
+  captainSessionId: captain.id,
+  createdAt: Date.now(),
+  members: [],
+  tasks: [],
+  taskSeq: 0,
+}
+await spawnMember(
+  {
+    subagents: {
+      getProvider: () => ({
+        prepareContinuable: () => undefined,
+        capabilities: { persona: true, toolFilter: true },
+      }),
+      list: () => ['spawn'],
+      startContinuable: async (spec) => {
+        startSpec = spec
+        return { childId: 'spawned-member', messageId: 'welcome-message' }
+      },
+    },
+  },
+  { provider: 'spawn', maxDepth: 1 },
+  {
+    withPending: async (_parentId, _label, _selection, operation) => operation(),
+  },
+  overriddenSelection,
+  captain,
+  spawnTeam,
+  spawnMemberRecord,
+  '.agent-teams',
+  new AbortController().signal,
+)
+check(
+  '#20: spawn receives the resolved per-member provider and model',
+  startSpec?.request?.agentOptions?.provider === 'other-provider'
+    && startSpec?.request?.agentOptions?.model === 'other-model'
+    && spawnMemberRecord.id === 'spawned-member',
+)
+
+function descriptorEvent(label, agentProvider = 'descriptor-provider', agentModel = 'descriptor-model') {
+  return {
+    type: 'subagent/descriptor',
+    data: {
+      version: 2,
+      mode: 'continuable',
+      provider: 'spawn',
+      label,
+      agentProvider,
+      agentModel,
+    },
+  }
+}
+
+function fakeChildContext({ label, parentSessionId, cwd, agentProvider, agentModel }) {
+  const listeners = new Map()
+  return {
+    listeners,
+    context: {
+      agent: {
+        session: {
+          header: { parentSession: parentSessionId, cwd, seedLength: 0 },
+          events: [descriptorEvent(label, agentProvider, agentModel)],
+        },
+      },
+      on(name, listener) {
+        listeners.set(name, listener)
+        return () => listeners.delete(name)
+      },
+    },
+  }
+}
+
+async function routedConfig(child) {
+  const assemble = child.listeners.get('system-prompt/assemble')
+  const request = child.listeners.get('agent/request')
+  await assemble({}, {}, async () => ({ variables: {} }))
+  return request({}, async () => ({
+    provider: 'unselected-provider',
+    model: 'unselected-model',
+    reasoningEffort: 'low',
+  }))
+}
+
+let setupMemberSelection
+const selectionRuntime = installMemberSelectionRuntime({
+  subagents: {
+    registerContinuableSetup: (setup) => {
+      setupMemberSelection = setup
+      return () => undefined
+    },
+  },
+}, '.agent-teams')
+const freshChild = fakeChildContext({
+  label: 'agent-teams:fresh-team:backend',
+  parentSessionId: 'captain-session',
+  cwd: process.cwd(),
+})
+let disposeFresh
+await selectionRuntime.withPending(
+  'captain-session',
+  'agent-teams:fresh-team:backend',
+  overriddenSelection,
+  async () => {
+    disposeFresh = setupMemberSelection(freshChild.context)
+  },
+)
+const freshRoute = await routedConfig(freshChild)
+check(
+  'fresh child request receives the resolved reasoning effort',
+  freshRoute.provider === 'other-provider'
+    && freshRoute.model === 'other-model'
+    && freshRoute.reasoningEffort === 'max',
+)
+disposeFresh()
+
+const restoreWorkspace = await mkdtemp(join(tmpdir(), 'dsh-agent-teams-selection-'))
+try {
+  const restoreStateRoot = join(restoreWorkspace, '.agent-teams')
+  await createTeamDir(restoreStateRoot, {
+    name: 'Restore Team',
+    id: 'restore-team',
+    captainSessionId: 'captain-session',
+    createdAt: Date.now(),
+    members: [{
+      id: 'cold-member',
+      name: 'reviewer',
+      provider: 'cold-provider',
+      model: 'cold-model',
+      reasoningEffort: 'high',
+      joinedAt: Date.now(),
+      status: 'idle',
+    }],
+    tasks: [],
+    taskSeq: 0,
+  })
+  const coldChild = fakeChildContext({
+    label: 'agent-teams:restore-team:reviewer',
+    parentSessionId: 'captain-session',
+    cwd: restoreWorkspace,
+    agentProvider: 'cold-provider',
+    agentModel: 'cold-model',
+  })
+  const disposeCold = setupMemberSelection(coldChild.context)
+  const coldRoute = await routedConfig(coldChild)
+  check(
+    'cold-resumed child restores provider, model, and reasoning from team.json',
+    coldRoute.provider === 'cold-provider'
+      && coldRoute.model === 'cold-model'
+      && coldRoute.reasoningEffort === 'high',
+  )
+  disposeCold()
+} finally {
+  await rm(restoreWorkspace, { recursive: true, force: true })
+}
 
 if (failures > 0) {
   console.error(`\n${failures} check(s) FAILED`)

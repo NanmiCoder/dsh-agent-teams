@@ -73,6 +73,8 @@ Then ask for a team directly:
 
 Team state is stored under `<workspace>/.agent-teams/`; the Web panel reads that disk truth and combines it with live sub-agent activity.
 
+Member creation is zero-interaction by default: the plugin snapshots the LLM provider, model, and reasoning effort actually used by the captain's current step, and restores that snapshot on later continuations. Only an explicit heterogeneous-team request (for example, “backend on provider A/model X, frontend on provider B/model Y”) supplies a member-specific `provider` + `model`; there is no per-member model or reasoning prompt.
+
 ## Configuration
 
 Defaults work without extra setup. A trusted profile can override member behavior:
@@ -86,6 +88,8 @@ Defaults work without extra setup. A trusted profile can override member behavio
     memberMaxDepth: 1
     maxMembers: 8
 ```
+
+`memberProvider` is the sub-agent runtime backend (`spawn` / `fork`), not an LLM provider. Cross-LLM-provider routing uses the optional `provider` + `model` fields of `agent_teams_add_member`; `memberModel` is only a model default for all members.
 
 ## Boundaries
 

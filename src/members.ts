@@ -13,10 +13,13 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import type { Agent } from '@deepseek-ai/dsh-agent'
+import { installModelSelection, type Agent, type ModelSelection } from '@deepseek-ai/dsh-agent'
 // Declaration merge only: makes ctx.subagents visible.
-import type {} from '@deepseek-ai/dsh-subagent'
+import { foldSubagentDescriptor } from '@deepseek-ai/dsh-subagent'
+import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { SessionId } from '@deepseek-ai/dsh-session'
+import { join } from 'node:path'
+import { readTeamSync } from './state.ts'
 import type { TeamMember, TeamState } from './types.ts'
 
 /** Captain-only AgentTeams tools hidden from newly spawned members. */
@@ -42,10 +45,189 @@ function brandedSessionId(value: string): SessionId {
 export interface MemberRuntimeConfig {
   /** Registered `ctx.subagents` provider name (must support continuable + persona). */
   provider: string
-  /** Optional model override applied to every member. */
-  model?: string
   /** Child delegation depth cap (0 forbids delegation entirely). */
   maxDepth?: number
+}
+
+/** Durable provider/model/reasoning snapshot for one member. */
+export interface MemberLlmSelection {
+  /** Registered LLM provider route. */
+  provider: string
+  /** Provider-owned model id. */
+  model: string
+  /** Adapter-owned reasoning effort, absent when the target has no explicit/default effort. */
+  reasoningEffort?: string
+}
+
+/** Optional member-level route requested by the captain. */
+export interface MemberLlmSelectionRequest {
+  /** Explicit LLM provider route; requires an explicit model. */
+  provider?: string
+  /** Explicit model id; otherwise the plugin default or captain model is used. */
+  model?: string
+  /** Plugin-level member model default. */
+  defaultModel?: string
+}
+
+/** Process-local bridge between spawn admission and synchronous child setup. */
+export interface MemberSelectionRuntime {
+  /** Make one selection visible while Harness materializes the fresh child. */
+  withPending<T>(
+    parentSessionId: string,
+    label: string,
+    selection: MemberLlmSelection,
+    operation: () => Promise<T>,
+  ): Promise<T>
+}
+
+const MEMBER_LABEL_PREFIX = 'agent-teams:'
+
+function pendingSelectionKey(parentSessionId: string, label: string): string {
+  return `${parentSessionId}\u0000${label}`
+}
+
+function selectionFromMember(member: TeamMember | undefined): MemberLlmSelection | undefined {
+  if (member?.provider === undefined || member.model === undefined) return undefined
+  const provider = member.provider.trim()
+  const model = member.model.trim()
+  if (provider === '' || model === '') return undefined
+  const reasoningEffort = member.reasoningEffort?.trim()
+  return {
+    provider,
+    model,
+    ...reasoningEffort === undefined || reasoningEffort === '' ? {} : { reasoningEffort },
+  }
+}
+
+function modelSelection(selection: MemberLlmSelection): ModelSelection {
+  return {
+    provider: selection.provider,
+    model: selection.model,
+    ...selection.reasoningEffort === undefined
+      ? {}
+      : { reasoningEffort: ReasoningEffortId(selection.reasoningEffort) },
+  }
+}
+
+/**
+ * Resolve one member's complete model selection. Ordinary members snapshot the
+ * captain's current request route and reasoning effort. An explicit member
+ * provider/model or plugin-level model replaces only that route; the current
+ * captain effort remains the inherited policy and is validated against the
+ * target model before a child is created.
+ */
+export async function resolveMemberLlmSelection(
+  ctx: Context,
+  captain: Agent,
+  request: MemberLlmSelectionRequest,
+  signal?: AbortSignal,
+): Promise<MemberLlmSelection> {
+  const explicitProvider = request.provider?.trim()
+  const explicitModel = request.model?.trim()
+  const defaultModel = request.defaultModel?.trim()
+  if (request.provider !== undefined && explicitProvider === '') {
+    throw new Error('member LLM provider must not be empty')
+  }
+  if (request.model !== undefined && explicitModel === '') {
+    throw new Error('member model must not be empty')
+  }
+  if (request.defaultModel !== undefined && defaultModel === '') {
+    throw new Error('configured memberModel must not be empty')
+  }
+  if (explicitProvider !== undefined && explicitModel === undefined) {
+    throw new Error('an explicit member LLM provider requires an explicit member model')
+  }
+
+  const current = captain.session.requestHeader()?.config
+  const provider = explicitProvider ?? current?.provider ?? captain.options.provider
+  const model = explicitModel ?? defaultModel ?? current?.model ?? captain.options.model
+  if (provider === undefined || model === undefined) {
+    throw new Error('cannot resolve the member LLM route from the current captain session')
+  }
+
+  const resolved = await ctx.llm.resolveCallConfig({
+    provider,
+    model,
+    ...current?.reasoningEffort === undefined
+      ? {}
+      : { reasoningEffort: current.reasoningEffort },
+  }, signal)
+  return {
+    provider: resolved.provider,
+    model: resolved.model,
+    ...resolved.reasoningEffort === undefined
+      ? {}
+      : { reasoningEffort: String(resolved.reasoningEffort) },
+  }
+}
+
+/**
+ * Install the member selection bridge for every fresh or cold-resumed
+ * continuable child. Fresh creation reads the pending in-memory selection;
+ * cold resume restores the same selection from the owning team's durable
+ * record. Legacy members without a complete saved route retain Harness's
+ * descriptor provider/model behavior.
+ */
+export function installMemberSelectionRuntime(ctx: Context, stateDir: string): MemberSelectionRuntime {
+  const pending = new Map<string, MemberLlmSelection>()
+  ctx.subagents.registerContinuableSetup((childCtx) => {
+    const child = childCtx.agent
+    if (child === undefined) return () => undefined
+    const suffix = child.session.events.slice(child.session.header.seedLength ?? 0)
+    const descriptor = foldSubagentDescriptor(suffix)
+    if (descriptor?.mode !== 'continuable' || !descriptor.label.startsWith(MEMBER_LABEL_PREFIX)) {
+      return () => undefined
+    }
+
+    const parentSessionId = child.session.header.parentSession
+    if (parentSessionId === undefined) return () => undefined
+    const key = pendingSelectionKey(parentSessionId, descriptor.label)
+    let selection = pending.get(key)
+    if (selection === undefined) {
+      const identity = descriptor.label.slice(MEMBER_LABEL_PREFIX.length)
+      const separator = identity.indexOf(':')
+      if (separator < 1 || separator === identity.length - 1) return () => undefined
+      const teamId = identity.slice(0, separator)
+      const memberName = identity.slice(separator + 1)
+      const workspace = child.session.header.cwd ?? process.cwd()
+      const team = readTeamSync(join(workspace, stateDir), teamId)
+      if (team?.captainSessionId !== parentSessionId) return () => undefined
+      selection = selectionFromMember(team.members.find(member => member.name === memberName))
+      // An old team record has no provider/reasoning snapshot. Its durable
+      // Harness descriptor still restores provider/model, so leave it alone.
+      if (selection === undefined) return () => undefined
+      if (descriptor.agentProvider !== selection.provider || descriptor.agentModel !== selection.model) {
+        throw new Error(
+          `agent-teams: saved model route for member "${memberName}" does not match its subagent descriptor`,
+        )
+      }
+    }
+
+    return installModelSelection(childCtx, {
+      current: modelSelection(selection),
+      assembled: undefined,
+    })
+  })
+
+  return {
+    async withPending<T>(
+      parentSessionId: string,
+      label: string,
+      selection: MemberLlmSelection,
+      operation: () => Promise<T>,
+    ): Promise<T> {
+      const key = pendingSelectionKey(parentSessionId, label)
+      if (pending.has(key)) {
+        throw new Error(`member model selection is already pending for "${label}"`)
+      }
+      pending.set(key, selection)
+      try {
+        return await operation()
+      } finally {
+        pending.delete(key)
+      }
+    },
+  }
 }
 
 /**
@@ -87,6 +269,8 @@ export function memberWelcome(team: TeamState): string {
  * `member.id` with its child session id. On failure nothing is persisted.
  * @param ctx - the plugin context (injects `subagents`).
  * @param config - member runtime knobs.
+ * @param selections - fresh/cold child model-selection bridge.
+ * @param llmSelection - resolved provider/model/reasoning snapshot.
  * @param captain - the exact live captain agent (the calling agent).
  * @param team - the team record (read-only here).
  * @param member - the member draft whose `id` is filled on success.
@@ -96,6 +280,8 @@ export function memberWelcome(team: TeamState): string {
 export async function spawnMember(
   ctx: Context,
   config: MemberRuntimeConfig,
+  selections: MemberSelectionRuntime,
+  llmSelection: MemberLlmSelection,
   captain: Agent,
   team: TeamState,
   member: TeamMember,
@@ -121,19 +307,25 @@ export async function spawnMember(
   if (!provider.capabilities.toolFilter) {
     throw new Error(`agent-teams: provider "${config.provider}" cannot restrict captain-only tools for members`)
   }
-  const start = await ctx.subagents.startContinuable({
-    provider: config.provider,
-    label: `agent-teams:${team.id}:${member.name}`,
-    request: {
-      prompt: [{ type: 'text', text: memberWelcome(team) }],
-      parent: captain,
-      persona: memberPersona(team, member, stateDir),
-      toolFilter: { deny: [...MEMBER_DENIED_TOOLS] },
-      ...config.model !== undefined ? { agentOptions: { model: config.model } } : {},
-      ...config.maxDepth !== undefined ? { maxDepth: config.maxDepth } : {},
-    },
-    signal,
-  })
+  const label = `${MEMBER_LABEL_PREFIX}${team.id}:${member.name}`
+  const start = await selections.withPending(captain.id, label, llmSelection, () => (
+    ctx.subagents.startContinuable({
+      provider: config.provider,
+      label,
+      request: {
+        prompt: [{ type: 'text', text: memberWelcome(team) }],
+        parent: captain,
+        persona: memberPersona(team, member, stateDir),
+        toolFilter: { deny: [...MEMBER_DENIED_TOOLS] },
+        agentOptions: {
+          provider: llmSelection.provider,
+          model: llmSelection.model,
+        },
+        ...config.maxDepth !== undefined ? { maxDepth: config.maxDepth } : {},
+      },
+      signal,
+    })
+  ))
   member.id = start.childId
 }
 

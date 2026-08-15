@@ -54,6 +54,8 @@
 | `agent_teams_status` | 团队全景：成员活动、任务清单、队长邮箱、各成员待读消息 |
 | `agent_teams_delete` | 结束团队：打断成员，团队目录**归档保留**（任务与依赖图、邮箱完整留存） |
 
+`agent_teams_add_member` 默认不需要模型参数：它会快照队长当前请求真正生效的 LLM provider、model 与思考强度。用户明确要求某个角色使用其他模型时，可以同时传入可选的 `provider` + `model`；只覆盖 `model` 时沿用队长当前 LLM provider。插件不会为每个成员发起二次选择或弹窗，也不暴露逐成员思考强度参数。
+
 ## 配置
 
 在 profile 的 `cordis.patch.yml` 中覆盖：
@@ -62,11 +64,13 @@
 - id: agent-teams
   config:
     stateDir: .agent-teams        # 团队状态目录名（工作区下）
-    memberProvider: spawn         # 成员子代理 provider（spawn / fork）
+    memberProvider: spawn         # 子代理运行后端（spawn / fork），不是 LLM provider
     memberModel: deepseek-v4      # 可选：成员模型覆盖
     memberMaxDepth: 1             # 成员再委派深度上限（0 = 禁止）
     maxMembers: 8                 # 团队人数上限
 ```
+
+最终优先级为：成员显式 `provider` + `model` / `model` → `memberModel` → 队长当前路由。思考强度默认继承队长当前值，并在目标 provider/model 上创建前校验；不兼容时成员创建会明确失败。最终生效的 provider/model/思考强度会写入 `team.json`，供状态查询和成员冷恢复使用。
 
 ## 使用协议
 

@@ -37,19 +37,23 @@
 > [!NOTE]
 > 使用前请确保已安装 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)。
 
-任选一种插件来源。
-
 ### npm
 
 ```sh
 dsh plugin --profile web add @nanmicoder/dsh-agent-teams
 ```
 
-### GitHub `main`
+### 从源码构建
 
 ```sh
-dsh plugin --profile web add 'git+https://github.com/NanmiCoder/dsh-agent-teams.git#main'
+git clone https://github.com/NanmiCoder/dsh-agent-teams.git
+cd dsh-agent-teams
+pnpm install
+pnpm build
+dsh plugin --profile web add .
 ```
+
+修改源码后请重新执行 `pnpm build`。本地安装会继续链接到当前源码目录。
 
 检查组合配置、重启 DSH，然后刷新 Web UI：
 

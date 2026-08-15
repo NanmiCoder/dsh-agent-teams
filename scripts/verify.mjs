@@ -82,6 +82,13 @@ check(
   !pkg.name.startsWith('@') || pkg.publishConfig?.access === 'public',
   'scoped packages default to restricted without publishConfig.access = "public"',
 )
+const requiredPeers = Object.keys(pkg.peerDependencies ?? {})
+  .filter(name => pkg.peerDependenciesMeta?.[name]?.optional !== true)
+check(
+  'shared runtime peers are optional for standalone profile installs',
+  requiredPeers.length === 0,
+  `required peers trigger pnpm warnings: ${JSON.stringify(requiredPeers)}`,
+)
 // The browser half registers itself with __ModuleLoader__ under an id the host
 // resolves by package name. A stale id here fails only in the browser — the
 // host half loads fine, so every server-side check still passes.

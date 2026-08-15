@@ -40,6 +40,13 @@ check(
   !pkg.name.startsWith('@') || pkg.publishConfig?.access === 'public',
   'scoped packages default to restricted without publishConfig.access = "public"',
 )
+const requiredPeers = Object.keys(pkg.peerDependencies ?? {})
+  .filter(name => pkg.peerDependenciesMeta?.[name]?.optional !== true)
+check(
+  'shared runtime peers are optional for standalone profile installs',
+  requiredPeers.length === 0,
+  `required peers trigger pnpm warnings: ${JSON.stringify(requiredPeers)}`,
+)
 
 for (const path of ['../lib/index.js', '../lib/client.js']) {
   try {

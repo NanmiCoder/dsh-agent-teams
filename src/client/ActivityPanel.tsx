@@ -198,6 +198,16 @@ function TaskNode({ task, tasks, focused, dimmed, pinned, onPin, onPreview }: {
   readonly onPreview: (id: string | null) => void
 }) {
   const tone = taskTone(task.state, task.status)
+  // Debounce hover preview so the chain highlight does not flicker while the
+  // pointer sweeps across the tree; keyboard focus stays immediate.
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => {
+    if (hoverTimer.current !== null) clearTimeout(hoverTimer.current)
+  }, [])
+  const schedulePreview = (id: string | null): void => {
+    if (hoverTimer.current !== null) clearTimeout(hoverTimer.current)
+    hoverTimer.current = setTimeout(() => { onPreview(id) }, id === null ? 0 : 180)
+  }
   return (
     <button
       type="button"
@@ -207,10 +217,10 @@ function TaskNode({ task, tasks, focused, dimmed, pinned, onPin, onPreview }: {
       data-focused={focused}
       data-dimmed={dimmed}
       aria-pressed={pinned}
-      title={`${task.id} · ${task.subject}（点击固定依赖链）`}
+      title={`${task.id} · ${task.subject}（悬停高亮依赖链 · 点击固定）`}
       onClick={() => { onPin(task.id) }}
-      onMouseEnter={() => { onPreview(task.id) }}
-      onMouseLeave={() => { onPreview(null) }}
+      onMouseEnter={() => { schedulePreview(task.id) }}
+      onMouseLeave={() => { schedulePreview(null) }}
       onFocus={() => { onPreview(task.id) }}
       onBlur={() => { onPreview(null) }}
     >
@@ -250,7 +260,7 @@ function DependencyMap({ tasks }: { readonly tasks: readonly ActivityTask[] }) {
     <section className={css.dependencySection} aria-label="任务依赖链" data-dependency-map>
       <header className={css.sectionHead}>
         <span className={css.sectionTitle}><IconBranchOutline16 /> 任务依赖</span>
-        <span className={css.sectionHint}>{pinnedTaskId === null ? '悬停预览 · 点击固定' : `${pinnedTaskId} 已固定 · Esc 取消`}</span>
+        <span className={css.sectionHint}>{pinnedTaskId === null ? '悬停高亮依赖链 · 点击固定' : `${pinnedTaskId} 已固定 · Esc 取消`}</span>
       </header>
       <div className={css.stageFlow}>
         {stages.map((stage, index) => (

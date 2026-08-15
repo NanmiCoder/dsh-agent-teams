@@ -29,6 +29,21 @@ export function activityPanelExpandedForSession(
   return open && owner !== undefined && owner === current
 }
 
+/**
+ * Resolve the task whose dependency chain should be highlighted.
+ *
+ * A pinned task is an explicit user choice. Keyboard focus takes precedence
+ * over delayed pointer intent so an older hover timer cannot steal the active
+ * chain from someone navigating the task map with the keyboard.
+ */
+export function dependencyFocusTaskId(
+  pinnedTaskId: string | null,
+  keyboardTaskId: string | null,
+  hoverTaskId: string | null,
+): string | null {
+  return pinnedTaskId ?? keyboardTaskId ?? hoverTaskId
+}
+
 /** Group tasks by their precomputed dependency depth. */
 export function taskStages<T extends RelationshipTask>(tasks: readonly T[]): readonly RelationshipStage<T>[] {
   const byDepth = new Map<number, T[]>()

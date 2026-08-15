@@ -83,7 +83,8 @@
     "sync:skill": "node scripts/sync-skill.mjs",
     "verify:skill": "node scripts/sync-skill.mjs --check",
     "verify": "node scripts/verify.mjs && pnpm verify:skill",
-    "prepublishOnly": "pnpm build && pnpm verify"
+    "prepublishOnly": "pnpm build && pnpm verify",
+    "prepare": "npm run build"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1-rc.1",

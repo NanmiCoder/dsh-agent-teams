@@ -7,16 +7,17 @@
  * log containing an event type outside its hard-coded
  * `KNOWN_SESSION_EVENT_TYPES` unless the event is marked ignorable
  * (`SessionFormatUnsupportedError`), which made every session that used
- * AgentTeams unreadable. The upstream fix (aace29c, `lib/events.js`) guards
+ * AgentTeams unreadable. The upstream fix (aace29c, `src/events.ts`) guards
  * the write side: events are only appended when the running harness already
  * recognizes their type, and session write failures are contained.
  *
  * This script pins that guard so it cannot regress. It stubs
  * `@deepseek-ai/dsh-session` with a loader hook (the repo intentionally does
- * not install `@deepseek-ai/*` packages — see .npmrc), so it runs in a clean
- * checkout with zero dependencies:
+ * not install `@deepseek-ai/*` packages — see .npmrc), so it runs with zero
+ * dependencies beyond the built package (lib/ is generated from src/ by
+ * `pnpm build`, the same convention as `scripts/verify.mjs`):
  *
- *   node scripts/verify-events.mjs
+ *   pnpm build && node scripts/verify-events.mjs
  */
 
 import { register } from 'node:module';

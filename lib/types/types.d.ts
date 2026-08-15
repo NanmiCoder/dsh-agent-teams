@@ -39,8 +39,12 @@ export interface TeamMember {
     name: string;
     /** Role description, e.g. `researcher`, `engineer`, `reviewer`. */
     role?: string;
-    /** Optional model override for this member. */
+    /** Resolved LLM provider route captured when this member was created. */
+    provider?: string;
+    /** Resolved model captured when this member was created. */
     model?: string;
+    /** Resolved reasoning effort captured from the captain's current session. */
+    reasoningEffort?: string;
     joinedAt: number;
     status: MemberStatus;
 }

@@ -35,8 +35,10 @@ import {
 } from './state.ts'
 import {
   deliverToMember,
+  installMemberSelectionRuntime,
   interruptMember,
   memberActivity,
+  resolveMemberLlmSelection,
   spawnMember,
   type MemberRuntimeConfig,
 } from './members.ts'
@@ -190,6 +192,8 @@ export function steerCaptainReport(captain: Pick<Agent, 'steer'>, from: string, 
  * @param config - resolved tool config.
  */
 export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void {
+  const memberSelections = installMemberSelectionRuntime(ctx, config.stateDir)
+
   ctx.tools.register(defineTool({
     name: 'agent_teams_create',
     description: 'Create a new AgentTeams team: you (the calling agent) become the captain. A captain leads one team at a time; create tasks and members afterwards with agent_teams_add_member and agent_teams_create_task.',
@@ -255,11 +259,12 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
 
   ctx.tools.register(defineTool({
     name: 'agent_teams_add_member',
-    description: 'Add a member to your team: spawns a durable continuable subagent with a member persona. The member waits for your messages and works on assigned tasks; it can message you and teammates. One team per captain, members are capped by config.',
+    description: 'Add a durable continuable member. By default it snapshots the captain\'s current LLM provider, model, and reasoning effort with no user prompt. Supply provider/model only for an explicitly requested role-specific route. The member waits for messages, works on assigned tasks, and can message the team.',
     parameters: {
       name: { type: 'string', required: true, description: 'Unique member name inside the team.' },
       role: { type: 'string', description: 'Role of the member (e.g. researcher, engineer, reviewer).' },
-      model: { type: 'string', description: 'Optional model override for this member (defaults to the captain\'s model).' },
+      provider: { type: 'string', description: 'Optional LLM provider route. Use only when the user explicitly requests a different provider; requires model.' },
+      model: { type: 'string', description: 'Optional model override. Omit for the captain\'s current model (or the configured memberModel default).' },
     },
     output: {
       schema: {
@@ -268,12 +273,15 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
         properties: {
           member_name: { type: 'string', required: true },
           member_id: { type: 'string', required: true },
+          provider: { type: 'string', required: true },
+          model: { type: 'string', required: true },
+          reasoning_effort: { type: 'string' },
           status: { type: 'string', required: true },
         },
       },
       render: (args, value) => [{
         type: 'text',
-        text: `Member "${value.member_name}" added (subagent id ${value.member_id}, status ${value.status}).`,
+        text: `Member "${value.member_name}" added (subagent id ${value.member_id}, ${value.provider}/${value.model}${value.reasoning_effort === undefined ? '' : `, reasoning ${value.reasoning_effort}`}, status ${value.status}).`,
       }],
     },
     async execute(args, exec) {
@@ -295,15 +303,32 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
         if (fresh.members.filter((candidate) => candidate.status !== 'removed').length >= config.maxMembers) {
           throw new Error(`team "${fresh.name}" is at its member cap (${config.maxMembers})`)
         }
+        const selection = await resolveMemberLlmSelection(ctx, captain, {
+          provider: args.provider,
+          model: args.model,
+          defaultModel: config.memberModel,
+        }, exec.signal)
         const member: TeamMember = {
           id: '',
           name: memberName,
           role: args.role,
-          model: args.model,
+          provider: selection.provider,
+          model: selection.model,
+          reasoningEffort: selection.reasoningEffort,
           joinedAt: Date.now(),
           status: 'idle',
         }
-        await spawnMember(ctx, memberRuntime(config), captain, fresh, member, config.stateDir, exec.signal)
+        await spawnMember(
+          ctx,
+          memberRuntime(config),
+          memberSelections,
+          selection,
+          captain,
+          fresh,
+          member,
+          config.stateDir,
+          exec.signal,
+        )
         fresh.members.push(member)
         await writeTeam(stateRoot, fresh)
         appendTeamEvent(ctx, captainSessionOf(ctx, fresh.captainSessionId, captain.session), 'agent-teams/member-added', {
@@ -312,7 +337,16 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
           name: member.name,
           ...member.role !== undefined ? { role: member.role } : {},
         })
-        return { member_name: member.name, member_id: member.id, status: member.status }
+        return {
+          member_name: member.name,
+          member_id: member.id,
+          provider: selection.provider,
+          model: selection.model,
+          ...selection.reasoningEffort === undefined
+            ? {}
+            : { reasoning_effort: selection.reasoningEffort },
+          status: member.status,
+        }
       })
     },
   }))
@@ -687,7 +721,9 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
         .map((member) => ({
           name: member.name,
           role: member.role ?? '',
+          provider: member.provider ?? '',
           model: member.model ?? '',
+          reasoning_effort: member.reasoningEffort ?? '',
           status: member.status,
           activity: member.id !== '' ? (activity.get(member.id) ?? 'unknown') : 'unspawned',
         }))
@@ -791,7 +827,6 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
 function memberRuntime(config: ToolsConfig): MemberRuntimeConfig {
   return {
     provider: config.memberProvider,
-    model: config.memberModel,
     maxDepth: config.memberMaxDepth,
   }
 }
@@ -802,7 +837,15 @@ function renderStatus(value: JsonValue): string {
     team_name: string
     description?: string
     viewer: string
-    members: { name: string; role: string; status: string; activity: string }[]
+    members: {
+      name: string
+      role: string
+      provider: string
+      model: string
+      reasoning_effort: string
+      status: string
+      activity: string
+    }[]
     tasks: { id: string; subject: string; status: string; assignee: string; dependencies: string[]; output?: string }[]
     captain_inbox: { from: string; content: string }[]
     member_inboxes: Record<string, { count: number; latest: string }>
@@ -813,7 +856,11 @@ function renderStatus(value: JsonValue): string {
     `Team "${team.team_name}"${team.description ? ` — ${team.description}` : ''}`,
     `Viewing as: ${team.viewer}`,
     `Members (${team.members.length}):`,
-    ...team.members.map((member) => `  - ${member.name} [${member.role}] ${member.status}/${member.activity}`),
+    ...team.members.map((member) => {
+      const route = member.provider && member.model ? ` · ${member.provider}/${member.model}` : ''
+      const effort = member.reasoning_effort ? ` · reasoning ${member.reasoning_effort}` : ''
+      return `  - ${member.name} [${member.role}] ${member.status}/${member.activity}${route}${effort}`
+    }),
     `Tasks (${team.tasks.length}):`,
     ...team.tasks.map((task) => {
       const deps = task.dependencies.length > 0 ? ` (deps: ${task.dependencies.join(',')})` : ''

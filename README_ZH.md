@@ -73,6 +73,8 @@ dsh web
 
 团队状态保存在 `<workspace>/.agent-teams/`；Web 面板读取这份磁盘真相，并与实时子 Agent 活动合并展示。
 
+成员创建默认零交互：插件会快照队长**当前这一步**实际使用的 LLM provider、model 与思考强度，成员后续续跑仍使用这份快照。只有当用户明确提出异构分工（例如“后端用 provider A/model X，前端用 provider B/model Y”）时，队长才会把对应的 `provider` + `model` 传给该成员；不会逐个弹出模型或思考强度选择。
+
 ## 配置
 
 默认配置可以直接使用。受信任的 Profile 可以覆盖成员行为：
@@ -86,6 +88,8 @@ dsh web
     memberMaxDepth: 1
     maxMembers: 8
 ```
+
+这里的 `memberProvider` 指子 Agent 的运行后端（`spawn` / `fork`），不是 LLM provider。跨 LLM provider 由 `agent_teams_add_member` 的可选 `provider` + `model` 参数表达；`memberModel` 只是所有成员的模型默认覆盖。
 
 ## 使用边界
 

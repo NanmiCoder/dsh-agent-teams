@@ -12,17 +12,54 @@
  * @module dsh-agent-teams/members
  */
 import type { Context } from '@deepseek-ai/cordis';
-import type { Agent } from '@deepseek-ai/dsh-agent';
+import { type Agent } from '@deepseek-ai/dsh-agent';
 import type { TeamMember, TeamState } from './types.ts';
 /** Runtime knobs for member spawning, resolved from plugin config. */
 export interface MemberRuntimeConfig {
     /** Registered `ctx.subagents` provider name (must support continuable + persona). */
     provider: string;
-    /** Optional model override applied to every member. */
-    model?: string;
     /** Child delegation depth cap (0 forbids delegation entirely). */
     maxDepth?: number;
 }
+/** Durable provider/model/reasoning snapshot for one member. */
+export interface MemberLlmSelection {
+    /** Registered LLM provider route. */
+    provider: string;
+    /** Provider-owned model id. */
+    model: string;
+    /** Adapter-owned reasoning effort, absent when the target has no explicit/default effort. */
+    reasoningEffort?: string;
+}
+/** Optional member-level route requested by the captain. */
+export interface MemberLlmSelectionRequest {
+    /** Explicit LLM provider route; requires an explicit model. */
+    provider?: string;
+    /** Explicit model id; otherwise the plugin default or captain model is used. */
+    model?: string;
+    /** Plugin-level member model default. */
+    defaultModel?: string;
+}
+/** Process-local bridge between spawn admission and synchronous child setup. */
+export interface MemberSelectionRuntime {
+    /** Make one selection visible while Harness materializes the fresh child. */
+    withPending<T>(parentSessionId: string, label: string, selection: MemberLlmSelection, operation: () => Promise<T>): Promise<T>;
+}
+/**
+ * Resolve one member's complete model selection. Ordinary members snapshot the
+ * captain's current request route and reasoning effort. An explicit member
+ * provider/model or plugin-level model replaces only that route; the current
+ * captain effort remains the inherited policy and is validated against the
+ * target model before a child is created.
+ */
+export declare function resolveMemberLlmSelection(ctx: Context, captain: Agent, request: MemberLlmSelectionRequest, signal?: AbortSignal): Promise<MemberLlmSelection>;
+/**
+ * Install the member selection bridge for every fresh or cold-resumed
+ * continuable child. Fresh creation reads the pending in-memory selection;
+ * cold resume restores the same selection from the owning team's durable
+ * record. Legacy members without a complete saved route retain Harness's
+ * descriptor provider/model behavior.
+ */
+export declare function installMemberSelectionRuntime(ctx: Context, stateDir: string): MemberSelectionRuntime;
 /**
  * The member's system prompt (persona), shadowing the deployment persona for
  * that child. Self-contained: it replaces the whole persona section.
@@ -42,13 +79,15 @@ export declare function memberWelcome(team: TeamState): string;
  * `member.id` with its child session id. On failure nothing is persisted.
  * @param ctx - the plugin context (injects `subagents`).
  * @param config - member runtime knobs.
+ * @param selections - fresh/cold child model-selection bridge.
+ * @param llmSelection - resolved provider/model/reasoning snapshot.
  * @param captain - the exact live captain agent (the calling agent).
  * @param team - the team record (read-only here).
  * @param member - the member draft whose `id` is filled on success.
  * @param stateDir - configured state directory (for the persona).
  * @param signal - caller cancellation, forwarded to the start.
  */
-export declare function spawnMember(ctx: Context, config: MemberRuntimeConfig, captain: Agent, team: TeamState, member: TeamMember, stateDir: string, signal: AbortSignal): Promise<void>;
+export declare function spawnMember(ctx: Context, config: MemberRuntimeConfig, selections: MemberSelectionRuntime, llmSelection: MemberLlmSelection, captain: Agent, team: TeamState, member: TeamMember, stateDir: string, signal: AbortSignal): Promise<void>;
 /**
  * Deliver one message to a member as its next FIFO turn. Best effort: a
  * failure (member gone or not continuable) is logged and reported as `false`

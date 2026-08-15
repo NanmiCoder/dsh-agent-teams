@@ -14,6 +14,7 @@
  */
 
 import { createHash, randomUUID } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import { mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { TaskStatus, TeamMember, TeamMessage, TeamState, TeamTask } from './types.ts'
@@ -139,6 +140,31 @@ export async function createTeamDir(stateRoot: string, state: TeamState): Promis
 export async function readTeam(stateRoot: string, teamId: string): Promise<TeamState | undefined> {
   try {
     const raw = await readFile(join(stateRoot, teamId, 'team.json'), 'utf8')
+    const value: unknown = JSON.parse(stripLeadingBom(raw))
+    if (!isTeamState(value, teamId)) {
+      throw new Error(`invalid AgentTeams state in team "${teamId}"`)
+    }
+    return value
+  } catch (error: unknown) {
+    if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return undefined
+    }
+    throw error
+  }
+}
+
+/**
+ * Synchronously read one team record while a continuable child is being
+ * composed. Harness requires child setup contributions to be synchronous;
+ * this narrow boundary lets a cold-resumed member restore its durable model
+ * selection before its first request can be published.
+ * @param stateRoot - resolved absolute state root directory.
+ * @param teamId - the team's sanitized id.
+ * @returns the team record, or `undefined` when absent.
+ */
+export function readTeamSync(stateRoot: string, teamId: string): TeamState | undefined {
+  try {
+    const raw = readFileSync(join(stateRoot, teamId, 'team.json'), 'utf8')
     const value: unknown = JSON.parse(stripLeadingBom(raw))
     if (!isTeamState(value, teamId)) {
       throw new Error(`invalid AgentTeams state in team "${teamId}"`)
@@ -346,7 +372,9 @@ function isTeamMember(value: unknown): value is TeamMember {
     && typeof value['name'] === 'string'
     && value['name'].trim() !== ''
     && isOptionalString(value['role'])
+    && isOptionalString(value['provider'])
     && isOptionalString(value['model'])
+    && isOptionalString(value['reasoningEffort'])
     && isFiniteNumber(value['joinedAt'])
     && (value['status'] === 'idle' || value['status'] === 'working' || value['status'] === 'removed')
 }

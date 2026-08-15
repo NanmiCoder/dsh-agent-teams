@@ -28,7 +28,12 @@ import {
   unsatisfiedDependencies,
   withTeamLock,
 } from '../lib/state.js'
-import { activityPanelExpandedForSession, relatedTaskIds, taskStages } from '../lib/client/activity-model.js'
+import {
+  activityPanelExpandedForSession,
+  dependencyFocusTaskId,
+  relatedTaskIds,
+  taskStages,
+} from '../lib/client/activity-model.js'
 import { parseAgentTeamsCreateArgs } from '../lib/client/agent-teams-card-definition.js'
 import { steerCaptainReport } from '../lib/tools.js'
 import {
@@ -273,6 +278,18 @@ check('relationship chain includes upstream dependency', chain.has('t1'))
 check('relationship chain includes focused task', chain.has('t2'))
 check('relationship chain includes downstream dependent', chain.has('t4'))
 check('relationship chain excludes sibling branch', !chain.has('t3'))
+check(
+  'pinned dependency chain wins over keyboard and hover previews',
+  dependencyFocusTaskId('pinned', 'keyboard', 'hover') === 'pinned',
+)
+check(
+  'keyboard dependency chain wins over delayed hover preview',
+  dependencyFocusTaskId(null, 'keyboard', 'hover') === 'keyboard',
+)
+check(
+  'hover dependency chain is used without a pinned or keyboard task',
+  dependencyFocusTaskId(null, null, 'hover') === 'hover',
+)
 const cyclic = [
   { id: 'a', dependencies: ['b'], depth: 0 },
   { id: 'b', dependencies: ['a'], depth: 1 },

@@ -22,7 +22,12 @@ import {
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { ObservableSnapshot, SessionListState } from '@deepseek-ai/dsh-client-runtime/client'
-import { activityPanelExpandedForSession, relatedTaskIds, taskStages } from './activity-model.ts'
+import {
+  activityPanelExpandedForSession,
+  dependencyFocusTaskId,
+  relatedTaskIds,
+  taskStages,
+} from './activity-model.ts'
 import { ACTION_ART, LEAD_ART, memberArtUrl } from './artwork.ts'
 import { OPEN_PANEL_EVENT } from './AgentTeamsCard.tsx'
 import type { AgentTeamsCardData } from './agent-teams-card-definition.ts'
@@ -188,26 +193,17 @@ function dependencyLabel(task: ActivityTask, tasks: readonly ActivityTask[]): st
   }).join('、')
 }
 
-function TaskNode({ task, tasks, focused, dimmed, pinned, onPin, onPreview }: {
+function TaskNode({ task, tasks, focused, dimmed, pinned, onPin, onHover, onFocusChange }: {
   readonly task: ActivityTask
   readonly tasks: readonly ActivityTask[]
   readonly focused: boolean
   readonly dimmed: boolean
   readonly pinned: boolean
   readonly onPin: (id: string) => void
-  readonly onPreview: (id: string | null) => void
+  readonly onHover: (id: string | null) => void
+  readonly onFocusChange: (id: string | null) => void
 }) {
   const tone = taskTone(task.state, task.status)
-  // Debounce hover preview so the chain highlight does not flicker while the
-  // pointer sweeps across the tree; keyboard focus stays immediate.
-  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  useEffect(() => () => {
-    if (hoverTimer.current !== null) clearTimeout(hoverTimer.current)
-  }, [])
-  const schedulePreview = (id: string | null): void => {
-    if (hoverTimer.current !== null) clearTimeout(hoverTimer.current)
-    hoverTimer.current = setTimeout(() => { onPreview(id) }, id === null ? 0 : 180)
-  }
   return (
     <button
       type="button"
@@ -219,10 +215,10 @@ function TaskNode({ task, tasks, focused, dimmed, pinned, onPin, onPreview }: {
       aria-pressed={pinned}
       title={`${task.id} · ${task.subject}（悬停高亮依赖链 · 点击固定）`}
       onClick={() => { onPin(task.id) }}
-      onMouseEnter={() => { schedulePreview(task.id) }}
-      onMouseLeave={() => { schedulePreview(null) }}
-      onFocus={() => { onPreview(task.id) }}
-      onBlur={() => { onPreview(null) }}
+      onMouseEnter={() => { onHover(task.id) }}
+      onMouseLeave={() => { onHover(null) }}
+      onFocus={() => { onFocusChange(task.id) }}
+      onBlur={() => { onFocusChange(null) }}
     >
       <span className={css.taskNodeHead}>
         <span className={css.taskId}>{task.id}</span>
@@ -240,14 +236,33 @@ function TaskNode({ task, tasks, focused, dimmed, pinned, onPin, onPreview }: {
 }
 
 function DependencyMap({ tasks }: { readonly tasks: readonly ActivityTask[] }) {
-  const [previewTaskId, setPreviewTaskId] = useState<string | null>(null)
+  const [hoverTaskId, setHoverTaskId] = useState<string | null>(null)
+  const [keyboardTaskId, setKeyboardTaskId] = useState<string | null>(null)
   const [pinnedTaskId, setPinnedTaskId] = useState<string | null>(null)
-  const focusedTaskId = pinnedTaskId ?? previewTaskId
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const focusedTaskId = dependencyFocusTaskId(pinnedTaskId, keyboardTaskId, hoverTaskId)
   const stages = useMemo(() => taskStages(tasks), [tasks])
   const related = useMemo(
     () => focusedTaskId === null ? null : relatedTaskIds(focusedTaskId, tasks),
     [focusedTaskId, tasks],
   )
+  const scheduleHover = (id: string | null): void => {
+    if (hoverTimer.current !== null) {
+      clearTimeout(hoverTimer.current)
+      hoverTimer.current = null
+    }
+    if (id === null) {
+      setHoverTaskId(null)
+      return
+    }
+    hoverTimer.current = setTimeout(() => {
+      hoverTimer.current = null
+      setHoverTaskId(id)
+    }, 180)
+  }
+  useEffect(() => () => {
+    if (hoverTimer.current !== null) clearTimeout(hoverTimer.current)
+  }, [])
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.key === 'Escape') setPinnedTaskId(null)
@@ -286,7 +301,8 @@ function DependencyMap({ tasks }: { readonly tasks: readonly ActivityTask[] }) {
                     dimmed={related !== null && !related.has(task.id)}
                     pinned={pinnedTaskId === task.id}
                     onPin={(id) => { setPinnedTaskId((current) => current === id ? null : id) }}
-                    onPreview={setPreviewTaskId}
+                    onHover={scheduleHover}
+                    onFocusChange={setKeyboardTaskId}
                   />
                 ))}
               </div>

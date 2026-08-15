@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Package version to publish
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -28,28 +34,25 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
           package-manager-cache: false
 
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10.33.0
-
       - name: Set up npm with trusted publishing support
         run: npm install --global npm@11.19.0
 
-      - name: Verify release tag
+      - name: Verify release version
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
         shell: bash
         run: |
           package_version="$(node --print "require('./package.json').version")"
-          test "${GITHUB_REF_NAME}" = "v${package_version}"
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            test "${GITHUB_REF_NAME}" = "v${package_version}"
+          else
+            test "${RELEASE_VERSION}" = "${package_version}"
+          fi
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Typecheck
-        run: pnpm typecheck
-
-      - name: Verify package
-        run: pnpm verify
+      - name: Verify committed package
+        run: |
+          node scripts/verify-package.mjs
+          npm pack --dry-run --ignore-scripts
 
       - name: Publish to npm
-        run: npm publish --access public
+        run: npm publish --ignore-scripts --access public

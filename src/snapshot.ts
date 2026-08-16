@@ -13,7 +13,7 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import {
-  CAPTAIN_KEY, listArchivedTeamIds, readArchivedTeam, readMailbox, readTeam,
+  CAPTAIN_KEY, listArchivedTeamIds, readArchivedTeam, readUnreadMailbox, readTeam,
   taskDepthsById, taskVisualState,
 } from './state.ts'
 import type { TeamState, TeamTask } from './types.ts'
@@ -89,11 +89,14 @@ export async function assembleTeamSnapshot(
   const tasks = state.tasks
   const depths = taskDepthsById(tasks)
   const byName = new Map(state.members.filter((m) => m.status !== 'removed').map((m) => [m.name, m]))
-  const activity = new Map<string, 'running' | 'inactive'>()
+  const activity = new Map<string, 'running' | 'idle' | 'ready'>()
   try {
     const children = await ctx.subagents.listChildren(state.captainSessionId as SessionId)
     for (const entry of children) {
-      if (entry.kind === 'child') activity.set(entry.id, entry.activity)
+      if (entry.kind === 'child') {
+        const live = ctx.agents.get(entry.id)
+        activity.set(entry.id, live === undefined ? 'ready' : live.status)
+      }
     }
   } catch (error: unknown) {
     ctx.logger.warn(`agent-teams: activity listing failed for ${state.name}: ${String(error)}`)
@@ -101,7 +104,7 @@ export async function assembleTeamSnapshot(
   const unreadByMember = new Map<string, number>()
   for (const member of state.members.filter((candidate) => candidate.status !== 'removed')) {
     try {
-      unreadByMember.set(member.name, (await readMailbox(stateRoot, state.id, member.name)).length)
+      unreadByMember.set(member.name, (await readUnreadMailbox(stateRoot, state.id, member.name)).length)
     } catch (error: unknown) {
       ctx.logger.warn(`agent-teams: mailbox read failed for ${member.name}: ${String(error)}`)
       unreadByMember.set(member.name, 0)
@@ -116,7 +119,13 @@ export async function assembleTeamSnapshot(
         id: member.id,
         name: member.name,
         role: member.role ?? '',
-        activity: member.id !== '' ? (activity.get(member.id) === 'running' ? 'working' : activity.get(member.id) === 'inactive' ? 'idle' : 'unknown') : 'unknown',
+        activity: member.id !== ''
+          ? (activity.get(member.id) === 'running'
+              ? 'working'
+              : activity.get(member.id) === 'idle' || activity.get(member.id) === 'ready'
+                ? 'idle'
+                : 'unknown')
+          : 'unknown',
         progress: owned.length === 0 ? 0 : Math.round((done / owned.length) * 100),
         done,
         total: owned.length,
@@ -124,7 +133,7 @@ export async function assembleTeamSnapshot(
         unread: unreadByMember.get(member.name) ?? 0,
       }
     })
-  const captainInbox = await readMailbox(stateRoot, state.id, CAPTAIN_KEY)
+  const captainInbox = await readUnreadMailbox(stateRoot, state.id, CAPTAIN_KEY)
   return {
     workspace,
     teamId: state.id,

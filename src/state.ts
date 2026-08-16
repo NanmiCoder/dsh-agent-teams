@@ -21,6 +21,8 @@ import type { TaskStatus, TeamMember, TeamMessage, TeamState, TeamTask } from '.
 
 /** Mailbox key of the captain. */
 export const CAPTAIN_KEY = 'captain'
+/** A crashed live-delivery attempt becomes retryable after this interval. */
+const MAILBOX_DELIVERY_LEASE_MS = 60_000
 
 /** In-process per-team mutation queues (promise chains). */
 const locks = new Map<string, Promise<unknown>>()
@@ -119,6 +121,43 @@ export function transitionError(current: TaskStatus, next: TaskStatus): string |
     return `task status cannot move from "${current}" to "${next}"`
   }
   return undefined
+}
+
+/** Activate the task's current generation for one owner and return its capability id. */
+export function activateTaskAttempt(task: TeamTask, assignee: string): string {
+  const attemptId = randomUUID()
+  task.status = 'claimed'
+  task.assignee = assignee
+  task.attemptId = attemptId
+  task.handoffId = undefined
+  task.reassigning = false
+  task.output = undefined
+  task.updatedAt = Date.now()
+  return attemptId
+}
+
+/** Start a fresh task generation for one owner. */
+export function beginTaskAttempt(task: TeamTask, assignee: string): string {
+  task.attempt = (task.attempt ?? 0) + 1
+  return activateTaskAttempt(task, assignee)
+}
+
+/**
+ * Revoke the current worker immediately. Clearing its capability makes old
+ * updates stale; a separate handoff generation serializes async quiescence.
+ */
+export function invalidateTaskAttempt(
+  task: TeamTask,
+  nextAssignee?: string,
+  reassigning = false,
+): void {
+  task.attemptId = undefined
+  task.handoffId = randomUUID()
+  task.status = 'pending'
+  task.assignee = nextAssignee
+  task.reassigning = reassigning
+  task.output = undefined
+  task.updatedAt = Date.now()
 }
 
 /**
@@ -333,6 +372,99 @@ export async function readMailbox(
   }
 }
 
+/** Read only messages that have not been acknowledged by their recipient. */
+export async function readUnreadMailbox(
+  stateRoot: string,
+  teamId: string,
+  agentKey: string,
+  onMalformedLine?: (lineNumber: number, error: unknown) => void,
+): Promise<TeamMessage[]> {
+  const now = Date.now()
+  return (await readMailbox(stateRoot, teamId, agentKey, onMalformedLine))
+    .filter(message => message.readAt === undefined
+      && (message.deliveryClaimedAt === undefined
+        || now - message.deliveryClaimedAt >= MAILBOX_DELIVERY_LEASE_MS))
+}
+
+async function mutateMailbox(
+  stateRoot: string,
+  teamId: string,
+  agentKey: string,
+  messageIds: readonly string[],
+  mutate: (message: TeamMessage) => TeamMessage,
+): Promise<void> {
+  if (messageIds.length === 0) return
+  const file = join(stateRoot, teamId, 'inbox', `${sanitizeKey(agentKey)}.jsonl`)
+  let raw: string
+  try {
+    raw = await readFile(file, 'utf8')
+  } catch (error: unknown) {
+    if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') return
+    throw error
+  }
+  const selected = new Set(messageIds)
+  const lines = raw.split('\n').map((rawLine) => {
+    const line = stripLeadingBom(rawLine)
+    if (line.trim() === '') return rawLine
+    try {
+      const value: unknown = JSON.parse(line)
+      if (!isTeamMessage(value) || !selected.has(value.id)) return rawLine
+      return JSON.stringify(mutate(value))
+    } catch {
+      return rawLine
+    }
+  })
+  await atomicWriteText(file, lines.join('\n'))
+}
+
+/** Lease selected fallback messages to one delivery path. */
+export async function claimMailboxDelivery(
+  stateRoot: string,
+  teamId: string,
+  agentKey: string,
+  messageIds: readonly string[],
+): Promise<void> {
+  const now = Date.now()
+  await mutateMailbox(stateRoot, teamId, agentKey, messageIds, message => ({
+    ...message,
+    deliveryClaimedAt: now,
+  }))
+}
+
+/** Release a failed delivery lease so the scheduler can retry it later. */
+export async function releaseMailboxDelivery(
+  stateRoot: string,
+  teamId: string,
+  agentKey: string,
+  messageIds: readonly string[],
+): Promise<void> {
+  await mutateMailbox(stateRoot, teamId, agentKey, messageIds, (message) => {
+    const { deliveryClaimedAt: _claimed, ...released } = message
+    return released
+  })
+}
+
+/**
+ * Mark selected durable mailbox records delivered/read while preserving
+ * malformed lines for diagnostics. Callers serialize this with the team lock.
+ */
+export async function acknowledgeMailbox(
+  stateRoot: string,
+  teamId: string,
+  agentKey: string,
+  messageIds: readonly string[],
+): Promise<void> {
+  const now = Date.now()
+  await mutateMailbox(stateRoot, teamId, agentKey, messageIds, (message) => {
+    const { deliveryClaimedAt: _claimed, ...rest } = message
+    return {
+      ...rest,
+      deliveredAt: message.deliveredAt ?? now,
+      readAt: message.readAt ?? now,
+    }
+  })
+}
+
 /** Remove the optional UTF-8 BOM some editors prepend to JSON text. */
 function stripLeadingBom(value: string): string {
   return value.charCodeAt(0) === 0xFEFF ? value.slice(1) : value
@@ -395,6 +527,11 @@ function isTeamTask(value: unknown): value is TeamTask {
     && Array.isArray(value['dependencies'])
     && value['dependencies'].every((dependency) => typeof dependency === 'string')
     && isOptionalString(value['output'])
+    && (value['attempt'] === undefined
+      || (Number.isSafeInteger(value['attempt']) && (value['attempt'] as number) >= 0))
+    && isOptionalString(value['attemptId'])
+    && isOptionalString(value['handoffId'])
+    && (value['reassigning'] === undefined || typeof value['reassigning'] === 'boolean')
     && isFiniteNumber(value['createdAt'])
     && isFiniteNumber(value['updatedAt'])
 }
@@ -443,6 +580,9 @@ function isTeamMessage(value: unknown): value is TeamMessage {
     && typeof value['to'] === 'string'
     && typeof value['content'] === 'string'
     && isFiniteNumber(value['ts'])
+    && (value['deliveryClaimedAt'] === undefined || isFiniteNumber(value['deliveryClaimedAt']))
+    && (value['deliveredAt'] === undefined || isFiniteNumber(value['deliveredAt']))
+    && (value['readAt'] === undefined || isFiniteNumber(value['readAt']))
 }
 
 /**

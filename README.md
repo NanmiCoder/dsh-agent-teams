@@ -16,7 +16,7 @@
 
 `dsh-agent-teams` turns the current DeepSeek Harness session into a captain that can assemble durable sub-agents, split a goal into dependency-aware tasks, and coordinate work through direct messages.
 
-Ask in natural language. The plugin provides the team protocol, nine coordination tools, persistent state, and a live Web UI—without requiring a separate workflow engine.
+Ask in natural language. The plugin provides the team protocol, ten coordination tools, persistent state, an automatic shared-task scheduler, and a live Web UI—without requiring a separate workflow engine.
 
 <p align="center">
   <img src="./assets/ui.png" width="100%" alt="DeepSeek Harness conversation with the AgentTeams live activity panel, members, tasks, dependencies, and reports">
@@ -29,6 +29,7 @@ Ask in natural language. The plugin provides the team protocol, nine coordinatio
 | **Captain-led delegation** | The current session creates the team, assigns roles, and consolidates the final result. |
 | **Durable members** | Members are continuable DSH sub-agents that can be woken for focused follow-up turns. |
 | **Dependency-aware tasks** | Tasks move through explicit states and cannot be claimed before their dependencies finish. |
+| **Automatic reuse and safe takeover** | Idle members claim the next ready task; reassignment revokes stale attempts before new work starts, and cold recovery retries stranded open attempts. |
 | **Direct messaging** | Members send durable mailbox messages directly to teammates or the captain—no relay required. |
 | **Live activity panel** | The Web UI shows roles, current work, unread messages, task dependencies, and archived team history. |
 
@@ -71,8 +72,8 @@ Then ask for a team directly:
 1. The current session creates a team and becomes its captain.
 2. The captain adds role-specific members backed by continuable sub-agents.
 3. The goal becomes tasks with owners and explicit dependencies.
-4. Claimed tasks are dispatched through durable mailbox messages that wake each member.
-5. Members work, update task state, and report directly to the captain or one another.
+4. The shared scheduler uses real `running / idle / ready` state to atomically claim one ready task per idle member and wake it. If an idle/ready member still owns an open task after an interrupted turn or process restart, the scheduler retries it with a fresh attempt.
+5. Members update with the current `attempt_id`; reassignment or captain takeover revokes the old attempt and waits for the old worker to quiesce before a new attempt starts.
 6. The captain presents the combined result, then archives the complete team record.
 
 Team state is stored under `<workspace>/.agent-teams/`; the Web panel reads that disk truth and combines it with live sub-agent activity.
@@ -98,7 +99,7 @@ Defaults work without extra setup. A trusted profile can override member behavio
 ## Boundaries
 
 - One captain leads one active team at a time.
-- Members act only after they are woken; mail remains durable while a participant is idle.
+- Idle members are automatically reused for ready work; messages that cannot be delivered live remain durable and are retried at a later status boundary.
 - State is file-backed and serialized within one DSH process; concurrent processes editing the same team are not coordinated.
 - The activity panel reports persisted state as-is. Models may occasionally finish work without performing the expected task-state update.
 

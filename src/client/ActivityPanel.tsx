@@ -15,7 +15,7 @@
  * @module dsh-agent-teams/client/activity
  */
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from 'react'
 import {
   IconBranchOutline16, IconChevronRightOutline14, IconCloseOutline16,
   StateDot, type StateDotState,
@@ -33,8 +33,8 @@ import { OPEN_PANEL_EVENT } from './AgentTeamsCard.tsx'
 import type { AgentTeamsCardData } from './agent-teams-card-definition.ts'
 import css from './ActivityPanel.module.css'
 
-/** Poll cadence for the host snapshot route. */
-const POLL_MS = 1000
+/** Poll cadence for the host snapshot route (raised from 1000ms to reduce load). */
+const POLL_MS = 3000
 /** Grace before the panel collapses once no team remains. */
 const AUTOCLOSE_GRACE_MS = 2000
 /**
@@ -47,6 +47,41 @@ const AUTO_OPEN_SETTLE_MS = 4000
 const STATE_URL = '/plugins/dsh-agent-teams/state'
 /** Root marker shared with the panel CSS while the portal is expanded. */
 const PANEL_OPEN_ATTRIBUTE = 'data-agent-teams-panel-open'
+
+/**
+ * Draggable panel position (P2: user may move the top-right floater elsewhere).
+ * `null` keeps the CSS default (top-right, `top`/`right` anchored). A saved
+ * position switches the panel to `left`/`top` anchoring via inline style.
+ */
+const PANEL_POS_KEY = 'dsh-agent-teams:panel-pos'
+
+/** Read a previously saved panel position; malformed/absent → null (default corner). */
+function readPanelPos(): { x: number; y: number } | null {
+  try {
+    const raw = localStorage.getItem(PANEL_POS_KEY)
+    if (raw === null) return null
+    const parsed = JSON.parse(raw) as { x?: unknown; y?: unknown }
+    if (typeof parsed?.x === 'number' && typeof parsed?.y === 'number') {
+      return { x: parsed.x, y: parsed.y }
+    }
+  } catch {
+    // Malformed payload: fall back to the default corner.
+  }
+  return null
+}
+
+/** Keep the panel meaningfully on-screen: clamp its top-left so the user can
+ * still reach a chunk of it after a sloppy drag. */
+function clampPanelPos(pos: { x: number; y: number }, panelWidth: number, panelHeight: number): { x: number; y: number } {
+  const minX = -(panelWidth * 0.6)
+  const maxX = window.innerWidth - 24
+  const minY = 8
+  const maxY = window.innerHeight - 24
+  return {
+    x: Math.max(minX, Math.min(maxX, pos.x)),
+    y: Math.max(minY, Math.min(maxY, pos.y)),
+  }
+}
 
 /** One member row of a host snapshot. */
 export interface ActivityMember {
@@ -476,6 +511,62 @@ export function ActivityPanel({ sessionsList, openSession }: {
   const mountedAtRef = useRef(performance.now())
   const expanded = activityPanelExpandedForSession(open, openOwner, current)
 
+  // Draggable panel: user may move the floater; position persists to localStorage.
+  const [panelPos, setPanelPos] = useState<{ x: number; y: number } | null>(readPanelPos)
+  const panelRef = useRef<HTMLElement | null>(null)
+  const dragRef = useRef<{
+    pointerId: number
+    startClientX: number
+    startClientY: number
+    origX: number
+    origY: number
+    panelW: number
+    panelH: number
+  } | null>(null)
+  // Persist the saved position (and remove the key when the user has not moved it).
+  useEffect(() => {
+    try {
+      if (panelPos === null) localStorage.removeItem(PANEL_POS_KEY)
+      else localStorage.setItem(PANEL_POS_KEY, JSON.stringify(panelPos))
+    } catch {
+      // Privacy mode / quota: non-fatal.
+    }
+  }, [panelPos])
+
+  /** Begin dragging from the panel header. Ignores pointer-downs on the close
+   * button (and any other interactive child) so clicks still reach it. */
+  const onHeaderPointerDown = (event: ReactPointerEvent<HTMLElement>): void => {
+    const target = event.target as HTMLElement
+    if (target.closest('button') !== null) return
+    const el = panelRef.current
+    if (el === null) return
+    // Capture on the header so move/up keep flowing to it even when the pointer
+    // leaves the panel mid-drag.
+    const handle = event.currentTarget as HTMLElement
+    handle.setPointerCapture(event.pointerId)
+    const rect = el.getBoundingClientRect()
+    dragRef.current = {
+      pointerId: event.pointerId,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      origX: rect.left,
+      origY: rect.top,
+      panelW: rect.width,
+      panelH: rect.height,
+    }
+  }
+  /** Update the panel position while dragging (clamped to the viewport). */
+  const onHeaderPointerMove = (event: ReactPointerEvent<HTMLElement>): void => {
+    const drag = dragRef.current
+    if (drag === null || drag.pointerId !== event.pointerId) return
+    const dx = event.clientX - drag.startClientX
+    const dy = event.clientY - drag.startClientY
+    setPanelPos(clampPanelPos({ x: drag.origX + dx, y: drag.origY + dy }, drag.panelW, drag.panelH))
+  }
+  const onHeaderPointerUp = (event: ReactPointerEvent<HTMLElement>): void => {
+    if (dragRef.current?.pointerId === event.pointerId) dragRef.current = null
+  }
+
   // This portal survives conversation route changes. Gate expansion by its
   // owning session during render, then clear stale state before paint. This
   // removes the old panel immediately instead of waiting for the no-team
@@ -627,8 +718,21 @@ export function ActivityPanel({ sessionsList, openSession }: {
         }} />
       )}
       {expanded && (
-        <aside className={css.panel} data-agent-teams-activity>
-          <header className={css.panelHead}>
+        <aside
+          ref={panelRef}
+          className={css.panel}
+          data-agent-teams-activity
+          data-dragged={panelPos !== null}
+          style={panelPos === null ? undefined : { left: panelPos.x, top: panelPos.y, right: 'auto' }}
+        >
+          <header
+            className={css.panelHead}
+            title="按住拖动面板"
+            onPointerDown={onHeaderPointerDown}
+            onPointerMove={onHeaderPointerMove}
+            onPointerUp={onHeaderPointerUp}
+            onPointerCancel={onHeaderPointerUp}
+          >
             <span className={css.panelTitle}>
               AgentTeams 活动
               <span className={css.panelDot} data-busy={busy} aria-hidden />
@@ -704,3 +808,4 @@ export function ActivityPanel({ sessionsList, openSession }: {
     </>
   )
 }
+

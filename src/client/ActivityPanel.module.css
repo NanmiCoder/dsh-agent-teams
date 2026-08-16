@@ -133,6 +133,19 @@
   min-height: 44px;
   padding: 0 14px 0 16px;
   border-bottom: 1px solid var(--dsw-alias-line-normal);
+  cursor: grab;
+  touch-action: none;
+}
+
+.panelHead:active {
+  cursor: grabbing;
+}
+
+/* Once the user has dragged the panel, inline left/top positioning takes over
+ * (right is set to auto inline); drop the one-shot entry animation so a drag
+ * never fights a re-running transform. */
+.panel[data-dragged='true'] {
+  animation: none;
 }
 
 .panelTitle {
@@ -972,3 +985,4 @@
     padding-left: 45px;
   }
 }
+

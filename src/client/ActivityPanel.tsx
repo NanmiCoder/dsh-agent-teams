@@ -70,13 +70,16 @@ function readPanelPos(): { x: number; y: number } | null {
   return null
 }
 
-/** Keep the panel meaningfully on-screen: clamp its top-left so the user can
- * still reach a chunk of it after a sloppy drag. */
+/** Keep the panel meaningfully on-screen: clamp its top-left so at least a
+ * `MIN_VISIBLE` chunk remains reachable after a sloppy drag. Uses both
+ * panel dimensions so it can never be dragged almost entirely off-screen. */
+const MIN_VISIBLE = 48
 function clampPanelPos(pos: { x: number; y: number }, panelWidth: number, panelHeight: number): { x: number; y: number } {
-  const minX = -(panelWidth * 0.6)
-  const maxX = window.innerWidth - 24
+  const visible = Math.min(MIN_VISIBLE, panelWidth, panelHeight)
+  const minX = -(panelWidth - visible)
+  const maxX = window.innerWidth - visible
   const minY = 8
-  const maxY = window.innerHeight - 24
+  const maxY = window.innerHeight - visible
   return {
     x: Math.max(minX, Math.min(maxX, pos.x)),
     y: Math.max(minY, Math.min(maxY, pos.y)),
@@ -532,23 +535,38 @@ export function ActivityPanel({ sessionsList, openSession }: {
     panelW: number
     panelH: number
   } | null>(null)
-  // Persist the saved position (and remove the key when the user has not moved it).
+  // Persist the saved position to localStorage. Debounced (~250ms) so the
+  // high-frequency setPanelPos during a drag settle into one write (Copilot:
+  // avoid synchronous localStorage writes on every pointer move → jank).
+  const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
-    try {
-      if (panelPos === null) localStorage.removeItem(PANEL_POS_KEY)
-      else localStorage.setItem(PANEL_POS_KEY, JSON.stringify(panelPos))
-    } catch {
-      // Privacy mode / quota: non-fatal.
+    if (panelPos === null) {
+      // No saved position: remove immediately (no debounce needed).
+      if (persistTimerRef.current !== null) { clearTimeout(persistTimerRef.current); persistTimerRef.current = null }
+      try { localStorage.removeItem(PANEL_POS_KEY) } catch { /* non-fatal */ }
+      return
     }
+    if (persistTimerRef.current !== null) clearTimeout(persistTimerRef.current)
+    persistTimerRef.current = setTimeout(() => {
+      persistTimerRef.current = null
+      try { localStorage.setItem(PANEL_POS_KEY, JSON.stringify(panelPos)) } catch { /* non-fatal */ }
+    }, 250)
   }, [panelPos])
+  // Flush pending write on unmount so a just-finished drag isn't lost.
+  useEffect(() => () => {
+    if (persistTimerRef.current !== null) clearTimeout(persistTimerRef.current)
+  }, [])
 
-  /** Begin dragging from the panel header. Ignores pointer-downs on the close
+  /** Begin dragging from the panel header. Primary-button only; prevents text
+   * selection during the drag gesture. Ignores pointer-downs on the close
    * button (and any other interactive child) so clicks still reach it. */
   const onHeaderPointerDown = (event: ReactPointerEvent<HTMLElement>): void => {
+    if (event.button !== 0) return // 仅主键拖拽，忽略右键/中键等
     const target = event.target as HTMLElement
     if (target.closest('button') !== null) return
     const el = panelRef.current
     if (el === null) return
+    event.preventDefault() // 抑制拖动过程中 header 的文本选择
     // Capture on the header so move/up keep flowing to it even when the pointer
     // leaves the panel mid-drag.
     const handle = event.currentTarget as HTMLElement

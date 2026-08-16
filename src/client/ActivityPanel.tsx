@@ -28,6 +28,7 @@ import {
   COMPACT_DAG_NODE_WIDTH,
   dependencyFocusTaskId,
   relatedTaskIds,
+  usesParallelTaskGrid,
 } from './activity-model.ts'
 import { ACTION_ART, LEAD_ART, memberArtUrl } from './artwork.ts'
 import { OPEN_PANEL_EVENT } from './AgentTeamsCard.tsx'
@@ -255,6 +256,7 @@ function DependencyMap({ tasks }: { readonly tasks: readonly ActivityTask[] }) {
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const focusedTaskId = dependencyFocusTaskId(pinnedTaskId, keyboardTaskId, hoverTaskId)
   const layout = useMemo(() => compactDagLayout(tasks), [tasks])
+  const parallel = useMemo(() => usesParallelTaskGrid(tasks), [tasks])
   const related = useMemo(
     () => focusedTaskId === null ? null : relatedTaskIds(focusedTaskId, tasks),
     [focusedTaskId, tasks],
@@ -296,26 +298,34 @@ function DependencyMap({ tasks }: { readonly tasks: readonly ActivityTask[] }) {
     <section className={css.dependencySection} aria-label="任务依赖链" data-dependency-map>
       <header className={css.sectionHead}>
         <button type="button" className={css.sectionToggleTitle} onClick={() => { setOpen((current) => !current) }} aria-expanded={open}>
-          <Chevron open={open} /><IconBranchOutline16 /> 任务依赖
+          <Chevron open={open} /><IconBranchOutline16 /> {parallel ? '并行任务' : '任务依赖'}
         </button>
-        <span className={css.sectionHint}>{pinnedTaskId === null ? '悬停高亮依赖链 · 点击固定' : `${pinnedTaskId} 已固定 · Esc 取消`}</span>
+        <span className={css.sectionHint}>{pinnedTaskId === null
+          ? parallel ? '无前后依赖 · 点击查看详情' : '悬停高亮依赖链 · 点击固定'
+          : `${pinnedTaskId} 已固定 · Esc 取消`}</span>
       </header>
       {open && (
         <>
           <div className={css.dagViewport}>
-            <div className={css.dagCanvas} style={{ width: layout.width, height: layout.height }}>
-              <svg className={css.dagEdges} width={layout.width} height={layout.height} aria-hidden>
+            <div
+              className={css.dagCanvas}
+              data-layout={parallel ? 'parallel' : 'dependency'}
+              style={parallel ? undefined : { width: layout.width, height: layout.height }}
+            >
+              {!parallel && <svg className={css.dagEdges} width={layout.width} height={layout.height} aria-hidden>
                 {layout.edges.map((edge) => {
                   const active = related !== null && related.has(edge.from) && related.has(edge.to)
                   return <path key={`${edge.from}:${edge.to}`} d={edge.path} data-active={active} data-dimmed={related !== null && !active} />
                 })}
-              </svg>
+              </svg>}
               {layout.nodes.map(({ task, x, y }) => (
                 <button
                   key={task.id}
                   type="button"
                   className={css.dagNode}
-                  style={{ left: x, top: y, width: COMPACT_DAG_NODE_WIDTH, height: COMPACT_DAG_NODE_HEIGHT }}
+                  style={parallel
+                    ? { height: COMPACT_DAG_NODE_HEIGHT }
+                    : { left: x, top: y, width: COMPACT_DAG_NODE_WIDTH, height: COMPACT_DAG_NODE_HEIGHT }}
                   data-task-id={task.id}
                   data-state={taskTone(task.state, task.status)}
                   data-focused={related?.has(task.id) ?? false}
@@ -330,6 +340,11 @@ function DependencyMap({ tasks }: { readonly tasks: readonly ActivityTask[] }) {
                 >
                   <span className={css.dagNodeHead}><span className={css.dagNodeDot} />{task.id}</span>
                   <span className={css.dagNodeLabel}>{compactTaskLabel(task.subject)}</span>
+                  {task.state === 'running' && (
+                    <span className={css.dagRunningState} aria-label="运行中">
+                      <WorkGlyph active />
+                    </span>
+                  )}
                 </button>
               ))}
             </div>

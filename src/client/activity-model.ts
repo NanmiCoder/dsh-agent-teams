@@ -41,6 +41,13 @@ export const COMPACT_DAG_NODE_HEIGHT = 30
 export const COMPACT_DAG_COLUMN_GAP = 26
 export const COMPACT_DAG_ROW_GAP = 8
 
+/** Use a fill-width grid when the task graph has no real dependency edges. */
+export function usesParallelTaskGrid<T extends RelationshipTask>(tasks: readonly T[]): boolean {
+  if (tasks.length === 0) return false
+  const taskIds = new Set(tasks.map((task) => task.id))
+  return tasks.every((task) => task.dependencies.every((dependency) => !taskIds.has(dependency)))
+}
+
 /**
  * Whether an expanded activity panel still belongs to the current session.
  *

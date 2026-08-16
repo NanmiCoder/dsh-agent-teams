@@ -36,6 +36,7 @@ import {
   dependencyFocusTaskId,
   relatedTaskIds,
   taskStages,
+  usesParallelTaskGrid,
 } from '../lib/client/activity-model.js'
 import { parseAgentTeamsCreateArgs } from '../lib/client/agent-teams-card-definition.js'
 import { steerCaptainReport } from '../lib/tools.js'
@@ -103,6 +104,7 @@ check(
   `bundle registers ${JSON.stringify(registeredId)}, package.json has ${JSON.stringify(pkg.name)}`,
 )
 const activityPanelCss = await readFile(new URL('../src/client/ActivityPanel.module.css', import.meta.url), 'utf8')
+const activityPanelSource = await readFile(new URL('../src/client/ActivityPanel.tsx', import.meta.url), 'utf8')
 const requiredHarnessTokenBridges = [
   '--dsw-alias-line-normal: var(--dsw-static-neutral-bluish-150',
   '--dsw-alias-bg-module: var(--dsw-alias-bg-layer-1',
@@ -114,6 +116,26 @@ check(
   'activity panel bridges the reference palette to current Harness tokens',
   requiredHarnessTokenBridges.every(token => activityPanelCss.includes(token)),
   'missing token bridges make panel fills and DAG borders transparent',
+)
+const requiredPanelSizing = [
+  '--agent-teams-panel-min-height: 560px',
+  'min-height: min(',
+  'max-height: calc(100dvh - var(--agent-teams-panel-top) - var(--agent-teams-panel-bottom-gap))',
+]
+check(
+  'activity panel grows between a stable minimum and balanced viewport maximum',
+  requiredPanelSizing.every(rule => activityPanelCss.includes(rule))
+    && !activityPanelCss.includes('height: min(560px'),
+  'a fixed panel height leaves excessive space below tall viewports',
+)
+check(
+  'running DAG tasks reuse the animated work glyph without losing focus context',
+  activityPanelSource.includes("task.state === 'running'")
+    && activityPanelSource.includes('className={css.dagRunningState}')
+    && activityPanelSource.includes('<WorkGlyph active />')
+    && activityPanelCss.includes(".dagNode[data-state='running'][data-dimmed='true']")
+    && activityPanelCss.includes('.dagRunningState {'),
+  'running work should stay visible in both normal and dependency-focus states',
 )
 
 console.log('2/7 pure rules')
@@ -318,6 +340,15 @@ const cyclic = [
   { id: 'b', dependencies: ['a'], depth: 1 },
 ]
 check('relationship traversal is cycle-safe', relatedTaskIds('a', cyclic).size === 2)
+check('edge-free tasks switch to the fill-width parallel grid', usesParallelTaskGrid([
+  { id: 't1', dependencies: [], depth: 0 },
+  { id: 't2', dependencies: [], depth: 0 },
+  { id: 't3', dependencies: ['missing'], depth: 0 },
+]))
+check('a real dependency keeps the layered DAG layout', !usesParallelTaskGrid([
+  { id: 't1', dependencies: [], depth: 0 },
+  { id: 't2', dependencies: ['t1'], depth: 1 },
+]))
 const dag = compactDagLayout(projectionTasks.filter(task => Number.isFinite(task.depth)))
 check('compact DAG lays dependency depths out left-to-right',
   dag.nodes.find(node => node.task.id === 't1')?.x === 0

@@ -4,6 +4,9 @@
 
 :global(html) {
   --agent-teams-panel-width: 388px;
+  --agent-teams-panel-top: 64px;
+  --agent-teams-panel-bottom-gap: 64px;
+  --agent-teams-panel-min-height: 560px;
   /* Follow the better-sidebar plugin's width variable (0 when collapsed or
      when the plugin is absent), so the panel shifts left of that sidebar
      instead of overlapping it. The layout shift (--agent-teams-panel-shift)
@@ -54,7 +57,7 @@
 
 .badge {
   position: fixed;
-  top: 64px;
+  top: var(--agent-teams-panel-top);
   right: var(--agent-teams-panel-right);
   z-index: 2147483000;
   display: inline-flex;
@@ -121,14 +124,17 @@
 /* panel shell */
 .panel {
   position: fixed;
-  top: 64px;
+  top: var(--agent-teams-panel-top);
   right: var(--agent-teams-panel-right);
   z-index: 2147483000;
   display: flex;
   flex-direction: column;
   width: min(var(--agent-teams-panel-width), calc(100vw - 24px));
-  height: min(720px, calc(100dvh - 88px));
-  max-height: calc(100dvh - 88px);
+  min-height: min(
+    var(--agent-teams-panel-min-height),
+    calc(100dvh - var(--agent-teams-panel-top) - var(--agent-teams-panel-bottom-gap))
+  );
+  max-height: calc(100dvh - var(--agent-teams-panel-top) - var(--agent-teams-panel-bottom-gap));
   box-sizing: border-box;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--dsw-alias-line-strong) 58%, transparent);
@@ -828,6 +834,18 @@
   min-width: 100%;
 }
 
+.dagCanvas[data-layout='parallel'] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dagCanvas[data-layout='parallel'] .dagNode {
+  position: relative;
+  flex: 1 1 92px;
+  min-width: 92px;
+}
+
 .dagEdges {
   position: absolute;
   inset: 0;
@@ -879,6 +897,10 @@
   opacity: 0.3;
 }
 
+.dagNode[data-state='running'][data-dimmed='true'] {
+  opacity: 0.58;
+}
+
 .dagNode[data-state='completed'] {
   border-color: color-mix(in srgb, var(--dsw-alias-state-success) 48%, var(--dsw-alias-line-normal));
 }
@@ -911,6 +933,28 @@
 
 .dagNode[data-state='running'] .dagNodeDot {
   background: var(--dsw-alias-state-business-primary);
+}
+
+.dagNode[data-state='running'] .dagNodeHead {
+  padding-right: 12px;
+}
+
+.dagRunningState {
+  position: absolute;
+  top: 4px;
+  right: 5px;
+  display: inline-flex;
+  width: 9px;
+  height: 9px;
+  align-items: center;
+  justify-content: center;
+  color: var(--dsw-alias-state-business-primary);
+  pointer-events: none;
+}
+
+.dagRunningState .workGlyph {
+  width: 9px;
+  height: 9px;
 }
 
 .dagNode[data-state='blocked'] .dagNodeDot {
@@ -1058,6 +1102,7 @@
   .badge,
   .badgeDot,
   .panelDot,
+  .workGlyph rect,
   .stateArt,
   .memberAvatar[data-unread='true']::after {
     animation: none;
@@ -1079,17 +1124,13 @@
   :global(html) {
     /* Keep the narrow-screen inset while still clearing the better-sidebar. */
     --agent-teams-panel-right: calc(10px + var(--dsh-sidebar-width, 0px));
+    --agent-teams-panel-top: 56px;
+    --agent-teams-panel-bottom-gap: 56px;
   }
 
   .panel {
-    top: 56px;
     left: 10px;
     width: auto;
-    max-height: calc(100dvh - 68px);
-  }
-
-  .badge {
-    top: 56px;
   }
 
   .teamStats span[data-stat='messages'] {

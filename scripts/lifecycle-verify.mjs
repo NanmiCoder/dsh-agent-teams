@@ -68,8 +68,12 @@ function publishStatus(subject, status) {
 
 const captain = makeAgent('captain-session')
 liveAgents.set(captain.id, captain)
+// A non-AgentTeams continuable sibling must survive every team lifecycle
+// operation untouched.
+children.push({ id: 'foreign-session', label: 'unrelated continuable', mode: 'continuable' })
 
 const ctx = {
+  effect(setup) { return setup() },
   tools: {
     register(definition) {
       definitions.set(definition.name, definition)
@@ -107,17 +111,20 @@ const ctx = {
       const child = makeAgent(id, captain.id)
       child.status = 'running'
       liveAgents.set(id, child)
-      children.push({ id, label: spec.label })
+      children.push({ id, label: spec.label, mode: 'continuable' })
       return { childId: id, messageId: `welcome-${childSeq}` }
     },
     async listChildren(parentId) {
       if (parentId !== captain.id) return []
       return children.map(child => ({
-        kind: 'child', mode: 'continuable', id: child.id, label: child.label,
+        kind: 'child', mode: child.mode, id: child.id, label: child.label,
         // Residency, intentionally not the Agent's real status.
         activity: liveAgents.has(child.id) ? 'running' : 'inactive',
         hasChildren: false,
       }))
+    },
+    async listDescendants(parentId) {
+      return this.listChildren(parentId)
     },
     async followup(_parent, childId, content) {
       if (failNextDelivery.delete(childId)) throw new Error('injected delivery failure')
@@ -268,6 +275,19 @@ try {
   check('removing a member revokes and redispatches its unfinished task',
     afterRemoval?.members.find(member => member.name === 'alpha')?.status === 'removed'
       && recovered?.assignee !== 'alpha')
+  check('removing a member removes its continuable catalog entry',
+    (await ctx.subagents.listChildren(captain.id)).every(child => child.id !== alpha.id))
+  let removedFollowupRejected = false
+  const deliveriesBeforeRemovedFollowup = deliveries.length
+  try {
+    await ctx.subagents.followup(captain, alpha.id, [{ type: 'text', text: 'must not resume' }], {
+      source: { kind: 'plugin', plugin: 'verification' }, signal: new AbortController().signal,
+    })
+  } catch (error) {
+    removedFollowupRejected = error?.code === 'NOT_RESUMABLE'
+  }
+  check('removing a member blocks direct followup before resume',
+    removedFollowupRejected && deliveries.length === deliveriesBeforeRemovedFollowup)
   let removedRejected = false
   try {
     await call('agent_teams_update_task', {
@@ -363,6 +383,9 @@ try {
 
   beta.status = 'idle'
   gamma.status = 'idle'
+  // Exercise the storage-only ready path: deletion must deny cold resume
+  // without materializing the member or spending a model turn.
+  liveAgents.delete(gamma.id)
   await call('agent_teams_delete', {})
   const archived = await readArchivedTeam(stateRoot, teamId)
   check('team shutdown archives the complete durable record',
@@ -374,6 +397,40 @@ try {
     archivedSnapshot?.members.length === 3
       && ['alpha', 'beta', 'gamma'].every(name => archivedSnapshot.members.some(member => member.name === name))
       && archivedSnapshot.members.every(member => member.activity === 'idle'))
+  check('team shutdown retires live, cold, and previously removed members',
+    (await ctx.subagents.listChildren(captain.id))
+      .filter(child => child.kind === 'child'
+        && child.mode === 'continuable'
+        && child.label.startsWith('agent-teams:')).length === 0)
+  let coldFollowupRejected = false
+  const deliveriesBeforeColdFollowup = deliveries.length
+  try {
+    await ctx.subagents.followup(captain, gamma.id, [{ type: 'text', text: 'must stay retired' }], {
+      source: { kind: 'plugin', plugin: 'verification' }, signal: new AbortController().signal,
+    })
+  } catch (error) {
+    coldFollowupRejected = error?.code === 'NOT_RESUMABLE'
+  }
+  check('team shutdown blocks storage-only member cold resume',
+    coldFollowupRejected && deliveries.length === deliveriesBeforeColdFollowup)
+  check('team shutdown leaves unrelated continuable subagents untouched',
+    (await ctx.subagents.listChildren(captain.id))
+      .some(child => child.id === 'foreign-session' && child.mode === 'continuable'))
+  const foreignFollowup = await ctx.subagents.followup(captain, 'foreign-session', [
+    { type: 'text', text: 'unrelated work still routes' },
+  ], {
+    source: { kind: 'plugin', plugin: 'verification' }, signal: new AbortController().signal,
+  })
+  check('team shutdown leaves unrelated continuable followup untouched',
+    typeof foreignFollowup === 'string'
+      && deliveries.some(delivery => delivery.childId === 'foreign-session'))
+
+  await call('agent_teams_create', { name: 'Lifecycle', description: 'second generation' })
+  await call('agent_teams_delete', {})
+  const replacementArchive = await readArchivedTeam(stateRoot, teamId)
+  check('same-name team can be recreated and archived again',
+    await readTeam(stateRoot, teamId) === undefined
+      && replacementArchive?.description === 'second generation')
 } finally {
   await rm(workspace, { recursive: true, force: true })
 }

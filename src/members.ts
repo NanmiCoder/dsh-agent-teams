@@ -15,11 +15,11 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { installModelSelection, type Agent, type ModelSelection } from '@deepseek-ai/dsh-agent'
 // Declaration merge only: makes ctx.subagents visible.
-import { foldSubagentDescriptor } from '@deepseek-ai/dsh-subagent'
+import { foldSubagentDescriptor, SubagentError } from '@deepseek-ai/dsh-subagent'
 import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import { join } from 'node:path'
-import { readTeamSync } from './state.ts'
+import { readRetiredMemberIds, readTeamSync } from './state.ts'
 import type { TeamMember, TeamState } from './types.ts'
 
 /** Captain-only AgentTeams tools hidden from newly spawned members. */
@@ -380,6 +380,68 @@ export function interruptMember(ctx: Context, captain: Agent, childId: string): 
   } catch (error: unknown) {
     ctx.logger.warn(`agent-teams: interrupt of member ${childId} failed: ${String(error)}`)
   }
+}
+
+/** Resolve one live parent's workspace-scoped retirement index. */
+async function retiredForParent(ctx: Context, parentId: SessionId, stateDir: string): Promise<Set<string>> {
+  const parent = ctx.agents.get(parentId)
+  return parent === undefined
+    ? new Set()
+    : readRetiredMemberIds(join(parent.session.header.cwd ?? process.cwd(), stateDir))
+}
+
+/**
+ * Install the missing per-child retirement boundary above Harness rc.6.
+ *
+ * Upstream `interrupt()` deliberately preserves continuable sessions and the
+ * upstream seam exposes no targeted forget/retire method. The durable
+ * AgentTeams index therefore guards all three public continuation boundaries:
+ * retired rows disappear from `list_agents` (children and descendants), and a
+ * direct `followup()` is rejected before it can cold-resume the member. Exact
+ * ids keep unrelated subagents untouched; transcripts remain in persistence
+ * for archived-team review.
+ */
+export function installRetiredMemberGuard(ctx: Context, stateDir: string): void {
+  const runtime = ctx.subagents
+  ctx.effect(() => {
+    const listChildren = runtime.listChildren
+    const listDescendants = runtime.listDescendants
+    const followup = runtime.followup
+
+    const guardedChildren: typeof runtime.listChildren = async (parentId, signal) => {
+      const [entries, retired] = await Promise.all([
+        listChildren.call(runtime, parentId, signal),
+        retiredForParent(ctx, parentId, stateDir),
+      ])
+      return entries.filter(entry => !retired.has(entry.id))
+    }
+    const guardedDescendants: typeof runtime.listDescendants = async (rootId, signal) => {
+      const [entries, retired] = await Promise.all([
+        listDescendants.call(runtime, rootId, signal),
+        retiredForParent(ctx, rootId, stateDir),
+      ])
+      return entries.filter(entry => !retired.has(entry.id))
+    }
+    const guardedFollowup: typeof runtime.followup = async (parent, childId, content, options) => {
+      const retired = await readRetiredMemberIds(join(parent.session.header.cwd ?? process.cwd(), stateDir))
+      if (retired.has(childId)) {
+        throw new SubagentError(
+          `AgentTeams member "${childId}" was retired and cannot be resumed`,
+          'NOT_RESUMABLE',
+        )
+      }
+      return followup.call(runtime, parent, childId, content, options)
+    }
+
+    runtime.listChildren = guardedChildren
+    runtime.listDescendants = guardedDescendants
+    runtime.followup = guardedFollowup
+    return () => {
+      if (runtime.listChildren === guardedChildren) runtime.listChildren = listChildren
+      if (runtime.listDescendants === guardedDescendants) runtime.listDescendants = listDescendants
+      if (runtime.followup === guardedFollowup) runtime.followup = followup
+    }
+  }, 'agent-teams: retired member guard')
 }
 
 /**

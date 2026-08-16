@@ -29,6 +29,7 @@ import {
   findTeamByParticipant,
   invalidateTaskAttempt,
   readUnreadMailbox,
+  recordRetiredMemberIds,
   releaseMailboxDelivery,
   readTeam,
   sanitizeKey,
@@ -39,6 +40,7 @@ import {
 } from './state.ts'
 import {
   deliverToMember,
+  installRetiredMemberGuard,
   installMemberSelectionRuntime,
   interruptMember,
   memberActivity,
@@ -220,6 +222,7 @@ export function steerCaptainReport(captain: Pick<Agent, 'steer'>, from: string, 
  * @param config - resolved tool config.
  */
 export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void {
+  installRetiredMemberGuard(ctx, config.stateDir)
   const memberSelections = installMemberSelectionRuntime(ctx, config.stateDir)
   const scheduler = installTeamScheduler(ctx, { stateDir: config.stateDir })
 
@@ -427,6 +430,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
         return { member: { ...member }, requeued }
       })
       if (revoked.member.id !== '') {
+        await recordRetiredMemberIds(stateRoot, [revoked.member.id])
         interruptMember(ctx, captain, revoked.member.id)
         await waitForMemberIdle(ctx, revoked.member, exec.signal)
       }
@@ -1044,7 +1048,9 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
       const team = await requireCaptainTeam(workspace, config, captain)
       const members = await withTeamLock(teamLockKey(stateRoot, team.id), async () => {
         const fresh = await requireFreshCaptainTeam(stateRoot, team.id, captain.id)
-        const active = fresh.members.filter(member => member.status !== 'removed').map(member => ({ ...member }))
+        // Include previously removed members so deleting a pre-fix team also
+        // retires durable catalog entries left behind by remove_member.
+        const roster = fresh.members.map(member => ({ ...member }))
         for (const member of fresh.members) {
           if (member.status === 'removed') continue
           member.status = 'removed'
@@ -1053,8 +1059,9 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
           }
         }
         await writeTeam(stateRoot, fresh)
-        return active
+        return roster
       })
+      await recordRetiredMemberIds(stateRoot, members.map(member => member.id))
       for (const member of members) {
         if (member.id === '') continue
         interruptMember(ctx, captain, member.id)

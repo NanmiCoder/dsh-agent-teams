@@ -23,6 +23,8 @@ import type { TaskStatus, TeamMember, TeamMessage, TeamState, TeamTask } from '.
 export const CAPTAIN_KEY = 'captain'
 /** A crashed live-delivery attempt becomes retryable after this interval. */
 const MAILBOX_DELIVERY_LEASE_MS = 60_000
+/** Durable deny-list for AgentTeams members that must never be resumed. */
+const RETIRED_MEMBERS_FILE = 'retired-members.json'
 
 /** In-process per-team mutation queues (promise chains). */
 const locks = new Map<string, Promise<unknown>>()
@@ -224,6 +226,39 @@ export function readTeamSync(stateRoot: string, teamId: string): TeamState | und
  */
 export async function writeTeam(stateRoot: string, state: TeamState): Promise<void> {
   await atomicWriteText(join(stateRoot, state.id, 'team.json'), JSON.stringify(state, null, 2))
+}
+
+/** Read the durable set of member session ids retired by remove/delete. */
+export async function readRetiredMemberIds(stateRoot: string): Promise<Set<string>> {
+  try {
+    const parsed: unknown = JSON.parse(stripLeadingBom(
+      await readFile(join(stateRoot, RETIRED_MEMBERS_FILE), 'utf8'),
+    ))
+    if (!Array.isArray(parsed) || parsed.some(value => typeof value !== 'string' || value === '')) {
+      throw new Error('invalid AgentTeams retired member index')
+    }
+    return new Set(parsed)
+  } catch (error: unknown) {
+    if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return new Set()
+    }
+    throw error
+  }
+}
+
+/** Atomically add session ids to the durable retired-member deny-list. */
+export async function recordRetiredMemberIds(stateRoot: string, memberIds: readonly string[]): Promise<void> {
+  const additions = memberIds.filter(id => id !== '')
+  if (additions.length === 0) return
+  await withTeamLock(`retired-members:${stateRoot}`, async () => {
+    const retired = await readRetiredMemberIds(stateRoot)
+    for (const id of additions) retired.add(id)
+    await mkdir(stateRoot, { recursive: true })
+    await atomicWriteText(
+      join(stateRoot, RETIRED_MEMBERS_FILE),
+      `${JSON.stringify([...retired].sort(), null, 2)}\n`,
+    )
+  })
 }
 
 /**
@@ -606,7 +641,38 @@ export async function removeTeamDir(stateRoot: string, teamId: string): Promise<
 export async function archiveTeamDir(stateRoot: string, teamId: string): Promise<void> {
   const archiveRoot = join(stateRoot, 'archive')
   await mkdir(archiveRoot, { recursive: true })
-  await rename(join(stateRoot, teamId), join(archiveRoot, teamId))
+  const source = join(stateRoot, teamId)
+  const target = join(archiveRoot, teamId)
+  const previous = join(archiveRoot, `.${teamId}.previous-${randomUUID()}`)
+  let displaced = false
+  try {
+    await rename(target, previous)
+    displaced = true
+  } catch (error: unknown) {
+    if (!(error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT')) {
+      throw error
+    }
+  }
+
+  try {
+    await rename(source, target)
+  } catch (error: unknown) {
+    if (displaced) {
+      try {
+        await rename(previous, target)
+      } catch (restoreError: unknown) {
+        throw new AggregateError(
+          [error, restoreError],
+          `failed to archive team "${teamId}" and restore its previous archive`,
+        )
+      }
+    }
+    throw error
+  }
+
+  // The new generation is authoritative. A failed cleanup only leaves a
+  // hidden recovery directory, which archive discovery deliberately ignores.
+  if (displaced) await rm(previous, { recursive: true, force: true }).catch(() => undefined)
 }
 
 /**
@@ -627,7 +693,9 @@ export async function readArchivedTeam(stateRoot: string, teamId: string): Promi
 export async function listArchivedTeamIds(stateRoot: string): Promise<string[]> {
   try {
     const entries = await readdir(join(stateRoot, 'archive'), { withFileTypes: true })
-    return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name)
+    return entries
+      .filter((entry) => entry.isDirectory() && !entry.name.startsWith('.'))
+      .map((entry) => entry.name)
   } catch (error: unknown) {
     if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
       return []

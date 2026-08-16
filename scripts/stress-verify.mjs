@@ -76,6 +76,7 @@ function mountRuntime() {
   }
 
   const ctx = {
+    effect(setup) { return setup() },
     tools: {
       register(definition) {
         definitions.set(definition.name, definition)
@@ -113,17 +114,20 @@ function mountRuntime() {
         const child = makeAgent(id, captain.id)
         child.status = 'running'
         liveAgents.set(id, child)
-        children.push({ id, label: spec.label })
+        children.push({ id, label: spec.label, mode: 'continuable' })
         return { childId: id, messageId: `welcome-${childSeq}` }
       },
       async listChildren(parentId) {
         if (parentId !== captain.id) return []
         return children.map(child => ({
-          kind: 'child', mode: 'continuable', id: child.id, label: child.label,
+          kind: 'child', mode: child.mode, id: child.id, label: child.label,
           // Deliberately residency-only; the plugin must refine through agents.get().
           activity: liveAgents.has(child.id) ? 'running' : 'inactive',
           hasChildren: false,
         }))
+      },
+      async listDescendants(parentId) {
+        return this.listChildren(parentId)
       },
       async followup(_parent, childId, content) {
         const remaining = failDeliveryCount.get(childId) ?? 0
@@ -304,7 +308,19 @@ try {
 
   await Promise.all(memberNames.map(async name => idle(await liveMember(name))))
   let snapshot = await state()
-  const roots = snapshot.tasks.slice(0, 8)
+  let roots = snapshot.tasks.slice(0, 8)
+  // Status notifications schedule reconciliation asynchronously. Under a busy
+  // event loop, one fixed sleep can observe the wave while it is still being
+  // written, so wait for the actual scheduler invariant instead of elapsed
+  // wall-clock time.
+  for (let round = 0; round < 100; round += 1) {
+    if (roots.every(task => task.status === 'claimed')
+      && new Set(roots.map(task => task.assignee)).size === 8) break
+    await call('agent_teams_status', {})
+    await settle()
+    snapshot = await state()
+    roots = snapshot.tasks.slice(0, 8)
+  }
   check('first wave assigns all eight roots to eight distinct members',
     roots.every(task => task.status === 'claimed') && new Set(roots.map(task => task.assignee)).size === 8)
 
@@ -507,6 +523,11 @@ try {
     await readTeam(stateRoot, teamId) === undefined
       && archived?.tasks.length === 38
       && archived.tasks.every(task => task.status === 'completed'))
+  check('shutdown retires all eight durable member catalog entries',
+    (await runtime.ctx.subagents.listChildren(runtime.captain.id))
+      .filter(child => child.kind === 'child'
+        && child.mode === 'continuable'
+        && child.label.startsWith('agent-teams:')).length === 0)
 } finally {
   await rm(workspace, { recursive: true, force: true })
 }

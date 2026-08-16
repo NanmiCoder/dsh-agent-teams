@@ -6,7 +6,12 @@ import { resolve } from 'node:path'
 const root = resolve(import.meta.dirname, '..')
 const sourcePath = resolve(root, 'skills/dsh-plugin-development/SKILL.md')
 const mirrorPath = resolve(root, '.dsh/skills/dsh-plugin-development/SKILL.md')
-const checkOnly = process.argv.includes('--check')
+const args = process.argv.slice(2)
+if (args.some(a => !['--check'].includes(a))) {
+  console.error('Usage: sync-skill.mjs [--check]')
+  process.exit(1)
+}
+const checkOnly = args.includes('--check')
 
 async function main() {
   const source = await readFile(sourcePath, 'utf8')

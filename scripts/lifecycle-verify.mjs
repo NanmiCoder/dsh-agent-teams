@@ -13,6 +13,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { registerAgentTeamsTools } from '../lib/tools.js'
 import { readArchivedTeam, readTeam, readUnreadMailbox } from '../lib/state.js'
+import { collectArchivedTeamsActivity } from '../lib/snapshot.js'
 
 const workspace = await mkdtemp(join(tmpdir(), 'dsh-agent-teams-lifecycle-'))
 const definitions = new Map()
@@ -363,9 +364,16 @@ try {
   beta.status = 'idle'
   gamma.status = 'idle'
   await call('agent_teams_delete', {})
+  const archived = await readArchivedTeam(stateRoot, teamId)
   check('team shutdown archives the complete durable record',
     await readTeam(stateRoot, teamId) === undefined
-      && await readArchivedTeam(stateRoot, teamId) !== undefined)
+      && archived !== undefined)
+  const archivedSnapshot = (await collectArchivedTeamsActivity(ctx, [{ workspace, stateRoot }]))
+    .find(candidate => candidate.teamId === teamId)
+  check('archived activity keeps every member after shutdown',
+    archivedSnapshot?.members.length === 3
+      && ['alpha', 'beta', 'gamma'].every(name => archivedSnapshot.members.some(member => member.name === name))
+      && archivedSnapshot.members.every(member => member.activity === 'idle'))
 } finally {
   await rm(workspace, { recursive: true, force: true })
 }

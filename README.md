@@ -31,7 +31,7 @@ Ask in natural language. The plugin provides the team protocol, ten coordination
 | **Dependency-aware tasks** | Tasks move through explicit states and cannot be claimed before their dependencies finish. |
 | **Automatic reuse and safe takeover** | Idle members claim the next ready task; reassignment revokes stale attempts before new work starts, and cold recovery retries stranded open attempts. |
 | **Direct messaging** | Members send durable mailbox messages directly to teammates or the captain—no relay required. |
-| **Live activity panel** | The Web UI shows roles, current work, unread messages, task dependencies, and archived team history. |
+| **Live activity panel** | The Web UI combines segmented progress, a collapsible roster, and an interactive task DAG; completed archives retain their full member and task history. |
 
 ## Install
 

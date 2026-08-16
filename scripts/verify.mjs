@@ -30,6 +30,9 @@ import {
 } from '../lib/state.js'
 import {
   activityPanelExpandedForSession,
+  compactDagLayout,
+  COMPACT_DAG_NODE_HEIGHT,
+  COMPACT_DAG_NODE_WIDTH,
   dependencyFocusTaskId,
   relatedTaskIds,
   taskStages,
@@ -302,6 +305,20 @@ const cyclic = [
   { id: 'b', dependencies: ['a'], depth: 1 },
 ]
 check('relationship traversal is cycle-safe', relatedTaskIds('a', cyclic).size === 2)
+const dag = compactDagLayout(projectionTasks.filter(task => Number.isFinite(task.depth)))
+check('compact DAG lays dependency depths out left-to-right',
+  dag.nodes.find(node => node.task.id === 't1')?.x === 0
+    && dag.nodes.find(node => node.task.id === 't2')?.x === 118
+    && dag.nodes.find(node => node.task.id === 't4')?.x === 236)
+check('compact DAG keeps stable rows and reference node geometry',
+  dag.nodes.find(node => node.task.id === 't3')?.y === 38
+    && dag.width === 328
+    && dag.height === 68
+    && COMPACT_DAG_NODE_WIDTH === 92
+    && COMPACT_DAG_NODE_HEIGHT === 30)
+check('compact DAG emits one curved SVG edge per valid dependency',
+  dag.edges.length === 3
+    && dag.edges.some(edge => edge.from === 't1' && edge.to === 't2' && edge.path.startsWith('M92 15C')))
 check(
   'expanded activity panel belongs only to its current session',
   activityPanelExpandedForSession(true, 'session-a', 'session-a')

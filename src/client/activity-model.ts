@@ -13,6 +13,34 @@ export interface RelationshipStage<T extends RelationshipTask> {
   readonly tasks: readonly T[]
 }
 
+/** Geometry used by the compact task DAG in the activity panel. */
+export interface CompactDagNode<T extends RelationshipTask> {
+  readonly task: T
+  readonly x: number
+  readonly y: number
+}
+
+/** One dependency edge routed between two compact DAG nodes. */
+export interface CompactDagEdge {
+  readonly from: string
+  readonly to: string
+  readonly path: string
+}
+
+/** Complete, scrollable compact DAG projection. */
+export interface CompactDagLayout<T extends RelationshipTask> {
+  readonly width: number
+  readonly height: number
+  readonly nodes: readonly CompactDagNode<T>[]
+  readonly edges: readonly CompactDagEdge[]
+}
+
+/** Reference-panel geometry: narrow nodes with enough room for curved edges. */
+export const COMPACT_DAG_NODE_WIDTH = 92
+export const COMPACT_DAG_NODE_HEIGHT = 30
+export const COMPACT_DAG_COLUMN_GAP = 26
+export const COMPACT_DAG_ROW_GAP = 8
+
 /**
  * Whether an expanded activity panel still belongs to the current session.
  *
@@ -59,6 +87,56 @@ export function taskStages<T extends RelationshipTask>(tasks: readonly T[]): rea
       depth,
       tasks: stageTasks.slice().sort((left, right) => left.id.localeCompare(right.id, 'en', { numeric: true })),
     }))
+}
+
+/**
+ * Lay tasks out as the reference panel's compact left-to-right DAG.
+ *
+ * Columns are dependency-depth stages. Rows are stable task-id order within
+ * each stage. Edges use cubic curves so fan-in remains readable without
+ * turning every task into a large card.
+ */
+export function compactDagLayout<T extends RelationshipTask>(tasks: readonly T[]): CompactDagLayout<T> {
+  const stages = taskStages(tasks)
+  const positions = new Map<string, { x: number; y: number }>()
+  const nodes: CompactDagNode<T>[] = []
+  for (const [column, stage] of stages.entries()) {
+    for (const [row, task] of stage.tasks.entries()) {
+      const x = column * (COMPACT_DAG_NODE_WIDTH + COMPACT_DAG_COLUMN_GAP)
+      const y = row * (COMPACT_DAG_NODE_HEIGHT + COMPACT_DAG_ROW_GAP)
+      positions.set(task.id, { x, y })
+      nodes.push({ task, x, y })
+    }
+  }
+  const edges: CompactDagEdge[] = []
+  for (const task of tasks) {
+    const target = positions.get(task.id)
+    if (target === undefined) continue
+    for (const dependency of task.dependencies) {
+      const source = positions.get(dependency)
+      if (source === undefined) continue
+      const x1 = source.x + COMPACT_DAG_NODE_WIDTH
+      const y1 = source.y + COMPACT_DAG_NODE_HEIGHT / 2
+      const x2 = target.x
+      const y2 = target.y + COMPACT_DAG_NODE_HEIGHT / 2
+      edges.push({
+        from: dependency,
+        to: task.id,
+        path: `M${x1} ${y1}C${x1 + 14} ${y1},${x2 - 14} ${y2},${x2} ${y2}`,
+      })
+    }
+  }
+  const rows = Math.max(1, ...stages.map((stage) => stage.tasks.length))
+  return {
+    width: stages.length === 0
+      ? 0
+      : stages.length * COMPACT_DAG_NODE_WIDTH + (stages.length - 1) * COMPACT_DAG_COLUMN_GAP,
+    height: stages.length === 0
+      ? 0
+      : rows * COMPACT_DAG_NODE_HEIGHT + (rows - 1) * COMPACT_DAG_ROW_GAP,
+    nodes,
+    edges,
+  }
 }
 
 /**

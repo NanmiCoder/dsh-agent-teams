@@ -28,6 +28,30 @@
   will-change: padding-right;
 }
 
+/* The reference export used an older DSW token vocabulary. Harness rc.6
+   exposes the same palette through layer/border and primary state tokens.
+   Bridge them only inside this plugin surface so every declaration remains
+   valid without mutating the host theme globally. */
+.badge,
+.panel {
+  --dsw-alias-line-normal: var(--dsw-static-neutral-bluish-150, #e7e9ee);
+  --dsw-alias-line-strong: color-mix(
+    in srgb,
+    var(--dsw-static-neutral-bluish-200, #e1e5ee) 50%,
+    var(--dsw-static-neutral-bluish-300, #cfd3d6)
+  );
+  --dsw-alias-bg-module: var(--dsw-alias-bg-layer-1, #ffffff);
+  --dsw-alias-bg-fill-neutral: var(--dsw-static-neutral-bluish-100, #eef0f4);
+  --dsw-alias-bg-fill-business: var(--dsw-alias-state-business-primary, #4d6bfe);
+  --dsw-alias-bg-fill-success: var(--dsw-alias-state-success-primary, #12a150);
+  --dsw-alias-bg-fill-warning: var(--dsw-alias-state-warn-primary, #e08700);
+  --dsw-alias-bg-fill-danger: var(--dsw-alias-state-error-primary, #e5484d);
+  --dsw-alias-state-success: var(--dsw-alias-state-success-primary, #12a150);
+  --dsw-alias-state-warning: var(--dsw-alias-state-warn-primary, #e08700);
+  --dsw-alias-state-danger: var(--dsw-alias-state-error-primary, #e5484d);
+  --dsw-alias-label-on-fill: var(--dsw-alias-label-primary-inverted, #ffffff);
+}
+
 .badge {
   position: fixed;
   top: 64px;
@@ -109,7 +133,7 @@
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--dsw-alias-line-strong) 58%, transparent);
   border-radius: 16px;
-  background: color-mix(in srgb, var(--dsw-alias-bg-module-platform) 95%, transparent);
+  background: color-mix(in srgb, var(--dsw-alias-bg-module) 95%, transparent);
   backdrop-filter: blur(20px) saturate(1.08);
   box-shadow:
     0 12px 32px color-mix(in srgb, var(--dsw-alias-label-primary) 12%, transparent),
@@ -177,6 +201,11 @@
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.teams::-webkit-scrollbar {
+  display: none;
 }
 
 /* team */
@@ -642,7 +671,7 @@
   width: 19px;
   height: 19px;
   box-sizing: border-box;
-  border: 2px solid var(--dsw-alias-bg-module-platform);
+  border: 2px solid var(--dsw-alias-bg-module);
   border-radius: 50%;
   object-fit: cover;
   background: #0b1d33;
@@ -991,11 +1020,9 @@
   line-height: 16px;
 }
 
-/* historic teams */
-.team[data-historic],
-.archivedWrap {
-  opacity: 0.82;
-}
+/* Historic teams retain the exact same visual hierarchy as live teams. The
+   explicit label carries the ended state; fading the entire subtree made the
+   reference colors and DAG borders look missing. */
 
 .historicPill {
   flex: none;

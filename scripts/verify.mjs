@@ -102,6 +102,19 @@ check(
   registeredId === pkg.name,
   `bundle registers ${JSON.stringify(registeredId)}, package.json has ${JSON.stringify(pkg.name)}`,
 )
+const activityPanelCss = await readFile(new URL('../src/client/ActivityPanel.module.css', import.meta.url), 'utf8')
+const requiredHarnessTokenBridges = [
+  '--dsw-alias-line-normal: var(--dsw-static-neutral-bluish-150',
+  '--dsw-alias-bg-module: var(--dsw-alias-bg-layer-1',
+  '--dsw-alias-state-success: var(--dsw-alias-state-success-primary',
+  '--dsw-alias-state-warning: var(--dsw-alias-state-warn-primary',
+  '--dsw-alias-state-danger: var(--dsw-alias-state-error-primary',
+]
+check(
+  'activity panel bridges the reference palette to current Harness tokens',
+  requiredHarnessTokenBridges.every(token => activityPanelCss.includes(token)),
+  'missing token bridges make panel fills and DAG borders transparent',
+)
 
 console.log('2/7 pure rules')
 check("sanitizeKey('My Team!') -> 'my-team'", sanitizeKey('My Team!') === 'my-team')

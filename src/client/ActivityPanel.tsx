@@ -174,13 +174,22 @@ function taskTone(state: ActivityTask['state'], status: string): string {
 }
 
 /** Collapsed badge: an always-visible corner pill while any team exists. */
-function CollapsedBadge({ count, busy, onClick }: {
+function CollapsedBadge({ count, busy, onClick, panelPos }: {
   readonly count: number
   readonly busy: boolean
   readonly onClick: () => void
+  /** Saved drag position; when set the badge follows the panel (left/top, right auto). */
+  readonly panelPos: { x: number; y: number } | null
 }) {
   return (
-    <button type="button" className={css.badge} data-busy={busy} onClick={onClick} aria-label={`AgentTeams 活动，${count} 个团队`}>
+    <button
+      type="button"
+      className={css.badge}
+      data-busy={busy}
+      onClick={onClick}
+      aria-label={`AgentTeams 活动，${count} 个团队`}
+      style={panelPos === null ? undefined : { left: panelPos.x, top: panelPos.y, right: 'auto' }}
+    >
       <span className={css.badgeDot} data-busy={busy} aria-hidden />
       <span className={css.badgeCount}>{count}</span>
     </button>
@@ -711,7 +720,7 @@ export function ActivityPanel({ sessionsList, openSession }: {
   return (
     <>
       {!expanded && (
-        <CollapsedBadge count={visibleCount} busy={busy} onClick={() => {
+        <CollapsedBadge count={visibleCount} busy={busy} panelPos={panelPos} onClick={() => {
           if (current === undefined) return
           setOpenOwner(current)
           setOpen(true)

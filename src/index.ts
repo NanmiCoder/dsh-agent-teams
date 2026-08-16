@@ -30,6 +30,7 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { collectArchivedTeamsActivity, collectTeamsActivity } from './snapshot.ts'
+import type { MemberPersonaPlacement } from './members.ts'
 
 /**
  * Structural slice of the web server service, compatible with both the
@@ -61,12 +62,14 @@ export interface Config {
    * `<workspace>/<stateDir>/<teamId>/` (default `.agent-teams`).
    */
   stateDir?: string
-  /** `ctx.subagents` provider used to spawn members; must support continuable children and personas (default `spawn`). */
+  /** `ctx.subagents` provider used to spawn members; must support continuable children (default `spawn`). */
   memberProvider?: string
   /** Optional model override applied to every member. */
   memberModel?: string
   /** Member delegation depth cap (default `1`; `0` forbids delegation entirely). */
   memberMaxDepth?: number
+  /** Put the member protocol in a scoped system persona or the initial user prompt (default `system`). */
+  memberPersonaPlacement?: MemberPersonaPlacement
   /** Team size cap in members (default `8`). */
   maxMembers?: number
   /** Prompt-section order for the usage policy (default `117`, after delegation policy). */
@@ -78,6 +81,7 @@ export const Config: z<Config> = z.object({
   memberProvider: z.string().default('spawn'),
   memberModel: z.string(),
   memberMaxDepth: z.natural().default(1),
+  memberPersonaPlacement: z.union(['system', 'prompt'] as const).default('system'),
   maxMembers: z.natural().min(1).default(8),
   promptSectionOrder: z.natural().default(117),
 })
@@ -101,6 +105,7 @@ export function apply(ctx: Context, config: Config): void {
     memberProvider: config.memberProvider ?? 'spawn',
     memberModel: config.memberModel,
     memberMaxDepth: config.memberMaxDepth ?? 1,
+    memberPersonaPlacement: config.memberPersonaPlacement ?? 'system',
     maxMembers: config.maxMembers ?? 8,
   }
 

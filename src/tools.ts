@@ -40,6 +40,7 @@ import {
   memberActivity,
   resolveMemberLlmSelection,
   spawnMember,
+  type MemberPersonaPlacement,
   type MemberRuntimeConfig,
 } from './members.ts'
 import type { TeamMember, TeamState, TeamTask } from './types.ts'
@@ -54,6 +55,8 @@ export interface ToolsConfig {
   memberModel?: string
   /** Member delegation depth cap. */
   memberMaxDepth?: number
+  /** Where each member receives its role and team protocol. */
+  memberPersonaPlacement: MemberPersonaPlacement
   /** Team size cap (members). */
   maxMembers: number
 }
@@ -828,6 +831,7 @@ function memberRuntime(config: ToolsConfig): MemberRuntimeConfig {
   return {
     provider: config.memberProvider,
     maxDepth: config.memberMaxDepth,
+    personaPlacement: config.memberPersonaPlacement,
   }
 }
 

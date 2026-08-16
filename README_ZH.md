@@ -90,10 +90,11 @@ dsh web
     memberProvider: spawn
     memberModel: deepseek-v4
     memberMaxDepth: 1
+    memberPersonaPlacement: system
     maxMembers: 8
 ```
 
-这里的 `memberProvider` 指子 Agent 的运行后端（`spawn` / `fork`），不是 LLM provider。跨 LLM provider 由 `agent_teams_add_member` 的可选 `provider` + `model` 参数表达；`memberModel` 只是所有成员的模型默认覆盖。
+这里的 `memberProvider` 指子 Agent 的运行后端（`spawn` / `fork`），不是 LLM provider。跨 LLM provider 由 `agent_teams_add_member` 的可选 `provider` + `model` 参数表达；`memberModel` 只是所有成员的模型默认覆盖。`memberPersonaPlacement` 默认为 `system`，保持原有的系统级成员 persona；对于 Anchored Standard 等依赖首轮轨迹的 preset，可设为 `prompt`，把成员协议移入首条用户消息，并保持子 Agent preset 的 `deployment:persona` 不变。
 
 ## 使用边界
 

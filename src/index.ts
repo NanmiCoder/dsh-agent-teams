@@ -71,6 +71,12 @@ export interface Config {
   maxMembers?: number
   /** Prompt-section order for the usage policy (default `117`, after delegation policy). */
   promptSectionOrder?: number
+  /**
+   * Focus mode (default `false`): a prompt-level guideline that asks the captain
+   * to only surface completion, failure, or decisions that need the user, and to
+   * batch the final summary. It is not a hard notification filter.
+   */
+  focusMode?: boolean
 }
 
 export const Config: z<Config> = z.object({
@@ -80,10 +86,20 @@ export const Config: z<Config> = z.object({
   memberMaxDepth: z.natural().default(1),
   maxMembers: z.natural().min(1).default(8),
   promptSectionOrder: z.natural().default(117),
+  focusMode: z.boolean().default(false),
 })
 
 /** The model-facing usage policy: when and how to drive AgentTeams. */
-function usageSectionText(toolNames: string): string {
+function usageSectionText(toolNames: string, focusMode: boolean): string {
+  const focusProtocol = focusMode
+    ? `
+Focus mode is ON. Follow these rules to protect the human's attention:
+1. Notify the user only on three event kinds: a task completed, a task failed, or a decision genuinely needs the user. Do not send progress pings, status refreshes, or routine member messages as they happen.
+2. Keep the human-visible task list short. Only put tasks that need human domain knowledge or final judgment on the main line; push everything else to background/autonomous work.
+3. When agents are running, do not start extra deep tasks just to fill waiting time. Let the human rest; batch the final team summary instead of streaming intermediate updates.
+4. If a task is blocked or needs a human decision, mark it clearly as needs-decision and wait. Do not repeatedly re-trigger the same interruption.
+`
+    : ''
   return `When the user asks to run something with AgentTeams (e.g. "use AgentTeams to do X"), you are the captain of a multi-agent team. Follow this protocol:
 1. Call agent_teams_create with a team name and the goal as description. You become the captain and may lead one team at a time.
 2. Call agent_teams_add_member once per role the goal needs (researcher, engineer, reviewer, ...). Members are durable subagents: they wait for your messages, then work a full turn. By default each member snapshots your current provider, model, and reasoning effort. Never ask the user to choose these per member; only pass provider/model when the user explicitly requests a different route for that role.
@@ -92,7 +108,7 @@ function usageSectionText(toolNames: string): string {
 5. If work is blocked, stale, or needs takeover, always call agent_teams_reassign_task first. Reassign to another idle member, or use assignee=captain before doing it yourself. Reassignment revokes the old attempt and waits for that member to quiesce, preventing late results from overwriting the new attempt.
 6. Tasks carry attempt_id capabilities. Members must use the current attempt_id for updates; stale-attempt errors mean ownership changed. Poll status until every required task is terminal and every member is idle/ready.
 7. Present the team's results to the user, then agent_teams_delete the team unless the user wants to keep working with it.
-
+${focusProtocol}
 Tools: ${toolNames}`
 }
 
@@ -126,7 +142,7 @@ export function apply(ctx: Context, config: Config): void {
   ctx.systemPrompt.section({
     name: 'agent-teams:usage',
     order: config.promptSectionOrder ?? 117,
-    text: usageSectionText(toolNames),
+    text: usageSectionText(toolNames, config.focusMode ?? true),
   })
 
   registerAgentTeamsTools(ctx, resolved)

@@ -70,9 +70,12 @@
     memberModel: deepseek-v4      # 可选：成员模型覆盖
     memberMaxDepth: 1             # 成员再委派深度上限（0 = 禁止）
     maxMembers: 8                 # 团队人数上限
+    focusMode: true               # 专注模式（prompt 层引导）：尽量只在完成/失败/需决策时打扰人
 ```
 
 最终优先级为：成员显式 `provider` + `model` / `model` → `memberModel` → 队长当前路由。思考强度默认继承队长当前值，并在目标 provider/model 上创建前校验；不兼容时成员创建会明确失败。最终生效的 provider/model/思考强度会写入 `team.json`，供状态查询和成员冷恢复使用。
+
+`focusMode`（默认 `false`）是专注模式，属于 **prompt 层引导**：开启后队长被要求只在“任务完成 / 任务失败 / 真正需要人决策”三类事件时向用户汇报，不刷过程进度，并把最终结果批量总结。它不是硬性通知过滤，模型仍可能上报重要更新。设为 `true` 开启。
 
 ## 使用协议
 

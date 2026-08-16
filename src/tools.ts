@@ -18,14 +18,18 @@ import type { ToolRunContext } from '@deepseek-ai/dsh-tools'
 import { join } from 'node:path'
 import { appendTeamEvent, captainSessionOf } from './events.ts'
 import {
+  acknowledgeMailbox,
   appendMailbox,
   archiveTeamDir,
+  beginTaskAttempt,
   CAPTAIN_KEY,
   createMessage,
   createTeamDir,
   findTeamByCaptain,
   findTeamByParticipant,
-  readMailbox,
+  invalidateTaskAttempt,
+  readUnreadMailbox,
+  releaseMailboxDelivery,
   readTeam,
   sanitizeKey,
   transitionError,
@@ -42,7 +46,8 @@ import {
   spawnMember,
   type MemberRuntimeConfig,
 } from './members.ts'
-import type { TeamMember, TeamState, TeamTask } from './types.ts'
+import { TERMINAL_TASK_STATUSES, type TeamMember, type TeamState, type TeamTask } from './types.ts'
+import { installTeamScheduler } from './scheduler.ts'
 
 /** Resolved plugin config consumed by the tools. */
 export interface ToolsConfig {
@@ -165,6 +170,29 @@ function requireTask(team: TeamState, taskId: string): TeamTask {
   return task
 }
 
+function memberOpenTask(team: TeamState, memberName: string, exceptTaskId?: string): TeamTask | undefined {
+  return team.tasks.find(task => task.id !== exceptTaskId
+    && task.assignee === memberName
+    && (task.status === 'claimed' || task.status === 'in_progress'))
+}
+
+async function waitForMemberIdle(ctx: Context, member: TeamMember, signal: AbortSignal): Promise<void> {
+  if (member.id === '') return
+  const live = ctx.agents.get(member.id as SessionId)
+  if (live === undefined) return
+  if (signal.aborted) throw signal.reason
+  let onAbort!: () => void
+  const aborted = new Promise<never>((_resolve, reject) => {
+    onAbort = () => reject(signal.reason ?? new Error('task reassignment was cancelled'))
+    signal.addEventListener('abort', onAbort, { once: true })
+  })
+  try {
+    await Promise.race([live.whenIdle(), aborted])
+  } finally {
+    signal.removeEventListener('abort', onAbort)
+  }
+}
+
 /**
  * Deliver a durable member report at the captain's nearest model boundary.
  *
@@ -193,6 +221,7 @@ export function steerCaptainReport(captain: Pick<Agent, 'steer'>, from: string, 
  */
 export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void {
   const memberSelections = installMemberSelectionRuntime(ctx, config.stateDir)
+  const scheduler = installTeamScheduler(ctx, { stateDir: config.stateDir })
 
   ctx.tools.register(defineTool({
     name: 'agent_teams_create',
@@ -289,7 +318,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
       const workspace = workspaceOf(captain)
       const stateRoot = stateRootOf(workspace, config)
       const team = await requireCaptainTeam(workspace, config, captain)
-      return withTeamLock(teamLockKey(stateRoot, team.id), async () => {
+      const created = await withTeamLock(teamLockKey(stateRoot, team.id), async () => {
         const fresh = await requireFreshCaptainTeam(stateRoot, team.id, captain.id)
         const memberName = args.name.trim()
         if (memberName === '') throw new Error('member name must not be empty')
@@ -348,12 +377,14 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
           status: member.status,
         }
       })
+      await scheduler.kickMember(workspace, team.id, created.member_name, captain)
+      return created
     },
   }))
 
   ctx.tools.register(defineTool({
     name: 'agent_teams_remove_member',
-    description: 'Remove a member from your team: interrupts its live turn (best effort) and marks it removed. Its mailbox and past task outputs stay on disk.',
+    description: 'Remove a member safely: revoke its current attempts, return all unfinished owned tasks to the shared pending pool, interrupt its live turn, and mark it removed.',
     parameters: {
       name: { type: 'string', required: true, description: 'Name of the member to remove.' },
     },
@@ -364,11 +395,12 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
         properties: {
           member_name: { type: 'string', required: true },
           status: { type: 'string', required: true },
+          requeued_tasks: { type: 'array', items: { type: 'string' }, required: true },
         },
       },
       render: (args, value) => [{
         type: 'text',
-        text: `Member "${value.member_name}" removed (status ${value.status}).`,
+        text: `Member "${value.member_name}" removed (status ${value.status}); requeued tasks: ${value.requeued_tasks.join(', ') || 'none'}.`,
       }],
     },
     async execute(args, exec) {
@@ -376,18 +408,34 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
       const workspace = workspaceOf(captain)
       const stateRoot = stateRootOf(workspace, config)
       const team = await requireCaptainTeam(workspace, config, captain)
-      return withTeamLock(teamLockKey(stateRoot, team.id), async () => {
+      const revoked = await withTeamLock(teamLockKey(stateRoot, team.id), async () => {
         const fresh = await requireFreshCaptainTeam(stateRoot, team.id, captain.id)
         const member = requireMember(fresh, args.name)
-        if (member.id !== '') interruptMember(ctx, captain, member.id)
+        const requeued: string[] = []
+        for (const task of fresh.tasks) {
+          if (task.assignee !== member.name || task.status === 'completed') continue
+          invalidateTaskAttempt(task)
+          task.reassigning = false
+          requeued.push(task.id)
+        }
         member.status = 'removed'
         await writeTeam(stateRoot, fresh)
         appendTeamEvent(ctx, captainSessionOf(ctx, fresh.captainSessionId, captain.session), 'agent-teams/member-removed', {
           teamId: fresh.id,
           memberId: member.id,
         })
-        return { member_name: member.name, status: member.status }
+        return { member: { ...member }, requeued }
       })
+      if (revoked.member.id !== '') {
+        interruptMember(ctx, captain, revoked.member.id)
+        await waitForMemberIdle(ctx, revoked.member, exec.signal)
+      }
+      await scheduler.kickTeam(workspace, team.id, captain)
+      return {
+        member_name: revoked.member.name,
+        status: revoked.member.status,
+        requeued_tasks: revoked.requeued,
+      }
     },
   }))
 
@@ -425,7 +473,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
       const workspace = workspaceOf(captain)
       const stateRoot = stateRootOf(workspace, config)
       const team = await requireCaptainTeam(workspace, config, captain)
-      return withTeamLock(teamLockKey(stateRoot, team.id), async () => {
+      const created = await withTeamLock(teamLockKey(stateRoot, team.id), async () => {
         const fresh = await requireFreshCaptainTeam(stateRoot, team.id, captain.id)
         const dependencies = args.dependencies ?? []
         for (const dependency of dependencies) {
@@ -441,6 +489,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
           status: 'pending',
           assignee: args.assignee,
           dependencies,
+          attempt: 0,
           createdAt: Date.now(),
           updatedAt: Date.now(),
         }
@@ -461,12 +510,117 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
           ...task.assignee !== undefined ? { assignee: task.assignee } : {},
         }
       })
+      await scheduler.kickTeam(workspace, team.id, captain)
+      return created
+    },
+  }))
+
+  ctx.tools.register(defineTool({
+    name: 'agent_teams_reassign_task',
+    description: 'Atomically retry, reassign, or let the captain take over any unfinished/failed task. The old attempt is revoked before its member is interrupted, so late updates cannot overwrite the new owner. Use assignee="captain" for captain takeover.',
+    parameters: {
+      task_id: { type: 'string', required: true, description: 'Task to retry/reassign.' },
+      assignee: { type: 'string', required: true, description: 'Active member name, or "captain" for captain takeover.' },
+      reason: { type: 'string', description: 'Why the task is being retried or reassigned.' },
+    },
+    output: {
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          task_id: { type: 'string', required: true },
+          previous_assignee: { type: 'string', required: true },
+          assignee: { type: 'string', required: true },
+          status: { type: 'string', required: true },
+          attempt: { type: 'number', required: true },
+          attempt_id: { type: 'string' },
+        },
+      },
+      render: (_args, value) => [{
+        type: 'text',
+        text: `Task ${value.task_id} reassigned ${value.previous_assignee || 'unassigned'} → ${value.assignee} (attempt ${value.attempt}, status ${value.status}${value.attempt_id ? `, attempt_id ${value.attempt_id}` : ''}).`,
+      }],
+    },
+    async execute(args, exec) {
+      const captain = requireCaptain(exec)
+      const workspace = workspaceOf(captain)
+      const stateRoot = stateRootOf(workspace, config)
+      const team = await requireCaptainTeam(workspace, config, captain)
+      const target = args.assignee.trim()
+      if (target === '') throw new Error('reassignment assignee must not be empty')
+
+      const revoked = await withTeamLock(teamLockKey(stateRoot, team.id), async () => {
+        const fresh = await requireFreshCaptainTeam(stateRoot, team.id, captain.id)
+        const task = requireTask(fresh, args.task_id)
+        if (task.status === 'completed') throw new Error(`completed task ${task.id} is immutable and cannot be reassigned`)
+        if (task.reassigning === true) throw new Error(`task ${task.id} is already being reassigned`)
+        const targetMember = target === CAPTAIN_KEY ? undefined : requireMember(fresh, target)
+        if (targetMember !== undefined) {
+          const busy = memberOpenTask(fresh, targetMember.name, task.id)
+          if (busy !== undefined) {
+            throw new Error(`member "${targetMember.name}" is busy with ${busy.id}; finish or reassign it first`)
+          }
+        }
+        const previousAssignee = task.assignee ?? ''
+        const previousMember = (task.status !== 'claimed' && task.status !== 'in_progress')
+          || task.assignee === undefined || task.assignee === CAPTAIN_KEY
+          ? undefined
+          : fresh.members.find(member => member.name === task.assignee && member.status !== 'removed')
+        invalidateTaskAttempt(task, target, true)
+        await writeTeam(stateRoot, fresh)
+        return {
+          previousAssignee,
+          previousMember: previousMember === undefined ? undefined : { ...previousMember },
+          handoffId: task.handoffId,
+        }
+      })
+
+      let quiescenceError: unknown
+      if (revoked.previousMember !== undefined) {
+        interruptMember(ctx, captain, revoked.previousMember.id)
+        try {
+          await waitForMemberIdle(ctx, revoked.previousMember, exec.signal)
+        } catch (error: unknown) {
+          quiescenceError = error
+        }
+      }
+
+      await withTeamLock(teamLockKey(stateRoot, team.id), async () => {
+        const fresh = await requireFreshCaptainTeam(stateRoot, team.id, captain.id)
+        const task = requireTask(fresh, args.task_id)
+        if (task.handoffId !== revoked.handoffId || task.assignee !== target || task.reassigning !== true) {
+          throw new Error(`task ${task.id} changed during reassignment; refusing to overwrite the newer state`)
+        }
+        task.reassigning = false
+        if (quiescenceError === undefined && target === CAPTAIN_KEY) beginTaskAttempt(task, CAPTAIN_KEY)
+        await writeTeam(stateRoot, fresh)
+        appendTeamEvent(ctx, captain.session, 'agent-teams/task-updated', {
+          teamId: fresh.id,
+          taskId: task.id,
+          status: task.status,
+          assignee: task.assignee,
+          ...args.reason === undefined ? {} : { output: `Reassigned: ${args.reason}` },
+        })
+      })
+      if (quiescenceError !== undefined) throw quiescenceError
+      if (target !== CAPTAIN_KEY) await scheduler.kickMember(workspace, team.id, target, captain)
+      const current = await readTeam(stateRoot, team.id)
+      const task = current === undefined ? undefined : requireTask(current, args.task_id)
+      if (task === undefined) throw new Error(`team "${team.name}" ended during reassignment`)
+      return {
+        task_id: task.id,
+        previous_assignee: revoked.previousAssignee,
+        assignee: task.assignee ?? '',
+        status: task.status,
+        attempt: task.attempt ?? 0,
+        ...task.attemptId === undefined ? {} : { attempt_id: task.attemptId },
+      }
     },
   }))
 
   ctx.tools.register(defineTool({
     name: 'agent_teams_claim_task',
-    description: 'Claim a task for a member (or for yourself when you are the member). Blocked while any dependency is unfinished — the error lists the pending dependencies. The captain may claim on behalf of an assignee; a member may only claim tasks assigned to it (or unassigned).',
+    description: 'Claim one ready task for a member (or yourself). A member cannot own a second unfinished task. The returned attempt_id is required for that member\'s updates and becomes stale after retry/reassignment.',
     parameters: {
       task_id: { type: 'string', required: true, description: 'The task id to claim.' },
       assignee: { type: 'string', description: 'Member to claim for (captain only; defaults to the task\'s assignee).' },
@@ -479,11 +633,13 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
           task_id: { type: 'string', required: true },
           status: { type: 'string', required: true },
           assignee: { type: 'string', required: true },
+          attempt: { type: 'number', required: true },
+          attempt_id: { type: 'string' },
         },
       },
       render: (args, value) => [{
         type: 'text',
-        text: `Task ${value.task_id} claimed by ${value.assignee} (status ${value.status}).`,
+        text: `Task ${value.task_id} claimed by ${value.assignee} (attempt ${value.attempt}${value.attempt_id ? `, attempt_id ${value.attempt_id}` : ''}, status ${value.status}).`,
       }],
     },
     async execute(args, exec) {
@@ -494,6 +650,9 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
       return withTeamLock(teamLockKey(stateRoot, team.id), async () => {
         const { team: fresh, identity } = await requireFreshParticipant(stateRoot, team.id, caller.id)
         const task = requireTask(fresh, args.task_id)
+        if (task.reassigning === true) {
+          throw new Error(`task ${task.id} is being reassigned; wait for the handoff to finish`)
+        }
         let assignee = task.assignee
         if (identity.kind === 'captain') {
           if (args.assignee !== undefined) {
@@ -515,7 +674,13 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
           if (assignee === undefined || task.assignee !== assignee) {
             throw new Error(`task ${task.id} is already claimed by "${task.assignee ?? 'nobody'}"`)
           }
-          return { task_id: task.id, status: task.status, assignee }
+          return {
+            task_id: task.id,
+            status: task.status,
+            assignee,
+            attempt: task.attempt ?? 0,
+            ...task.attemptId === undefined ? {} : { attempt_id: task.attemptId },
+          }
         }
         const pending = unsatisfiedDependencies(fresh.tasks, task.dependencies)
         if (pending.length > 0) {
@@ -526,9 +691,11 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
         if (assignee === undefined) {
           throw new Error('claiming an unassigned task needs an assignee (claim on behalf of a member)')
         }
-        task.status = 'claimed'
-        task.assignee = assignee
-        task.updatedAt = Date.now()
+        const busy = memberOpenTask(fresh, assignee, task.id)
+        if (busy !== undefined) {
+          throw new Error(`member "${assignee}" is busy with ${busy.id}; finish or reassign it first`)
+        }
+        const attemptId = beginTaskAttempt(task, assignee)
         await writeTeam(stateRoot, fresh)
         appendTeamEvent(ctx, captainSessionOf(ctx, fresh.captainSessionId, caller.session), 'agent-teams/task-updated', {
           teamId: fresh.id,
@@ -536,14 +703,20 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
           status: task.status,
           assignee: task.assignee,
         })
-        return { task_id: task.id, status: task.status, assignee: task.assignee ?? '' }
+        return {
+          task_id: task.id,
+          status: task.status,
+          assignee: task.assignee ?? '',
+          attempt: task.attempt ?? 0,
+          attempt_id: attemptId,
+        }
       })
     },
   }))
 
   ctx.tools.register(defineTool({
     name: 'agent_teams_update_task',
-    description: 'Update a task\'s status and/or write its output. Transitions: claimed → in_progress → completed|failed|cancelled (pending may also be cancelled). The captain may update any task; a member may only update tasks assigned to it. Set output when completing or failing a task.',
+    description: 'Update a task status/output. Members must supply the current attempt_id returned by claim_task; stale attempts are rejected after takeover/reassignment. Terminal results are immutable. A captain must use reassign_task(assignee="captain") before updating member-owned work.',
     parameters: {
       task_id: { type: 'string', required: true, description: 'The task id to update.' },
       status: {
@@ -552,6 +725,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
         description: 'New status (in_progress, completed, failed, cancelled).',
       },
       output: { type: 'string', description: 'Result summary; set when completing or failing.' },
+      attempt_id: { type: 'string', description: 'Current execution capability returned by claim_task (required for members when present on the task).' },
     },
     output: {
       schema: {
@@ -561,11 +735,13 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
           task_id: { type: 'string', required: true },
           status: { type: 'string', required: true },
           output: { type: 'string' },
+          attempt: { type: 'number', required: true },
+          attempt_id: { type: 'string' },
         },
       },
       render: (args, value) => [{
         type: 'text',
-        text: `Task ${value.task_id} → ${value.status}${value.output !== undefined ? `\nOutput: ${value.output}` : ''}`,
+        text: `Task ${value.task_id} attempt ${value.attempt} → ${value.status}${value.output !== undefined ? `\nOutput: ${value.output}` : ''}`,
       }],
     },
     async execute(args, exec) {
@@ -573,12 +749,34 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
       const workspace = workspaceOf(caller)
       const stateRoot = stateRootOf(workspace, config)
       const team = await requireParticipantTeam(workspace, config, caller)
-      return withTeamLock(teamLockKey(stateRoot, team.id), async () => {
+      const updated = await withTeamLock(teamLockKey(stateRoot, team.id), async () => {
         const { team: fresh, identity } = await requireFreshParticipant(stateRoot, team.id, caller.id)
         const task = requireTask(fresh, args.task_id)
+        if (identity.kind === 'captain'
+          && task.assignee !== undefined
+          && task.assignee !== CAPTAIN_KEY) {
+          throw new Error(`task ${task.id} is owned by member "${task.assignee}"; call agent_teams_reassign_task with assignee="captain" before takeover`)
+        }
         if (identity.kind === 'member') {
           if (task.assignee !== identity.name) {
             throw new Error(`task ${task.id} is assigned to "${task.assignee ?? 'nobody'}", not you`)
+          }
+          if (task.attemptId !== undefined && args.attempt_id !== task.attemptId) {
+            throw new Error(`stale attempt for task ${task.id}: expected the current attempt_id; stop work and request fresh assignment`)
+          }
+        }
+        if (TERMINAL_TASK_STATUSES.includes(task.status)) {
+          const sameStatus = args.status === undefined || args.status === task.status
+          const sameOutput = args.output === undefined || args.output === task.output
+          if (!sameStatus || !sameOutput) {
+            throw new Error(`terminal task ${task.id} is immutable; use agent_teams_reassign_task to retry failed/cancelled work`)
+          }
+          return {
+            task_id: task.id,
+            status: task.status,
+            attempt: task.attempt ?? 0,
+            ...task.attemptId === undefined ? {} : { attempt_id: task.attemptId },
+            ...task.output !== undefined ? { output: task.output } : {},
           }
         }
         if (args.status !== undefined) {
@@ -599,9 +797,13 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
         return {
           task_id: task.id,
           status: task.status,
+          attempt: task.attempt ?? 0,
+          ...task.attemptId === undefined ? {} : { attempt_id: task.attemptId },
           ...task.output !== undefined ? { output: task.output } : {},
         }
       })
+      await scheduler.kickTeam(workspace, team.id, team.captainSessionId === caller.id ? caller : undefined)
+      return updated
     },
   }))
 
@@ -644,7 +846,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
           throw new Error(`agent_teams_send_message: "from" must be your own identity ("${from}"), not "${args.from}"`)
         }
         if (to === CAPTAIN_KEY) {
-          const message = createMessage(from, CAPTAIN_KEY, args.content)
+          const message = { ...createMessage(from, CAPTAIN_KEY, args.content), deliveryClaimedAt: Date.now() }
           await appendMailbox(stateRoot, fresh.id, CAPTAIN_KEY, message)
           appendTeamEvent(ctx, captainSessionOf(ctx, fresh.captainSessionId, caller.session), 'agent-teams/message-sent', {
             teamId: fresh.id,
@@ -657,7 +859,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
           return { kind: 'captain' as const, fresh, identity, message, from }
         }
         const recipient = requireMember(fresh, to)
-        const message = createMessage(from, recipient.name, args.content)
+        const message = { ...createMessage(from, recipient.name, args.content), deliveryClaimedAt: Date.now() }
         await appendMailbox(stateRoot, fresh.id, recipient.name, message)
         appendTeamEvent(ctx, captainSessionOf(ctx, fresh.captainSessionId, caller.session), 'agent-teams/message-sent', {
           teamId: fresh.id,
@@ -678,6 +880,15 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
         if (captain !== undefined && prepared.identity.kind === 'member') {
           delivered = steerCaptainReport(captain, prepared.from, args.content) ? 'live' : 'mailbox'
         }
+        if (delivered === 'live') {
+          await withTeamLock(teamLockKey(stateRoot, prepared.fresh.id), () => (
+            acknowledgeMailbox(stateRoot, prepared.fresh.id, CAPTAIN_KEY, [prepared.message.id])
+          ))
+        } else {
+          await withTeamLock(teamLockKey(stateRoot, prepared.fresh.id), () => (
+            releaseMailboxDelivery(stateRoot, prepared.fresh.id, CAPTAIN_KEY, [prepared.message.id])
+          ))
+        }
         return { message_id: prepared.message.id, from: prepared.from, to: CAPTAIN_KEY, delivered }
       }
       let delivered: 'wake' | 'mailbox' = 'mailbox'
@@ -688,6 +899,16 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
         const text = `AgentTeams state policy: inspect ${config.stateDir}/${prepared.fresh.id}/ read-only; never edit team.json or inbox files directly. Use agent_teams_* tools for team state.\n\n${senderText}`
         const accepted = await deliverToMember(ctx, captain, prepared.recipient.id, text, exec.signal)
         delivered = accepted ? 'wake' : 'mailbox'
+        if (accepted) {
+          await withTeamLock(teamLockKey(stateRoot, prepared.fresh.id), () => (
+            acknowledgeMailbox(stateRoot, prepared.fresh.id, prepared.recipient.name, [prepared.message.id])
+          ))
+        }
+      }
+      if (delivered === 'mailbox') {
+        await withTeamLock(teamLockKey(stateRoot, prepared.fresh.id), () => (
+          releaseMailboxDelivery(stateRoot, prepared.fresh.id, prepared.recipient.name, [prepared.message.id])
+        ))
       }
       return {
         message_id: prepared.message.id,
@@ -711,6 +932,9 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
       const workspace = workspaceOf(caller)
       const stateRoot = stateRootOf(workspace, config)
       const located = await requireParticipantTeam(workspace, config, caller)
+      if (located.captainSessionId === caller.id) {
+        await scheduler.kickTeam(workspace, located.id, caller)
+      }
       const { team, identity } = await withTeamLock(
         teamLockKey(stateRoot, located.id),
         () => requireFreshParticipant(stateRoot, located.id, caller.id),
@@ -733,6 +957,9 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
         status: task.status,
         assignee: task.assignee ?? '',
         dependencies: task.dependencies,
+        attempt: task.attempt ?? 0,
+        attempt_id: task.attemptId ?? '',
+        reassigning: task.reassigning === true,
         ...task.output !== undefined ? { output: task.output } : {},
       }))
       const mailboxWarnings: string[] = []
@@ -744,14 +971,14 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
         }
       }
       const captainInbox = identity.kind === 'captain'
-        ? await readMailbox(stateRoot, team.id, CAPTAIN_KEY, reportMalformed(CAPTAIN_KEY))
+        ? await readUnreadMailbox(stateRoot, team.id, CAPTAIN_KEY, reportMalformed(CAPTAIN_KEY))
         : []
       const memberInboxes: Record<string, { count: number; latest: string }> = {}
       const visibleMembers = identity.kind === 'captain'
         ? members
         : members.filter((member) => member.name === identity.name)
       for (const member of visibleMembers) {
-        const messages = await readMailbox(
+        const messages = await readUnreadMailbox(
           stateRoot,
           team.id,
           member.name,
@@ -764,7 +991,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
           }
         }
       }
-      return {
+      const result = {
         team_id: team.id,
         team_name: team.name,
         description: team.description ?? '',
@@ -780,6 +1007,15 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
         mailbox_warnings: mailboxWarnings,
         mailbox_warning_count: mailboxWarningCount,
       }
+      const acknowledged = identity.kind === 'captain'
+        ? captainInbox.map(message => message.id)
+        : await readUnreadMailbox(stateRoot, team.id, identity.name).then(messages => messages.map(message => message.id))
+      if (acknowledged.length > 0) {
+        await withTeamLock(teamLockKey(stateRoot, team.id), () => (
+          acknowledgeMailbox(stateRoot, team.id, identity.kind === 'captain' ? CAPTAIN_KEY : identity.name, acknowledged)
+        ))
+      }
+      return result
     },
   }))
 
@@ -806,11 +1042,31 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
       const workspace = workspaceOf(captain)
       const stateRoot = stateRootOf(workspace, config)
       const team = await requireCaptainTeam(workspace, config, captain)
+      const members = await withTeamLock(teamLockKey(stateRoot, team.id), async () => {
+        const fresh = await requireFreshCaptainTeam(stateRoot, team.id, captain.id)
+        const active = fresh.members.filter(member => member.status !== 'removed').map(member => ({ ...member }))
+        for (const member of fresh.members) {
+          if (member.status === 'removed') continue
+          member.status = 'removed'
+          for (const task of fresh.tasks) {
+            if (task.assignee === member.name && task.status !== 'completed') invalidateTaskAttempt(task)
+          }
+        }
+        await writeTeam(stateRoot, fresh)
+        return active
+      })
+      for (const member of members) {
+        if (member.id === '') continue
+        interruptMember(ctx, captain, member.id)
+      }
+      const quiescence = await Promise.allSettled(members.map(member => waitForMemberIdle(ctx, member, exec.signal)))
+      for (const result of quiescence) {
+        if (result.status === 'rejected') {
+          ctx.logger.warn(`agent-teams: member did not quiesce cleanly before team archive: ${String(result.reason)}`)
+        }
+      }
       await withTeamLock(teamLockKey(stateRoot, team.id), async () => {
         const fresh = await requireFreshCaptainTeam(stateRoot, team.id, captain.id)
-        for (const member of fresh.members) {
-          if (member.status !== 'removed' && member.id !== '') interruptMember(ctx, captain, member.id)
-        }
         appendTeamEvent(ctx, captainSessionOf(ctx, fresh.captainSessionId, captain.session), 'agent-teams/team-deleted', {
           teamId: fresh.id,
         })
@@ -846,7 +1102,7 @@ function renderStatus(value: JsonValue): string {
       status: string
       activity: string
     }[]
-    tasks: { id: string; subject: string; status: string; assignee: string; dependencies: string[]; output?: string }[]
+    tasks: { id: string; subject: string; status: string; assignee: string; dependencies: string[]; attempt: number; attempt_id: string; reassigning: boolean; output?: string }[]
     captain_inbox: { from: string; content: string }[]
     member_inboxes: Record<string, { count: number; latest: string }>
     mailbox_warnings: string[]
@@ -865,7 +1121,8 @@ function renderStatus(value: JsonValue): string {
     ...team.tasks.map((task) => {
       const deps = task.dependencies.length > 0 ? ` (deps: ${task.dependencies.join(',')})` : ''
       const output = task.output !== undefined ? `\n      output: ${task.output.slice(0, 300)}` : ''
-      return `  - ${task.id} [${task.status}] ${task.subject} → ${task.assignee || 'unassigned'}${deps}${output}`
+      const handoff = task.reassigning ? ' (reassigning)' : ''
+      return `  - ${task.id} [${task.status}] attempt ${task.attempt}${handoff} ${task.subject} → ${task.assignee || 'unassigned'}${deps}${output}`
     }),
     `Captain inbox (${team.captain_inbox.length}):`,
     ...team.captain_inbox.map((message) => `  - [${message.from}] ${message.content.slice(0, 200)}`),

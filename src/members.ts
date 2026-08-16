@@ -27,6 +27,7 @@ const MEMBER_DENIED_TOOLS = [
   'agent_teams_create',
   'agent_teams_add_member',
   'agent_teams_remove_member',
+  'agent_teams_reassign_task',
   'agent_teams_create_task',
   'agent_teams_delete',
 ] as const
@@ -248,12 +249,13 @@ Team context:
 - The captain and your teammates reach you through messages. Each message you receive is a new turn: act on it and end your turn with a concise reply.
 
 Working rules:
-1. When the captain assigns you a task, call agent_teams_claim_task with the task id to claim it, then agent_teams_update_task (status=in_progress) once you start working.
+1. When you receive a task assignment, call agent_teams_claim_task with the task id. Keep the returned attempt_id: include it in every agent_teams_update_task call for that execution attempt. Then mark the task in_progress.
 2. Work thoroughly with your available tools; do not cut corners.
-3. When finished, call agent_teams_update_task with status=completed and a concise \`output\` summarizing what you did and the key results.
+3. When finished, call agent_teams_update_task with the same attempt_id, status=completed, and a concise \`output\` summarizing what you did and the key results. A stale-attempt rejection means the captain reassigned or took over the task; stop touching that task and wait for new work.
 4. Send a short report to the captain with agent_teams_send_message (to=captain) when you complete a task or hit a blocker.
 5. To ask a teammate something, use agent_teams_send_message with to=<teammate name>; the message lands in their mailbox and wakes them directly — teammates talk to each other without the captain in the loop. The same applies to the captain (to=captain).
-6. You are a worker: do not create or delete teams, and do not add or remove members — that is the captain's job.`
+6. After your turn becomes idle, the shared task scheduler may assign your next ready task automatically. Never claim a second task while you still own unfinished work.
+7. You are a worker: do not create or delete teams, reassign tasks, or add/remove members — that is the captain's job.`
 }
 
 /**
@@ -381,9 +383,10 @@ export function interruptMember(ctx: Context, captain: Agent, childId: string): 
 }
 
 /**
- * Snapshot each direct continuable child's activity under the captain's
- * session, keyed by child session id. A member that is currently running its
- * turn reports `running`; an idle member reports `inactive`.
+ * Snapshot each direct continuable child's real driver activity under the
+ * captain's session. `listChildren().activity` is only session residency, so
+ * live children are refined through the Agent registry exactly like Harness's
+ * shipped `list_agents` tool.
  * @param ctx - the plugin context (injects `subagents`).
  * @param captainSessionId - the captain's session id.
  * @returns child id → activity, missing entries are unknown children.
@@ -391,11 +394,13 @@ export function interruptMember(ctx: Context, captain: Agent, childId: string): 
 export async function memberActivity(
   ctx: Context,
   captainSessionId: string,
-): Promise<Map<string, 'running' | 'inactive'>> {
+): Promise<Map<string, 'running' | 'idle' | 'ready'>> {
   const entries = await ctx.subagents.listChildren(brandedSessionId(captainSessionId))
-  const activity = new Map<string, 'running' | 'inactive'>()
+  const activity = new Map<string, 'running' | 'idle' | 'ready'>()
   for (const entry of entries) {
-    if (entry.kind === 'child') activity.set(entry.id, entry.activity)
+    if (entry.kind !== 'child') continue
+    const live = ctx.agents.get(entry.id)
+    activity.set(entry.id, live === undefined ? 'ready' : live.status)
   }
   return activity
 }

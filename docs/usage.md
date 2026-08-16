@@ -8,10 +8,11 @@
 
 | DSH 能力 | AgentTeams 用法 |
 |---|---|
-| `ctx.tools` 注册表 | 注册 9 个 `agent_teams_*` 工具（与 `tool-workflow` 同一注册路径） |
+| `ctx.tools` 注册表 | 注册 10 个 `agent_teams_*` 工具（与 `tool-workflow` 同一注册路径） |
 | `ctx.subagents.startContinuable()` | 创建成员：durable 可续聊子代理，带成员 persona |
 | `ctx.subagents.followup()` | 唤醒收件成员（消息进入其下一轮次） |
-| `ctx.subagents.listChildren()` | 查询成员实时活动（running / inactive） |
+| `ctx.subagents.listChildren()` + `ctx.agents` | 前者发现 durable 成员，后者提供真实 `running / idle / ready` 活动状态 |
+| `agent/status` | 成员进入 idle 后触发共享任务池自动续领与下一轮唤醒 |
 | `ctx.systemPrompt.section()` | 注册"AgentTeams 使用策略"提示段 |
 | Web server 路由注册 | 活动面板数据路由 `/plugins/dsh-agent-teams/state` + 鲸鱼图片静态服务（`webServer`/`httpServer` 双键兼容，见下） |
 | 文件系统 | 团队状态持久化在 `<workspace>/.agent-teams/<teamId>/` |
@@ -38,7 +39,7 @@
     └── <member>.jsonl   # 每个成员一个邮箱（JSONL）
 ```
 
-任务状态机：`pending → claimed → in_progress → completed | failed | cancelled`；迁移白名单校验；领取前校验依赖（未完成依赖报错列出）。
+任务状态机：`pending → claimed → in_progress → completed | failed | cancelled`。每次执行携带单调 `attempt` + 唯一 `attemptId`；转派先使旧 attempt 失效，再中断并等待旧成员安静，因此迟到更新无法覆盖新结果。领取前校验依赖，并禁止成员同时拥有两个未完成任务。
 
 ## 工具一览
 
@@ -46,10 +47,11 @@
 |---|---|
 | `agent_teams_create` | 创建团队，调用者成为队长（一个队长同时只带一个团队） |
 | `agent_teams_add_member` | 拉成员入队（spawn 可续聊子代理 + 成员 persona） |
-| `agent_teams_remove_member` | 移除成员（尽力打断其当前轮次） |
+| `agent_teams_remove_member` | 安全移除成员：撤销 attempt、回收其未完成任务、等待中断收敛后重新调度 |
 | `agent_teams_create_task` | 创建任务，支持 `dependencies` 依赖声明与 `assignee` 指派 |
+| `agent_teams_reassign_task` | 原子重试/转派任务；`assignee=captain` 表示队长安全接管 |
 | `agent_teams_claim_task` | 领取任务（校验依赖；队长可代领，成员只能领自己的/未指派的） |
-| `agent_teams_update_task` | 推进任务状态并写入 `output` 结果 |
+| `agent_teams_update_task` | 携带当前 `attempt_id` 推进任务；拒绝旧 attempt 和终态结果覆盖 |
 | `agent_teams_send_message` | 任意成员→任意成员/队长：消息直达对方邮箱并唤醒对方（无队长转发；拒绝冒名 `from`） |
 | `agent_teams_status` | 团队全景：成员活动、任务清单、队长邮箱、各成员待读消息 |
 | `agent_teams_delete` | 结束团队：打断成员，团队目录**归档保留**（任务与依赖图、邮箱完整留存） |
@@ -74,11 +76,11 @@
 
 ## 使用协议
 
-插件提示段会指导模型按协议执行：建团队 → 按角色拉成员 → 拆任务并声明依赖 → 领取并唤醒成员 → 轮询 `agent_teams_status` 收集产出 → 汇报后 `agent_teams_delete`。成员之间可以直接互发消息（`agent_teams_send_message` 直达对方邮箱并唤醒对方），无需队长中转。
+插件提示段会指导模型按协议执行：建团队 → 按角色拉成员 → 拆任务并声明依赖 → 共享调度器自动领取并唤醒空闲成员 → 队长监控/引导 → 阻塞时先安全转派或接管 → 汇报后 `agent_teams_delete`。成员之间可以直接互发消息，无需队长中转。成员若在中断、异常结束或进程重启后变成 `idle/ready`，但磁盘上仍持有 `claimed/in_progress` 任务，调度器会撤销旧 capability、生成新 attempt 并重新唤醒同一成员。
 
 ## 已知限制
 
-- 成员在收到消息（被唤醒）后才行动，没有常驻轮询；队长离线时消息留在邮箱、待队长下次操作时投递。
+- 调度是事件驱动而非常驻轮询；队长离线时无法冷恢复成员，任务和消息保留在磁盘，待队长恢复或调用状态工具后继续投递。
 - 一个队长同时只能带一个团队（与 Claude Code AgentTeams 一致）。
 - 成员 persona 替换部署默认 persona；成员仍拥有完整工具集（bash/fs/web 等）。
 - 团队状态为文件级持久化，多进程同时操作同一团队不保证一致（同一 dsh 进程内已用锁串行化）。
@@ -88,6 +90,6 @@
 
 ## 验证
 
-- 离线冒烟：`pnpm build && pnpm typecheck && node scripts/verify.mjs`；组合验证 `dsh --profile agent-teams-check --dump-config`
+- 离线与生命周期：`pnpm build && pnpm typecheck && pnpm verify`。除基础检查外，还包含 8 成员、31 节点多层 DAG（运行中扩展至 38 任务）的故障矩阵：并发接管/移除、50 次迟到写入、4 个开放任务冷重启、7 路认领竞争、40 次终态覆盖、42 条消息突发和最终归档；组合验证 `dsh --profile agent-teams-check --dump-config`
 - 真实 e2e：`dsh plugin --profile headless add <path>` 后 `dsh --profile headless "用 AgentTeams …"`，核对 `.agent-teams/` 状态文件与会话日志事件流
 - GUI：独立实例 + ego-browser（详见 `verification-guide.md`）

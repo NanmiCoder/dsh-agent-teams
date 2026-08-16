@@ -29,12 +29,20 @@ export interface TeamTask {
   /** What needs to be done. */
   description?: string
   status: TaskStatus
-  /** Member name the task is assigned to; unassigned tasks await a claim. */
+  /** Member name (or `captain`) the task is assigned to; unassigned tasks await a claim. */
   assignee?: string
   /** Task ids that must reach `completed` before this task can be claimed. */
   dependencies: string[]
   /** The worker's written result, set when the task completes or fails. */
   output?: string
+  /** Monotonic execution generation. Reassignment/retry invalidates every older attempt. */
+  attempt?: number
+  /** Capability for the current claimed/in-progress attempt. Members must present it when updating. */
+  attemptId?: string
+  /** Opaque generation for a revocation/handoff that has not started its next attempt yet. */
+  handoffId?: string
+  /** A handoff is quiescing the old owner; the scheduler must not dispatch it yet. */
+  reassigning?: boolean
   createdAt: number
   updatedAt: number
 }
@@ -69,6 +77,12 @@ export interface TeamMessage {
   to: string
   content: string
   ts: number
+  /** Process-local delivery lease; prevents fallback and direct delivery racing. */
+  deliveryClaimedAt?: number
+  /** Set after the durable message was accepted by the recipient's live Harness inbox. */
+  deliveredAt?: number
+  /** Set once the recipient has consumed or been shown the durable fallback. */
+  readAt?: number
 }
 
 /** The full durable team record. */

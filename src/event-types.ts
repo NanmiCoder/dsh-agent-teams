@@ -49,6 +49,8 @@ export interface AgentTeamsTaskUpdatedData {
   readonly status: string
   readonly assignee?: string
   readonly output?: string
+  readonly attempt?: number
+  readonly attemptId?: string
 }
 
 /** Closes one team record: the team was deleted. */

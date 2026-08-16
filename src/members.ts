@@ -43,11 +43,16 @@ function brandedSessionId(value: string): SessionId {
 
 /** Runtime knobs for member spawning, resolved from plugin config. */
 export interface MemberRuntimeConfig {
-  /** Registered `ctx.subagents` provider name (must support continuable + persona). */
+  /** Registered `ctx.subagents` provider name (must support continuable children). */
   provider: string
   /** Child delegation depth cap (0 forbids delegation entirely). */
   maxDepth?: number
+  /** Where the member protocol is injected. */
+  personaPlacement: MemberPersonaPlacement
 }
+
+/** How a member receives its role and team protocol. */
+export type MemberPersonaPlacement = 'system' | 'prompt'
 
 /** Durable provider/model/reasoning snapshot for one member. */
 export interface MemberLlmSelection {
@@ -259,9 +264,19 @@ Working rules:
 /**
  * The initial user message delivered when the member is created.
  * @param team - the team the member joined.
+ * @param member - the member record named by a prompt-scoped protocol.
+ * @param stateDir - configured state directory used by the member protocol.
+ * @param placement - whether the protocol lives in the system persona or this message.
  */
-export function memberWelcome(team: TeamState): string {
-  return `You have joined the team "${team.name}" as a member. The captain will send you tasks and messages; wait for instructions. Current team status: ${team.tasks.length} task(s), none assigned to you yet.`
+export function memberWelcome(
+  team: TeamState,
+  member: TeamMember,
+  stateDir: string,
+  placement: MemberPersonaPlacement,
+): string {
+  const welcome = `You have joined the team "${team.name}" as a member. The captain will send you tasks and messages; wait for instructions. Current team status: ${team.tasks.length} task(s), none assigned to you yet.`
+  if (placement === 'system') return welcome
+  return `${memberPersona(team, member, stateDir)}\n\n${welcome}`
 }
 
 /**
@@ -301,7 +316,7 @@ export async function spawnMember(
   if (provider.prepareContinuable === undefined) {
     throw new Error(`agent-teams: provider "${config.provider}" does not support continuable members`)
   }
-  if (!provider.capabilities.persona) {
+  if (config.personaPlacement === 'system' && !provider.capabilities.persona) {
     throw new Error(`agent-teams: provider "${config.provider}" cannot apply a member persona`)
   }
   if (!provider.capabilities.toolFilter) {
@@ -313,9 +328,11 @@ export async function spawnMember(
       provider: config.provider,
       label,
       request: {
-        prompt: [{ type: 'text', text: memberWelcome(team) }],
+        prompt: [{ type: 'text', text: memberWelcome(team, member, stateDir, config.personaPlacement) }],
         parent: captain,
-        persona: memberPersona(team, member, stateDir),
+        ...config.personaPlacement === 'system'
+          ? { persona: memberPersona(team, member, stateDir) }
+          : {},
         toolFilter: { deny: [...MEMBER_DENIED_TOOLS] },
         agentOptions: {
           provider: llmSelection.provider,

@@ -90,10 +90,11 @@ Defaults work without extra setup. A trusted profile can override member behavio
     memberProvider: spawn
     memberModel: deepseek-v4
     memberMaxDepth: 1
+    memberPersonaPlacement: system
     maxMembers: 8
 ```
 
-`memberProvider` is the sub-agent runtime backend (`spawn` / `fork`), not an LLM provider. Cross-LLM-provider routing uses the optional `provider` + `model` fields of `agent_teams_add_member`; `memberModel` is only a model default for all members.
+`memberProvider` is the sub-agent runtime backend (`spawn` / `fork`), not an LLM provider. Cross-LLM-provider routing uses the optional `provider` + `model` fields of `agent_teams_add_member`; `memberModel` is only a model default for all members. `memberPersonaPlacement` defaults to `system`, which preserves the original system-level member persona. Set it to `prompt` for trajectory-sensitive presets such as Anchored Standard: the member protocol moves into the initial user message and the child preset's `deployment:persona` remains unchanged.
 
 ## Boundaries
 

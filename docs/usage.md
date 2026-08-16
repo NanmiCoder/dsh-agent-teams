@@ -9,7 +9,7 @@
 | DSH 能力 | AgentTeams 用法 |
 |---|---|
 | `ctx.tools` 注册表 | 注册 9 个 `agent_teams_*` 工具（与 `tool-workflow` 同一注册路径） |
-| `ctx.subagents.startContinuable()` | 创建成员：durable 可续聊子代理，带成员 persona |
+| `ctx.subagents.startContinuable()` | 创建成员：durable 可续聊子代理；成员协议可放在系统 persona 或首条用户消息 |
 | `ctx.subagents.followup()` | 唤醒收件成员（消息进入其下一轮次） |
 | `ctx.subagents.listChildren()` | 查询成员实时活动（running / inactive） |
 | `ctx.systemPrompt.section()` | 注册"AgentTeams 使用策略"提示段 |
@@ -45,7 +45,7 @@
 | 工具 | 作用 |
 |---|---|
 | `agent_teams_create` | 创建团队，调用者成为队长（一个队长同时只带一个团队） |
-| `agent_teams_add_member` | 拉成员入队（spawn 可续聊子代理 + 成员 persona） |
+| `agent_teams_add_member` | 拉成员入队（spawn 可续聊子代理 + 可配置的成员协议注入） |
 | `agent_teams_remove_member` | 移除成员（尽力打断其当前轮次） |
 | `agent_teams_create_task` | 创建任务，支持 `dependencies` 依赖声明与 `assignee` 指派 |
 | `agent_teams_claim_task` | 领取任务（校验依赖；队长可代领，成员只能领自己的/未指派的） |
@@ -67,10 +67,13 @@
     memberProvider: spawn         # 子代理运行后端（spawn / fork），不是 LLM provider
     memberModel: deepseek-v4      # 可选：成员模型覆盖
     memberMaxDepth: 1             # 成员再委派深度上限（0 = 禁止）
+    memberPersonaPlacement: system # system（默认）或 prompt
     maxMembers: 8                 # 团队人数上限
 ```
 
 最终优先级为：成员显式 `provider` + `model` / `model` → `memberModel` → 队长当前路由。思考强度默认继承队长当前值，并在目标 provider/model 上创建前校验；不兼容时成员创建会明确失败。最终生效的 provider/model/思考强度会写入 `team.json`，供状态查询和成员冷恢复使用。
+
+`memberPersonaPlacement: system` 保持原行为：成员协议作为 scoped persona 覆盖部署 persona。`prompt` 将同一份成员协议放进首条用户消息，不发送子 Agent `request.persona`，因此 Anchored Standard、梁神模式等依赖精确首轮系统提示的 preset 可以原样完成轨迹锚定；协议仍随会话历史持久化并参与续聊。
 
 ## 使用协议
 
@@ -80,7 +83,7 @@
 
 - 成员在收到消息（被唤醒）后才行动，没有常驻轮询；队长离线时消息留在邮箱、待队长下次操作时投递。
 - 一个队长同时只能带一个团队（与 Claude Code AgentTeams 一致）。
-- 成员 persona 替换部署默认 persona；成员仍拥有完整工具集（bash/fs/web 等）。
+- `memberPersonaPlacement: system` 会替换部署默认 persona；`prompt` 会保留 preset persona，并把成员协议持久化在首条用户消息中。成员仍拥有完整工具集（bash/fs/web 等）。
 - 团队状态为文件级持久化，多进程同时操作同一团队不保证一致（同一 dsh 进程内已用锁串行化）。
 - 活动面板读磁盘真相（1s 轮询），与会话日志事件流相互独立。
 - 右上角浮层通过 body portal 挂载；宽屏展开时主对话列平滑向左礼让空间，窄屏退回 overlay 模式，左侧导航保持不动。

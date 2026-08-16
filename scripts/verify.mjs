@@ -441,6 +441,46 @@ check(
     && spawnMemberRecord.id === 'spawned-member',
 )
 
+let inheritedPersonaStartSpec
+let inheritedPersonaSpawned = false
+try {
+  await spawnMember(
+    {
+      subagents: {
+        getProvider: () => ({
+          prepareContinuable: () => undefined,
+          capabilities: { persona: false, toolFilter: true },
+        }),
+        list: () => ['spawn'],
+        startContinuable: async (spec) => {
+          inheritedPersonaStartSpec = spec
+          return { childId: 'inherited-persona-member', messageId: 'welcome-message' }
+        },
+      },
+    },
+    { provider: 'spawn', maxDepth: 1, personaPlacement: 'prompt' },
+    {
+      withPending: async (_parentId, _label, _selection, operation) => operation(),
+    },
+    overriddenSelection,
+    captain,
+    spawnTeam,
+    { ...spawnMemberRecord, id: '', name: 'anchored-worker' },
+    '.agent-teams',
+    new AbortController().signal,
+  )
+  inheritedPersonaSpawned = true
+} catch {
+  inheritedPersonaSpawned = false
+}
+check(
+  'prompt persona placement preserves the child preset and moves member protocol into the initial message',
+  inheritedPersonaSpawned
+    && inheritedPersonaStartSpec?.request?.persona === undefined
+    && inheritedPersonaStartSpec?.request?.prompt?.[0]?.text.includes('You are anchored-worker')
+    && inheritedPersonaStartSpec?.request?.prompt?.[0]?.text.includes('wait for instructions'),
+)
+
 function descriptorEvent(label, agentProvider = 'descriptor-provider', agentModel = 'descriptor-model') {
   return {
     type: 'subagent/descriptor',

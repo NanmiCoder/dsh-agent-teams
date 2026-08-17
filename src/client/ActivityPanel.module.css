@@ -152,6 +152,27 @@
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+/* Embedded mode: rendered inside a Better Sidebar tab instead of the
+   body-portal floater, so the shell fills the tab instead of floating
+   over the page. */
+.panel.embedded {
+  position: static;
+  top: auto;
+  right: auto;
+  z-index: auto;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  max-height: none;
+  overflow: auto;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  backdrop-filter: none;
+  box-shadow: none;
+  animation: none;
+}
+
 @keyframes agentTeamsPulse {
   0%, 100% { opacity: 0.42; }
   50% { opacity: 1; }

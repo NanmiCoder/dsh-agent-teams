@@ -59,6 +59,9 @@ importers:
       '@types/react-dom':
         specifier: ^18.3.7
         version: 18.3.7(@types/react@18.3.31)
+      dsh-better-sidebar:
+        specifier: ^0.12.3
+        version: 0.12.3(64bc451ca69292ce23067a770280050a)
       lightningcss:
         specifier: ^1.33.0
         version: 1.33.0
@@ -106,6 +109,72 @@ packages:
   '@babel/types@8.0.4':
     resolution: {integrity: sha512-eY+Yn3dCqTGmyiq2QRU66lA5FL8lqqqvecHt0fF3uHONIa7ToYsaCiWV8lOKqAs0Rb2SjixiKFROngnulPtt2g==}
     engines: {node: ^22.18.0 || >=24.11.0}
+
+  '@codemirror/autocomplete@6.20.3':
+    resolution: {integrity: sha512-tlosUqb+3BbxCxZdu4tKeRghPFC+QM7q4X5YhKV2eCmPG+1r2F3f4AaSz5sCrFqUtX4Jh20VFTKecl16MgiV9g==}
+
+  '@codemirror/commands@6.11.0':
+    resolution: {integrity: sha512-/K4Rl5BN0OtTiPWmJCdqODu38XnDMsDxKY5rgrPnCkutPTJf2wVbkoixLfealF5Kwse/s8P8M5jAiURiwSwnFA==}
+
+  '@codemirror/lang-cpp@6.0.3':
+    resolution: {integrity: sha512-URM26M3vunFFn9/sm6rzqrBzDgfWuDixp85uTY49wKudToc2jTHUrKIGGKs+QWND+YLofNNZpxcNGRynFJfvgA==}
+
+  '@codemirror/lang-css@6.3.1':
+    resolution: {integrity: sha512-kr5fwBGiGtmz6l0LSJIbno9QrifNMUusivHbnA1H6Dmqy4HZFte3UAICix1VuKo0lMPKQr2rqB+0BkKi/S3Ejg==}
+
+  '@codemirror/lang-go@6.0.1':
+    resolution: {integrity: sha512-7fNvbyNylvqCphW9HD6WFnRpcDjr+KXX/FgqXy5H5ZS0eC5edDljukm/yNgYkwTsgp2busdod50AOTIy6Jikfg==}
+
+  '@codemirror/lang-html@6.4.12':
+    resolution: {integrity: sha512-pw2ReWKUqSkbvh76RAT4NYxiogRu+PWkR2ukAwO9uOgrm8uipkzjtKKtNpyeAQwHOqxEeSvAXZ6vr3AfyB9y/w==}
+
+  '@codemirror/lang-java@6.0.2':
+    resolution: {integrity: sha512-m5Nt1mQ/cznJY7tMfQTJchmrjdjQ71IDs+55d1GAa8DGaB8JXWsVCkVT284C3RTASaY43YknrK2X3hPO/J3MOQ==}
+
+  '@codemirror/lang-javascript@6.2.5':
+    resolution: {integrity: sha512-zD4e5mS+50htS7F+TYjBPsiIFGanfVqg4HyUz6WNFikgOPf2BgKlx+TQedI1w6n/IqRBVBbBWmGFdLB/7uxO4A==}
+
+  '@codemirror/lang-json@6.0.2':
+    resolution: {integrity: sha512-x2OtO+AvwEHrEwR0FyyPtfDUiloG3rnVTSZV1W8UteaLL8/MajQd8DpvUb2YVzC+/T18aSDv0H9mu+xw0EStoQ==}
+
+  '@codemirror/lang-markdown@6.5.2':
+    resolution: {integrity: sha512-AwBOdkWYuA//WcM0xO5PfHPUcmz/O2i5o0Nsg1U69SII/loCJlFI1Romd9xp2HYb1kYJRGZotyqRghuHH5n8Kw==}
+
+  '@codemirror/lang-php@6.0.2':
+    resolution: {integrity: sha512-ZKy2v1n8Fc8oEXj0Th0PUMXzQJ0AIR6TaZU+PbDHExFwdu+guzOA4jmCHS1Nz4vbFezwD7LyBdDnddSJeScMCA==}
+
+  '@codemirror/lang-python@6.2.1':
+    resolution: {integrity: sha512-IRjC8RUBhn9mGR9ywecNhB51yePWCGgvHfY1lWN/Mrp3cKuHr0isDKia+9HnvhiWNnMpbGhWrkhuWOc09exRyw==}
+
+  '@codemirror/lang-rust@6.0.2':
+    resolution: {integrity: sha512-EZaGjCUegtiU7kSMvOfEZpaCReowEf3yNidYu7+vfuGTm9ow4mthAparY5hisJqOHmJowVH3Upu+eJlUji6qqA==}
+
+  '@codemirror/lang-sql@6.10.0':
+    resolution: {integrity: sha512-6ayPkEd/yRw0XKBx5uAiToSgGECo/GY2NoJIHXIIQh1EVwLuKoU8BP/qK0qH5NLXAbtJRLuT73hx7P9X34iO4w==}
+
+  '@codemirror/lang-xml@6.1.0':
+    resolution: {integrity: sha512-3z0blhicHLfwi2UgkZYRPioSgVTo9PV5GP5ducFH6FaHy0IAJRg+ixj5gTR1gnT/glAIC8xv4w2VL1LoZfs+Jg==}
+
+  '@codemirror/lang-yaml@6.1.3':
+    resolution: {integrity: sha512-AZ8DJBuXGVHybpBQhmZtgew5//4hv3tdkXnr3vDmOUMJRuB6vn/uuwtmTOTlqEaQFg3hQSVeA90NmvIQyUV6FQ==}
+
+  '@codemirror/language@6.12.4':
+    resolution: {integrity: sha512-1q4PaT+o6PbgpkJt4Q8Fv5XJxTy4FUZ4MWETtyiDw3J0Pyr9E2vqcKL+k9wcvjNTIsauxvE7OfmWj3FRPHQ76A==}
+
+  '@codemirror/legacy-modes@6.5.3':
+    resolution: {integrity: sha512-xCsmIzH78MyWkib9jlPaaun57XNkfbMIhagfaZVd0iLTqlpw3jXaIcbZm72MTmmn64eTZpBVNjbyYh+QXnxRsg==}
+
+  '@codemirror/lint@6.9.7':
+    resolution: {integrity: sha512-28/+iWLYxKxsvGYhSYL7zaCZqLz5+FFFDq9tVsvGv9kv8RY4fFAchJ5WX9M3YrrRlTIsECjsXPqeNgnSmNP2dg==}
+
+  '@codemirror/search@6.7.1':
+    resolution: {integrity: sha512-uMe5UO6PamJtSHrXhhHOzSX3ReWtiJrva6GnPMwSOrZtiExb5X5eExhr2OUZQVvdxPsKpY3Ro2mFbQadpPWmHA==}
+
+  '@codemirror/state@6.7.1':
+    resolution: {integrity: sha512-9QzNDgE4EYDnAHfrTlR2lwiPciiOymLtwKK+8yHQzCc7GXhAP9xdEbEJFy2IWB1j9UGUl9BsgMmTo/ImA02T7A==}
+
+  '@codemirror/view@6.43.9':
+    resolution: {integrity: sha512-sTuUzTpPMFebRhg6dawChoKKgndIwfjmJgKVxBefPElcU2NwQ6AFroupk0SFqEerQyZOGRfDNnSN8Dw/lMAsXw==}
 
   '@deepseek-ai/cordis-plugin-include@1.0.6':
     resolution: {integrity: sha512-i1VXrZCbv6tk/iUgedCNjrxxArbWT3IvRZGB5sdqJ3ectnihivXXQbRZ8JJ73DSmAPvlMGmrbtjFAfm10yvXRg==}
@@ -317,6 +386,12 @@ packages:
 
   '@deepseek-ai/dsh-client-ui-slots@0.1.0-rc.6':
     resolution: {integrity: sha512-F4VZA60bMRi4DAbZvNipM4E/Jl01QC0cQCPpeIEIh1/lq/y/bpc7IqujtzWESHPe3qSljTURip3hkANfsYs3UA==}
+    peerDependencies:
+      '@deepseek-ai/cordis': ^4.0.1
+      '@deepseek-ai/dsh-invariants': ^0.1.0-rc.6
+
+  '@deepseek-ai/dsh-client-web-react@0.1.0-rc.6':
+    resolution: {integrity: sha512-2PAnRsZzokVr/nCcwX87axdxzobQYp76xzX70vYSqghlDab1phsIdgDSm1JxpszN9G3ETBMTLPM9xz30iodqYQ==}
     peerDependencies:
       '@deepseek-ai/cordis': ^4.0.1
       '@deepseek-ai/dsh-invariants': ^0.1.0-rc.6
@@ -714,6 +789,57 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
+  '@lezer/common@1.5.2':
+    resolution: {integrity: sha512-sxQE460fPZyU3sdc8lafxiPwJHBzZRy/udNFynGQky1SePYBdhkBl1kOagA9uT3pxR8K09bOrmTUqA9wb/PjSQ==}
+
+  '@lezer/cpp@1.1.6':
+    resolution: {integrity: sha512-vh9gWWJOXFVY8HBHK3Twzq8MgwG2iN4GSyzBP9sCGTe37P15x2R14VaBQk0VA0ezTRN1KHYBBsHhvpGZ2Xy/pA==}
+
+  '@lezer/css@1.3.6':
+    resolution: {integrity: sha512-YJE78Wcg+zX8f10hiHWQ4Az48Qr/c13eId0VtRQYLBpxHDmDeSrXIlkbl+fJGW42rWC/uoUco9mhBZeVWP/A1g==}
+
+  '@lezer/go@1.0.1':
+    resolution: {integrity: sha512-xToRsYxwsgJNHTgNdStpcvmbVuKxTapV0dM0wey1geMMRc9aggoVyKgzYp41D2/vVOx+Ii4hmE206kvxIXBVXQ==}
+
+  '@lezer/highlight@1.2.3':
+    resolution: {integrity: sha512-qXdH7UqTvGfdVBINrgKhDsVTJTxactNNxLk7+UMwZhU13lMHaOBlJe9Vqp907ya56Y3+ed2tlqzys7jDkTmW0g==}
+
+  '@lezer/html@1.3.13':
+    resolution: {integrity: sha512-oI7n6NJml729m7pjm9lvLvmXbdoMoi2f+1pwSDJkl9d68zGr7a9Btz8NdHTGQZtW2DA25ybeuv/SyDb9D5tseg==}
+
+  '@lezer/java@1.1.3':
+    resolution: {integrity: sha512-yHquUfujwg6Yu4Fd1GNHCvidIvJwi/1Xu2DaKl/pfWIA2c1oXkVvawH3NyXhCaFx4OdlYBVX5wvz2f7Aoa/4Xw==}
+
+  '@lezer/javascript@1.5.4':
+    resolution: {integrity: sha512-vvYx3MhWqeZtGPwDStM2dwgljd5smolYD2lR2UyFcHfxbBQebqx8yjmFmxtJ/E6nN6u1D9srOiVWm3Rb4tmcUA==}
+
+  '@lezer/json@1.0.3':
+    resolution: {integrity: sha512-BP9KzdF9Y35PDpv04r0VeSTKDeox5vVr3efE7eBbx3r4s3oNLfunchejZhjArmeieBH+nVOpgIiBJpEAv8ilqQ==}
+
+  '@lezer/lr@1.4.10':
+    resolution: {integrity: sha512-rnCpTIBafOx4mRp43xOxDJbFipJm/c0cia/V5TiGlhmMa+wsSdoGmUN3w5Bqrks/09Q/D4tNAmWaT8p6NRi77A==}
+
+  '@lezer/markdown@1.7.2':
+    resolution: {integrity: sha512-iTkYvoVcKt3WkeL7qUDyXHONZEwLio4wj8KTNi2dnjQEXBZKMV63BpQrPqfsM+OkvuRbiSTAcycYAsQzLhRNoQ==}
+
+  '@lezer/php@1.0.5':
+    resolution: {integrity: sha512-W7asp9DhM6q0W6DYNwIkLSKOvxlXRrif+UXBMxzsJUuqmhE7oVU+gS3THO4S/Puh7Xzgm858UNaFi6dxTP8dJA==}
+
+  '@lezer/python@1.1.19':
+    resolution: {integrity: sha512-MhQIURHRytsNzP/YXnqpYKW6la6voAH3kyplTOOiCdjyFY6cWWGFVmYVdHIPrElqSDf4iCDktQCockB9FxuhzQ==}
+
+  '@lezer/rust@1.0.2':
+    resolution: {integrity: sha512-Lz5sIPBdF2FUXcWeCu1//ojFAZqzTQNRga0aYv6dYXqJqPfMdCAI0NzajWUd4Xijj1IKJLtjoXRPMvTKWBcqKg==}
+
+  '@lezer/xml@1.0.6':
+    resolution: {integrity: sha512-CdDwirL0OEaStFue/66ZmFSeppuL6Dwjlk8qk153mSQwiSH/Dlri4GNymrNWnUmPl2Um7QfV1FO9KFUyX3Twww==}
+
+  '@lezer/yaml@1.0.4':
+    resolution: {integrity: sha512-2lrrHqxalACEbxIbsjhqGpSW8kWpUKuY6RHgnSAFZa6qK62wvnPxA8hGOwOoDbwHcOFs5M4o27mjGu+P7TvBmw==}
+
+  '@marijn/find-cluster-break@1.0.3':
+    resolution: {integrity: sha512-FY+MKLBoTsLNJF/eLWaOsXGdz6uh3Iu1axjPf6TUq92IYumcTcXWHoS747JARLkcdlJ/Waiaxc5wQfFO8jC6NA==}
+
   '@napi-rs/wasm-runtime@1.2.2':
     resolution: {integrity: sha512-JfB4kuJQjaoHuCTseIINHtHWeJnvgEcxjwA5t/Y00ZgaOO1Crz3fjT/p8kT28zA/Caz7oiUMn3d6H2yOVCVwuw==}
     engines: {node: ^20.19.0 || ^22.13.0 || >=23.5.0}
@@ -762,42 +888,36 @@ packages:
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [arm64]
     os: [linux]
-    libc: [glibc]
 
   '@rolldown/binding-linux-arm64-musl@1.1.5':
     resolution: {integrity: sha512-lAryqH7IteztmCXQXk0etKj4wBQ7Gx5S6LjKhsgp9zb8I5bsuvU/2llH1hDQcjsFeqIsovMVN339/8pUDDBXxA==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [arm64]
     os: [linux]
-    libc: [musl]
 
   '@rolldown/binding-linux-ppc64-gnu@1.1.5':
     resolution: {integrity: sha512-fsK/sNBnxzBlL4O1JNrZakVQxPspqpED5dLtNsZS9oOKmtSpdNIzxH2kkol5HYTWJN47sE20ztMJPxfZ89qGOg==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [ppc64]
     os: [linux]
-    libc: [glibc]
 
   '@rolldown/binding-linux-s390x-gnu@1.1.5':
     resolution: {integrity: sha512-gLYb4BIadlfTOYT5gO503n8zQjXflgzpD0FcyKh0Mzx3rqCZKnHoJWV9xe1KXUJ5lx2JfcSHr/mhzS0PC/McAA==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [s390x]
     os: [linux]
-    libc: [glibc]
 
   '@rolldown/binding-linux-x64-gnu@1.1.5':
     resolution: {integrity: sha512-FjcpEKUyJygHgs1o50VYNvkt5+7Le/VEdYt0AkRpkL33MnyQfwr8l5mXwMmfmTbyMPr5vJLC+8/Gd9gXnwU1QQ==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [x64]
     os: [linux]
-    libc: [glibc]
 
   '@rolldown/binding-linux-x64-musl@1.1.5':
     resolution: {integrity: sha512-Me+PfPI2TMeOQk0gYWfLQZtTktrmzbr8cDboqX83XKc7UrgAi55gF+2dUkWdxd19n55Essp2yeca+O9N5rBxHg==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [x64]
     os: [linux]
-    libc: [musl]
 
   '@rolldown/binding-openharmony-arm64@1.1.5':
     resolution: {integrity: sha512-yc5WrLzXks6zCQfn9Oxr8pORKyl/pF+QjHmW/Qx3qu0oyrrNC+y2JLTU1E2rcWYAmzlnqngWXHQjy51VzW70Vw==}
@@ -947,6 +1067,12 @@ packages:
     resolution: {integrity: sha512-OkTL9umf+He2DZkUq8f8J9of7yL6RJKI24dVITBmNfZBmri9zYZQrKkuXiKhyfPSu8tUhnVBB1iKXevvnlR4Ww==}
     engines: {node: '>= 12'}
 
+  cosmokit@1.8.1:
+    resolution: {integrity: sha512-PDBv4l90xZKrUsZ0vtoycgZpO/j4iFsqJXrAxsyBDsnQRI7ZMJXIjgDJsKNjd5L8jnVnnlrDCdhkFbTncgCVjQ==}
+
+  crelt@1.0.7:
+    resolution: {integrity: sha512-aK6BbWfhf4U/wCcLHKPJl/xa6VkVstRaPywWtMKGwuOLc/wZTyQYuoxgvZnNsBvv7Kg3YTBQYYBCggcviQczuA==}
+
   csstype@3.2.3:
     resolution: {integrity: sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==}
 
@@ -975,6 +1101,33 @@ packages:
 
   devlop@1.1.0:
     resolution: {integrity: sha512-RWmIqhcFf1lRYBvNmr7qTNuyCt/7/ns2jbpp1+PalgE/rDQcBT0fioSMUpJ93irlUhC5hrg4cYqe6U+0ImW0rA==}
+
+  dsh-better-sidebar@0.12.3:
+    resolution: {integrity: sha512-ui+ouxw81TOZxZOZI41EuGcqXSzmkmT0bQmzt5hQl9lRqnKN5nIKJ/Qtm8h3nbBL7wU+c3tR1N57Vm4C+zN/LQ==}
+    engines: {node: '>=20'}
+    peerDependencies:
+      '@deepseek-ai/cordis': ^4.0.1
+      '@deepseek-ai/dsh-agent': ^0.1.0-rc.6
+      '@deepseek-ai/dsh-client-locale': ^0.1.0-rc.6
+      '@deepseek-ai/dsh-client-runtime': ^0.1.0-rc.6
+      '@deepseek-ai/dsh-client-schema-form': ^0.1.0-rc.6
+      '@deepseek-ai/dsh-client-ui-conversation': ^0.1.0-rc.6
+      '@deepseek-ai/dsh-client-ui-primitives': ^0.1.0-rc.6
+      '@deepseek-ai/dsh-client-ui-settings': ^0.1.0-rc.6
+      '@deepseek-ai/dsh-client-ui-slots': ^0.1.0-rc.6
+      '@deepseek-ai/dsh-client-web-react': ^0.1.0-rc.6
+      '@deepseek-ai/dsh-host-webserver': ^0.1.0-rc.6
+      '@deepseek-ai/dsh-invariants': ^0.1.0-rc.6
+      '@deepseek-ai/dsh-llm': ^0.1.0-rc.6
+      '@deepseek-ai/dsh-session': ^0.1.0-rc.6
+      '@deepseek-ai/dsh-settings': ^0.1.0-rc.6
+      '@deepseek-ai/dsh-tools': ^0.1.0-rc.6
+      cordis: ^4.0.0-rc.7
+      react: ^18.2.0
+      react-dom: ^18.2.0
+    peerDependenciesMeta:
+      cordis:
+        optional: true
 
   dts-resolver@3.0.0:
     resolution: {integrity: sha512-1T1f+z+4tl9XD+m+0HBgWoL/nm0bOIffyWaUuUSBlFg/86IWvfx+wjNaO/ybU0AJzG9/Mi5hBUgGV6zCmWEN7Q==}
@@ -1082,28 +1235,24 @@ packages:
     engines: {node: '>= 12.0.0'}
     cpu: [arm64]
     os: [linux]
-    libc: [glibc]
 
   lightningcss-linux-arm64-musl@1.33.0:
     resolution: {integrity: sha512-yiO5ROMuYQgXbC60yjZU5CYSFZGKXL0HFATXt9mHJn1+zW55oCtMI9NfcVhYLMFDL7gV7oBPon/EmMMGg2OvtQ==}
     engines: {node: '>= 12.0.0'}
     cpu: [arm64]
     os: [linux]
-    libc: [musl]
 
   lightningcss-linux-x64-gnu@1.33.0:
     resolution: {integrity: sha512-ar+Ju7LmcN0Jo4FpL4hpFybwNG9/3A/Br5KW2n2jyODg3MEZXaDYADdemoNS+BDNfMgKvylJLj4S5tyRActuAg==}
     engines: {node: '>= 12.0.0'}
     cpu: [x64]
     os: [linux]
-    libc: [glibc]
 
   lightningcss-linux-x64-musl@1.33.0:
     resolution: {integrity: sha512-RYiYbkokw0trfKqqzfF55lginwEPrD3OJDfTuJzFs1MK6iFnDenaz1fqLLtX4ITG3OktJQXOeTaw1awrBAlZPw==}
     engines: {node: '>= 12.0.0'}
     cpu: [x64]
     os: [linux]
-    libc: [musl]
 
   lightningcss-win32-arm64-msvc@1.33.0:
     resolution: {integrity: sha512-1K+MPfLSFVpphzpdbfkhlWk6wBrTObBzS2T6db10PNOZgR9GoVsAWzwNyuhUYYbTp23j+4RrncfujZ4uAzXvwA==}
@@ -1260,6 +1409,12 @@ packages:
   ms@2.1.3:
     resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==}
 
+  node-addon-api@7.1.1:
+    resolution: {integrity: sha512-5m3bsyrjFWE1xf7nz7YXdN4udnVtXK6/Yfgn5qnahL6bCkf2yKt4k3nuTKAtT4r3IG8JNR2ncsIMdZuAzJjHQQ==}
+
+  node-pty@1.1.0:
+    resolution: {integrity: sha512-20JqtutY6JPXTUnL0ij1uad7Qe1baT46lyolh2sSENDd4sTzKZ4nmAFkeAARDKwmlLjPx6XKRlwRUxwjOy+lUg==}
+
   obug@2.1.4:
     resolution: {integrity: sha512-4a+OsYv9UktOJKE+l1A4OufDgdRF9PifWj+tJnHURo/P+WOxpG4GzUFL9qCalmWauao6ogiG+QvnCovwPoyAWA==}
     engines: {node: '>=12.20.0'}
@@ -1328,8 +1483,14 @@ packages:
     engines: {node: ^20.19.0 || >=22.12.0}
     hasBin: true
 
+  rxjs@7.8.2:
+    resolution: {integrity: sha512-dhKf903U/PQZY6boNNtAGdWbG85WAbjT/1xYoZIC7FAY0yWapOBQVsVrDl58W86//e1VpMNBtRV4MaXfdMySFA==}
+
   scheduler@0.23.2:
     resolution: {integrity: sha512-UOShsPwz7NrMUqhR6t0hWjFduvOzbtv7toDH1/hIrfRNIDBnnBWd0CwJTGvTpngVlmwGCdP9/Zl/tVrDqcuYzQ==}
+
+  schemastery@3.18.0:
+    resolution: {integrity: sha512-Jw2uxjoyyqc/yeurmChUEc/jbi8GsrdXV/KmqRUDZXJAXAmrJiPsz8vKa17l/VckyzljHZ9oGaul443CQiXxtA==}
 
   semver@7.8.5:
     resolution: {integrity: sha512-Y7/KDsb8LjooZpwaqGyulO6DQlksgCncchHGk+sZIY4SBvUocMBEFH5Ur1fI4dV+Jvl0w6cjvucaIi40puRioA==}
@@ -1345,6 +1506,9 @@ packages:
 
   stringify-entities@4.0.4:
     resolution: {integrity: sha512-IwfBptatlO+QCJUo19AqvrPNqlVMpW9YEL2LIVY+Rpv2qsjCGxaDLNRgeGsQWJhfItebuJhsGSLjaBbNSQ+ieg==}
+
+  style-mod@4.1.3:
+    resolution: {integrity: sha512-i/n8VsZydrugj3Iuzll8+x/00GH2vnYsk1eomD8QiRrSAeW6ItbCQDtfXCeJHd0iwiNagqjQkvpvREEPtW3IoQ==}
 
   tinyexec@1.3.0:
     resolution: {integrity: sha512-QKAl9m8gWWGHV8jZcPeym6j+XULi6tOf1mT83WYJ4Lk2ytW/uwAWkrP0uFsdoYMdueVJ0qs26wZ+23xeB4ibNQ==}
@@ -1438,6 +1602,9 @@ packages:
   vfile@6.0.3:
     resolution: {integrity: sha512-KzIbH/9tXat2u30jf+smMwFCsno4wHVdNmzFyL+T/L3UGqqk6JKfVqOFOZEpZSHADH1k40ab6NUIXZq422ov3Q==}
 
+  w3c-keyname@2.2.8:
+    resolution: {integrity: sha512-dpojBhNsCNN7T82Tm7k26A6G9ML3NkhDsnw9n/eoxSRlVBB4CEtIQ/KTCLI2Fwf3ataSXRhYFkQi3SlnFwPvPQ==}
+
   ws@8.21.3:
     resolution: {integrity: sha512-201TZ/kPWxoPr/OKWjquZR1SWKXcvxdH+e1xrx89b3YbmzLMFCLfnaG1HFIgWzJOEWZ7MvpK++odZufgYR50Rw==}
     engines: {node: '>=10.0.0'}
@@ -1500,6 +1667,168 @@ snapshots:
     dependencies:
       '@babel/helper-string-parser': 8.0.0
       '@babel/helper-validator-identifier': 8.0.4
+
+  '@codemirror/autocomplete@6.20.3':
+    dependencies:
+      '@codemirror/language': 6.12.4
+      '@codemirror/state': 6.7.1
+      '@codemirror/view': 6.43.9
+      '@lezer/common': 1.5.2
+
+  '@codemirror/commands@6.11.0':
+    dependencies:
+      '@codemirror/language': 6.12.4
+      '@codemirror/state': 6.7.1
+      '@codemirror/view': 6.43.9
+      '@lezer/common': 1.5.2
+
+  '@codemirror/lang-cpp@6.0.3':
+    dependencies:
+      '@codemirror/language': 6.12.4
+      '@lezer/cpp': 1.1.6
+
+  '@codemirror/lang-css@6.3.1':
+    dependencies:
+      '@codemirror/autocomplete': 6.20.3
+      '@codemirror/language': 6.12.4
+      '@codemirror/state': 6.7.1
+      '@lezer/common': 1.5.2
+      '@lezer/css': 1.3.6
+
+  '@codemirror/lang-go@6.0.1':
+    dependencies:
+      '@codemirror/autocomplete': 6.20.3
+      '@codemirror/language': 6.12.4
+      '@codemirror/state': 6.7.1
+      '@lezer/common': 1.5.2
+      '@lezer/go': 1.0.1
+
+  '@codemirror/lang-html@6.4.12':
+    dependencies:
+      '@codemirror/autocomplete': 6.20.3
+      '@codemirror/lang-css': 6.3.1
+      '@codemirror/lang-javascript': 6.2.5
+      '@codemirror/language': 6.12.4
+      '@codemirror/state': 6.7.1
+      '@codemirror/view': 6.43.9
+      '@lezer/common': 1.5.2
+      '@lezer/css': 1.3.6
+      '@lezer/html': 1.3.13
+
+  '@codemirror/lang-java@6.0.2':
+    dependencies:
+      '@codemirror/language': 6.12.4
+      '@lezer/java': 1.1.3
+
+  '@codemirror/lang-javascript@6.2.5':
+    dependencies:
+      '@codemirror/autocomplete': 6.20.3
+      '@codemirror/language': 6.12.4
+      '@codemirror/lint': 6.9.7
+      '@codemirror/state': 6.7.1
+      '@codemirror/view': 6.43.9
+      '@lezer/common': 1.5.2
+      '@lezer/javascript': 1.5.4
+
+  '@codemirror/lang-json@6.0.2':
+    dependencies:
+      '@codemirror/language': 6.12.4
+      '@lezer/json': 1.0.3
+
+  '@codemirror/lang-markdown@6.5.2':
+    dependencies:
+      '@codemirror/autocomplete': 6.20.3
+      '@codemirror/lang-html': 6.4.12
+      '@codemirror/language': 6.12.4
+      '@codemirror/state': 6.7.1
+      '@codemirror/view': 6.43.9
+      '@lezer/common': 1.5.2
+      '@lezer/markdown': 1.7.2
+
+  '@codemirror/lang-php@6.0.2':
+    dependencies:
+      '@codemirror/lang-html': 6.4.12
+      '@codemirror/language': 6.12.4
+      '@codemirror/state': 6.7.1
+      '@lezer/common': 1.5.2
+      '@lezer/php': 1.0.5
+
+  '@codemirror/lang-python@6.2.1':
+    dependencies:
+      '@codemirror/autocomplete': 6.20.3
+      '@codemirror/language': 6.12.4
+      '@codemirror/state': 6.7.1
+      '@lezer/common': 1.5.2
+      '@lezer/python': 1.1.19
+
+  '@codemirror/lang-rust@6.0.2':
+    dependencies:
+      '@codemirror/language': 6.12.4
+      '@lezer/rust': 1.0.2
+
+  '@codemirror/lang-sql@6.10.0':
+    dependencies:
+      '@codemirror/autocomplete': 6.20.3
+      '@codemirror/language': 6.12.4
+      '@codemirror/state': 6.7.1
+      '@lezer/common': 1.5.2
+      '@lezer/highlight': 1.2.3
+      '@lezer/lr': 1.4.10
+
+  '@codemirror/lang-xml@6.1.0':
+    dependencies:
+      '@codemirror/autocomplete': 6.20.3
+      '@codemirror/language': 6.12.4
+      '@codemirror/state': 6.7.1
+      '@codemirror/view': 6.43.9
+      '@lezer/common': 1.5.2
+      '@lezer/xml': 1.0.6
+
+  '@codemirror/lang-yaml@6.1.3':
+    dependencies:
+      '@codemirror/autocomplete': 6.20.3
+      '@codemirror/language': 6.12.4
+      '@codemirror/state': 6.7.1
+      '@lezer/common': 1.5.2
+      '@lezer/highlight': 1.2.3
+      '@lezer/lr': 1.4.10
+      '@lezer/yaml': 1.0.4
+
+  '@codemirror/language@6.12.4':
+    dependencies:
+      '@codemirror/state': 6.7.1
+      '@codemirror/view': 6.43.9
+      '@lezer/common': 1.5.2
+      '@lezer/highlight': 1.2.3
+      '@lezer/lr': 1.4.10
+      style-mod: 4.1.3
+
+  '@codemirror/legacy-modes@6.5.3':
+    dependencies:
+      '@codemirror/language': 6.12.4
+
+  '@codemirror/lint@6.9.7':
+    dependencies:
+      '@codemirror/state': 6.7.1
+      '@codemirror/view': 6.43.9
+      crelt: 1.0.7
+
+  '@codemirror/search@6.7.1':
+    dependencies:
+      '@codemirror/state': 6.7.1
+      '@codemirror/view': 6.43.9
+      crelt: 1.0.7
+
+  '@codemirror/state@6.7.1':
+    dependencies:
+      '@marijn/find-cluster-break': 1.0.3
+
+  '@codemirror/view@6.43.9':
+    dependencies:
+      '@codemirror/state': 6.7.1
+      crelt: 1.0.7
+      style-mod: 4.1.3
+      w3c-keyname: 2.2.8
 
   '@deepseek-ai/cordis-plugin-include@1.0.6(@deepseek-ai/cordis-plugin-loader@1.0.2)(@deepseek-ai/cordis@4.0.1)':
     dependencies:
@@ -1796,6 +2125,14 @@ snapshots:
     dependencies:
       '@deepseek-ai/cordis': 4.0.1(@deepseek-ai/cordis-plugin-include@1.0.6)(@deepseek-ai/cordis-plugin-loader@1.0.2)
       '@deepseek-ai/dsh-invariants': 0.1.0-rc.6(@deepseek-ai/cordis@4.0.1)
+
+  '@deepseek-ai/dsh-client-web-react@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1))':
+    dependencies:
+      '@deepseek-ai/cordis': 4.0.1(@deepseek-ai/cordis-plugin-include@1.0.6)(@deepseek-ai/cordis-plugin-loader@1.0.2)
+      '@deepseek-ai/dsh-client-ui-slots': 0.1.0-rc.6(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1))
+      '@deepseek-ai/dsh-invariants': 0.1.0-rc.6(@deepseek-ai/cordis@4.0.1)
+      react: 18.3.1
+      use-sync-external-store: 1.2.0(react@18.3.1)
 
   '@deepseek-ai/dsh-code-runtime@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1))':
     dependencies:
@@ -2213,6 +2550,95 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
+  '@lezer/common@1.5.2': {}
+
+  '@lezer/cpp@1.1.6':
+    dependencies:
+      '@lezer/common': 1.5.2
+      '@lezer/highlight': 1.2.3
+      '@lezer/lr': 1.4.10
+
+  '@lezer/css@1.3.6':
+    dependencies:
+      '@lezer/common': 1.5.2
+      '@lezer/highlight': 1.2.3
+      '@lezer/lr': 1.4.10
+
+  '@lezer/go@1.0.1':
+    dependencies:
+      '@lezer/common': 1.5.2
+      '@lezer/highlight': 1.2.3
+      '@lezer/lr': 1.4.10
+
+  '@lezer/highlight@1.2.3':
+    dependencies:
+      '@lezer/common': 1.5.2
+
+  '@lezer/html@1.3.13':
+    dependencies:
+      '@lezer/common': 1.5.2
+      '@lezer/highlight': 1.2.3
+      '@lezer/lr': 1.4.10
+
+  '@lezer/java@1.1.3':
+    dependencies:
+      '@lezer/common': 1.5.2
+      '@lezer/highlight': 1.2.3
+      '@lezer/lr': 1.4.10
+
+  '@lezer/javascript@1.5.4':
+    dependencies:
+      '@lezer/common': 1.5.2
+      '@lezer/highlight': 1.2.3
+      '@lezer/lr': 1.4.10
+
+  '@lezer/json@1.0.3':
+    dependencies:
+      '@lezer/common': 1.5.2
+      '@lezer/highlight': 1.2.3
+      '@lezer/lr': 1.4.10
+
+  '@lezer/lr@1.4.10':
+    dependencies:
+      '@lezer/common': 1.5.2
+
+  '@lezer/markdown@1.7.2':
+    dependencies:
+      '@lezer/common': 1.5.2
+      '@lezer/highlight': 1.2.3
+
+  '@lezer/php@1.0.5':
+    dependencies:
+      '@lezer/common': 1.5.2
+      '@lezer/highlight': 1.2.3
+      '@lezer/lr': 1.4.10
+
+  '@lezer/python@1.1.19':
+    dependencies:
+      '@lezer/common': 1.5.2
+      '@lezer/highlight': 1.2.3
+      '@lezer/lr': 1.4.10
+
+  '@lezer/rust@1.0.2':
+    dependencies:
+      '@lezer/common': 1.5.2
+      '@lezer/highlight': 1.2.3
+      '@lezer/lr': 1.4.10
+
+  '@lezer/xml@1.0.6':
+    dependencies:
+      '@lezer/common': 1.5.2
+      '@lezer/highlight': 1.2.3
+      '@lezer/lr': 1.4.10
+
+  '@lezer/yaml@1.0.4':
+    dependencies:
+      '@lezer/common': 1.5.2
+      '@lezer/highlight': 1.2.3
+      '@lezer/lr': 1.4.10
+
+  '@marijn/find-cluster-break@1.0.3': {}
+
   '@napi-rs/wasm-runtime@1.2.2(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)':
     dependencies:
       '@emnapi/core': 1.11.1
@@ -2393,6 +2819,10 @@ snapshots:
 
   commander@8.3.0: {}
 
+  cosmokit@1.8.1: {}
+
+  crelt@1.0.7: {}
+
   csstype@3.2.3: {}
 
   debug@4.4.3:
@@ -2412,6 +2842,56 @@ snapshots:
   devlop@1.1.0:
     dependencies:
       dequal: 2.0.3
+
+  dsh-better-sidebar@0.12.3(64bc451ca69292ce23067a770280050a):
+    dependencies:
+      '@codemirror/commands': 6.11.0
+      '@codemirror/lang-cpp': 6.0.3
+      '@codemirror/lang-css': 6.3.1
+      '@codemirror/lang-go': 6.0.1
+      '@codemirror/lang-html': 6.4.12
+      '@codemirror/lang-java': 6.0.2
+      '@codemirror/lang-javascript': 6.2.5
+      '@codemirror/lang-json': 6.0.2
+      '@codemirror/lang-markdown': 6.5.2
+      '@codemirror/lang-php': 6.0.2
+      '@codemirror/lang-python': 6.2.1
+      '@codemirror/lang-rust': 6.0.2
+      '@codemirror/lang-sql': 6.10.0
+      '@codemirror/lang-xml': 6.1.0
+      '@codemirror/lang-yaml': 6.1.3
+      '@codemirror/language': 6.12.4
+      '@codemirror/legacy-modes': 6.5.3
+      '@codemirror/search': 6.7.1
+      '@codemirror/state': 6.7.1
+      '@codemirror/view': 6.43.9
+      '@deepseek-ai/cordis': 4.0.1(@deepseek-ai/cordis-plugin-include@1.0.6)(@deepseek-ai/cordis-plugin-loader@1.0.2)
+      '@deepseek-ai/dsh-agent': 0.1.0-rc.6(b0514d7a320728b6d8f5a31eb3960e10)
+      '@deepseek-ai/dsh-client-locale': 0.1.0-rc.6(ce9105fc2b8666e57db2f9de071e4b25)
+      '@deepseek-ai/dsh-client-runtime': 0.1.0-rc.6(6ef9bea1ffb02b7be9333a18bfeaf17e)
+      '@deepseek-ai/dsh-client-schema-form': 0.1.0-rc.6(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1))
+      '@deepseek-ai/dsh-client-ui-conversation': 0.1.0-rc.6(e8451c10452151e540675b4b130aebe9)
+      '@deepseek-ai/dsh-client-ui-primitives': 0.1.0-rc.6(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1))
+      '@deepseek-ai/dsh-client-ui-settings': 0.1.0-rc.6(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-api-remotes@0.1.0-rc.6(83d9c5c9b8349236135a0a0b0d2ee7ec))(@deepseek-ai/dsh-client-connection@0.1.0-rc.6)(@deepseek-ai/dsh-client-runtime@0.1.0-rc.6(6ef9bea1ffb02b7be9333a18bfeaf17e))(@deepseek-ai/dsh-client-schema-form@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1)))(@deepseek-ai/dsh-client-ui-slots@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1)))(@deepseek-ai/dsh-invariants@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/dsh-settings@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-brand@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1)))(@deepseek-ai/dsh-invariants@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/schemastery@3.18.1))(react@18.3.1)
+      '@deepseek-ai/dsh-client-ui-slots': 0.1.0-rc.6(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1))
+      '@deepseek-ai/dsh-client-web-react': 0.1.0-rc.6(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1))
+      '@deepseek-ai/dsh-host-webserver': 0.1.0-rc.6(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1))
+      '@deepseek-ai/dsh-invariants': 0.1.0-rc.6(@deepseek-ai/cordis@4.0.1)
+      '@deepseek-ai/dsh-llm': 0.1.0-rc.6(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-attachment@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-brand@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1)))(@deepseek-ai/dsh-invariants@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1)))(@deepseek-ai/dsh-brand@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1)))(@deepseek-ai/dsh-invariants@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/dsh-timeout@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1)))
+      '@deepseek-ai/dsh-session': 0.1.0-rc.6(6fd26f59436a18b115f326d6060415e6)
+      '@deepseek-ai/dsh-settings': 0.1.0-rc.6(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-brand@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1)(@deepseek-ai/dsh-invariants@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1)))(@deepseek-ai/dsh-invariants@0.1.0-rc.6(@deepseek-ai/cordis@4.0.1))(@deepseek-ai/schemastery@3.18.1)
+      '@deepseek-ai/dsh-tools': 0.1.0-rc.6(f8724372086ccc1457fc84e7becee2e0)
+      '@lezer/highlight': 1.2.3
+      clsx: 2.1.1
+      node-pty: 1.1.0
+      react: 18.3.1
+      react-dom: 18.3.1(react@18.3.1)
+      rxjs: 7.8.2
+      schemastery: 3.18.0
+      ws: 8.21.3
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
 
   dts-resolver@3.0.0: {}
 
@@ -2857,6 +3337,12 @@ snapshots:
 
   ms@2.1.3: {}
 
+  node-addon-api@7.1.1: {}
+
+  node-pty@1.1.0:
+    dependencies:
+      node-addon-api: 7.1.1
+
   obug@2.1.4: {}
 
   oniguruma-parser@0.12.2: {}
@@ -2934,9 +3420,18 @@ snapshots:
       '@rolldown/binding-win32-arm64-msvc': 1.1.5
       '@rolldown/binding-win32-x64-msvc': 1.1.5
 
+  rxjs@7.8.2:
+    dependencies:
+      tslib: 2.8.1
+
   scheduler@0.23.2:
     dependencies:
       loose-envify: 1.4.0
+
+  schemastery@3.18.0:
+    dependencies:
+      '@standard-schema/spec': 1.1.0
+      cosmokit: 1.8.1
 
   semver@7.8.5: {}
 
@@ -2957,6 +3452,8 @@ snapshots:
     dependencies:
       character-entities-html4: 2.1.0
       character-entities-legacy: 3.0.0
+
+  style-mod@4.1.3: {}
 
   tinyexec@1.3.0: {}
 
@@ -2994,8 +3491,7 @@ snapshots:
       - oxc-resolver
       - vue-tsc
 
-  tslib@2.8.1:
-    optional: true
+  tslib@2.8.1: {}
 
   typescript@5.9.3: {}
 
@@ -3047,6 +3543,8 @@ snapshots:
     dependencies:
       '@types/unist': 3.0.3
       vfile-message: 4.0.3
+
+  w3c-keyname@2.2.8: {}
 
   ws@8.21.3: {}
 

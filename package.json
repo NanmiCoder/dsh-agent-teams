@@ -99,6 +99,7 @@
     "@deepseek-ai/dsh-system-prompt": "^0.1.0-rc.6",
     "@deepseek-ai/dsh-tools": "^0.1.0-rc.6",
     "@deepseek-ai/schemastery": "^3.18.1-rc.1",
+    "dsh-better-sidebar": "^0.12.3",
     "react": "^18.2.0"
   },
   "peerDependenciesMeta": {
@@ -141,6 +142,9 @@
     "@deepseek-ai/schemastery": {
       "optional": true
     },
+    "dsh-better-sidebar": {
+      "optional": true
+    },
     "react": {
       "optional": true
     }
@@ -163,6 +167,7 @@
     "@types/node": "^24.13.3",
     "@types/react": "~18.3.1",
     "@types/react-dom": "^18.3.7",
+    "dsh-better-sidebar": "^0.12.3",
     "lightningcss": "^1.33.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",

@@ -504,9 +504,10 @@ function historicCardTeam(data: AgentTeamsCardData, owner: string): ActivityTeam
 /** The top-right activity floater. Teams follow the current session: live
  * snapshots and historic card summaries are only shown while their captain
  * session is the one currently open. */
-export function ActivityPanel({ sessionsList, openSession }: {
+export function ActivityPanel({ sessionsList, openSession, embedded = false }: {
   readonly sessionsList: ObservableSnapshot<SessionListState>
   readonly openSession: (id: SessionId) => void
+  readonly embedded?: boolean
 }) {
   // Navigating to a member's subagent transcript is an explicit departure:
   // hide the floater immediately instead of waiting out the autocollapse
@@ -530,7 +531,7 @@ export function ActivityPanel({ sessionsList, openSession }: {
   const currentRef = useRef(current)
   useEffect(() => { currentRef.current = current }, [current])
   const mountedAtRef = useRef(performance.now())
-  const expanded = activityPanelExpandedForSession(open, openOwner, current)
+  const expanded = embedded || activityPanelExpandedForSession(open, openOwner, current)
 
   // This portal survives conversation route changes. Gate expansion by its
   // owning session during render, then clear stale state before paint. This
@@ -548,11 +549,12 @@ export function ActivityPanel({ sessionsList, openSession }: {
   // CSS can then make the conversation column yield space without knowing the
   // host shell's hashed module class names. Narrow viewports keep overlay mode.
   useLayoutEffect(() => {
+    if (embedded) return
     const root = document.documentElement
     if (expanded) root.setAttribute(PANEL_OPEN_ATTRIBUTE, '')
     else root.removeAttribute(PANEL_OPEN_ATTRIBUTE)
     return () => { root.removeAttribute(PANEL_OPEN_ATTRIBUTE) }
-  }, [expanded])
+  }, [embedded, expanded])
 
   useEffect(() => {
     let cancelled = false
@@ -683,23 +685,25 @@ export function ActivityPanel({ sessionsList, openSession }: {
         }} />
       )}
       {expanded && (
-        <aside className={css.panel} data-agent-teams-activity>
+        <aside className={embedded ? `${css.panel} ${css.embedded}` : css.panel} data-agent-teams-activity data-agent-teams-embedded={embedded || undefined}>
           <header className={css.panelHead}>
             <span className={css.panelTitle}>
               AgentTeams 活动
               <span className={css.panelDot} data-busy={busy} aria-hidden />
             </span>
-            <button
-              type="button"
-              className={css.closeButton}
-              onClick={() => {
-                setOpen(false)
-                setOpenOwner(undefined)
-              }}
-              aria-label="关闭"
-            >
-              <IconCloseOutline16 />
-            </button>
+            {!embedded && (
+              <button
+                type="button"
+                className={css.closeButton}
+                onClick={() => {
+                  setOpen(false)
+                  setOpenOwner(undefined)
+                }}
+                aria-label="关闭"
+              >
+                <IconCloseOutline16 />
+              </button>
+            )}
           </header>
           <div className={css.teams}>
             {visibleCount === 0

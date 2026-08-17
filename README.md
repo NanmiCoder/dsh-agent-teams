@@ -94,7 +94,7 @@ Defaults work without extra setup. A trusted profile can override member behavio
     maxMembers: 8
 ```
 
-`memberProvider` is the sub-agent runtime backend (`spawn` / `fork`), not an LLM provider. Cross-LLM-provider routing uses the optional `provider` + `model` fields of `agent_teams_add_member`; `memberModel` is only a model default for all members.
+`memberProvider` is the sub-agent runtime backend (`spawn` / `fork`), not an LLM provider. Cross-LLM-provider routing uses the optional `provider` + `model` fields of `agent_teams_add_member`; `memberModel` is only a model default for all members. When a member should run at a different reasoning effort than the captain's current one, pass the optional `reasoning_effort` field — one of the target model's supported effort ids, or `"default"` for the model's own default; when omitted the member inherits the captain's current effort.
 
 ## Boundaries
 

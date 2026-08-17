@@ -362,7 +362,18 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
           exec.signal,
         )
         fresh.members.push(member)
-        await writeTeam(stateRoot, fresh)
+        try {
+          await writeTeam(stateRoot, fresh)
+        } catch (error: unknown) {
+          // The continuable child is already live, but the durable team record
+          // never saw it. Retire the orphan so it disappears from subagent
+          // listings and cannot be resumed, then surface the write failure.
+          if (member.id !== '') {
+            await recordRetiredMemberIds(stateRoot, [member.id]).catch(() => undefined)
+            interruptMember(ctx, captain, member.id)
+          }
+          throw error
+        }
         appendTeamEvent(ctx, captainSessionOf(ctx, fresh.captainSessionId, captain.session), 'agent-teams/member-added', {
           teamId: fresh.id,
           memberId: member.id,

@@ -10,7 +10,7 @@
  * Usage: node scripts/verify.mjs
  */
 
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
@@ -62,7 +62,7 @@ console.log('dsh-agent-teams offline verification')
 // loads this plugin, so it must equal the published package name. A mismatch
 // only surfaces after someone installs the package (the row fails to load),
 // never in local link-installed development — hence this pre-publish gate.
-console.log('1/7 packaging contract')
+console.log('1/8 packaging contract')
 const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'))
 const patchText = await readFile(new URL('../cordis.patch.yml', import.meta.url), 'utf8')
 const patchName = patchText
@@ -138,7 +138,7 @@ check(
   'running work should stay visible in both normal and dependency-focus states',
 )
 
-console.log('2/7 pure rules')
+console.log('2/8 pure rules')
 check("sanitizeKey('My Team!') -> 'my-team'", sanitizeKey('My Team!') === 'my-team')
 // #15: an ASCII-only whitelist folded every non-Latin name onto one constant,
 // so distinct members shared a mailbox file and the second one was rejected as
@@ -172,7 +172,7 @@ check('in_progress -> completed allowed', transitionError('in_progress', 'comple
 check('completed -> in_progress denied', transitionError('completed', 'in_progress') !== undefined)
 check('same status is a no-op', transitionError('failed', 'failed') === undefined)
 
-console.log('3/7 dependency gating')
+console.log('3/8 dependency gating')
 const tasks = [
   { id: 't1', status: 'completed' },
   { id: 't2', status: 'pending' },
@@ -182,7 +182,7 @@ check('all-done deps satisfied', unsatisfiedDependencies(tasks, ['t1']).length =
 check('pending dep blocks', unsatisfiedDependencies(tasks, ['t2']).length === 1)
 check('failed dep blocks too', unsatisfiedDependencies(tasks, ['t3']).length === 1)
 
-console.log('4/7 on-disk team flow (temp dir)')
+console.log('4/8 on-disk team flow (temp dir)')
 const stateRoot = await mkdtemp(join(tmpdir(), 'dsh-agent-teams-verify-'))
 try {
   const team = {
@@ -287,7 +287,7 @@ try {
   await rm(stateRoot, { recursive: true, force: true })
 }
 
-console.log('5/7 host visual-state functions (activity panel)')
+console.log('5/8 host visual-state functions (activity panel)')
 const { taskVisualState, taskDepthsById } = await import('../lib/state.js')
 const vtasks = [
   { id: 't1', subject: 'a', status: 'completed', assignee: 'alice', dependencies: [], createdAt: 0, updatedAt: 0 },
@@ -306,7 +306,7 @@ check('t2 depth 1 (longest path)', depths.get('t2') === 1)
 check('t3 depth 2', depths.get('t3') === 2)
 check('missing dep contributes no depth', depths.get('t4') === 0)
 
-console.log('6/7 client relationship projections')
+console.log('6/8 client relationship projections')
 const projectionTasks = [
   { id: 't4', dependencies: ['t2'], depth: 2 },
   { id: 't1', dependencies: [], depth: 0 },
@@ -394,7 +394,7 @@ check(
   steerCaptainReport({ steer: () => { throw new Error('offline') } }, 'alice', 'finished t1') === false,
 )
 
-console.log('7/7 member model selection and continuation restore')
+console.log('7/8 member model selection and continuation restore')
 const captain = {
   id: 'captain-session',
   options: { provider: 'birth-provider', model: 'birth-model' },
@@ -616,6 +616,215 @@ try {
   disposeCold()
 } finally {
   await rm(restoreWorkspace, { recursive: true, force: true })
+}
+
+console.log('8/8 state-file atomic write hardening (Windows EPERM fallback)')
+// The durable state files (team.json, mailboxes, retired index) are replaced
+// through `atomicWriteText` = write-temp + rename. On Windows a rename over an
+// existing target throws EPERM while another process holds it open without
+// FILE_SHARE_DELETE; the hardened path retries the rename a few times and then
+// degrades to a direct overwrite (content-equivalent because the temp file was
+// fully written). These checks pin that behavior through the injectable seam
+// and, on Windows, against a real cross-process handle lock.
+const atomicStateRoot = await mkdtemp(join(tmpdir(), 'dsh-agent-teams-atomic-'))
+try {
+  const {
+    replaceFileAtomicOrDirect,
+    writeTeam,
+  } = await import('../lib/state.js')
+  const epermError = () => Object.assign(
+    new Error("EPERM: operation not permitted, rename '.../team.json.tmp' -> '.../team.json'"),
+    { code: 'EPERM' },
+  )
+
+  let renameCalls = 0
+  let fallbackWrites = 0
+  let fallbackRemovals = 0
+  let fallbackContent = ''
+  const fallbackTarget = join(atomicStateRoot, 'forced', 'team.json')
+  await replaceFileAtomicOrDirect('forced.tmp', fallbackTarget, '{"fallback":1}', {
+    rename: async () => { renameCalls += 1; throw epermError() },
+    writeFile: async (_file, content) => { fallbackWrites += 1; fallbackContent = content },
+    remove: async () => { fallbackRemovals += 1 },
+  }, { retryDelayMs: 1 })
+  check(
+    'persistent EPERM exhausts the rename retries (1 initial + 3 retries)',
+    renameCalls === 4,
+    `renameCalls = ${renameCalls}`,
+  )
+  check(
+    'persistent EPERM falls back to a direct overwrite of the target',
+    fallbackWrites === 1 && fallbackContent === '{"fallback":1}',
+    `fallbackWrites = ${fallbackWrites}`,
+  )
+  check('the temp file is removed after the fallback write', fallbackRemovals === 1)
+
+  let transientCalls = 0
+  let transientWrites = 0
+  await replaceFileAtomicOrDirect('transient.tmp', join(atomicStateRoot, 'transient', 'team.json'), '{"retried":2}', {
+    rename: async () => {
+      transientCalls += 1
+      if (transientCalls <= 2) throw epermError()
+    },
+    writeFile: async (file, content) => { transientWrites += 1; await writeFile(file, content) },
+    remove: async () => undefined,
+  }, { retryDelayMs: 1 })
+  check(
+    'a transient EPERM recovers via rename retries without the fallback',
+    transientCalls === 3 && transientWrites === 0,
+    `renameCalls = ${transientCalls}, fallbackWrites = ${transientWrites}`,
+  )
+
+  let aggregateThrown = false
+  let dualRemovals = 0
+  try {
+    await replaceFileAtomicOrDirect('dual.tmp', join(atomicStateRoot, 'dual', 'team.json'), 'x', {
+      rename: async () => { throw epermError() },
+      writeFile: async () => { throw Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' }) },
+      remove: async () => { dualRemovals += 1 },
+    }, { retryDelayMs: 1 })
+  } catch (error) {
+    aggregateThrown = error instanceof AggregateError
+  }
+  check('failure of both the atomic and the direct path raises AggregateError', aggregateThrown)
+  check('the temp file is removed even after a dual failure', dualRemovals === 1)
+
+  if (process.platform === 'win32') {
+    // Real cross-process lock: hold team.json with FileShare.ReadWrite (no
+    // FILE_SHARE_DELETE) from a child .NET handle, then verify the public
+    // write path still persists through the direct-write fallback.
+    const lockedTeam = {
+      name: 'Locked Team',
+      id: 'locked-team',
+      captainSessionId: 'sess-lock',
+      createdAt: Date.now(),
+      members: [],
+      tasks: [],
+      taskSeq: 0,
+    }
+    await createTeamDir(atomicStateRoot, lockedTeam)
+    const lockedJson = join(atomicStateRoot, lockedTeam.id, 'team.json')
+    const { spawn } = await import('node:child_process')
+    const holder = spawn(
+      'powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-Command',
+        `$f = '${lockedJson.replaceAll("'", "''")}';
+         $s = [System.IO.File]::Open($f, [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::ReadWrite);
+         [Console]::Out.WriteLine('HELD'); [Console]::Out.Flush();
+         Start-Sleep -Seconds 45; $s.Dispose()`],
+      { stdio: ['ignore', 'pipe', 'inherit'] },
+    )
+    const held = await new Promise((resolve, reject) => {
+      let buffer = ''
+      const onData = (chunk) => {
+        buffer += chunk.toString()
+        if (buffer.includes('HELD')) { cleanup(); resolve(true) }
+      }
+      const onExit = () => { cleanup(); reject(new Error('lock holder exited before arming')) }
+      const timer = setTimeout(() => {
+        cleanup()
+        reject(new Error('timed out waiting for the lock holder'))
+      }, 15_000)
+      function cleanup() {
+        clearTimeout(timer)
+        holder.stdout.off('data', onData)
+        holder.off('exit', onExit)
+      }
+      holder.stdout.on('data', onData)
+      holder.on('exit', onExit)
+    })
+    try {
+      if (held) {
+        lockedTeam.members.push({ id: 'sess-new', name: 'member', joinedAt: Date.now(), status: 'idle' })
+        await writeTeam(atomicStateRoot, lockedTeam)
+        const persisted = JSON.parse(await readFile(lockedJson, 'utf8'))
+        const leftovers = (await readdir(join(atomicStateRoot, lockedTeam.id))).filter(name => name.endsWith('.tmp'))
+        check(
+          'writeTeam survives a real Windows lock without FILE_SHARE_DELETE',
+          persisted.members.length === 1 && leftovers.length === 0,
+          `members = ${persisted.members.length}, tmp leftovers = ${leftovers.join(', ') || 'none'}`,
+        )
+      }
+      // Archive moves the whole team directory with `rename(source, target)`.
+      // The same Windows delete-sharing EPERM applies when a file below the
+      // directory is momentarily locked, so it retries the rename. A short
+      // (≈150 ms) lock falls inside the retry window and must not abort the
+      // archive.
+      const { archiveTeamDir } = await import('../lib/state.js')
+      const transientTeam = {
+        name: 'Transient Lock Team',
+        id: 'transient-lock',
+        captainSessionId: 'sess-transient',
+        createdAt: Date.now(),
+        members: [],
+        tasks: [],
+        taskSeq: 0,
+      }
+      await createTeamDir(atomicStateRoot, transientTeam)
+      const transientJson = join(atomicStateRoot, transientTeam.id, 'team.json')
+      const flasher = spawn(
+        'powershell.exe',
+        ['-NoProfile', '-NonInteractive', '-Command',
+          `$f = '${transientJson.replaceAll("'", "''")}';
+           $s = [System.IO.File]::Open($f, [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::ReadWrite);
+           [Console]::Out.WriteLine('HELD_T'); [Console]::Out.Flush();
+           Start-Sleep -Milliseconds 140; $s.Dispose()`],
+        { stdio: ['ignore', 'pipe', 'inherit'] },
+      )
+      const flashed = await new Promise((resolve, reject) => {
+        let buffer = ''
+        const onData = (chunk) => {
+          buffer += chunk.toString()
+          if (buffer.includes('HELD_T')) { cleanup(); resolve(true) }
+        }
+        const onExit = () => { cleanup(); reject(new Error('transient holder exited before arming')) }
+        const timer = setTimeout(() => {
+          cleanup()
+          reject(new Error('timed out waiting for the transient lock holder'))
+        }, 10_000)
+        function cleanup() {
+          clearTimeout(timer)
+          flasher.stdout.off('data', onData)
+          flasher.off('exit', onExit)
+        }
+        flasher.stdout.on('data', onData)
+        flasher.on('exit', onExit)
+      })
+      try {
+        // The flasher releases after ~140 ms; archiveTeamDir retries the
+        // rename across that window, so archiving must still succeed.
+        await archiveTeamDir(atomicStateRoot, transientTeam.id)
+        const archived = await readFile(join(atomicStateRoot, 'archive', transientTeam.id, 'team.json'), 'utf8')
+        check(
+          'archiveTeamDir survives a transient Windows directory lock via rename retries',
+          flashed && JSON.parse(archived).id === transientTeam.id,
+        )
+      } catch (error) {
+        check(
+          'archiveTeamDir survives a transient Windows directory lock via rename retries',
+          false,
+          String(error),
+        )
+      } finally {
+        flasher.kill()
+      }
+    } finally {
+      holder.kill()
+      if (holder.exitCode === null && holder.signalCode === null) {
+        await new Promise((resolve) => {
+          const timer = setTimeout(resolve, 5_000)
+          holder.once('exit', () => { clearTimeout(timer); resolve() })
+        })
+      }
+    }
+  } else {
+    check('real Windows lock integration skipped on this platform', true)
+  }
+} finally {
+  await rm(atomicStateRoot, { recursive: true, force: true }).catch(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 500))
+    await rm(atomicStateRoot, { recursive: true, force: true })
+  })
 }
 
 if (failures > 0) {

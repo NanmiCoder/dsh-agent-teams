@@ -505,16 +505,112 @@ function stripLeadingBom(value: string): string {
   return value.charCodeAt(0) === 0xFEFF ? value.slice(1) : value
 }
 
-/** Atomically replace one UTF-8 state file from a same-directory temp file. */
+/** Rename attempts before falling back to a direct overwrite. */
+const ATOMIC_RENAME_RETRIES = 3
+/** Pause between rename attempts, giving a briefly-locking owner time to finish. */
+const ATOMIC_RENAME_RETRY_DELAY_MS = 50
+/**
+ * Rename error codes worth retrying before the direct-write fallback. On
+ * Windows, replacing an existing file whose target is momentarily held open
+ * without FILE_SHARE_DELETE surfaces as EPERM (or EACCES/EBUSY variants);
+ * EEXIST/ENOTEMPTY cover other "target busy" edge shapes.
+ */
+const RETRYABLE_RENAME_CODES = new Set(['EPERM', 'EACCES', 'EBUSY', 'EEXIST', 'ENOTEMPTY'])
+
+function isRetryableRenameError(error: unknown): boolean {
+  return error instanceof Error
+    && 'code' in error
+    && RETRYABLE_RENAME_CODES.has((error as NodeJS.ErrnoException).code ?? '')
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+/** Filesystem primitives used by {@link replaceFileAtomicOrDirect}; injectable for tests. */
+export interface AtomicReplacePrimitives {
+  rename: (from: string, to: string) => Promise<void>
+  writeFile: (file: string, content: string) => Promise<void>
+  remove: (file: string) => Promise<void>
+}
+
+/** Tuning knobs for {@link replaceFileAtomicOrDirect} (defaults match production). */
+export interface AtomicReplaceOptions {
+  /** Rename attempts before the direct-write fallback (default 3). */
+  retries?: number
+  /** Delay between rename attempts in ms (default 50). */
+  retryDelayMs?: number
+}
+
+/**
+ * Replace `file` with `content`, preferring an atomic same-directory rename of
+ * an already-written temp file.
+ *
+ * On Windows, `rename(tmp, file)` over an existing target throws EPERM while
+ * any other process keeps the target open without FILE_SHARE_DELETE (editors,
+ * indexers, antivirus scans, preview panes). By that point the payload has
+ * already been fully written to the temp file, so a direct overwrite of the
+ * target is a content-equivalent degraded path: retry the rename a few times
+ * (transient locks clear quickly), then write the target in place. Every path
+ * removes the temp file; when both the atomic rename and the direct write
+ * fail, the combined error surfaces as an {@link AggregateError}.
+ *
+ * @returns nothing once the file has been replaced by one of the two paths.
+ */
+export async function replaceFileAtomicOrDirect(
+  temporary: string,
+  file: string,
+  content: string,
+  primitives: AtomicReplacePrimitives,
+  options: AtomicReplaceOptions = {},
+): Promise<void> {
+  const retries = options.retries ?? ATOMIC_RENAME_RETRIES
+  const retryDelayMs = options.retryDelayMs ?? ATOMIC_RENAME_RETRY_DELAY_MS
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      await primitives.rename(temporary, file)
+      return
+    } catch (error: unknown) {
+      if (isRetryableRenameError(error) && attempt < retries) {
+        await sleep(retryDelayMs)
+        continue
+      }
+      let fallbackError: unknown
+      try {
+        await primitives.writeFile(file, content)
+      } catch (writeError: unknown) {
+        fallbackError = writeError
+      }
+      await primitives.remove(temporary).catch(() => undefined)
+      if (fallbackError !== undefined) {
+        throw new AggregateError(
+          [error, fallbackError],
+          `failed to replace "${file}" atomically (${String(error)}) or by direct write (${String(fallbackError)})`,
+        )
+      }
+      return
+    }
+  }
+}
+
+/**
+ * Atomically replace one UTF-8 state file from a same-directory temp file,
+ * degrading to a direct overwrite when the atomic rename cannot proceed
+ * (see {@link replaceFileAtomicOrDirect} for the Windows EPERM rationale).
+ */
 async function atomicWriteText(file: string, content: string): Promise<void> {
   const temporary = `${file}.${process.pid}.${randomUUID()}.tmp`
   try {
     await writeFile(temporary, content, { encoding: 'utf8', flag: 'wx' })
-    await rename(temporary, file)
   } catch (error: unknown) {
     await rm(temporary, { force: true }).catch(() => undefined)
     throw error
   }
+  await replaceFileAtomicOrDirect(temporary, file, content, {
+    rename: (from, to) => rename(from, to),
+    writeFile: (target, payload) => writeFile(target, payload, 'utf8'),
+    remove: (path) => rm(path, { force: true }),
+  })
 }
 
 /** Whether a parsed JSON value is a plain record. */
@@ -630,6 +726,30 @@ export async function removeTeamDir(stateRoot: string, teamId: string): Promise<
 }
 
 /**
+ * `rename` with the same transient retry policy as the state-file atomic
+ * write, for paths (like archiving a whole team directory) where there is no
+ * content-equivalent direct-write degradation on Windows. A short-lived
+ * delete-sharing lock on any file below the renamed path is retried a few
+ * times before the error propagates.
+ * @param from - source path.
+ * @param to - destination path.
+ */
+async function renameWithRetry(from: string, to: string): Promise<void> {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      await rename(from, to)
+      return
+    } catch (error: unknown) {
+      if (isRetryableRenameError(error) && attempt < ATOMIC_RENAME_RETRIES) {
+        await sleep(ATOMIC_RENAME_RETRY_DELAY_MS)
+        continue
+      }
+      throw error
+    }
+  }
+}
+
+/**
  * Archive a team instead of deleting it: the whole directory (team.json with
  * tasks and dependency graph, plus the mailboxes) moves under
  * `<stateRoot>/archive/<teamId>/` so later sessions can review how tasks were
@@ -646,20 +766,25 @@ export async function archiveTeamDir(stateRoot: string, teamId: string): Promise
   const previous = join(archiveRoot, `.${teamId}.previous-${randomUUID()}`)
   let displaced = false
   try {
-    await rename(target, previous)
+    // The same Windows EPERM-on-rename applies at the directory boundary: a
+    // delete-sharing violation on any file below `target` blocks the move, so
+    // retry the transient-lock case before giving up.
+    await renameWithRetry(target, previous)
     displaced = true
   } catch (error: unknown) {
+    // Only ENOENT means there was nothing to displace; any other failure
+    // (including a persistent EPERM lock) surfaces to the caller.
     if (!(error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT')) {
       throw error
     }
   }
 
   try {
-    await rename(source, target)
+    await renameWithRetry(source, target)
   } catch (error: unknown) {
     if (displaced) {
       try {
-        await rename(previous, target)
+        await renameWithRetry(previous, target)
       } catch (restoreError: unknown) {
         throw new AggregateError(
           [error, restoreError],

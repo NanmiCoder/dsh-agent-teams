@@ -68,6 +68,8 @@ export interface MemberLlmSelectionRequest {
   model?: string
   /** Plugin-level member model default. */
   defaultModel?: string
+  /** Explicit reasoning effort; "default" selects the target model's default effort. */
+  reasoningEffort?: string
 }
 
 /** Process-local bridge between spawn admission and synchronous child setup. */
@@ -112,10 +114,12 @@ function modelSelection(selection: MemberLlmSelection): ModelSelection {
 
 /**
  * Resolve one member's complete model selection. Ordinary members snapshot the
- * captain's current request route and reasoning effort. An explicit member
- * provider/model or plugin-level model replaces only that route; the current
- * captain effort remains the inherited policy and is validated against the
- * target model before a child is created.
+ * captain's current request route and reasoning effort. When provider or model
+ * changes, effort is intentionally omitted so the target model materializes
+ * its own default instead of receiving an adapter-owned id from another route.
+ * An explicit effort overrides either policy; the sentinel "default" also
+ * selects the target model's default. The final effort is validated against
+ * the target model before a child is created.
  */
 export async function resolveMemberLlmSelection(
   ctx: Context,
@@ -126,6 +130,7 @@ export async function resolveMemberLlmSelection(
   const explicitProvider = request.provider?.trim()
   const explicitModel = request.model?.trim()
   const defaultModel = request.defaultModel?.trim()
+  const explicitEffort = request.reasoningEffort?.trim()
   if (request.provider !== undefined && explicitProvider === '') {
     throw new Error('member LLM provider must not be empty')
   }
@@ -135,23 +140,40 @@ export async function resolveMemberLlmSelection(
   if (request.defaultModel !== undefined && defaultModel === '') {
     throw new Error('configured memberModel must not be empty')
   }
+  if (request.reasoningEffort !== undefined && explicitEffort === '') {
+    throw new Error('member reasoning effort must not be empty')
+  }
   if (explicitProvider !== undefined && explicitModel === undefined) {
     throw new Error('an explicit member LLM provider requires an explicit member model')
   }
 
   const current = captain.session.requestHeader()?.config
-  const provider = explicitProvider ?? current?.provider ?? captain.options.provider
-  const model = explicitModel ?? defaultModel ?? current?.model ?? captain.options.model
+  const currentProvider = current?.provider ?? captain.options.provider
+  const currentModel = current?.model ?? captain.options.model
+  const provider = explicitProvider ?? currentProvider
+  const model = explicitModel ?? defaultModel ?? currentModel
   if (provider === undefined || model === undefined) {
     throw new Error('cannot resolve the member LLM route from the current captain session')
   }
 
+  // Effort ids belong to one exact provider/model capability. Preserve the
+  // captain's effort only on the same route; a changed route must resolve its
+  // own default. Explicit effort still wins, while "default" forces that
+  // target-default behavior even when the route did not change.
+  const sameRoute = provider === currentProvider && model === currentModel
+  const reasoningEffort = explicitEffort === undefined
+    ? sameRoute
+      ? current?.reasoningEffort
+      : undefined
+    : explicitEffort === 'default'
+      ? undefined
+      : ReasoningEffortId(explicitEffort)
   const resolved = await ctx.llm.resolveCallConfig({
     provider,
     model,
-    ...current?.reasoningEffort === undefined
+    ...reasoningEffort === undefined
       ? {}
-      : { reasoningEffort: current.reasoningEffort },
+      : { reasoningEffort },
   }, signal)
   return {
     provider: resolved.provider,

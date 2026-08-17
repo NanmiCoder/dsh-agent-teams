@@ -56,7 +56,7 @@
 | `agent_teams_status` | 团队全景：成员活动、任务清单、队长邮箱、各成员待读消息 |
 | `agent_teams_delete` | 结束团队：打断成员，团队目录**归档保留**（任务与依赖图、邮箱完整留存） |
 
-`agent_teams_add_member` 默认不需要模型参数：它会快照队长当前请求真正生效的 LLM provider、model 与思考强度。用户明确要求某个角色使用其他模型时，可以同时传入可选的 `provider` + `model`；只覆盖 `model` 时沿用队长当前 LLM provider。思考强度默认同样快照队长当前值；用户明确要求某个成员使用不同强度时，可以传入可选的 `reasoning_effort`（目标模型支持的档位 id，或 `"default"` 表示模型自身默认档）。插件不会为每个成员发起二次选择或弹窗。
+`agent_teams_add_member` 默认不需要模型参数：成员沿用队长当前 LLM provider/model 时，会一并快照队长当前思考强度。用户明确要求某个角色使用其他模型时，可以同时传入可选的 `provider` + `model`；只覆盖 `model` 时沿用队长当前 LLM provider。provider 或 model 任一改变时，思考强度自动使用目标模型默认档；用户明确要求某个成员使用特定强度时，可以传入可选的 `reasoning_effort`（目标模型支持的档位 id，或 `"default"` 表示强制使用模型自身默认档）。插件不会为每个成员发起二次选择或弹窗。
 
 ## 配置
 
@@ -72,7 +72,7 @@
     maxMembers: 8                 # 团队人数上限
 ```
 
-最终优先级为：成员显式 `provider` + `model` / `model` → `memberModel` → 队长当前路由。思考强度默认继承队长当前值，并在目标 provider/model 上创建前校验；不兼容时成员创建会明确失败。最终生效的 provider/model/思考强度会写入 `team.json`，供状态查询和成员冷恢复使用。
+最终优先级为：成员显式 `provider` + `model` / `model` → `memberModel` → 队长当前路由。成员沿用队长当前 provider/model 时继承队长的思考强度；provider 或 model 任一改变时自动使用目标模型的默认档。显式 `reasoning_effort`（目标模型支持的档位 id，或 `"default"`）优先，并在目标 provider/model 上创建前校验；不兼容时成员创建会明确失败。最终生效的 provider/model/思考强度会写入 `team.json`，供状态查询和成员冷恢复使用。
 
 ## 使用协议
 

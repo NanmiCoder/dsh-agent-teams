@@ -291,13 +291,13 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
 
   ctx.tools.register(defineTool({
     name: 'agent_teams_add_member',
-    description: 'Add a durable continuable member. By default it snapshots the captain\'s current LLM provider, model, and reasoning effort with no user prompt. Supply provider/model only for an explicitly requested role-specific route. Set reasoning_effort to override the inherited effort with one of the target model\'s supported ids (or "default" for the model\'s own default). The member waits for messages, works on assigned tasks, and can message the team.',
+    description: 'Add a durable continuable member. By default it snapshots the captain\'s current LLM route and effort. Supply provider/model only for an explicitly requested role-specific route; a changed provider or model automatically uses the target model\'s default effort. Set reasoning_effort only to request one of the target model\'s supported ids explicitly (or "default" to force its default). The member waits for messages, works on assigned tasks, and can message the team.',
     parameters: {
       name: { type: 'string', required: true, description: 'Unique member name inside the team.' },
       role: { type: 'string', description: 'Role of the member (e.g. researcher, engineer, reviewer).' },
       provider: { type: 'string', description: 'Optional LLM provider route. Use only when the user explicitly requests a different provider; requires model.' },
       model: { type: 'string', description: 'Optional model override. Omit for the captain\'s current model (or the configured memberModel default).' },
-      reasoning_effort: { type: 'string', description: 'Optional reasoning effort override: one of the target model\'s supported effort ids, or "default" for the model\'s own default. Omit to inherit the captain\'s current effort.' },
+      reasoning_effort: { type: 'string', description: 'Optional reasoning effort override: one of the target model\'s supported effort ids, or "default" to force its default. When omitted, the captain\'s effort is inherited only for the same provider/model; a changed route uses the target default.' },
     },
     output: {
       schema: {

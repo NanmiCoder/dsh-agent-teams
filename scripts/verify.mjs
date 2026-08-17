@@ -409,11 +409,25 @@ const captain = {
   },
 }
 const resolvedCalls = []
+const routeDefaultEfforts = new Map([
+  ['captain-provider/captain-model', 'high'],
+  ['captain-provider/configured-member-model', 'medium'],
+  ['other-provider/other-model', 'low'],
+])
 const selectionContext = {
   llm: {
     resolveCallConfig: async (config) => {
       resolvedCalls.push(config)
-      return config
+      const route = `${config.provider}/${config.model}`
+      if (route !== 'captain-provider/captain-model' && config.reasoningEffort === 'max') {
+        const error = new Error(`provider/model route ${route} does not support reasoning effort "max"`)
+        error.code = 'UNSUPPORTED_REASONING_EFFORT'
+        throw error
+      }
+      const defaultEffort = routeDefaultEfforts.get(route)
+      return config.reasoningEffort !== undefined || defaultEffort === undefined
+        ? config
+        : { ...config, reasoningEffort: defaultEffort }
     },
   },
 }
@@ -429,18 +443,41 @@ const overriddenSelection = await resolveMemberLlmSelection(selectionContext, ca
   model: 'other-model',
 })
 check(
-  'explicit cross-provider route keeps and validates captain effort',
+  'cross-provider route uses the target model default instead of captain effort',
   overriddenSelection.provider === 'other-provider'
     && overriddenSelection.model === 'other-model'
-    && resolvedCalls.at(-1)?.reasoningEffort === 'max',
+    && overriddenSelection.reasoningEffort === 'low'
+    && resolvedCalls.at(-1)?.reasoningEffort === undefined,
 )
 const defaultedSelection = await resolveMemberLlmSelection(selectionContext, captain, {
   defaultModel: 'configured-member-model',
 })
 check(
-  'plugin memberModel overrides only the model on the current provider',
+  'plugin memberModel route uses that target model default effort',
   defaultedSelection.provider === 'captain-provider'
-    && defaultedSelection.model === 'configured-member-model',
+    && defaultedSelection.model === 'configured-member-model'
+    && defaultedSelection.reasoningEffort === 'medium'
+    && resolvedCalls.at(-1)?.reasoningEffort === undefined,
+)
+const explicitEffortSelection = await resolveMemberLlmSelection(selectionContext, captain, {
+  provider: 'other-provider',
+  model: 'other-model',
+  reasoningEffort: 'high',
+})
+check(
+  'explicit member effort overrides cross-provider target default',
+  explicitEffortSelection.reasoningEffort === 'high'
+    && resolvedCalls.at(-1)?.reasoningEffort === 'high',
+)
+const forcedDefaultSelection = await resolveMemberLlmSelection(selectionContext, captain, {
+  reasoningEffort: 'default',
+})
+check(
+  'default sentinel opts out of same-route captain effort inheritance',
+  forcedDefaultSelection.provider === 'captain-provider'
+    && forcedDefaultSelection.model === 'captain-model'
+    && forcedDefaultSelection.reasoningEffort === 'high'
+    && resolvedCalls.at(-1)?.reasoningEffort === undefined,
 )
 let providerWithoutModelRejected = false
 try {
@@ -449,6 +486,13 @@ try {
   providerWithoutModelRejected = true
 }
 check('explicit provider without model is rejected', providerWithoutModelRejected)
+let emptyEffortRejected = false
+try {
+  await resolveMemberLlmSelection(selectionContext, captain, { reasoningEffort: '  ' })
+} catch {
+  emptyEffortRejected = true
+}
+check('empty explicit reasoning effort is rejected', emptyEffortRejected)
 
 let startSpec
 const spawnMemberRecord = {
@@ -574,7 +618,7 @@ check(
   'fresh child request receives the resolved reasoning effort',
   freshRoute.provider === 'other-provider'
     && freshRoute.model === 'other-model'
-    && freshRoute.reasoningEffort === 'max',
+    && freshRoute.reasoningEffort === 'low',
 )
 disposeFresh()
 

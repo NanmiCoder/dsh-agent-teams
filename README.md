@@ -92,9 +92,12 @@ Defaults work without extra setup. A trusted profile can override member behavio
     memberModel: deepseek-v4
     memberMaxDepth: 1
     maxMembers: 8
+    focusMode: true
 ```
 
 `memberProvider` is the sub-agent runtime backend (`spawn` / `fork`), not an LLM provider. Cross-LLM-provider routing uses the optional `provider` + `model` fields of `agent_teams_add_member`; `memberModel` is only a model default for all members. A member on the captain's current provider/model inherits the captain's reasoning effort, while a changed provider or model automatically uses the target model's default. To request a particular effort, pass the optional `reasoning_effort` field — one of the target model's supported effort ids, or `"default"` to force the model's own default.
+
+`focusMode` (default `false`) is a prompt-level guideline: when enabled, it asks the captain to only interrupt the human on completion, failure, or a decision that genuinely needs the user, and to batch the final team summary. It is not a hard notification filter — a model may still surface important updates. Set `true` to enable it.
 
 ## Boundaries
 

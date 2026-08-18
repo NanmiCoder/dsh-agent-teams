@@ -92,9 +92,12 @@ dsh web
     memberModel: deepseek-v4
     memberMaxDepth: 1
     maxMembers: 8
+    focusMode: true
 ```
 
 这里的 `memberProvider` 指子 Agent 的运行后端（`spawn` / `fork`），不是 LLM provider。跨 LLM provider 由 `agent_teams_add_member` 的可选 `provider` + `model` 参数表达；`memberModel` 只是所有成员的模型默认覆盖。成员沿用队长当前 provider/model 时会继承队长的思考强度；provider 或 model 任一改变时会自动使用目标模型的默认档。需要指定特定强度时，可传入可选的 `reasoning_effort` 参数（目标模型支持的档位 id，或 `"default"` 表示强制使用模型自身默认档）。
+
+`focusMode`（默认 `false`）是 prompt 层引导：开启后让队长尽量只在“完成 / 失败 / 真正需要人决策”时打扰你，并把最终结果批量总结。它不是硬性通知过滤器，模型仍可能上报重要更新。设为 `true` 开启。
 
 ## 使用边界
 

@@ -48,6 +48,7 @@ interface DispatchTicket {
   readonly previousAssignee?: string
   readonly subject: string
   readonly description?: string
+  readonly dependencyOutputs?: readonly { taskId: string; output: string }[]
 }
 
 function stateRootOf(workspace: string, config: SchedulerConfig): string {
@@ -83,9 +84,12 @@ function nextReadyTask(tasks: readonly TeamTask[], memberName: string): TeamTask
 
 function assignmentPrompt(ticket: DispatchTicket, stateDir: string, teamId: string): string {
   const description = ticket.description === undefined ? '' : `\n\n${ticket.description}`
+  const depOutputs = ticket.dependencyOutputs && ticket.dependencyOutputs.length > 0
+    ? `\n\nPrerequisite task results (outputs from tasks this task depends on):\n${ticket.dependencyOutputs.map(d => `--- ${d.taskId} ---\n${d.output}`).join('\n\n')}`
+    : ''
   return `AgentTeams automatic task assignment from the shared task list.
 
-Task: ${ticket.taskId} — ${ticket.subject}${description}
+Task: ${ticket.taskId} — ${ticket.subject}${description}${depOutputs}
 Attempt: ${ticket.attempt}
 Attempt id: ${ticket.attemptId}
 
@@ -193,6 +197,16 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
           const attemptId = beginTaskAttempt(task, currentMember.name)
           currentMember.status = 'working'
           await writeTeam(stateRoot, fresh)
+          // Collect outputs of completed dependency tasks so the assignee
+          // has the prerequisite results inline (avoids reading files).
+          const dependencyOutputs = task.dependencies
+            ?.map(depId => {
+              const dep = fresh.tasks.find(t => t.id === depId)
+              return dep?.status === 'completed' && dep.output
+                ? { taskId: depId, output: dep.output }
+                : undefined
+            })
+            .filter((x): x is { taskId: string; output: string } => x !== undefined)
           return {
             taskId: task.id,
             memberName: currentMember.name,
@@ -202,6 +216,7 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
             previousAssignee,
             subject: task.subject,
             description: task.description,
+            dependencyOutputs: dependencyOutputs?.length ? dependencyOutputs : undefined,
           }
         })
         if (ticket === undefined) return

@@ -85,7 +85,7 @@ function nextReadyTask(tasks: readonly TeamTask[], memberName: string): TeamTask
 function assignmentPrompt(ticket: DispatchTicket, stateDir: string, teamId: string): string {
   const description = ticket.description === undefined ? '' : `\n\n${ticket.description}`
   const depOutputs = ticket.dependencyOutputs && ticket.dependencyOutputs.length > 0
-    ? `\n\nPrerequisite task results (outputs from tasks this task depends on):\n${ticket.dependencyOutputs.map(d => `--- ${d.taskId} ---\n${d.output}`).join('\n\n')}`
+    ? `\n\nPrerequisite task results (outputs from tasks this task depends on):\n${ticket.dependencyOutputs.map(d => `--- ${d.taskId} ---\n${d.output.length > 2000 ? d.output.slice(0, 2000) + '\n...(truncated)' : d.output}`).join('\n\n')}`
     : ''
   return `AgentTeams automatic task assignment from the shared task list.
 

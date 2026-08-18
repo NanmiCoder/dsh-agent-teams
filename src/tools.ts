@@ -505,6 +505,9 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
             // Forward reference: the dependency may be created later in this same
             // batch of parallel tool calls. Store it; claim_task will reject if
             // the dependency never materializes.
+            // TODO: if the dependency never materializes (e.g. t1 creation failed),
+            // task t3 will silently stay pending forever. Consider adding a
+            // validation hook after the parallel batch completes.
           }
         }
         if (args.assignee !== undefined) requireMember(fresh, args.assignee)

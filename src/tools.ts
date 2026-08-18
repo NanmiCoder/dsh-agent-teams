@@ -494,8 +494,17 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
         const fresh = await requireFreshCaptainTeam(stateRoot, team.id, captain.id)
         const dependencies = args.dependencies ?? []
         for (const dependency of dependencies) {
+          // Allow forward references: tasks created in the same batch may reference
+          // task ids that have not been inserted yet (e.g. t3 depends on t1, t2
+          // when all three are created in parallel). The dependency is validated
+          // lazily at claim time; here we only check the id format.
+          if (!/^t\d+$/.test(dependency)) {
+            throw new Error(`dependency "${dependency}" is not a valid task id (expected format like "t1")`)
+          }
           if (!fresh.tasks.some((task) => task.id === dependency)) {
-            throw new Error(`dependency "${dependency}" does not exist in team "${fresh.name}"`)
+            // Forward reference: the dependency may be created later in this same
+            // batch of parallel tool calls. Store it; claim_task will reject if
+            // the dependency never materializes.
           }
         }
         if (args.assignee !== undefined) requireMember(fresh, args.assignee)

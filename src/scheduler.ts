@@ -89,7 +89,7 @@ Task: ${ticket.taskId} — ${ticket.subject}${description}
 Attempt: ${ticket.attempt}
 Attempt id: ${ticket.attemptId}
 
-Call agent_teams_claim_task for ${ticket.taskId}; it will return this same attempt_id. Include attempt_id=${ticket.attemptId} in every agent_teams_update_task call. If it is rejected as stale, stop work because the task was reassigned. Work only this task in this turn, report the result to the captain, then become idle so the scheduler can select your next ready task.
+Call agent_teams_claim_task for ${ticket.taskId}; it will return this same attempt_id. Include attempt_id=${ticket.attemptId} in every agent_teams_update_task call. You already know the attempt_id (${ticket.attemptId}) from this message, so you MAY call agent_teams_claim_task and agent_teams_update_task(status=in_progress) in the SAME response to save a round-trip. If it is rejected as stale, stop work because the task was reassigned. Work only this task in this turn, then call agent_teams_update_task(completed) and agent_teams_send_message(to=captain) together in one response, and become idle so the scheduler can select your next ready task.
 
 State policy: ${stateDir}/${teamId}/ is read-only diagnostics; mutate team state only through agent_teams_* tools.`
 }

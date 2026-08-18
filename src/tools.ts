@@ -482,7 +482,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
       },
       render: (args, value) => [{
         type: 'text',
-        text: `Task "${value.subject}" created as ${value.task_id} (status ${value.status}${value.assignee ? `, assigned to ${value.assignee}` : ''}).`,
+        text: `Task "${value.subject}" created as ${value.task_id} (status ${value.status}${value.assignee ? `, assigned to ${value.assignee}` : ''}). The assignee has been auto-notified; do NOT call agent_teams_status to check — wait for the member's completion message.`,
       }],
     },
     async execute(args, exec) {
@@ -938,7 +938,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
 
   ctx.tools.register(defineTool({
     name: 'agent_teams_status',
-    description: 'Team snapshot: members with live activity and tasks with status/assignee/dependencies/output. Captains also see every team mailbox; members see only their own inbox. Poll this to watch progress.',
+    description: 'Team snapshot: members with live activity and tasks with status/assignee/dependencies/output. Captains also see every team mailbox; members see only their own inbox. Call this sparingly to check progress — do NOT poll in a loop; members report completion to the captain via messages automatically.',
     parameters: {},
     output: {
       schema: { type: 'object', additionalProperties: true, properties: {} },

@@ -62,7 +62,7 @@ export interface TeamMember {
   provider?: string
   /** Resolved model captured when this member was created. */
   model?: string
-  /** Resolved reasoning effort captured from the captain's current session. */
+  /** Resolved reasoning effort captured from the captain or target model default. */
   reasoningEffort?: string
   joinedAt: number
   status: MemberStatus

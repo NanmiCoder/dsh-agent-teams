@@ -30,13 +30,21 @@ import {
   relatedTaskIds,
   usesParallelTaskGrid,
 } from './activity-model.ts'
+import {
+  getActivityMonitorTargetsSnapshot,
+  getActivitySnapshotsSnapshot,
+  startActivityPolling,
+  subscribeActivityMonitorTargets,
+  subscribeActivitySnapshots,
+  type ActivityMember,
+  type ActivityTask,
+  type ActivityTeam,
+} from './activity-monitor.ts'
 import { ACTION_ART, LEAD_ART, memberArtUrl } from './artwork.ts'
 import { OPEN_PANEL_EVENT } from './AgentTeamsCard.tsx'
 import type { AgentTeamsCardData } from './agent-teams-card-definition.ts'
 import css from './ActivityPanel.module.css'
 
-/** Poll cadence for the host snapshot route. */
-const POLL_MS = 1000
 /** Grace before the panel collapses once no team remains. */
 const AUTOCLOSE_GRACE_MS = 2000
 /**
@@ -45,54 +53,8 @@ const AUTOCLOSE_GRACE_MS = 2000
  * right after load. New activity after this window auto-expands as usual.
  */
 const AUTO_OPEN_SETTLE_MS = 4000
-/** Host route serving team snapshots. */
-const STATE_URL = '/plugins/dsh-agent-teams/state'
 /** Root marker shared with the panel CSS while the portal is expanded. */
 const PANEL_OPEN_ATTRIBUTE = 'data-agent-teams-panel-open'
-
-/** One member row of a host snapshot. */
-export interface ActivityMember {
-  readonly id: string
-  readonly name: string
-  readonly role: string
-  readonly status?: 'idle' | 'working' | 'removed'
-  readonly activity: 'working' | 'idle' | 'unknown'
-  readonly progress: number
-  readonly done: number
-  readonly total: number
-  readonly currentTask: string
-  readonly unread: number
-}
-
-/** One task row of a host snapshot. */
-export interface ActivityTask {
-  readonly id: string
-  readonly subject: string
-  readonly status: string
-  readonly state: 'blocked' | 'open' | 'running' | 'completed'
-  readonly assignee: string
-  readonly dependencies: readonly string[]
-  readonly depth: number
-}
-
-/** One captain-inbox preview row. */
-export interface ActivityMessage {
-  readonly from: string
-  readonly content: string
-}
-
-/** One team snapshot (mirrors the host TeamActivitySnapshot). */
-export interface ActivityTeam {
-  readonly workspace: string
-  readonly teamId: string
-  readonly name: string
-  readonly description?: string
-  readonly captainSessionId: string
-  readonly members: readonly ActivityMember[]
-  readonly tasks: readonly ActivityTask[]
-  readonly messageCount: number
-  readonly captainInbox: readonly ActivityMessage[]
-}
 
 /** Initial-letter fallback for unmatched roles. */
 function memberInitial(name: string): string {
@@ -516,8 +478,6 @@ export function ActivityPanel({ sessionsList, openSession }: {
     setWasActive(false)
     openSession(id)
   }
-  const [teams, setTeams] = useState<readonly ActivityTeam[]>([])
-  const [archivedTeams, setArchivedTeams] = useState<readonly ActivityTeam[]>([])
   const [open, setOpen] = useState(false)
   const [openOwner, setOpenOwner] = useState<SessionId | undefined>()
   const [autoOpened, setAutoOpened] = useState(false)
@@ -527,6 +487,18 @@ export function ActivityPanel({ sessionsList, openSession }: {
     sessionsList.subscribe,
     sessionsList.getSnapshot,
   ).current
+  const monitorTargets = useSyncExternalStore(
+    subscribeActivityMonitorTargets,
+    getActivityMonitorTargetsSnapshot,
+  )
+  const { teams, archivedTeams } = useSyncExternalStore(
+    subscribeActivitySnapshots,
+    getActivitySnapshotsSnapshot,
+  )
+  const currentTargets = useMemo(
+    () => current === undefined ? [] : monitorTargets.filter((target) => target.sessionId === current),
+    [current, monitorTargets],
+  )
   const currentRef = useRef(current)
   useEffect(() => { currentRef.current = current }, [current])
   const mountedAtRef = useRef(performance.now())
@@ -555,37 +527,12 @@ export function ActivityPanel({ sessionsList, openSession }: {
   }, [expanded])
 
   useEffect(() => {
-    let cancelled = false
-    let inFlight = false
-    const tick = async (): Promise<void> => {
-      if (inFlight || cancelled) return
-      inFlight = true
-      try {
-        const [liveResponse, archivedResponse] = await Promise.all([
-          fetch(STATE_URL, { cache: 'no-store' }),
-          fetch(`${STATE_URL}?archived=1`, { cache: 'no-store' }),
-        ])
-        if (liveResponse.ok) {
-          const body = (await liveResponse.json()) as { teams?: unknown }
-          if (!cancelled && Array.isArray(body.teams)) setTeams(body.teams as readonly ActivityTeam[])
-        }
-        if (archivedResponse.ok) {
-          const body = (await archivedResponse.json()) as { teams?: unknown }
-          if (!cancelled && Array.isArray(body.teams)) setArchivedTeams(body.teams as readonly ActivityTeam[])
-        }
-      } catch {
-        // Host restarting; keep the last snapshot.
-      } finally {
-        inFlight = false
-      }
-    }
-    void tick()
-    const timer = setInterval(() => { void tick() }, POLL_MS)
-    return () => {
-      cancelled = true
-      clearInterval(timer)
-    }
-  }, [])
+    // Installing the plugin alone must not touch the state route. A successful
+    // AgentTeams conversation card registers the demand that reaches here.
+    if (currentTargets.length === 0) return
+    const controller = startActivityPolling(currentTargets)
+    return () => { controller.stop() }
+  }, [currentTargets])
 
   useEffect(() => {
     const onOpenPanel = (event: Event): void => {

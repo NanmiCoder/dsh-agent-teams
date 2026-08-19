@@ -38,6 +38,13 @@ import {
   taskStages,
   usesParallelTaskGrid,
 } from '../lib/client/activity-model.js'
+import {
+  getActivityMonitorTargetsSnapshot,
+  monitorAgentTeam,
+  settleActivityMonitorTargets,
+  startActivityPolling,
+  subscribeActivityMonitorTargets,
+} from '../lib/client/activity-monitor.js'
 import { parseAgentTeamsCreateArgs } from '../lib/client/agent-teams-card-definition.js'
 import { steerCaptainReport } from '../lib/tools.js'
 import {
@@ -105,6 +112,7 @@ check(
 )
 const activityPanelCss = await readFile(new URL('../src/client/ActivityPanel.module.css', import.meta.url), 'utf8')
 const activityPanelSource = await readFile(new URL('../src/client/ActivityPanel.tsx', import.meta.url), 'utf8')
+const agentTeamsCardSource = await readFile(new URL('../src/client/AgentTeamsCard.tsx', import.meta.url), 'utf8')
 const requiredHarnessTokenBridges = [
   '--dsw-alias-line-normal: var(--dsw-static-neutral-bluish-150',
   '--dsw-alias-bg-module: var(--dsw-alias-bg-layer-1',
@@ -136,6 +144,15 @@ check(
     && activityPanelCss.includes(".dagNode[data-state='running'][data-dimmed='true']")
     && activityPanelCss.includes('.dagRunningState {'),
   'running work should stay visible in both normal and dependency-focus states',
+)
+check(
+  'activity polling is dormant until a successful team card requests monitoring',
+  activityPanelSource.includes('if (currentTargets.length === 0) return')
+    && activityPanelSource.includes('startActivityPolling(currentTargets)')
+    && agentTeamsCardSource.includes('monitorAgentTeam(owner, data.teamId)')
+    && !agentTeamsCardSource.includes('setInterval(')
+    && !agentTeamsCardSource.includes('fetch('),
+  'the global panel must be demand-gated and cards must not start duplicate polling loops',
 )
 
 console.log('2/8 pure rules')
@@ -368,6 +385,104 @@ check(
   activityPanelExpandedForSession(true, 'session-a', 'session-a')
     && !activityPanelExpandedForSession(true, 'session-a', 'session-b')
     && !activityPanelExpandedForSession(true, 'session-a', undefined),
+)
+let monitorNotifications = 0
+const unsubscribeMonitor = subscribeActivityMonitorTargets(() => { monitorNotifications += 1 })
+const releaseMonitorOne = monitorAgentTeam('verify-session', 'verify-team')
+const releaseMonitorTwo = monitorAgentTeam('verify-session', 'verify-team')
+const registeredMonitor = getActivityMonitorTargetsSnapshot()[0]
+check(
+  'activity monitor coalesces duplicate cards into one shared target',
+  getActivityMonitorTargetsSnapshot().length === 1
+    && registeredMonitor?.sessionId === 'verify-session'
+    && registeredMonitor.teamId === 'verify-team',
+)
+releaseMonitorOne()
+check('one card cleanup keeps another card monitoring', getActivityMonitorTargetsSnapshot().length === 1)
+if (registeredMonitor !== undefined) settleActivityMonitorTargets(new Set([registeredMonitor.key]))
+check('archived targets retire from polling', getActivityMonitorTargetsSnapshot().length === 0)
+releaseMonitorTwo()
+unsubscribeMonitor()
+check('activity monitor publishes lifecycle changes without duplicate-card churn', monitorNotifications === 2)
+
+let dormantFetches = 0
+let dormantSchedules = 0
+const dormantPoller = startActivityPolling([], {
+  fetchState: async () => {
+    dormantFetches += 1
+    return { ok: true, json: async () => ({ teams: [] }) }
+  },
+  schedule: () => {
+    dormantSchedules += 1
+    return 0
+  },
+})
+await dormantPoller.firstTick
+dormantPoller.stop()
+check(
+  'no monitor targets create no request and no timer',
+  dormantFetches === 0 && dormantSchedules === 0,
+)
+
+const pollTarget = { key: 'poll-target', sessionId: 'poll-session', teamId: 'poll-team' }
+let resolveSlowLive
+const slowLive = new Promise((resolve) => { resolveSlowLive = resolve })
+const slowFetchSignals = []
+let slowFetchCount = 0
+let scheduledTick
+let cancelledTimer = false
+let latePublications = 0
+const slowPoller = startActivityPolling([pollTarget], {
+  fetchState: async (_url, init) => {
+    slowFetchCount += 1
+    slowFetchSignals.push(init.signal)
+    return slowLive
+  },
+  schedule: (callback) => {
+    scheduledTick = callback
+    return 'slow-timer'
+  },
+  cancel: (timer) => { cancelledTimer = timer === 'slow-timer' },
+  publishSnapshots: () => { latePublications += 1 },
+})
+scheduledTick?.()
+scheduledTick?.()
+await Promise.resolve()
+check('a slow state request never overlaps the next interval', slowFetchCount === 1)
+slowPoller.stop()
+check(
+  'stopping activity polling clears its timer and aborts the in-flight request',
+  cancelledTimer && slowFetchSignals[0]?.aborted === true,
+)
+resolveSlowLive?.({ ok: true, json: async () => ({ teams: [] }) })
+await slowPoller.firstTick
+check('a late response after stop cannot publish snapshots', latePublications === 0)
+
+const fallbackUrls = []
+const settledFallbackKeys = []
+let fallbackResponseIndex = 0
+const fallbackResponses = [
+  { ok: true, json: async () => ({ teams: [] }) },
+  { ok: true, json: async () => ({ teams: [] }) },
+]
+const fallbackPoller = startActivityPolling([pollTarget], {
+  fetchState: async (url) => {
+    fallbackUrls.push(url)
+    return fallbackResponses[fallbackResponseIndex++]
+  },
+  schedule: () => 'fallback-timer',
+  cancel: () => {},
+  publishSnapshots: () => {},
+  settleTargets: (keys) => { settledFallbackKeys.push(...keys) },
+})
+await fallbackPoller.firstTick
+fallbackPoller.stop()
+check(
+  'a live miss checks archive once and retires even an orphaned legacy card',
+  fallbackUrls.length === 2
+    && fallbackUrls[1]?.endsWith('?archived=1')
+    && settledFallbackKeys.length === 1
+    && settledFallbackKeys[0] === pollTarget.key,
 )
 check(
   'agent team cards derive a stable id from the standard create tool call',

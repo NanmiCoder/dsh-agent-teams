@@ -80,6 +80,27 @@ Team state is stored under `<workspace>/.agent-teams/`; the Web panel reads that
 
 Member creation is zero-interaction by default: the plugin snapshots the LLM provider, model, and reasoning effort actually used by the captain's current step, and restores that snapshot on later continuations. Only an explicit heterogeneous-team request (for example, “backend on provider A/model X, frontend on provider B/model Y”) supplies a member-specific `provider` + `model`; there is no per-member model or reasoning prompt.
 
+## Slash command
+
+No “use AgentTeams” phrasing required. The plugin registers the
+closed-namespace `/agent-teams` host command, so the Web GUI slash menu shows
+an `agent-teams` placeholder with an input hint: pick it (or type the
+command), describe the goal, and press Enter.
+
+```
+/agent-teams research the pricing pages of three competitors
+```
+
+The line is claimed by the command pipeline and never reaches the model as
+plain text — the handler queues one deterministic activation message as an
+ordinary follow-up turn, so the captain protocol starts immediately. The
+invocation is durably logged (`command/run` / `command/done`).
+
+Surfaces without command adjudication (for example the headless CLI) get the
+same deterministic activation through a gesture boundary: any genuine user
+message starting with `/agent-teams` activates the protocol for the rest of
+the text. Mid-sentence mentions stay ordinary prose.
+
 ## Configuration
 
 Defaults work without extra setup. A trusted profile can override member behavior:
@@ -95,6 +116,8 @@ Defaults work without extra setup. A trusted profile can override member behavio
 ```
 
 `memberProvider` is the sub-agent runtime backend (`spawn` / `fork`), not an LLM provider. Cross-LLM-provider routing uses the optional `provider` + `model` fields of `agent_teams_add_member`; `memberModel` is only a model default for all members.
+
+`slashCommand: false` disables the deterministic `/agent-teams` activation surfaces (slash command and gesture boundary), leaving the natural-language trigger as the only entry point.
 
 ## Boundaries
 

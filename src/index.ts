@@ -26,6 +26,7 @@ import type {} from '@deepseek-ai/dsh-system-prompt'
 import type { WorkspaceRegistry } from '@deepseek-ai/dsh-workspace'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { registerAgentTeamsTools, type ToolsConfig } from './tools.ts'
+import { installAgentTeamsGestureBoundary, registerAgentTeamsCommand } from './command.ts'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -71,6 +72,12 @@ export interface Config {
   maxMembers?: number
   /** Prompt-section order for the usage policy (default `117`, after delegation policy). */
   promptSectionOrder?: number
+  /**
+   * Register the deterministic `/agent-teams` activation surfaces (the
+   * closed-namespace slash command and the plain-text gesture boundary).
+   * Disable to keep the natural-language trigger as the only entry point.
+   */
+  slashCommand?: boolean
 }
 
 export const Config: z<Config> = z.object({
@@ -80,11 +87,12 @@ export const Config: z<Config> = z.object({
   memberMaxDepth: z.natural().default(1),
   maxMembers: z.natural().min(1).default(8),
   promptSectionOrder: z.natural().default(117),
+  slashCommand: z.boolean().default(true),
 })
 
 /** The model-facing usage policy: when and how to drive AgentTeams. */
 function usageSectionText(toolNames: string): string {
-  return `When the user asks to run something with AgentTeams (e.g. "use AgentTeams to do X"), you are the captain of a multi-agent team. Follow this protocol:
+  return `When the user asks to run something with AgentTeams (e.g. "use AgentTeams to do X"), or an activation message from the /agent-teams slash command arrives, you are the captain of a multi-agent team. Follow this protocol:
 1. Call agent_teams_create with a team name and the goal as description. You become the captain and may lead one team at a time.
 2. Call agent_teams_add_member once per role the goal needs (researcher, engineer, reviewer, ...). Members are durable subagents: they wait for your messages, then work a full turn. By default each member snapshots your current provider, model, and reasoning effort. Never ask the user to choose these per member; only pass provider/model when the user explicitly requests a different route for that role.
 3. Break the goal into tasks with agent_teams_create_task and wire dependencies. Assign role-specific work when useful; unassigned ready work belongs to the shared pool. The scheduler automatically claims one ready task for each truly idle member and wakes it, including across later rounds.
@@ -130,6 +138,23 @@ export function apply(ctx: Context, config: Config): void {
   })
 
   registerAgentTeamsTools(ctx, resolved)
+
+  // Deterministic activation surfaces: the closed-namespace `/agent-teams`
+  // host command (surfaces in the Web GUI slash menu via the Harness
+  // ui-commands client) and the plain-text gesture boundary for surfaces
+  // without command adjudication (headless CLI). Both default on; a profile
+  // can disable them to keep the natural-language trigger exclusive.
+  //
+  // `commands` is registered lazily (not a required inject): it ships in the
+  // base bundle of every standard profile, but a minimal composition that
+  // omits the command registry keeps the plugin fully functional — the fiber
+  // never pends on it and simply never gains the slash command.
+  if (config.slashCommand ?? true) {
+    ctx.inject(['commands'], (commandCtx) => {
+      registerAgentTeamsCommand(commandCtx)
+    })
+    installAgentTeamsGestureBoundary(ctx)
+  }
 
   // The activity panel data/artwork routes need the Web server and the
   // workspace registry, which headless profiles do not mount; under

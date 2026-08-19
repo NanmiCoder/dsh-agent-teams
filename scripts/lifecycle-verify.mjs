@@ -12,6 +12,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { registerAgentTeamsTools } from '../lib/tools.js'
+import { buildActivationDirective, invokedAgentTeamsGoal, registerAgentTeamsCommand } from '../lib/command.js'
 import { readArchivedTeam, readTeam, readUnreadMailbox } from '../lib/state.js'
 import { collectArchivedTeamsActivity } from '../lib/snapshot.js'
 
@@ -49,6 +50,10 @@ function makeAgent(id, parentSession) {
     status: 'idle',
     options: { provider: 'fake', model: 'fake-model' },
     session: session(parentSession),
+    followups: [],
+    followup(message) {
+      this.followups.push(message)
+    },
     steer() {},
     cancel() {},
     whenIdle() {
@@ -164,6 +169,52 @@ const state = () => readTeam(stateRoot, teamId)
 const task = async id => (await state())?.tasks.find(candidate => candidate.id === id)
 
 console.log('dsh-agent-teams lifecycle verification')
+
+// ── /agent-teams slash command and gesture boundary ───────────────────
+const commandDefinitions = new Map()
+ctx.commands = {
+  register(definition) {
+    commandDefinitions.set(definition.name, definition)
+  },
+}
+registerAgentTeamsCommand(ctx)
+
+const command = commandDefinitions.get('agent-teams')
+check('slash command registers as /agent-teams',
+  command !== undefined && typeof command.description === 'string' && command.description.length > 0)
+check('slash command advertises an input hint for the menu placeholder',
+  typeof command?.input?.hint === 'string' && command.input.hint.length > 0)
+
+const bare = command.handler({
+  agent: captain, rawInput: '   ', signal: new AbortController().signal, commandId: 'cmd-bare',
+})
+check('bare /agent-teams reports usage instead of activating',
+  bare.kind === 'error' && bare.text.includes('Usage: /agent-teams')
+    && captain.followups.length === 0)
+
+const goal = 'ship a tiny CLI'
+const activated = command.handler({
+  agent: captain, rawInput: `  ${goal}  `, signal: new AbortController().signal, commandId: 'cmd-goal',
+})
+check('argued /agent-teams queues one deterministic activation turn',
+  activated.kind === 'success' && captain.followups.length === 1)
+const activation = captain.followups[0]
+check('activation carries the command source and the goal',
+  activation?.source?.kind === 'agent-teams-command' && activation.source.goal === goal
+    && activation.content.some(block => block.type === 'text' && block.text.includes(goal)))
+check('activation directive names the protocol', buildActivationDirective(goal).includes('AgentTeams protocol'))
+
+const userMessage = text => ({ id: 'm', role: 'user', content: [{ type: 'text', text }], source: { kind: 'user' } })
+check('gesture recognizes a leading /agent-teams token',
+  invokedAgentTeamsGoal([userMessage('/agent-teams ship a CLI')]) === 'ship a CLI')
+check('bare gesture yields an empty goal', invokedAgentTeamsGoal([userMessage('  /agent-teams')]) === '')
+check('mid-sentence mention stays ordinary prose',
+  invokedAgentTeamsGoal([userMessage('how do I use /agent-teams here?')]) === undefined)
+check('non-user sources cannot forge the gesture',
+  invokedAgentTeamsGoal([{ ...userMessage('/agent-teams x'), source: { kind: 'plugin', plugin: 'fake' } }]) === undefined)
+check('latest user gesture wins in a batch',
+  invokedAgentTeamsGoal([userMessage('/agent-teams first'), userMessage('/agent-teams second')]) === 'second')
+
 try {
   await call('agent_teams_create', { name: 'Lifecycle', description: 'adversarial DAG' })
   const addedAlpha = await call('agent_teams_add_member', { name: 'alpha', role: 'slow implementer' })

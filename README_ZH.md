@@ -80,6 +80,18 @@ dsh web
 
 成员创建默认零交互：插件会快照队长**当前这一步**实际使用的 LLM provider、model 与思考强度，成员后续续跑仍使用这份快照。只有当用户明确提出异构分工（例如“后端用 provider A/model X，前端用 provider B/model Y”）时，队长才会把对应的 `provider` + `model` 传给该成员；不会逐个弹出模型或思考强度选择。
 
+## Slash 命令
+
+无需再说“用 AgentTeams”。插件注册了封闭命名空间的 `/agent-teams` 宿主命令，Web GUI 的 slash 菜单会显示 `agent-teams` 占位项与输入提示：选中它（或直接输入命令）、描述目标、回车即可。
+
+```
+/agent-teams 调研三家竞品的定价页
+```
+
+这一行会被命令管线认领，**不会**以纯文本形式发给模型——处理器会以一条确定性激活消息排队一个普通跟进回合，队长协议立即启动。调用会持久化记录（`command/run` / `command/done`）。
+
+没有命令裁决的表面（例如 headless CLI）也享有同等的确定性激活：任何以 `/agent-teams` 开头的真实用户消息，都会为其余文本激活该协议；句子中间出现的字样仍是普通文本。
+
 ## 配置
 
 默认配置可以直接使用。受信任的 Profile 可以覆盖成员行为：
@@ -95,6 +107,8 @@ dsh web
 ```
 
 这里的 `memberProvider` 指子 Agent 的运行后端（`spawn` / `fork`），不是 LLM provider。跨 LLM provider 由 `agent_teams_add_member` 的可选 `provider` + `model` 参数表达；`memberModel` 只是所有成员的模型默认覆盖。
+
+`slashCommand: false` 可关闭确定性的 `/agent-teams` 激活面（slash 命令与手势边界），仅保留自然语言触发。
 
 ## 使用边界
 

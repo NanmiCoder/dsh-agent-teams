@@ -3,3 +3,4 @@ lib/
 *.tsbuildinfo
 .DS_Store
 .agent-teams/
+.commandcode/

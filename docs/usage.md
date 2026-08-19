@@ -1,95 +1,95 @@
-# 使用指南（详细）
+# Usage Guide (detailed)
 
-本文档收纳 dsh-agent-teams 的详细使用内容：工作原理、Web UI 行为、工具一览、配置与已知限制。README 只保留简介与快速上手。
+This document collects the detailed usage of dsh-agent-teams: how it works, Web UI behavior, tool reference, configuration, and known limits. The README keeps only the introduction and quick start.
 
-## 工作原理
+## How it works
 
-`dsh-agent-teams` 复用 DSH 的能力接缝（capability seam），不依赖 workflow 引擎：
+`dsh-agent-teams` reuses DSH capability seams instead of depending on a workflow engine:
 
-| DSH 能力 | AgentTeams 用法 |
+| DSH capability | AgentTeams usage |
 |---|---|
-| `ctx.tools` 注册表 | 注册 10 个 `agent_teams_*` 工具（与 `tool-workflow` 同一注册路径） |
-| `ctx.subagents.startContinuable()` | 创建成员：durable 可续聊子代理，带成员 persona |
-| `ctx.subagents.followup()` | 唤醒收件成员（消息进入其下一轮次） |
-| `ctx.subagents.listChildren()` + `ctx.agents` | 前者发现 durable 成员，后者提供真实 `running / idle / ready` 活动状态 |
-| `agent/status` | 成员进入 idle 后触发共享任务池自动续领与下一轮唤醒 |
-| `ctx.systemPrompt.section()` | 注册"AgentTeams 使用策略"提示段 |
-| Web server 路由注册 | 活动面板数据路由 `/plugins/dsh-agent-teams/state` + 鲸鱼图片静态服务（`webServer`/`httpServer` 双键兼容，见下） |
-| 文件系统 | 团队状态持久化在 `<workspace>/.agent-teams/<teamId>/` |
+| `ctx.tools` registry | Registers 10 `agent_teams_*` tools (same registration path as `tool-workflow`) |
+| `ctx.subagents.startContinuable()` | Creates members: durable continuable subagents with a member persona |
+| `ctx.subagents.followup()` | Wakes the recipient member (messages enter its next turn) |
+| `ctx.subagents.listChildren()` + `ctx.agents` | The former discovers durable members; the latter provides real `running / idle / ready` activity status |
+| `agent/status` | After a member becomes idle, triggers automatic claims from the shared task pool and the next round of wake-ups |
+| `ctx.systemPrompt.section()` | Registers the "AgentTeams usage policy" prompt section |
+| Web server route registration | Activity panel data route `/plugins/dsh-agent-teams/state` + whale artwork static serving (dual-key `webServer`/`httpServer` compatibility, see below) |
+| File system | Team state persists under `<workspace>/.agent-teams/<teamId>/` |
 
-数据链路：工具执行 → 磁盘状态（真相源）→ host 快照路由 → 浮层 1s 轮询渲染；会话日志同时写入 `agent-teams/*` 事件（审计/重放/复盘）。
+Data chain: tool execution → disk state (source of truth) → host snapshot route → floater 1s polling render; the session log also records `agent-teams/*` events (audit/replay/retrospective).
 
-> **内测版本兼容**：npm `latest`（`0.0.1-rc.1`）的服务键仍是 `ctx.httpServer` / `ctx.workspace`，后续 `next`（`rc.2`）重命名为 `ctx.webServer` / `ctx.workspaceRegistry`。插件对两组键都做了探测（新键优先、旧键回退，`internal/service` 事件同时监听两组），两个版本都能注册路由。
+> **Beta version compatibility**: npm `latest` (`0.0.1-rc.1`) still uses the service keys `ctx.httpServer` / `ctx.workspace`; later `next` (`rc.2`) renames them to `ctx.webServer` / `ctx.workspaceRegistry`. The plugin probes both key sets (new keys first, old keys as fallback, and listens to `internal/service` events for both), so routes register on both versions.
 
 ### Web UI
 
-- **右上角活动面板**（body-portal 浮层）：团队创建后自动展开；每个团队展示队长、分段总进度、状态统计、可折叠成员树和紧凑任务 DAG。DAG 以真实 SVG 曲线连接依赖，悬停或键盘聚焦可预览完整上下游链，点击固定，`Esc` 取消；选中节点会显示负责人、未满足前置和下游解锁信息。成员行展示职业头像、角色、实时状态和任务标签，点击可打开成员子会话。收起态为右上角小浮标（团队数 + 活动脉冲点）。
-- **小鲸鱼形象**：队长/成员头像为 DeepSeek 小鲸鱼职业插画（`assets/agent-teams/`，8 角色 + 6 动作），按角色关键词匹配；状态动作小图随成员状态切换并带动画（工作浮动 / 空闲呼吸 / 未知思考），未读消息头像外圈光晕；遵循 `prefers-reduced-motion`。
-- **会话跟随**：面板只显示**当前会话**的团队（按 captainSessionId 匹配）；新建会话面板自动收起，切回团队会话恢复。
-- **对话流卡片**：团队创建时对话流出现轻量卡片（成员一览、点击跳转成员会话、"活动面板"按钮可重新激活已关闭的浮层）。
-- **历史复盘**：`agent_teams_delete` 将团队**归档保留**（`<stateRoot>/archive/<teamId>/`，成员、任务、依赖图和邮箱完整留存）；结束团队时成员会被标记为 removed，但历史快照仍保留整支队伍，并以空闲/已交付状态展示，避免任务仍在而成员消失。打开历史会话点卡片即可恢复同一套成员树与 DAG。
+- **Top-right activity panel** (body-portal floater): auto-expands after a team is created; each team shows the captain, segmented overall progress, status stats, a collapsible member tree, and a compact task DAG. The DAG connects dependencies with real SVG curves; hover or keyboard focus previews the full upstream/downstream chain, click pins, `Esc` unpins; the selected node shows its assignee, unsatisfied prerequisites, and downstream unlocks. Member rows show the role avatar, role, live status, and task chips; clicking opens the member's sub-session. The collapsed state is a small top-right badge (team count + activity pulse dot).
+- **Whale mascots**: captain/member avatars are DeepSeek whale role illustrations (`assets/agent-teams/`, 8 roles + 6 actions), matched by role keywords; the status action thumbnail switches with member state and animates (working float / idle breathing / unknown thinking); unread messages add an outer glow ring around the avatar; honors `prefers-reduced-motion`.
+- **Session following**: the panel only shows the **current session's** teams (matched by `captainSessionId`); a new session collapses the panel, switching back to the team session restores it.
+- **Conversation card**: when a team is created, a lightweight card appears in the conversation (member overview, click to jump to a member session, "Activity panel" button re-activates a closed floater).
+- **Historic review**: `agent_teams_delete` **archives** the team (`<stateRoot>/archive/<teamId>/`, keeping members, tasks, dependency graph, and mailboxes intact); when a team ends, members are marked removed, but the historic snapshot still shows the whole roster in an idle/delivered state, so tasks don't linger while members disappear. Opening the historic session and clicking the card restores the same member tree and DAG.
 
-### 团队状态文件
+### Team state files
 
 ```
 <workspace>/.agent-teams/<teamId>/
-├── team.json            # 团队记录：成员、任务（含依赖）、任务序号
+├── team.json            # Team record: members, tasks (with dependencies), task sequence
 └── inbox/
-    ├── captain.jsonl    # 队长邮箱（成员 → 队长）
-    └── <member>.jsonl   # 每个成员一个邮箱（JSONL）
+    ├── captain.jsonl    # Captain mailbox (members → captain)
+    └── <member>.jsonl   # One mailbox per member (JSONL)
 ```
 
-任务状态机：`pending → claimed → in_progress → completed | failed | cancelled`。每次执行携带单调 `attempt` + 唯一 `attemptId`；转派先使旧 attempt 失效，再中断并等待旧成员安静，因此迟到更新无法覆盖新结果。领取前校验依赖，并禁止成员同时拥有两个未完成任务。
+Task state machine: `pending → claimed → in_progress → completed | failed | cancelled`. Each execution carries a monotonic `attempt` plus a unique `attemptId`; reassignment first invalidates the old attempt, then interrupts and waits for the old member to quiesce, so late updates cannot overwrite the new result. Claims validate dependencies and forbid a member from holding two unfinished tasks at once.
 
-## 工具一览
+## Tool reference
 
-| 工具 | 作用 |
+| Tool | Purpose |
 |---|---|
-| `agent_teams_create` | 创建团队，调用者成为队长（一个队长同时只带一个团队） |
-| `agent_teams_add_member` | 拉成员入队（spawn 可续聊子代理 + 成员 persona） |
-| `agent_teams_remove_member` | 安全移除成员：撤销 attempt、回收其未完成任务、等待中断收敛后重新调度 |
-| `agent_teams_create_task` | 创建任务，支持 `dependencies` 依赖声明与 `assignee` 指派 |
-| `agent_teams_reassign_task` | 原子重试/转派任务；`assignee=captain` 表示队长安全接管 |
-| `agent_teams_claim_task` | 领取任务（校验依赖；队长可代领，成员只能领自己的/未指派的） |
-| `agent_teams_update_task` | 携带当前 `attempt_id` 推进任务；拒绝旧 attempt 和终态结果覆盖 |
-| `agent_teams_send_message` | 任意成员→任意成员/队长：消息直达对方邮箱并唤醒对方（无队长转发；拒绝冒名 `from`） |
-| `agent_teams_status` | 团队全景：成员活动、任务清单、队长邮箱、各成员待读消息 |
-| `agent_teams_delete` | 结束团队：打断成员，团队目录**归档保留**（任务与依赖图、邮箱完整留存） |
+| `agent_teams_create` | Creates the team; the caller becomes captain (one captain leads one team at a time) |
+| `agent_teams_add_member` | Adds a member (spawn continuable subagent + member persona) |
+| `agent_teams_remove_member` | Safely removes a member: revokes attempts, reclaims unfinished tasks, waits for interruption to converge, then reschedules |
+| `agent_teams_create_task` | Creates a task with optional `dependencies` and `assignee` |
+| `agent_teams_reassign_task` | Atomically retries/reassigns a task; `assignee=captain` means safe captain takeover |
+| `agent_teams_claim_task` | Claims a task (validates dependencies; the captain can claim on behalf of others, members can only claim their own or unassigned work) |
+| `agent_teams_update_task` | Advances a task carrying the current `attempt_id`; rejects stale attempts and terminal-result overwrites |
+| `agent_teams_send_message` | Any member → any member/captain: messages land directly in the recipient's mailbox and wake them (no captain relay; impersonated `from` is rejected) |
+| `agent_teams_status` | Full team overview: member activity, task list, captain mailbox, unread messages per member |
+| `agent_teams_delete` | Ends the team: interrupts members, the team directory is **archived** (tasks, dependency graph, and mailboxes fully preserved) |
 
-`agent_teams_add_member` 默认不需要模型参数：成员沿用队长当前 LLM provider/model 时，会一并快照队长当前思考强度。用户明确要求某个角色使用其他模型时，可以同时传入可选的 `provider` + `model`；只覆盖 `model` 时沿用队长当前 LLM provider。provider 或 model 任一改变时，思考强度自动使用目标模型默认档；用户明确要求某个成员使用特定强度时，可以传入可选的 `reasoning_effort`（目标模型支持的档位 id，或 `"default"` 表示强制使用模型自身默认档）。插件不会为每个成员发起二次选择或弹窗。
+`agent_teams_add_member` needs no model parameters by default: when a member follows the captain's current LLM provider/model, it snapshots the captain's current reasoning effort. When the user explicitly asks for a different model for a role, the optional `provider` + `model` can be passed together; overriding only `model` keeps the captain's current LLM provider. When either provider or model changes, the reasoning effort automatically uses the target model's default; when the user explicitly asks for a specific effort for a member, the optional `reasoning_effort` can be passed (a supported effort id of the target model, or `"default"` to force the model's own default). The plugin never prompts per-member or shows dialogs.
 
-## 配置
+## Configuration
 
-在 profile 的 `cordis.patch.yml` 中覆盖：
+Override in the profile's `cordis.patch.yml`:
 
 ```yaml
 - id: agent-teams
   config:
-    stateDir: .agent-teams        # 团队状态目录名（工作区下）
-    memberProvider: spawn         # 子代理运行后端（spawn / fork），不是 LLM provider
-    memberModel: deepseek-v4      # 可选：成员模型覆盖
-    memberMaxDepth: 1             # 成员再委派深度上限（0 = 禁止）
-    maxMembers: 8                 # 团队人数上限
+    stateDir: .agent-teams        # Team state directory name (under the workspace)
+    memberProvider: spawn         # Subagent runtime backend (spawn / fork), not an LLM provider
+    memberModel: deepseek-v4      # Optional: member model override
+    memberMaxDepth: 1             # Member delegation depth cap (0 = forbidden)
+    maxMembers: 8                 # Team size cap
 ```
 
-最终优先级为：成员显式 `provider` + `model` / `model` → `memberModel` → 队长当前路由。成员沿用队长当前 provider/model 时继承队长的思考强度；provider 或 model 任一改变时自动使用目标模型的默认档。显式 `reasoning_effort`（目标模型支持的档位 id，或 `"default"`）优先，并在目标 provider/model 上创建前校验；不兼容时成员创建会明确失败。最终生效的 provider/model/思考强度会写入 `team.json`，供状态查询和成员冷恢复使用。
+Final precedence: explicit member `provider` + `model` / `model` → `memberModel` → captain's current route. Members following the captain's current provider/model inherit the captain's reasoning effort; changing either provider or model automatically uses the target model's default. An explicit `reasoning_effort` (a supported effort id of the target model, or `"default"`) wins and is validated before creation on the target provider/model; incompatible values fail member creation explicitly. The resolved provider/model/reasoning effort is written to `team.json`, used by status queries and member cold recovery.
 
-## 使用协议
+## Usage protocol
 
-插件提示段会指导模型按协议执行：建团队 → 按角色拉成员 → 拆任务并声明依赖 → 共享调度器自动领取并唤醒空闲成员 → 队长监控/引导 → 阻塞时先安全转派或接管 → 汇报后 `agent_teams_delete`。成员之间可以直接互发消息，无需队长中转。成员若在中断、异常结束或进程重启后变成 `idle/ready`，但磁盘上仍持有 `claimed/in_progress` 任务，调度器会撤销旧 capability、生成新 attempt 并重新唤醒同一成员。
+The plugin's prompt section guides the model to follow the protocol: build the team → add members by role → break down tasks and declare dependencies → the shared scheduler automatically claims and wakes idle members → the captain monitors/guides → when blocked, safely reassign or take over first → report, then `agent_teams_delete`. Members can message each other directly without captain relay. If a member becomes `idle/ready` after an interruption, abnormal exit, or process restart while still holding a `claimed/in_progress` task on disk, the scheduler revokes the old capability, generates a new attempt, and wakes the same member again.
 
-## 已知限制
+## Known limits
 
-- 调度是事件驱动而非常驻轮询；队长离线时无法冷恢复成员，任务和消息保留在磁盘，待队长恢复或调用状态工具后继续投递。
-- 一个队长同时只能带一个团队（与 Claude Code AgentTeams 一致）。
-- 成员 persona 替换部署默认 persona；成员仍拥有完整工具集（bash/fs/web 等）。
-- 团队状态为文件级持久化，多进程同时操作同一团队不保证一致（同一 dsh 进程内已用锁串行化）。
-- 活动面板读磁盘真相（1s 轮询），与会话日志事件流相互独立。
-- 右上角浮层通过 body portal 挂载；宽屏展开时主对话列平滑向左礼让空间，窄屏退回 overlay 模式，左侧导航保持不动。
-- 成员（模型）不总是严格走工具"仪式"（如完成时不调 `agent_teams_update_task`）——面板如实反映磁盘真相，队长以 `agent_teams_status`/文件为准汇总。
+- Scheduling is event-driven, not resident polling; while the captain is offline, members cannot be cold-recovered, tasks and messages stay on disk and are delivered once the captain recovers or calls a status tool.
+- One captain leads one team at a time (consistent with Claude Code AgentTeams).
+- The member persona replaces the deployment default persona; members still have the full toolset (bash/fs/web etc.).
+- Team state is file-level persistence; multiple processes operating on the same team are not guaranteed consistent (serialized with locks inside one dsh process).
+- The activity panel reads disk truth (1s polling), independent of the session log event stream.
+- The top-right floater mounts through a body portal; on wide screens the main conversation column smoothly yields space to the left, narrow screens fall back to overlay mode, and the left navigation stays put.
+- Members (models) do not always strictly follow the tool "ritual" (e.g. not calling `agent_teams_update_task` when done) — the panel truthfully reflects disk state, and the captain consolidates from `agent_teams_status`/files.
 
-## 验证
+## Verification
 
-- 离线与生命周期：`pnpm build && pnpm typecheck && pnpm verify`。除基础检查外，还包含 8 成员、31 节点多层 DAG（运行中扩展至 38 任务）的故障矩阵：并发接管/移除、50 次迟到写入、4 个开放任务冷重启、7 路认领竞争、40 次终态覆盖、42 条消息突发和最终归档；组合验证 `dsh --profile agent-teams-check --dump-config`
-- 真实 e2e：`dsh plugin --profile headless add <path>` 后 `dsh --profile headless "用 AgentTeams …"`，核对 `.agent-teams/` 状态文件与会话日志事件流
-- GUI：独立实例 + ego-browser（详见 `verification-guide.md`）
+- Offline and lifecycle: `pnpm build && pnpm typecheck && pnpm verify`. Besides the basic checks, this includes a failure matrix on an 8-member, 31-node multi-layer DAG (expanding to 38 tasks at runtime): concurrent takeover/removal, 50 late writes, 4 open tasks cold-restarted, 7-way claim contention, 40 terminal overwrites, 42-message bursts, and final archiving; composition check `dsh --profile agent-teams-check --dump-config`
+- Real e2e: `dsh plugin --profile headless add <path>` then `dsh --profile headless "Use AgentTeams …"`, then verify `.agent-teams/` state files and the session log event stream
+- GUI: standalone instance + ego-browser (see `verification-guide.md`)

@@ -2,7 +2,7 @@
 # composition of a dsh profile. The plugin registers its `agent_teams_*` tools
 # into the shared `tools` registry and one usage section into the global
 # system prompt, so every session of the profile can drive AgentTeams through
-# natural language ("用 AgentTeams 做 X").
+# natural language ("Use AgentTeams to do X").
 #
 # Install: `dsh plugin --profile <name> add <this package>` (npm or a local
 # path). The `dsh plugin` command pnpm-installs the package into the profile

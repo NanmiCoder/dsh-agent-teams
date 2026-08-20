@@ -194,16 +194,19 @@ export function apply(ctx: Context, config: Config): void {
     },
   }), 'agent-teams: activity route')
 
-  // Whale mascot artwork: serve the packaged role/action images to the
+  // Whale mascot artwork: serve the packaged V2 role/action images to the
   // activity panel. An explicit allowlist guards the route (no path
   // traversal); the images ship with the bundle (files: assets/).
   const artDir = fileURLToPath(new URL('../assets/agent-teams/', import.meta.url))
   const ART_ALLOWLIST = new Set([
-    'team-lead.png', 'researcher.png', 'engineer.png', 'designer.png',
-    'qa-engineer.png', 'security-reviewer.png', 'data-analyst.png',
-    'docs-coordinator.png', 'action-working.png', 'action-thinking.png',
-    'action-reporting.png', 'action-celebrating.png', 'action-sleeping.png',
-    'action-sending.png',
+    'team-lead-v2.png',
+    'member-researcher-v2.png', 'member-engineer-v2.png',
+    'member-qa-v2.png', 'member-designer-v2.png',
+    'member-security-v2.png', 'member-docs-v2.png',
+    'member-data-v2.png', 'member-operator-v2.png',
+    'action-working-v2.png', 'action-thinking-v2.png',
+    'action-reporting-v2.png', 'action-celebrating-v2.png',
+    'action-sleeping-v2.png', 'action-sending-v2.png',
   ])
     ctx.effect(() => webServer.register({
       kind: 'prefix',

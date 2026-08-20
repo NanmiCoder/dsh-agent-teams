@@ -113,6 +113,56 @@ check(
 const activityPanelCss = await readFile(new URL('../src/client/ActivityPanel.module.css', import.meta.url), 'utf8')
 const activityPanelSource = await readFile(new URL('../src/client/ActivityPanel.tsx', import.meta.url), 'utf8')
 const agentTeamsCardSource = await readFile(new URL('../src/client/AgentTeamsCard.tsx', import.meta.url), 'utf8')
+const artworkSource = await readFile(new URL('../src/client/artwork.ts', import.meta.url), 'utf8')
+const hostSource = await readFile(new URL('../src/index.ts', import.meta.url), 'utf8')
+const expectedArtwork = [
+  'team-lead-v2.png',
+  'member-researcher-v2.png', 'member-engineer-v2.png',
+  'member-qa-v2.png', 'member-designer-v2.png',
+  'member-security-v2.png', 'member-docs-v2.png',
+  'member-data-v2.png', 'member-operator-v2.png',
+  'action-working-v2.png', 'action-thinking-v2.png',
+  'action-reporting-v2.png', 'action-celebrating-v2.png',
+  'action-sleeping-v2.png', 'action-sending-v2.png',
+].sort()
+const artworkDir = new URL('../assets/agent-teams/', import.meta.url)
+const packagedArtwork = (await readdir(artworkDir)).sort()
+check(
+  'artwork directory contains exactly the V2 captain, eight members, and six actions',
+  JSON.stringify(packagedArtwork) === JSON.stringify(expectedArtwork),
+  `artwork = ${JSON.stringify(packagedArtwork)}`,
+)
+const artworkHeaders = await Promise.all(expectedArtwork.map(async (name) => {
+  const data = await readFile(new URL(name, artworkDir))
+  return {
+    name,
+    png: data.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])),
+    width: data.readUInt32BE(16),
+    height: data.readUInt32BE(20),
+    bitDepth: data[24],
+    colorType: data[25],
+  }
+}))
+check(
+  'all V2 artwork is 256x256 8-bit RGBA PNG',
+  artworkHeaders.every(image => image.png
+    && image.width === 256
+    && image.height === 256
+    && image.bitDepth === 8
+    && image.colorType === 6),
+  `invalid headers = ${JSON.stringify(artworkHeaders.filter(image => !image.png
+    || image.width !== 256
+    || image.height !== 256
+    || image.bitDepth !== 8
+    || image.colorType !== 6))}`,
+)
+check(
+  'client mapping and host allowlist reference every V2 artwork asset',
+  expectedArtwork.every(name => artworkSource.includes(name) || hostSource.includes(name))
+    && artworkSource.includes('member-data-v2.png')
+    && artworkSource.includes('member-operator-v2.png'),
+  'a packaged image is unreachable or one of the eighth-member mappings is missing',
+)
 const requiredHarnessTokenBridges = [
   '--dsw-alias-line-normal: var(--dsw-static-neutral-bluish-150',
   '--dsw-alias-bg-module: var(--dsw-alias-bg-layer-1',

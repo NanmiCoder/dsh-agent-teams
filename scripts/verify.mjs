@@ -45,6 +45,7 @@ import {
   startActivityPolling,
   subscribeActivityMonitorTargets,
 } from '../lib/client/activity-monitor.js'
+import { memberArtUrl } from '../lib/client/artwork.js'
 import { parseAgentTeamsCreateArgs } from '../lib/client/agent-teams-card-definition.js'
 import { steerCaptainReport } from '../lib/tools.js'
 import {
@@ -162,6 +163,21 @@ check(
     && artworkSource.includes('member-data-v2.png')
     && artworkSource.includes('member-operator-v2.png'),
   'a packaged image is unreachable or one of the eighth-member mappings is missing',
+)
+const eightRoleArtwork = [
+  ['Researcher', 'Researcher'],
+  ['Engineer', 'Backend Engineer'],
+  ['QA', 'QA Engineer'],
+  ['Designer', 'UI UX Designer'],
+  ['Security', 'Security Reviewer'],
+  ['Docs', 'Docs Writer'],
+  ['Data', 'Data Analyst'],
+  ['Operator', 'Release Operator'],
+].map(([name, role]) => memberArtUrl(name, role))
+check(
+  'canonical eight-member roster resolves to eight distinct role images',
+  eightRoleArtwork.every(Boolean) && new Set(eightRoleArtwork).size === 8,
+  `resolved artwork = ${JSON.stringify(eightRoleArtwork)}`,
 )
 const requiredHarnessTokenBridges = [
   '--dsw-alias-line-normal: var(--dsw-static-neutral-bluish-150',

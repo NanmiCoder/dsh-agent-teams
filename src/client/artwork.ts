@@ -12,8 +12,10 @@ export const ART_BASE = '/plugins/dsh-agent-teams/assets/'
 const ROLE_ART: ReadonlyArray<readonly [RegExp, string]> = [
   [/data|analys|metric|performance|数据|分析|指标|性能/, 'member-data-v2.png'],
   [/resear|investig|explor|study|研究|调查|探索|调研/, 'member-researcher-v2.png'],
-  [/engineer|dev\b|server|backend|\bapi\b|runtime|watcher|contract|工程|后端|服务|接口|开发|代码|编程/, 'member-engineer-v2.png'],
+  // Match compound QA titles (for example "QA Engineer") before the broad
+  // engineer bucket, otherwise an eight-role roster repeats the engineer art.
   [/\bqa\b|test|verif|quality|测试|质量|验证/, 'member-qa-v2.png'],
+  [/engineer|dev\b|server|backend|\bapi\b|runtime|watcher|contract|工程|后端|服务|接口|开发|代码|编程/, 'member-engineer-v2.png'],
   [/design|\bui\b|\bux\b|front|theme|accessib|设计|前端|主题|无障碍/, 'member-designer-v2.png'],
   [/secur|audit|risk|threat|review|安全|审计|审查|风险/, 'member-security-v2.png'],
   [/docs|writer|product|spec|撰写|文案|写作|文档|规范/, 'member-docs-v2.png'],

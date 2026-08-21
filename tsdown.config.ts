@@ -4,7 +4,7 @@
  *
  * - CJS closure-factory artifact: `window.__ModuleLoader__.load({ id,
  *   factory: (require) => ... })`; externals resolve through the loader
- *   module table (platform seed entries + the runtime store exemption).
+ *   module table (platform seed entries + parser-preloaded runtime rows).
  * - CSS Modules compiled by lightningcss into hashed class maps; the css
  *   text auto-injects a `<style data-plugin>` tag at factory execution.
  * - Every other @deepseek-ai value import is a build error (purity gate):
@@ -22,17 +22,14 @@ import { defineConfig, type UserConfig } from 'tsdown'
 const PLATFORM_MODULES = [
   'react', 'react/jsx-runtime', 'react-dom', 'react-dom/client', '@deepseek-ai/cordis',
   '@deepseek-ai/dsh-client-ui-slots',
-  '@deepseek-ai/dsh-client-web-react',
   '@deepseek-ai/dsh-client-ui-primitives',
-  '@deepseek-ai/dsh-client-ui-attachment',
-  '@deepseek-ai/dsh-client-schema-form',
 ]
 
-/** Runtime store engine: documented exemption, external at runtime. */
-const RUNTIME_STORE_EXEMPTION = '@deepseek-ai/dsh-client-runtime/client'
+/** Dynamic rows whose factories the rc.8 shell preloads before boot. */
+const PRELOADED_CLIENT_EXTERNALS = ['@deepseek-ai/dsh-client-runtime/client']
 
 /** Externals resolved from the loader module table. */
-const CLIENT_EXTERNALS: readonly string[] = [...PLATFORM_MODULES, RUNTIME_STORE_EXEMPTION]
+const CLIENT_EXTERNALS: readonly string[] = [...PLATFORM_MODULES, ...PRELOADED_CLIENT_EXTERNALS]
 
 /** Wire/type layers a client bundle may inline (no shared runtime identity). */
 const INLINE_SAFE = /^@deepseek-ai\/dsh-(host-apiproxy|session|llm|tools|brand)(\/|$)/
@@ -67,13 +64,15 @@ const config: UserConfig = {
   dts: false,
   sourcemap: true,
   clean: false,
-  external: [...CLIENT_EXTERNALS],
+  deps: {
+    neverBundle: (id: string) => CLIENT_EXTERNALS.includes(id),
+    alwaysBundle: (id: string) => !CLIENT_EXTERNALS.includes(id),
+  },
   define: {
     'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV ?? 'production'),
     'import.meta.env.MODE': JSON.stringify(process.env.NODE_ENV ?? 'production'),
     'import.meta.env': JSON.stringify({ MODE: process.env.NODE_ENV ?? 'production' }),
   },
-  noExternal: (id: string) => (CLIENT_EXTERNALS.includes(id) ? undefined : true),
   plugins: [{
     name: 'dsh-client-bundle-purity',
     resolveId(source: string) {

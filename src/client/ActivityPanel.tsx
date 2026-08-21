@@ -1,23 +1,28 @@
 /**
  * AgentTeams activity panel: the top-right floater monitoring every team.
  *
- * Modeled on the Claude Code desktop SessionActivityPanel: a fixed glass
- * panel at the top-right corner. On wide viewports it cooperatively makes the
- * conversation column yield space; narrow viewports keep overlay mode. It
+ * Modeled on the Claude Code desktop SessionActivityPanel: a shell-overlay
+ * panel that docks at the conversation's top-right edge by default, can be
+ * dragged into a floating window, resized, and folded into an activity badge.
+ * On wide viewports the docked panel makes the conversation column yield
+ * space; narrow viewports keep a simple inset overlay. It
  * polls the host `/plugins/dsh-agent-teams/state` route for
  * server-side snapshots (durable files + live subagent activity), with a
  * collapsed badge that auto-expands once when activity appears. Archived
  * teams stay available for the owning conversation after live work ends.
  *
- * The floater mounts through a body portal (no top-right slot exists in the
- * web shell); it is not a conversation node — the in-conversation panel was
- * removed in favor of this always-available monitor.
+ * The floater mounts in ui-layout's additive `shell.overlay`; it is not a
+ * conversation node — the in-conversation panel was removed in favor of this
+ * always-available monitor.
  * @module dsh-agent-teams/client/activity
  */
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import {
-  IconBranchOutline16, IconCloseOutline16,
+  useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore,
+  type CSSProperties, type PointerEvent as ReactPointerEvent,
+} from 'react'
+import {
+  IconBranchOutline16, IconChevronDownOutline14, IconPanelLeftOutline16,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { ObservableSnapshot, SessionListState } from '@deepseek-ai/dsh-client-runtime/client'
@@ -43,6 +48,20 @@ import {
 import { ACTION_ART, LEAD_ART, memberArtUrl } from './artwork.ts'
 import { OPEN_PANEL_EVENT } from './AgentTeamsCard.tsx'
 import type { AgentTeamsCardData } from './agent-teams-card-definition.ts'
+import {
+  DEFAULT_PANEL_LAYOUT,
+  PANEL_LAYOUT_STORAGE_KEY,
+  compactPanelForBounds,
+  dockPanelLayout,
+  floatPanelLayout,
+  movePanelLayout,
+  parsePanelLayout,
+  resizePanelLayout,
+  resolvePanelGeometry,
+  type PanelBounds,
+  type PanelLayout,
+  type PanelResizeEdge,
+} from './panel-geometry.ts'
 import css from './ActivityPanel.module.css'
 
 /** Grace before the panel collapses once no team remains. */
@@ -53,8 +72,32 @@ const AUTOCLOSE_GRACE_MS = 2000
  * right after load. New activity after this window auto-expands as usual.
  */
 const AUTO_OPEN_SETTLE_MS = 4000
-/** Root marker shared with the panel CSS while the portal is expanded. */
+/** Root marker shared with the panel CSS while the shell overlay is expanded. */
 const PANEL_OPEN_ATTRIBUTE = 'data-agent-teams-panel-open'
+/** Shared width concession consumed by the conversation root CSS. */
+const PANEL_SHIFT_PROPERTY = '--agent-teams-panel-shift'
+const PANEL_CONVERSATION_GAP = 14
+const MOVE_THRESHOLD = 4
+
+type PanelGesture = {
+  readonly kind: 'move' | 'resize'
+  readonly edge?: PanelResizeEdge
+  readonly pointerId: number
+  readonly originX: number
+  readonly originY: number
+  readonly start: PanelLayout
+  activated: boolean
+}
+
+function initialPanelLayout(): PanelLayout {
+  if (typeof window === 'undefined') return DEFAULT_PANEL_LAYOUT
+  return parsePanelLayout(window.localStorage.getItem(PANEL_LAYOUT_STORAGE_KEY))
+}
+
+function initialPanelBounds(): PanelBounds {
+  if (typeof window === 'undefined') return { width: 1440, height: 900, anchorRight: 1440 }
+  return { width: window.innerWidth, height: window.innerHeight, anchorRight: window.innerWidth }
+}
 
 /** Initial-letter fallback for unmatched roles. */
 function memberInitial(name: string): string {
@@ -128,7 +171,7 @@ function CollapsedBadge({ count, busy, onClick }: {
   readonly onClick: () => void
 }) {
   return (
-    <button type="button" className={css.badge} data-busy={busy} onClick={onClick} aria-label={`AgentTeams 活动，${count} 个团队`}>
+    <button type="button" className={css.badge} data-agent-teams-collapsed data-busy={busy} onClick={onClick} aria-label={`AgentTeams 活动，${count} 个团队`}>
       <span className={css.badgeDot} data-busy={busy} aria-hidden />
       <span className={css.badgeCount}>{count}</span>
     </button>
@@ -483,6 +526,13 @@ export function ActivityPanel({ sessionsList, openSession }: {
   const [autoOpened, setAutoOpened] = useState(false)
   const [wasActive, setWasActive] = useState(false)
   const [historic, setHistoric] = useState<ReadonlyMap<string, { data: AgentTeamsCardData; owner: string }>>(new Map())
+  const [layout, setLayout] = useState<PanelLayout>(initialPanelLayout)
+  const [bounds, setBounds] = useState<PanelBounds>(initialPanelBounds)
+  const [interaction, setInteraction] = useState<'dragging' | 'resizing' | null>(null)
+  const boundsRef = useRef(bounds)
+  const gestureRef = useRef<PanelGesture | null>(null)
+  const frameRef = useRef<number | null>(null)
+  const pendingLayoutRef = useRef<PanelLayout | null>(null)
   const current = useSyncExternalStore(
     sessionsList.subscribe,
     sessionsList.getSnapshot,
@@ -503,8 +553,60 @@ export function ActivityPanel({ sessionsList, openSession }: {
   useEffect(() => { currentRef.current = current }, [current])
   const mountedAtRef = useRef(performance.now())
   const expanded = activityPanelExpandedForSession(open, openOwner, current)
+  const geometry = useMemo(() => resolvePanelGeometry(layout, bounds), [layout, bounds])
+  const compact = compactPanelForBounds(bounds)
 
-  // This portal survives conversation route changes. Gate expansion by its
+  const commitLayout = useCallback((next: PanelLayout): void => {
+    setLayout(next)
+  }, [])
+
+  useEffect(() => {
+    window.localStorage.setItem(PANEL_LAYOUT_STORAGE_KEY, JSON.stringify(layout))
+  }, [layout])
+
+  // The slot sits inside AppFrame, so all geometry is measured against the
+  // shell overlay rather than the browser viewport. The conversation's real
+  // right edge is the dock anchor and naturally follows sidebar/details
+  // concessions without importing their hashed implementation classes.
+  useLayoutEffect(() => {
+    const overlay = document.querySelector<HTMLElement>('[data-shell-overlay]')
+    if (overlay === null) return
+    const conversation = document.querySelector<HTMLElement>("[data-phase='active']")
+    let frame: number | null = null
+    const measure = (): void => {
+      frame = null
+      const overlayRect = overlay.getBoundingClientRect()
+      const conversationRect = conversation?.getBoundingClientRect()
+      const next: PanelBounds = {
+        width: overlayRect.width,
+        height: overlayRect.height,
+        anchorRight: conversationRect === undefined
+          ? overlayRect.width
+          : Math.min(Math.max(conversationRect.right - overlayRect.left, 0), overlayRect.width),
+      }
+      const previous = boundsRef.current
+      if (previous.width === next.width
+        && previous.height === next.height
+        && previous.anchorRight === next.anchorRight) return
+      boundsRef.current = next
+      setBounds(next)
+    }
+    const scheduleMeasure = (): void => {
+      frame ??= requestAnimationFrame(measure)
+    }
+    measure()
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(scheduleMeasure)
+    observer?.observe(overlay)
+    if (conversation !== null) observer?.observe(conversation)
+    window.addEventListener('resize', scheduleMeasure)
+    return () => {
+      if (frame !== null) cancelAnimationFrame(frame)
+      observer?.disconnect()
+      window.removeEventListener('resize', scheduleMeasure)
+    }
+  }, [current])
+
+  // This shell overlay survives conversation route changes. Gate expansion by its
   // owning session during render, then clear stale state before paint. This
   // removes the old panel immediately instead of waiting for the no-team
   // autoclose grace period on the destination page.
@@ -516,15 +618,24 @@ export function ActivityPanel({ sessionsList, openSession }: {
     setAutoOpened(false)
   }, [current, openOwner])
 
-  // The activity panel is a body portal, so announce its open state on body.
-  // CSS can then make the conversation column yield space without knowing the
-  // host shell's hashed module class names. Narrow viewports keep overlay mode.
+  // Only the wide docked mode asks the conversation column to yield. Floating
+  // and compact modes are intentionally true overlays. The width is written as
+  // one shared variable so the panel and the concession cannot drift apart.
   useLayoutEffect(() => {
     const root = document.documentElement
-    if (expanded) root.setAttribute(PANEL_OPEN_ATTRIBUTE, '')
-    else root.removeAttribute(PANEL_OPEN_ATTRIBUTE)
-    return () => { root.removeAttribute(PANEL_OPEN_ATTRIBUTE) }
-  }, [expanded])
+    const shouldYield = expanded && geometry.mode === 'docked' && !compact
+    if (shouldYield) {
+      root.setAttribute(PANEL_OPEN_ATTRIBUTE, '')
+      root.style.setProperty(PANEL_SHIFT_PROPERTY, `${geometry.width + PANEL_CONVERSATION_GAP + 18}px`)
+    } else {
+      root.removeAttribute(PANEL_OPEN_ATTRIBUTE)
+      root.style.removeProperty(PANEL_SHIFT_PROPERTY)
+    }
+    return () => {
+      root.removeAttribute(PANEL_OPEN_ATTRIBUTE)
+      root.style.removeProperty(PANEL_SHIFT_PROPERTY)
+    }
+  }, [compact, expanded, geometry.mode, geometry.width])
 
   useEffect(() => {
     // Installing the plugin alone must not touch the state route. A successful
@@ -618,6 +729,123 @@ export function ActivityPanel({ sessionsList, openSession }: {
   )
   const hasTeams = visibleCount > 0
 
+  const flushScheduledLayout = useCallback((): void => {
+    if (frameRef.current !== null) {
+      cancelAnimationFrame(frameRef.current)
+      frameRef.current = null
+    }
+    const pending = pendingLayoutRef.current
+    pendingLayoutRef.current = null
+    if (pending !== null) commitLayout(pending)
+  }, [commitLayout])
+
+  const scheduleLayout = useCallback((next: PanelLayout): void => {
+    pendingLayoutRef.current = next
+    frameRef.current ??= requestAnimationFrame(() => {
+      frameRef.current = null
+      const pending = pendingLayoutRef.current
+      pendingLayoutRef.current = null
+      if (pending !== null) commitLayout(pending)
+    })
+  }, [commitLayout])
+
+  useEffect(() => () => {
+    if (frameRef.current !== null) cancelAnimationFrame(frameRef.current)
+  }, [])
+
+  const beginMove = useCallback((event: ReactPointerEvent<HTMLElement>): void => {
+    if (compact || event.button !== 0 || (event.target as Element).closest('button') !== null) return
+    event.preventDefault()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    gestureRef.current = {
+      kind: 'move',
+      pointerId: event.pointerId,
+      originX: event.clientX,
+      originY: event.clientY,
+      start: geometry,
+      activated: false,
+    }
+  }, [compact, geometry])
+
+  const beginResize = useCallback((edge: PanelResizeEdge, event: ReactPointerEvent<HTMLDivElement>): void => {
+    if (compact || event.button !== 0 || (geometry.mode === 'docked' && edge !== 'left')) return
+    event.preventDefault()
+    event.stopPropagation()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    gestureRef.current = {
+      kind: 'resize',
+      edge,
+      pointerId: event.pointerId,
+      originX: event.clientX,
+      originY: event.clientY,
+      start: geometry,
+      activated: true,
+    }
+    setInteraction('resizing')
+  }, [compact, geometry])
+
+  const updateGesture = useCallback((event: ReactPointerEvent<HTMLElement>): void => {
+    const gesture = gestureRef.current
+    if (gesture === null || gesture.pointerId !== event.pointerId
+      || !event.currentTarget.hasPointerCapture(event.pointerId)) return
+    const dx = event.clientX - gesture.originX
+    const dy = event.clientY - gesture.originY
+    const activeBounds = boundsRef.current
+    if (gesture.kind === 'move') {
+      if (!gesture.activated && Math.hypot(dx, dy) < MOVE_THRESHOLD) return
+      if (!gesture.activated) {
+        gesture.activated = true
+        setInteraction('dragging')
+      }
+      scheduleLayout(movePanelLayout(
+        floatPanelLayout(gesture.start, activeBounds),
+        dx,
+        dy,
+        activeBounds,
+      ))
+      return
+    }
+    scheduleLayout(resizePanelLayout(
+      gesture.start,
+      gesture.edge ?? 'left',
+      dx,
+      dy,
+      activeBounds,
+    ))
+  }, [scheduleLayout])
+
+  const endGesture = useCallback((event: ReactPointerEvent<HTMLElement>): void => {
+    const gesture = gestureRef.current
+    if (gesture === null || gesture.pointerId !== event.pointerId) return
+    updateGesture(event)
+    flushScheduledLayout()
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+    gestureRef.current = null
+    setInteraction(null)
+  }, [flushScheduledLayout, updateGesture])
+
+  const cancelGesture = useCallback((event: ReactPointerEvent<HTMLElement>): void => {
+    const gesture = gestureRef.current
+    if (gesture === null || gesture.pointerId !== event.pointerId) return
+    flushScheduledLayout()
+    gestureRef.current = null
+    setInteraction(null)
+  }, [flushScheduledLayout])
+
+  const toggleDock = useCallback((): void => {
+    commitLayout(geometry.mode === 'docked'
+      ? floatPanelLayout(geometry, boundsRef.current)
+      : dockPanelLayout(geometry, boundsRef.current))
+  }, [commitLayout, geometry])
+
+  const panelStyle: CSSProperties = {
+    width: geometry.width,
+    height: geometry.height,
+    transform: `translate3d(${geometry.x}px, ${geometry.y}px, 0)`,
+  }
+
   if (!hasTeams && !expanded) return null
 
   return (
@@ -630,23 +858,56 @@ export function ActivityPanel({ sessionsList, openSession }: {
         }} />
       )}
       {expanded && (
-        <aside className={css.panel} data-agent-teams-activity>
-          <header className={css.panelHead}>
+        <aside
+          className={css.panel}
+          style={panelStyle}
+          data-agent-teams-activity
+          data-panel-mode={geometry.mode}
+          data-compact={compact || undefined}
+          data-dragging={interaction === 'dragging' || undefined}
+          data-resizing={interaction === 'resizing' || undefined}
+          aria-label="AgentTeams 活动面板"
+        >
+          <header
+            className={css.panelHead}
+            onPointerDown={beginMove}
+            onPointerMove={updateGesture}
+            onPointerUp={endGesture}
+            onPointerCancel={cancelGesture}
+            data-drag-handle={!compact || undefined}
+          >
             <span className={css.panelTitle}>
               AgentTeams 活动
               <span className={css.panelDot} data-busy={busy} aria-hidden />
             </span>
-            <button
-              type="button"
-              className={css.closeButton}
-              onClick={() => {
-                setOpen(false)
-                setOpenOwner(undefined)
-              }}
-              aria-label="关闭"
-            >
-              <IconCloseOutline16 />
-            </button>
+            <span className={css.panelControls}>
+              {!compact && (
+                <button
+                  type="button"
+                  className={css.iconButton}
+                  data-control="dock"
+                  data-mode={geometry.mode}
+                  onClick={toggleDock}
+                  aria-label={geometry.mode === 'docked' ? '切换为浮动面板' : '停靠到右侧'}
+                  title={geometry.mode === 'docked' ? '切换为浮动面板' : '停靠到右侧'}
+                >
+                  <IconPanelLeftOutline16 />
+                </button>
+              )}
+              <button
+                type="button"
+                className={css.iconButton}
+                data-control="collapse"
+                onClick={() => {
+                  setOpen(false)
+                  setOpenOwner(undefined)
+                }}
+                aria-label="收起活动面板"
+                title="收起活动面板"
+              >
+                <IconChevronDownOutline14 />
+              </button>
+            </span>
           </header>
           <div className={css.teams}>
             {visibleCount === 0
@@ -670,6 +931,39 @@ export function ActivityPanel({ sessionsList, openSession }: {
                 </>
               )}
           </div>
+          {!compact && (
+            <div
+              className={css.resizeHandle}
+              data-resize-edge="left"
+              onPointerDown={(event) => { beginResize('left', event) }}
+              onPointerMove={updateGesture}
+              onPointerUp={endGesture}
+              onPointerCancel={cancelGesture}
+              aria-hidden
+            />
+          )}
+          {!compact && geometry.mode === 'floating' && (
+            <>
+              <div
+                className={css.resizeHandle}
+                data-resize-edge="bottom"
+                onPointerDown={(event) => { beginResize('bottom', event) }}
+                onPointerMove={updateGesture}
+                onPointerUp={endGesture}
+                onPointerCancel={cancelGesture}
+                aria-hidden
+              />
+              <div
+                className={css.resizeHandle}
+                data-resize-edge="corner"
+                onPointerDown={(event) => { beginResize('corner', event) }}
+                onPointerMove={updateGesture}
+                onPointerUp={endGesture}
+                onPointerCancel={cancelGesture}
+                aria-hidden
+              />
+            </>
+          )}
         </aside>
       )}
     </>

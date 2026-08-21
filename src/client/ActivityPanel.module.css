@@ -3,35 +3,18 @@
    to right by precomputed depth. All surfaces follow DSH design tokens. */
 
 :global(html) {
-  --agent-teams-panel-width: 388px;
-  --agent-teams-panel-top: 64px;
-  --agent-teams-panel-bottom-gap: 64px;
-  --agent-teams-panel-min-height: 560px;
-  /* Follow the better-sidebar plugin's width variable (0 when collapsed or
-     when the plugin is absent), so the panel shifts left of that sidebar
-     instead of overlapping it. The layout shift (--agent-teams-panel-shift)
-     stays constant: both the panel and the conversation column move by the
-     same amount, so their relative position is unchanged. */
-  --agent-teams-panel-right: calc(18px + var(--dsh-sidebar-width, 0px));
-  --agent-teams-panel-gap: 14px;
-  --agent-teams-panel-shift: calc(var(--agent-teams-panel-width) + 18px + var(--agent-teams-panel-gap));
+  --agent-teams-panel-shift: 420px;
 }
 
-/* The web shell owns no top-right slot. While this body-portal panel is open,
-   its global marker lets only the center conversation column yield room. The
-   sidebar stays anchored; the transcript and sticky composer share one smooth
-   width transition because both live under the same conversation root. */
+/* The panel lives in shell.overlay. Only its wide docked mode marks the page,
+   allowing the center conversation to concede the exact measured width while
+   the shell's sidebar and details tracks keep their own geometry. */
 :global(html[data-agent-teams-panel-open]) :global([data-phase='active']) {
   box-sizing: border-box;
   padding-right: var(--agent-teams-panel-shift);
 }
 
-:global([data-phase='active']) {
-  transition: padding-right 360ms cubic-bezier(0.22, 1, 0.36, 1);
-  will-change: padding-right;
-}
-
-/* The reference export used an older DSW token vocabulary. Harness rc.6
+/* The reference export used an older DSW token vocabulary. Harness rc.8
    exposes the same palette through layer/border and primary state tokens.
    Bridge them only inside this plugin surface so every declaration remains
    valid without mutating the host theme globally. */
@@ -56,10 +39,9 @@
 }
 
 .badge {
-  position: fixed;
-  top: var(--agent-teams-panel-top);
-  right: var(--agent-teams-panel-right);
-  z-index: 2147483000;
+  position: absolute;
+  top: 64px;
+  right: 18px;
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -90,7 +72,7 @@
 }
 
 .badge:focus-visible,
-.closeButton:focus-visible,
+.iconButton:focus-visible,
 .memberRow:focus-visible,
 .membersToggle:focus-visible,
 .sectionToggleTitle:focus-visible,
@@ -123,18 +105,11 @@
 
 /* panel shell */
 .panel {
-  position: fixed;
-  top: var(--agent-teams-panel-top);
-  right: var(--agent-teams-panel-right);
-  z-index: 2147483000;
+  position: absolute;
+  top: 0;
+  left: 0;
   display: flex;
   flex-direction: column;
-  width: min(var(--agent-teams-panel-width), calc(100vw - 24px));
-  min-height: min(
-    var(--agent-teams-panel-min-height),
-    calc(100dvh - var(--agent-teams-panel-top) - var(--agent-teams-panel-bottom-gap))
-  );
-  max-height: calc(100dvh - var(--agent-teams-panel-top) - var(--agent-teams-panel-bottom-gap));
   box-sizing: border-box;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--dsw-alias-line-strong) 58%, transparent);
@@ -144,12 +119,21 @@
   box-shadow:
     0 12px 32px color-mix(in srgb, var(--dsw-alias-label-primary) 12%, transparent),
     0 32px 72px color-mix(in srgb, var(--dsw-alias-label-primary) 16%, transparent);
-  animation: agentTeamsPanelIn 180ms ease-out;
+  animation: agentTeamsPanelIn 160ms ease-out;
+  will-change: transform;
+}
+
+.panel[data-dragging],
+.panel[data-resizing] {
+  user-select: none;
+  box-shadow:
+    0 16px 38px color-mix(in srgb, var(--dsw-alias-label-primary) 14%, transparent),
+    0 36px 78px color-mix(in srgb, var(--dsw-alias-label-primary) 18%, transparent);
 }
 
 @keyframes agentTeamsPanelIn {
-  from { opacity: 0; transform: translateY(-6px) scale(0.99); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 @keyframes agentTeamsPulse {
@@ -165,6 +149,18 @@
   min-height: 44px;
   padding: 0 14px 0 16px;
   border-bottom: 1px solid var(--dsw-alias-line-normal);
+  cursor: grab;
+  touch-action: none;
+}
+
+.panelHead:active,
+.panel[data-dragging] .panelHead {
+  cursor: grabbing;
+}
+
+.panel[data-compact] .panelHead {
+  cursor: default;
+  touch-action: auto;
 }
 
 .panelTitle {
@@ -177,7 +173,14 @@
   line-height: 20px;
 }
 
-.closeButton {
+.panelControls {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+}
+
+.iconButton {
   display: inline-flex;
   width: 28px;
   height: 28px;
@@ -192,13 +195,59 @@
   transition: background-color 120ms ease, color 120ms ease, transform 120ms ease;
 }
 
-.closeButton:hover {
+.iconButton:hover {
   background: var(--dsw-alias-bg-fill-neutral);
   color: var(--dsw-alias-label-primary);
 }
 
-.closeButton:active {
+.iconButton:active {
   transform: scale(0.94);
+}
+
+.iconButton[data-control='dock'][data-mode='docked'] svg {
+  transform: scaleX(-1);
+}
+
+.resizeHandle {
+  position: absolute;
+  z-index: 1;
+  touch-action: none;
+}
+
+.resizeHandle[data-resize-edge='left'] {
+  top: 44px;
+  bottom: 8px;
+  left: 0;
+  width: 8px;
+  cursor: ew-resize;
+}
+
+.resizeHandle[data-resize-edge='bottom'] {
+  right: 12px;
+  bottom: 0;
+  left: 12px;
+  height: 8px;
+  cursor: ns-resize;
+}
+
+.resizeHandle[data-resize-edge='corner'] {
+  right: 0;
+  bottom: 0;
+  width: 18px;
+  height: 18px;
+  cursor: nwse-resize;
+}
+
+.resizeHandle[data-resize-edge='corner']::after {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 7px;
+  height: 7px;
+  border-right: 1px solid var(--dsw-alias-label-tertiary);
+  border-bottom: 1px solid var(--dsw-alias-label-tertiary);
+  content: '';
+  opacity: 0.52;
 }
 
 .teams {
@@ -1097,7 +1146,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :global([data-phase='active']),
   .panel,
   .badge,
   .badgeDot,
@@ -1111,26 +1159,15 @@
 }
 
 @media (max-width: 960px) {
-  :global(html) {
-    --agent-teams-main-shift: 0px;
-  }
-
   :global(html[data-agent-teams-panel-open]) :global([data-phase='active']) {
     padding-right: 0;
   }
 }
 
 @media (max-width: 640px) {
-  :global(html) {
-    /* Keep the narrow-screen inset while still clearing the better-sidebar. */
-    --agent-teams-panel-right: calc(10px + var(--dsh-sidebar-width, 0px));
-    --agent-teams-panel-top: 56px;
-    --agent-teams-panel-bottom-gap: 56px;
-  }
-
-  .panel {
-    left: 10px;
-    width: auto;
+  .badge {
+    top: 56px;
+    right: 10px;
   }
 
   .teamStats span[data-stat='messages'] {

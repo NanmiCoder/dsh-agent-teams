@@ -308,7 +308,7 @@ window.__ModuleLoader__.load({
 })
 ```
 
-`tsdown.config.ts` 关键配置（抄自仓库 `packages/client/tsdown.client.ts` 的 `clientConfig`）：
+`tsdown.config.ts` 关键配置（对齐 `0.1.0-rc.8` 仓库 `packages/client/tsdown.client.ts` 的 `clientConfig`）：
 
 ```ts
 export default {
@@ -316,9 +316,11 @@ export default {
   entry: { client: 'lib/client/index.js' },   // tsc client program 产物
   outDir: 'lib', format: 'cjs', platform: 'browser',
   dts: false, sourcemap: true, clean: false,
-  external: [...PLATFORM_MODULES, '@deepseek-ai/dsh-client-runtime/client'],
+  deps: {
+    neverBundle: (id) => CLIENT_EXTERNALS.includes(id),
+    alwaysBundle: (id) => !CLIENT_EXTERNALS.includes(id),
+  },
   define: { 'process.env.NODE_ENV': JSON.stringify('production'), /* import.meta.env 同理 */ },
-  noExternal: (id) => (EXTERNALS.includes(id) ? undefined : true),
   plugins: [
     // purity gate：@deepseek-ai 非 external/非内联安全包的值导入直接 build error
     // （跨插件值导入会内联重复实例或要模块表答不出的 specifier）
@@ -336,7 +338,8 @@ export default {
 }
 ```
 
-- `CLIENT_EXTERNALS` = 平台模块表 + `@deepseek-ai/dsh-client-runtime/client` 临时豁免；平台列表会演进，
+- `CLIENT_EXTERNALS` = `PLATFORM_MODULES` + `PRELOADED_CLIENT_EXTERNALS`；rc.8 的后者包含
+  `@deepseek-ai/dsh-client-runtime/client`。平台列表会演进，
   应从目标 checkout 的 `packages/client/web/src/platform.ts`/`tsdown.client.ts` 复制。
 - 浏览器端只能 import 平台模块、类型和当前 preset 允许的 inline-safe 包；跨插件值协作走 cordis service。
 - `dsh.client.inject` 是 package graph/prefetch/HMR 元数据，不保证 apply 顺序；等待 slot declaration 用
@@ -347,33 +350,34 @@ export default {
 
 先读当前 `packages/client/ui-*/src/client/contract/slots.ts`。当前已有
 `conversation.session.header.actions`、`conversation.input.dock`、`conversation.composer.dock`、
-`conversation.input.left/right`、`conversation.chat.node` 等稳定接缝。能落入语义正确 slot 就优先注册；
-只有跨会话、固定在 shell 角落且没有对应 seat 的全局面板，才使用 body portal + fixed 定位：
+`conversation.input.left/right`、`conversation.chat.node` 等稳定接缝。DeepSeek Harness `0.1.0-rc.8`
+还提供 frame 级 `shell.overlay`；能落入语义正确 slot 就优先注册。只有目标版本确实没有对应 seat 的
+全局面板，才使用 body portal + fixed 定位：
 
 ```tsx
-// src/client/index.tsx
-import { createRoot } from 'react-dom/client'
+// src/client/index.tsx (rc.8+)
 import type { ClientContext, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 
-export const inject = ['sessions']
+export const inject = ['slots', 'sessions']
 
 export function apply(ctx: ClientContext): void {
-  const host = document.createElement('div')
-  host.dataset.myPluginHost = ''
-  document.body.appendChild(host)
-  const root = createRoot(host)
-  root.render(<ActivityPanel openSession={(id: SessionId) => { ctx.sessions.open(id) }} />)
-  ctx.effect(() => () => { root.unmount(); host.remove() }, 'my-plugin: panel')
+  const Panel = () => <ActivityPanel openSession={(id: SessionId) => { ctx.sessions.open(id) }} />
+  ctx.slots.inject('shell.overlay', () => ctx.slots.register({
+    name: 'shell.overlay',
+    id: 'my-plugin-panel',
+    order: 80,
+  }, Panel))
 }
 ```
 
-- `ctx.sessions.list` 是 `ObservableSnapshot<SessionListState>`；portal 组件用 `useSyncExternalStore` 订阅。
-- portal host、React root、window/document 监听器和全局 attribute 都必须 effect-owned 并在 HMR 卸载时清理。
+- `ctx.sessions.list` 是 `ObservableSnapshot<SessionListState>`；跨会话面板用 `useSyncExternalStore` 订阅。
+- `shell.overlay` 已由 AppFrame 管理生命周期和 stacking context；window/document 监听器和全局 attribute 仍必须 effect-owned 并在 HMR 卸载时清理。
 - 自动展开/宽限收起要显式建模；用户导航时同步关闭，不依赖轮询延迟。
 
 #### 3.4.1 浮层与主工作区协作
 
-宽屏固定浮层会遮住 transcript/composer 时，让对话列礼让空间，但保持侧边栏不动。portal 用全局 attribute
+宽屏停靠浮层会遮住 transcript/composer 时，让对话列礼让空间，但保持侧边栏不动。面板用全局 attribute
 广播 open state，CSS 只依赖 host 的稳定 data 属性，不依赖 hashed class：
 
 ```tsx

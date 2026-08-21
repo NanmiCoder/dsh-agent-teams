@@ -45,6 +45,16 @@ import {
   startActivityPolling,
   subscribeActivityMonitorTargets,
 } from '../lib/client/activity-monitor.js'
+import {
+  DEFAULT_PANEL_LAYOUT,
+  compactPanelForBounds,
+  dockPanelLayout,
+  floatPanelLayout,
+  movePanelLayout,
+  parsePanelLayout,
+  resizePanelLayout,
+  resolvePanelGeometry,
+} from '../lib/client/panel-geometry.js'
 import { memberArtUrl } from '../lib/client/artwork.js'
 import { parseAgentTeamsCreateArgs } from '../lib/client/agent-teams-card-definition.js'
 import { steerCaptainReport } from '../lib/tools.js'
@@ -113,6 +123,7 @@ check(
 )
 const activityPanelCss = await readFile(new URL('../src/client/ActivityPanel.module.css', import.meta.url), 'utf8')
 const activityPanelSource = await readFile(new URL('../src/client/ActivityPanel.tsx', import.meta.url), 'utf8')
+const clientIndexSource = await readFile(new URL('../src/client/index.tsx', import.meta.url), 'utf8')
 const agentTeamsCardSource = await readFile(new URL('../src/client/AgentTeamsCard.tsx', import.meta.url), 'utf8')
 const artworkSource = await readFile(new URL('../src/client/artwork.ts', import.meta.url), 'utf8')
 const hostSource = await readFile(new URL('../src/index.ts', import.meta.url), 'utf8')
@@ -191,16 +202,24 @@ check(
   requiredHarnessTokenBridges.every(token => activityPanelCss.includes(token)),
   'missing token bridges make panel fills and DAG borders transparent',
 )
-const requiredPanelSizing = [
-  '--agent-teams-panel-min-height: 560px',
-  'min-height: min(',
-  'max-height: calc(100dvh - var(--agent-teams-panel-top) - var(--agent-teams-panel-bottom-gap))',
-]
 check(
-  'activity panel grows between a stable minimum and balanced viewport maximum',
-  requiredPanelSizing.every(rule => activityPanelCss.includes(rule))
-    && !activityPanelCss.includes('height: min(560px'),
-  'a fixed panel height leaves excessive space below tall viewports',
+  'activity panel uses the shell overlay instead of a page-breaking body portal',
+  clientIndexSource.includes("ctx.slots.inject('shell.overlay'")
+    && !clientIndexSource.includes('createRoot')
+    && activityPanelCss.includes('position: absolute')
+    && !activityPanelCss.includes('2147483000')
+    && !activityPanelCss.includes('position: fixed'),
+  'a body portal or unbounded z-index can cover host modal controls',
+)
+check(
+  'panel exposes drag, resize, dock, and fold interaction probes',
+  activityPanelSource.includes('data-drag-handle')
+    && activityPanelSource.includes('data-resize-edge="left"')
+    && activityPanelSource.includes('data-resize-edge="corner"')
+    && activityPanelSource.includes('data-control="dock"')
+    && activityPanelSource.includes('data-control="collapse"')
+    && activityPanelCss.includes('.resizeHandle'),
+  'interactive panel controls must stay visible to browser verification',
 )
 check(
   'running DAG tasks reuse the animated work glyph without losing focus context',
@@ -446,6 +465,42 @@ check('compact DAG keeps stable rows and reference node geometry',
 check('compact DAG emits one curved SVG edge per valid dependency',
   dag.edges.length === 3
     && dag.edges.some(edge => edge.from === 't1' && edge.to === 't2' && edge.path.startsWith('M92 15C')))
+const panelBounds = { width: 1440, height: 900, anchorRight: 1440 }
+const dockedPanel = resolvePanelGeometry(DEFAULT_PANEL_LAYOUT, panelBounds)
+check('docked panel follows the shell anchor and available height',
+  dockedPanel.mode === 'docked'
+    && dockedPanel.x === 1034
+    && dockedPanel.y === 64
+    && dockedPanel.width === 388
+    && dockedPanel.height === 788)
+const floatingPanel = floatPanelLayout(dockedPanel, panelBounds)
+const movedPanel = movePanelLayout(floatingPanel, 999, 999, panelBounds)
+check('floating panel movement clamps every edge inside the shell',
+  movedPanel.mode === 'floating' && movedPanel.x === 1040 && movedPanel.y === 100)
+const widerDockedPanel = resizePanelLayout(dockedPanel, 'left', -120, 0, panelBounds)
+check('docked left-edge resize preserves the right anchor',
+  widerDockedPanel.width === 508 && widerDockedPanel.x === 914)
+const narrowerFloatingPanel = resizePanelLayout(floatingPanel, 'left', 200, 0, panelBounds)
+check('floating left-edge resize preserves the opposite edge at minimum width',
+  narrowerFloatingPanel.width === 320 && narrowerFloatingPanel.x === 1102)
+const cornerPanel = resizePanelLayout({ ...floatingPanel, x: 400, y: 200, width: 388, height: 500 }, 'corner', 1200, 1200, panelBounds)
+check('floating corner resize preserves its top-left anchor at shell limits',
+  cornerPanel.x === 400 && cornerPanel.y === 200
+    && cornerPanel.width === 640 && cornerPanel.height === 688)
+const bottomPanel = resizePanelLayout({ ...floatingPanel, x: 400, y: 200, width: 388, height: 500 }, 'bottom', 0, 1200, panelBounds)
+check('floating bottom resize preserves its top edge at the shell limit',
+  bottomPanel.y === 200 && bottomPanel.height === 688)
+check('dock toggle preserves width while restoring shell alignment',
+  dockPanelLayout({ ...floatingPanel, width: 472, x: 120, y: 100 }, panelBounds).x === 950)
+const compactBounds = { width: 900, height: 700, anchorRight: 900 }
+const compactPanel = resolvePanelGeometry(floatingPanel, compactBounds)
+check('compact shell disables free geometry and uses a balanced inset',
+  compactPanelForBounds(compactBounds)
+    && compactPanel.x === 12 && compactPanel.y === 12
+    && compactPanel.width === 876 && compactPanel.height === 676)
+check('persisted panel state rejects corrupt or partial values',
+  parsePanelLayout('{"mode":"floating","x":1}').mode === 'docked'
+    && parsePanelLayout('not-json').mode === 'docked')
 check(
   'expanded activity panel belongs only to its current session',
   activityPanelExpandedForSession(true, 'session-a', 'session-a')

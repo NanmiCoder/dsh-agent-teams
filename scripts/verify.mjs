@@ -51,6 +51,8 @@ import {
   dockPanelLayout,
   floatPanelLayout,
   movePanelLayout,
+  panelMaximumHeight,
+  panelUsesAutoHeight,
   parsePanelLayout,
   resizePanelLayout,
   resolvePanelGeometry,
@@ -218,7 +220,11 @@ check(
     && activityPanelSource.includes('data-resize-edge="corner"')
     && activityPanelSource.includes('data-control="dock"')
     && activityPanelSource.includes('data-control="collapse"')
-    && activityPanelCss.includes('.resizeHandle'),
+    && activityPanelSource.includes('data-height-mode=')
+    && activityPanelSource.includes("height: autoHeight ? 'auto'")
+    && activityPanelCss.includes('.resizeHandle')
+    && activityPanelCss.includes('scrollbar-width: thin')
+    && !activityPanelCss.includes('scrollbar-width: none'),
   'interactive panel controls must stay visible to browser verification',
 )
 check(
@@ -467,12 +473,15 @@ check('compact DAG emits one curved SVG edge per valid dependency',
     && dag.edges.some(edge => edge.from === 't1' && edge.to === 't2' && edge.path.startsWith('M92 15C')))
 const panelBounds = { width: 1440, height: 900, anchorRight: 1440 }
 const dockedPanel = resolvePanelGeometry(DEFAULT_PANEL_LAYOUT, panelBounds)
-check('docked panel follows the shell anchor and available height',
+check('docked panel follows the shell anchor and retains an available-height ceiling',
   dockedPanel.mode === 'docked'
     && dockedPanel.x === 1034
     && dockedPanel.y === 64
     && dockedPanel.width === 388
-    && dockedPanel.height === 788)
+    && dockedPanel.height === 788
+    && dockedPanel.heightMode === 'auto'
+    && panelUsesAutoHeight(dockedPanel, panelBounds)
+    && panelMaximumHeight(dockedPanel, panelBounds) === 788)
 const floatingPanel = floatPanelLayout(dockedPanel, panelBounds)
 const movedPanel = movePanelLayout(floatingPanel, 999, 999, panelBounds)
 check('floating panel movement clamps every edge inside the shell',
@@ -486,21 +495,36 @@ check('floating left-edge resize preserves the opposite edge at minimum width',
 const cornerPanel = resizePanelLayout({ ...floatingPanel, x: 400, y: 200, width: 388, height: 500 }, 'corner', 1200, 1200, panelBounds)
 check('floating corner resize preserves its top-left anchor at shell limits',
   cornerPanel.x === 400 && cornerPanel.y === 200
-    && cornerPanel.width === 640 && cornerPanel.height === 688)
+    && cornerPanel.width === 640 && cornerPanel.height === 688
+    && cornerPanel.heightMode === 'manual'
+    && !panelUsesAutoHeight(cornerPanel, panelBounds))
 const bottomPanel = resizePanelLayout({ ...floatingPanel, x: 400, y: 200, width: 388, height: 500 }, 'bottom', 0, 1200, panelBounds)
 check('floating bottom resize preserves its top edge at the shell limit',
-  bottomPanel.y === 200 && bottomPanel.height === 688)
-check('dock toggle preserves width while restoring shell alignment',
-  dockPanelLayout({ ...floatingPanel, width: 472, x: 120, y: 100 }, panelBounds).x === 950)
+  bottomPanel.y === 200 && bottomPanel.height === 688
+    && bottomPanel.heightMode === 'manual')
+const redockedPanel = dockPanelLayout({ ...floatingPanel, width: 472, x: 120, y: 100, heightMode: 'manual' }, panelBounds)
+check('dock toggle preserves width while restoring shell alignment and content-fit height',
+  redockedPanel.x === 950 && redockedPanel.width === 472 && redockedPanel.heightMode === 'auto')
 const compactBounds = { width: 900, height: 700, anchorRight: 900 }
 const compactPanel = resolvePanelGeometry(floatingPanel, compactBounds)
 check('compact shell disables free geometry and uses a balanced inset',
   compactPanelForBounds(compactBounds)
     && compactPanel.x === 12 && compactPanel.y === 12
-    && compactPanel.width === 876 && compactPanel.height === 676)
+    && compactPanel.width === 876 && compactPanel.height === 676
+    && panelUsesAutoHeight({ ...compactPanel, heightMode: 'manual' }, compactBounds)
+    && panelMaximumHeight(compactPanel, compactBounds) === 676)
 check('persisted panel state rejects corrupt or partial values',
   parsePanelLayout('{"mode":"floating","x":1}').mode === 'docked'
     && parsePanelLayout('not-json').mode === 'docked')
+const migratedPanel = parsePanelLayout('{"mode":"floating","x":120,"y":80,"width":420,"height":600}')
+const manualPanel = parsePanelLayout('{"mode":"floating","x":120,"y":80,"width":420,"height":600,"heightMode":"manual"}')
+const legacyDockedManualPanel = parsePanelLayout('{"mode":"docked","x":120,"y":80,"width":420,"height":600,"heightMode":"manual"}')
+check('persisted panel height migrates to auto but preserves explicit manual sizing',
+  migratedPanel.heightMode === 'auto'
+    && panelUsesAutoHeight(migratedPanel, panelBounds)
+    && manualPanel.heightMode === 'manual'
+    && !panelUsesAutoHeight(manualPanel, panelBounds)
+    && legacyDockedManualPanel.heightMode === 'auto')
 check(
   'expanded activity panel belongs only to its current session',
   activityPanelExpandedForSession(true, 'session-a', 'session-a')

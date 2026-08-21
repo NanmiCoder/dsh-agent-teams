@@ -256,11 +256,28 @@
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-width: none;
+  scrollbar-color: color-mix(in srgb, var(--dsw-alias-label-tertiary) 28%, transparent) transparent;
+  scrollbar-width: thin;
 }
 
 .teams::-webkit-scrollbar {
-  display: none;
+  width: 6px;
+}
+
+.teams::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.teams::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--dsw-alias-label-tertiary) 28%, transparent);
+  background-clip: padding-box;
+}
+
+.teams:hover::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--dsw-alias-label-tertiary) 44%, transparent);
+  background-clip: padding-box;
 }
 
 /* team */

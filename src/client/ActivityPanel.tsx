@@ -55,6 +55,8 @@ import {
   dockPanelLayout,
   floatPanelLayout,
   movePanelLayout,
+  panelMaximumHeight,
+  panelUsesAutoHeight,
   parsePanelLayout,
   resizePanelLayout,
   resolvePanelGeometry,
@@ -529,6 +531,7 @@ export function ActivityPanel({ sessionsList, openSession }: {
   const [layout, setLayout] = useState<PanelLayout>(initialPanelLayout)
   const [bounds, setBounds] = useState<PanelBounds>(initialPanelBounds)
   const [interaction, setInteraction] = useState<'dragging' | 'resizing' | null>(null)
+  const panelRef = useRef<HTMLElement | null>(null)
   const boundsRef = useRef(bounds)
   const gestureRef = useRef<PanelGesture | null>(null)
   const frameRef = useRef<number | null>(null)
@@ -729,6 +732,15 @@ export function ActivityPanel({ sessionsList, openSession }: {
   )
   const hasTeams = visibleCount > 0
 
+  // Auto-height panels do not store their live content height. Capture the
+  // rendered box when a pointer gesture starts so movement and a first manual
+  // resize clamp against what the user actually sees.
+  const panelGeometryForGesture = useCallback((): PanelLayout => {
+    const measuredHeight = panelRef.current?.getBoundingClientRect().height
+    if (measuredHeight === undefined || measuredHeight <= 0) return geometry
+    return { ...geometry, height: measuredHeight }
+  }, [geometry])
+
   const flushScheduledLayout = useCallback((): void => {
     if (frameRef.current !== null) {
       cancelAnimationFrame(frameRef.current)
@@ -762,10 +774,10 @@ export function ActivityPanel({ sessionsList, openSession }: {
       pointerId: event.pointerId,
       originX: event.clientX,
       originY: event.clientY,
-      start: geometry,
+      start: panelGeometryForGesture(),
       activated: false,
     }
-  }, [compact, geometry])
+  }, [compact, panelGeometryForGesture])
 
   const beginResize = useCallback((edge: PanelResizeEdge, event: ReactPointerEvent<HTMLDivElement>): void => {
     if (compact || event.button !== 0 || (geometry.mode === 'docked' && edge !== 'left')) return
@@ -778,11 +790,11 @@ export function ActivityPanel({ sessionsList, openSession }: {
       pointerId: event.pointerId,
       originX: event.clientX,
       originY: event.clientY,
-      start: geometry,
+      start: panelGeometryForGesture(),
       activated: true,
     }
     setInteraction('resizing')
-  }, [compact, geometry])
+  }, [compact, geometry.mode, panelGeometryForGesture])
 
   const updateGesture = useCallback((event: ReactPointerEvent<HTMLElement>): void => {
     const gesture = gestureRef.current
@@ -835,14 +847,18 @@ export function ActivityPanel({ sessionsList, openSession }: {
   }, [flushScheduledLayout])
 
   const toggleDock = useCallback((): void => {
-    commitLayout(geometry.mode === 'docked'
-      ? floatPanelLayout(geometry, boundsRef.current)
-      : dockPanelLayout(geometry, boundsRef.current))
-  }, [commitLayout, geometry])
+    const liveGeometry = panelGeometryForGesture()
+    commitLayout(liveGeometry.mode === 'docked'
+      ? floatPanelLayout(liveGeometry, boundsRef.current)
+      : dockPanelLayout(liveGeometry, boundsRef.current))
+  }, [commitLayout, panelGeometryForGesture])
+
+  const autoHeight = panelUsesAutoHeight(geometry, bounds)
 
   const panelStyle: CSSProperties = {
     width: geometry.width,
-    height: geometry.height,
+    height: autoHeight ? 'auto' : geometry.height,
+    maxHeight: panelMaximumHeight(geometry, bounds),
     transform: `translate3d(${geometry.x}px, ${geometry.y}px, 0)`,
   }
 
@@ -859,10 +875,12 @@ export function ActivityPanel({ sessionsList, openSession }: {
       )}
       {expanded && (
         <aside
+          ref={panelRef}
           className={css.panel}
           style={panelStyle}
           data-agent-teams-activity
           data-panel-mode={geometry.mode}
+          data-height-mode={autoHeight ? 'auto' : 'manual'}
           data-compact={compact || undefined}
           data-dragging={interaction === 'dragging' || undefined}
           data-resizing={interaction === 'resizing' || undefined}

@@ -356,11 +356,11 @@
 
 .captainNode {
   display: grid;
-  grid-template-columns: 38px minmax(0, 1fr) auto;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
   gap: 9px;
   align-items: center;
-  min-height: 48px;
-  padding: 8px 10px;
+  min-height: 56px;
+  padding: 6px 10px;
   box-sizing: border-box;
   border: 1px solid color-mix(in srgb, var(--dsw-alias-state-business-primary) 32%, var(--dsw-alias-line-normal));
   border-radius: 10px;
@@ -377,20 +377,27 @@
 }
 
 .captainAvatar {
-  width: 36px;
-  height: 36px;
+  width: 46px;
+  height: 46px;
 }
 
 .leadAvatar,
-.memberArt,
-.memberInitial {
-  width: 34px;
-  height: 34px;
-  box-sizing: border-box;
-  border: 1px solid var(--dsw-alias-line-strong);
-  border-radius: 50%;
-  object-fit: cover;
-  background: #0b1d33;
+.memberArt {
+  border: 0;
+  border-radius: 0;
+  object-fit: contain;
+  background: transparent;
+  filter: drop-shadow(0 1px 1px rgb(18 45 72 / 20%));
+}
+
+.leadAvatar {
+  width: 44px;
+  height: 44px;
+}
+
+.memberArt {
+  width: 40px;
+  height: 40px;
 }
 
 .captainInfo,
@@ -659,7 +666,7 @@
 
 .memberBranch {
   position: absolute;
-  top: 23px;
+  top: 27px;
   right: 100%;
   display: block;
   width: 20px;
@@ -680,12 +687,12 @@
 
 .memberRow {
   display: grid;
-  grid-template-columns: 38px minmax(0, 1fr) auto;
+  grid-template-columns: 46px minmax(0, 1fr) auto;
   gap: 8px;
   align-items: center;
   width: 100%;
   min-width: 0;
-  min-height: 44px;
+  min-height: 48px;
   padding: 4px 6px;
   box-sizing: border-box;
   border: 0;
@@ -708,28 +715,37 @@
 }
 
 .memberAvatar {
-  width: 34px;
-  height: 34px;
+  width: 42px;
+  height: 42px;
 }
 
 .memberAvatar[data-unread='true']::after {
   position: absolute;
-  inset: -3px;
-  border: 1px solid var(--dsw-alias-state-business-primary);
+  top: 0;
+  right: -1px;
+  width: 6px;
+  height: 6px;
+  box-sizing: border-box;
+  border: 1px solid var(--dsw-alias-bg-module);
   border-radius: 50%;
+  background: var(--dsw-alias-state-business-primary);
   content: '';
-  animation: agentTeamsRing 1.5s ease-out infinite;
+  animation: agentTeamsUnreadPulse 1.8s ease-in-out infinite;
 }
 
-@keyframes agentTeamsRing {
-  0% { opacity: 0.82; transform: scale(0.94); }
-  75%, 100% { opacity: 0; transform: scale(1.18); }
+@keyframes agentTeamsUnreadPulse {
+  0%, 100% { opacity: 0.78; transform: scale(0.92); }
+  50% { opacity: 1; transform: scale(1.16); }
 }
 
 .memberInitial {
   display: inline-flex;
+  width: 34px;
+  height: 34px;
   align-items: center;
   justify-content: center;
+  border-radius: 50%;
+  background: var(--dsw-alias-bg-fill-business);
   color: var(--dsw-alias-label-on-fill);
   font-size: 14px;
   font-weight: 600;
@@ -738,15 +754,18 @@
 
 .stateArt {
   position: absolute;
-  right: -4px;
-  bottom: -4px;
-  width: 19px;
-  height: 19px;
+  right: -5px;
+  bottom: -3px;
+  width: 22px;
+  height: 22px;
   box-sizing: border-box;
-  border: 2px solid var(--dsw-alias-bg-module);
-  border-radius: 50%;
-  object-fit: cover;
-  background: #0b1d33;
+  border: 0;
+  border-radius: 0;
+  object-fit: contain;
+  background: transparent;
+  filter:
+    drop-shadow(0 0 1px var(--dsw-alias-bg-module))
+    drop-shadow(0 1px 1px rgb(18 45 72 / 24%));
 }
 
 .stateArt[data-activity='working'] {
@@ -791,7 +810,7 @@
   align-items: center;
   gap: 7px;
   min-width: 0;
-  padding: 0 6px 0 52px;
+  padding: 0 6px 0 60px;
 }
 
 .assignmentLabel {
@@ -1192,7 +1211,7 @@
   }
 
   .captainNode {
-    grid-template-columns: 38px minmax(0, 1fr);
+    grid-template-columns: 48px minmax(0, 1fr);
   }
 
   .captainState {
@@ -1209,6 +1228,6 @@
   }
 
   .assignmentLine {
-    padding-left: 45px;
+    padding-left: 53px;
   }
 }

@@ -126,6 +126,7 @@ check(
 const activityPanelCss = await readFile(new URL('../src/client/ActivityPanel.module.css', import.meta.url), 'utf8')
 const activityPanelSource = await readFile(new URL('../src/client/ActivityPanel.tsx', import.meta.url), 'utf8')
 const clientIndexSource = await readFile(new URL('../src/client/index.tsx', import.meta.url), 'utf8')
+const agentTeamsCardCss = await readFile(new URL('../src/client/AgentTeamsCard.module.css', import.meta.url), 'utf8')
 const agentTeamsCardSource = await readFile(new URL('../src/client/AgentTeamsCard.tsx', import.meta.url), 'utf8')
 const artworkSource = await readFile(new URL('../src/client/artwork.ts', import.meta.url), 'utf8')
 const hostSource = await readFile(new URL('../src/index.ts', import.meta.url), 'utf8')
@@ -196,6 +197,14 @@ check(
   'canonical eight-member roster resolves to eight distinct role images',
   eightRoleArtwork.every(Boolean) && new Set(eightRoleArtwork).size === 8,
   `resolved artwork = ${JSON.stringify(eightRoleArtwork)}`,
+)
+check(
+  'whale portraits use transparent cutouts instead of dark circular plates',
+  !/#0b1d33/iu.test(`${activityPanelCss}\n${agentTeamsCardCss}`)
+    && activityPanelCss.includes('object-fit: contain')
+    && activityPanelCss.includes('agentTeamsUnreadPulse')
+    && agentTeamsCardCss.includes('object-fit: contain'),
+  'portrait CSS should preserve each transparent role silhouette and use a compact unread dot',
 )
 const requiredHarnessTokenBridges = [
   '--dsw-alias-line-normal: var(--dsw-static-neutral-bluish-150',

@@ -20,12 +20,13 @@
 
 .leadAvatar {
   flex: none;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  border: 1px solid var(--dsw-alias-line-strong);
-  object-fit: cover;
-  background: #0B1D33;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 0;
+  object-fit: contain;
+  background: transparent;
+  filter: drop-shadow(0 1px 1px rgb(18 45 72 / 20%));
 }
 
 .teamName {
@@ -109,12 +110,13 @@
 }
 
 .memberArt {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  border: 1px solid var(--dsw-alias-line-strong);
-  object-fit: cover;
-  background: #0B1D33;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 0;
+  object-fit: contain;
+  background: transparent;
+  filter: drop-shadow(0 1px 1px rgb(18 45 72 / 18%));
 }
 
 .memberInitial {

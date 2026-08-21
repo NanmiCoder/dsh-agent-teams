@@ -27,6 +27,13 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v6
 
+      - name: Read package version
+        id: version
+        shell: bash
+        run: |
+          package_version="$(node --print "require('./package.json').version")"
+          echo "value=${package_version}" >> "$GITHUB_OUTPUT"
+
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
@@ -40,13 +47,14 @@ jobs:
       - name: Verify release version
         env:
           RELEASE_VERSION: ${{ inputs.version }}
+          PACKAGE_VERSION: ${{ steps.version.outputs.value }}
         shell: bash
         run: |
-          package_version="$(node --print "require('./package.json').version")"
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
-            test "${GITHUB_REF_NAME}" = "v${package_version}"
+            test "${GITHUB_REF_NAME}" = "v${PACKAGE_VERSION}"
+            test -f "release-notes/v${PACKAGE_VERSION}.md"
           else
-            test "${RELEASE_VERSION}" = "${package_version}"
+            test "${RELEASE_VERSION}" = "${PACKAGE_VERSION}"
           fi
 
       - name: Install dependencies
@@ -60,3 +68,29 @@ jobs:
 
       - name: Publish to npm
         run: npm publish --ignore-scripts --access public
+
+  release:
+    if: github.event_name == 'push'
+    needs: publish
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Read package version
+        id: version
+        shell: bash
+        run: |
+          package_version="$(node --print "require('./package.json').version")"
+          echo "value=${package_version}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.value }}
+          name: AgentTeams v${{ steps.version.outputs.value }}
+          body_path: release-notes/v${{ steps.version.outputs.value }}.md
+          draft: false
+          prerelease: false

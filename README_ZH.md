@@ -22,6 +22,10 @@
   <img src="./assets/ui.png" width="100%" alt="DeepSeek Harness 对话与 AgentTeams 实时活动面板，展示成员、任务依赖和回报">
 </p>
 
+## 版本更新
+
+查看[最新版本说明](https://github.com/NanmiCoder/dsh-agent-teams/releases/latest)，或浏览[完整发布历史](https://github.com/NanmiCoder/dsh-agent-teams/releases)。同一份 Markdown 说明也会随 npm 包发布到 `release-notes/` 目录。
+
 ## 为什么需要 AgentTeams？
 
 | 能力 | 带来的变化 |

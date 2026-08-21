@@ -1,6 +1,6 @@
 {
   "name": "@nanmicoder/dsh-agent-teams",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "description": "AgentTeams for DeepSeek Harness: multi-agent team collaboration (captain, members, tasks with dependencies, messaging) driven by natural language, with a tree monitor in the web GUI",
   "type": "module",
   "main": "lib/index.js",
@@ -21,7 +21,9 @@
     "lib",
     "assets/agent-teams",
     "assets/readme",
+    "assets/ui.png",
     "cordis.patch.yml",
+    "release-notes",
     "README.md",
     "README_ZH.md"
   ],

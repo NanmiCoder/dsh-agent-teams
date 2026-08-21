@@ -22,6 +22,10 @@ Ask in natural language. The plugin provides the team protocol, ten coordination
   <img src="./assets/ui.png" width="100%" alt="DeepSeek Harness conversation with the AgentTeams live activity panel, members, tasks, dependencies, and reports">
 </p>
 
+## Releases
+
+Read the [latest release notes](https://github.com/NanmiCoder/dsh-agent-teams/releases/latest) or browse the [complete release history](https://github.com/NanmiCoder/dsh-agent-teams/releases). The same Markdown notes are included in the npm package under `release-notes/`.
+
 ## Why AgentTeams?
 
 | Capability | What it changes |

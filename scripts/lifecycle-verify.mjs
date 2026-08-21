@@ -196,12 +196,15 @@ const goal = 'ship a tiny CLI'
 const activated = command.handler({
   agent: captain, rawInput: `  ${goal}  `, signal: new AbortController().signal, commandId: 'cmd-goal',
 })
-check('argued /agent-teams queues one deterministic activation turn',
+check('argued /agent-teams queues one visible user turn',
   activated.kind === 'success' && captain.followups.length === 1)
-const activation = captain.followups[0]
-check('activation carries the command source and the goal',
-  activation?.source?.kind === 'agent-teams-command' && activation.source.goal === goal
-    && activation.content.some(block => block.type === 'text' && block.text.includes(goal)))
+const submittedCommand = captain.followups[0]
+check('slash command preserves the exact submitted line as user-authored chat',
+  submittedCommand?.source?.kind === 'user'
+    && submittedCommand.content.some(block => block.type === 'text'
+      && block.text === `/agent-teams  ${goal}  `))
+check('preserved slash command still activates through the gesture boundary',
+  invokedAgentTeamsGoal([submittedCommand]) === goal)
 check('activation directive names the protocol', buildActivationDirective(goal).includes('AgentTeams protocol'))
 
 const userMessage = text => ({ id: 'm', role: 'user', content: [{ type: 'text', text }], source: { kind: 'user' } })

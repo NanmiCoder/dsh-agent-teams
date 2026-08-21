@@ -8,18 +8,16 @@
  *    `/agent-teams` command. The web GUI's slash menu (the Harness
  *    `ui-commands` client) lists it from the host catalog with the input
  *    hint; the argued line is claimed client-side and executed through
- *    `command.execute` WITHOUT ever reaching the model. The handler queues
- *    one explicit activation message as an ordinary follow-up turn
- *    (`agent.followup`), so the captain protocol starts deterministically —
- *    no "use AgentTeams" phrasing required.
+ *    `command.execute`. The handler replays that exact line as an ordinary
+ *    user follow-up (`agent.followup`) so it remains visible in the chat; the
+ *    gesture boundary then adds the deterministic activation message.
  * 2. **Gesture boundary** — a `agent/pre-step` listener recognizes a leading
  *    `/agent-teams` token in genuine user messages and injects the same
  *    activation message. This covers surfaces with no command adjudication
- *    (headless CLI, API, pasted text in plain composers) and is a no-op for
- *    the command path, whose line is consumed before it can become a prompt.
- *    Mid-sentence mentions stay ordinary prose; only `source.kind === 'user'`
- *    messages are scanned, so injected or external text cannot forge the
- *    gesture.
+ *    (headless CLI, API, pasted text in plain composers) and also handles the
+ *    exact user line replayed by the host command. Mid-sentence mentions stay
+ *    ordinary prose; only `source.kind === 'user'` messages are scanned, so
+ *    injected or external text cannot forge the gesture.
  *
  * @module dsh-agent-teams/command
  */
@@ -35,8 +33,8 @@ export const AGENT_TEAMS_COMMAND = 'agent-teams'
 declare module '@deepseek-ai/dsh-llm' {
   interface MessageSourceMap {
     /**
-     * A deterministic `/agent-teams` activation: the goal the user supplied,
-     * delivered as an ordinary follow-up turn instead of the raw slash line.
+     * A deterministic `/agent-teams` activation injected after the visible
+     * user-authored slash line.
      */
     'agent-teams-command': {
       readonly kind: 'agent-teams-command'
@@ -90,10 +88,11 @@ export function invokedAgentTeamsGoal(messages: readonly UserMessage[]): string 
 
 /**
  * Register the closed-namespace `/agent-teams` host command. The handler
- * runs against the receiving agent without sending the slash line to the
- * model: it queues the activation message as an ordinary follow-up turn and
- * wakes the driver. The registration rides the calling context's fiber, so
- * a disposed scope (HMR, plugin removal) unregisters the command.
+ * preserves the exact submitted slash line as an ordinary user follow-up;
+ * the pre-step gesture boundary injects the activation directive and wakes
+ * the captain deterministically. The registration rides the calling
+ * context's fiber, so a disposed scope (HMR, plugin removal) unregisters the
+ * command.
  * @param ctx - host context providing the `commands` registry.
  */
 export function registerAgentTeamsCommand(ctx: Context): void {
@@ -110,8 +109,8 @@ export function registerAgentTeamsCommand(ctx: Context): void {
         }
       }
       invocation.agent.followup(createUserMessage({
-        content: [{ type: 'text', text: buildActivationDirective(goal) }],
-        source: { kind: 'agent-teams-command', goal },
+        content: [{ type: 'text', text: `/${AGENT_TEAMS_COMMAND}${invocation.rawInput}` }],
+        source: { kind: 'user' },
       }))
       return {
         kind: 'success',

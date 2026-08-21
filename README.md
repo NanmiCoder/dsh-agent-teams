@@ -91,10 +91,11 @@ command), describe the goal, and press Enter.
 /agent-teams research the pricing pages of three competitors
 ```
 
-The line is claimed by the command pipeline and never reaches the model as
-plain text — the handler queues one deterministic activation message as an
-ordinary follow-up turn, so the captain protocol starts immediately. The
-invocation is durably logged (`command/run` / `command/done`).
+The command pipeline claims the line, then preserves that exact input as an
+ordinary user follow-up so it remains visible in the main chat. The gesture
+boundary adds the deterministic activation directive at pre-step, so the
+captain protocol still starts immediately. The invocation is also durably
+logged (`command/run` / `command/done`).
 
 Surfaces without command adjudication (for example the headless CLI) get the
 same deterministic activation through a gesture boundary: any genuine user

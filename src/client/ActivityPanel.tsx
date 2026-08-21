@@ -84,12 +84,12 @@ function accentOf(id: string): string {
 /** Badge text follows the raw task status (finer than the 4 visual states):
  * claimed/pending/failed/cancelled keep their own labels and colors. */
 const TASK_STATUS_LABEL: Record<string, string> = {
-  pending: '待领取',
-  claimed: '已认领',
-  in_progress: '进行中',
-  completed: '已完成',
-  failed: '失败',
-  cancelled: '已取消',
+  pending: 'Available',
+  claimed: 'Claimed',
+  in_progress: 'In progress',
+  completed: 'Completed',
+  failed: 'Failed',
+  cancelled: 'Cancelled',
 }
 
 function taskStatusLabel(status: string): string {
@@ -128,7 +128,7 @@ function CollapsedBadge({ count, busy, onClick }: {
   readonly onClick: () => void
 }) {
   return (
-    <button type="button" className={css.badge} data-busy={busy} onClick={onClick} aria-label={`AgentTeams 活动，${count} 个团队`}>
+    <button type="button" className={css.badge} data-busy={busy} onClick={onClick} aria-label={`AgentTeams activity, ${count} team${count === 1 ? '' : 's'}`}>
       <span className={css.badgeDot} data-busy={busy} aria-hidden />
       <span className={css.badgeCount}>{count}</span>
     </button>
@@ -137,33 +137,33 @@ function CollapsedBadge({ count, busy, onClick }: {
 
 function memberStateLabel(member: ActivityMember, tasks: readonly ActivityTask[], historic: boolean): string {
   const owned = tasks.filter((task) => task.assignee === member.name)
-  if (member.activity === 'working') return '工作中'
-  if (owned.some((task) => task.status === 'failed')) return '有失败'
-  if (owned.some((task) => task.state === 'blocked')) return '等待'
-  if (owned.length > 0 && owned.every((task) => task.status === 'completed')) return '已交付'
-  if (member.status === 'removed') return historic ? '已离队' : '已移除'
-  if (owned.length > 0) return '待执行'
-  return '待派工'
+  if (member.activity === 'working') return 'Working'
+  if (owned.some((task) => task.status === 'failed')) return 'Has failures'
+  if (owned.some((task) => task.state === 'blocked')) return 'Waiting'
+  if (owned.length > 0 && owned.every((task) => task.status === 'completed')) return 'Delivered'
+  if (member.status === 'removed') return historic ? 'Left team' : 'Removed'
+  if (owned.length > 0) return 'Pending'
+  return 'Unassigned'
 }
 
 function memberStatusText(member: ActivityMember, tasks: readonly ActivityTask[]): string {
   const owned = tasks.filter((task) => task.assignee === member.name)
   const current = owned.find((task) => task.id === member.currentTask)
   const blocked = owned.find((task) => task.state === 'blocked')
-  if (member.activity === 'working' && current !== undefined) return `正在执行 ${current.id}`
-  if (member.activity === 'working') return '正在处理已派任务'
+  if (member.activity === 'working' && current !== undefined) return `Working on ${current.id}`
+  if (member.activity === 'working') return 'Processing assigned tasks'
   if (blocked !== undefined) {
     const dependency = tasks.find((task) => blocked.dependencies.includes(task.id) && task.state !== 'completed')
-    if (dependency !== undefined) return `等待 ${dependency.id} · ${dependency.assignee || '待认领'}`
-    return '等待前置任务'
+    if (dependency !== undefined) return `Waiting on ${dependency.id} · ${dependency.assignee || 'unclaimed'}`
+    return 'Waiting on prerequisites'
   }
-  if (member.total === 0) return '等待队长派工'
-  if (member.done === member.total) return '任务已交付'
-  return member.activity === 'idle' ? '待继续执行' : '状态未知'
+  if (member.total === 0) return 'Waiting for captain'
+  if (member.done === member.total) return 'Tasks delivered'
+  return member.activity === 'idle' ? 'Ready to continue' : 'Status unknown'
 }
 
 function compactTaskLabel(subject: string): string {
-  const withoutVerb = subject.replace(/^开发\s*/u, '').replace(/^\d+[-_.、\s]*/u, '')
+  const withoutVerb = subject.replace(/^\s*/u, '').replace(/^\d+[-_.、\s]*/u, '')
   const head = withoutVerb.split(/[（(·：:]/u)[0]?.trim() ?? withoutVerb
   return head.length > 18 ? `${head.slice(0, 17)}…` : head
 }
@@ -173,15 +173,15 @@ function taskSummary(team: ActivityTeam): string {
   const running = team.tasks.filter((task) => task.state === 'running')
   const blocked = team.tasks.filter((task) => task.state === 'blocked')
   const ready = team.tasks.filter((task) => task.state === 'open' && task.status !== 'completed')
-  if (team.tasks.length === 0) return '等待队长拆解任务'
-  if (completed.length === team.tasks.length) return `全部 ${completed.length} 项任务已交付`
+  if (team.tasks.length === 0) return 'Waiting for the captain to break down tasks'
+  if (completed.length === team.tasks.length) return `All ${completed.length} tasks delivered`
   if (blocked.length > 0 && running.length > 0) {
-    return `${blocked.slice(0, 3).map((task) => task.id).join('、')}${blocked.length > 3 ? ` 等 ${blocked.length} 项` : ''} 等待前置，其余已开工`
+    return `${blocked.slice(0, 3).map((task) => task.id).join(', ')}${blocked.length > 3 ? ` +${blocked.length - 3} more` : ''} waiting on prerequisites, others in progress`
   }
-  if (running.length > 0) return `${running.map((task) => task.id).join('、')} 正在执行`
-  if (ready.length > 0) return `${ready.map((task) => task.id).join('、')} 已就绪待开工`
-  if (blocked.length > 0) return `${blocked.map((task) => task.id).join('、')} 等待前置`
-  return '等待下一轮调度'
+  if (running.length > 0) return `${running.map((task) => task.id).join(', ')} in progress`
+  if (ready.length > 0) return `${ready.map((task) => task.id).join(', ')} ready to start`
+  if (blocked.length > 0) return `${blocked.map((task) => task.id).join(', ')} waiting on prerequisites`
+  return 'Waiting for next scheduling round'
 }
 
 function ProgressOverview({ team }: { readonly team: ActivityTeam }) {
@@ -190,17 +190,17 @@ function ProgressOverview({ team }: { readonly team: ActivityTeam }) {
   const completed = team.tasks.filter((task) => task.status === 'completed').length
   const summaryTone = blocked > 0 ? 'warning' : completed === team.tasks.length && team.tasks.length > 0 ? 'completed' : 'running'
   return (
-    <section className={css.progressOverview} aria-label="团队总进度" data-progress-summary>
-      <span className={css.progressTitle}>总进度</span>
+    <section className={css.progressOverview} aria-label="Team overall progress" data-progress-summary>
+      <span className={css.progressTitle}>Overall progress</span>
       {team.tasks.length > 0 ? (
         <span className={css.progressSegments} aria-hidden>
           {team.tasks.map((task) => <span key={task.id} data-state={taskTone(task.state, task.status)} />)}
         </span>
       ) : <span className={css.progressEmpty} />}
       <span className={css.progressLegend}>
-        <span data-state="running">■ 进行中 {running}</span>
-        <span data-state="blocked">■ 等待依赖 {blocked}</span>
-        <span data-state="completed">■ 已交付 {completed}</span>
+        <span data-state="running">■ In progress {running}</span>
+        <span data-state="blocked">■ Waiting on dependencies {blocked}</span>
+        <span data-state="completed">■ Delivered {completed}</span>
       </span>
       <span className={css.progressSummary} data-state={summaryTone}>
         <span className={css.progressSummaryDot} />
@@ -257,14 +257,14 @@ function DependencyMap({ tasks }: { readonly tasks: readonly ActivityTask[] }) {
   ))
   const dependents = tasks.filter((task) => task.dependencies.includes(detailTask.id))
   return (
-    <section className={css.dependencySection} aria-label="任务依赖链" data-dependency-map>
+    <section className={css.dependencySection} aria-label="Task dependency chain" data-dependency-map>
       <header className={css.sectionHead}>
         <button type="button" className={css.sectionToggleTitle} onClick={() => { setOpen((current) => !current) }} aria-expanded={open}>
-          <Chevron open={open} /><IconBranchOutline16 /> {parallel ? '并行任务' : '任务依赖'}
+          <Chevron open={open} /><IconBranchOutline16 /> {parallel ? 'Parallel tasks' : 'Task dependencies'}
         </button>
         <span className={css.sectionHint}>{pinnedTaskId === null
-          ? parallel ? '无前后依赖 · 点击查看详情' : '悬停高亮依赖链 · 点击固定'
-          : `${pinnedTaskId} 已固定 · Esc 取消`}</span>
+          ? parallel ? 'No ordering · click a task for details' : 'Hover to highlight the dependency chain · click to pin'
+          : `${pinnedTaskId} pinned · Esc to unpin`}</span>
       </header>
       {open && (
         <>
@@ -303,7 +303,7 @@ function DependencyMap({ tasks }: { readonly tasks: readonly ActivityTask[] }) {
                   <span className={css.dagNodeHead}><span className={css.dagNodeDot} />{task.id}</span>
                   <span className={css.dagNodeLabel}>{compactTaskLabel(task.subject)}</span>
                   {task.state === 'running' && (
-                    <span className={css.dagRunningState} aria-label="运行中">
+                    <span className={css.dagRunningState} aria-label="Running">
                       <WorkGlyph active />
                     </span>
                   )}
@@ -314,19 +314,19 @@ function DependencyMap({ tasks }: { readonly tasks: readonly ActivityTask[] }) {
           <section className={css.taskDetail} data-task-detail={detailTask.id}>
             <span className={css.taskDetailHead}>
               <span className={css.taskDetailId}>{detailTask.id}</span>
-              <span className={css.taskDetailSubject} title={detailTask.subject}>{detailTask.subject.replace(/^开发\s*/u, '')}</span>
+              <span className={css.taskDetailSubject} title={detailTask.subject}>{detailTask.subject}</span>
               <span className={css.taskDetailBadge} data-state={taskTone(detailTask.state, detailTask.status)}>{taskStatusLabel(detailTask.status)}</span>
             </span>
             <span className={css.taskDetailLine}>
-              {detailTask.assignee || '待认领'} · {detailTask.status === 'completed'
-                ? '已完成并交付'
+              {detailTask.assignee || 'Unclaimed'} · {detailTask.status === 'completed'
+                ? 'Completed and delivered'
                 : detailTask.dependencies.length === 0
-                ? '无前置，可立即开工'
+                ? 'No prerequisites, can start immediately'
                 : waitingOn.length === 0
-                  ? '前置已就绪，可开工'
-                  : `等待 ${waitingOn.join('、')}`}
+                  ? 'Prerequisites ready, can start'
+                  : `Waiting on ${waitingOn.join(', ')}`}
             </span>
-            <span className={css.taskDetailMeta}>{dependents.length === 0 ? '无下游任务' : `完成后解锁 ${dependents.map((task) => task.id).join('、')}`}</span>
+            <span className={css.taskDetailMeta}>{dependents.length === 0 ? 'No downstream tasks' : `Completing unlocks ${dependents.map((task) => task.id).join(', ')}`}</span>
           </section>
         </>
       )}
@@ -349,41 +349,41 @@ function TeamSection({ team, onNavigate, historic = false }: {
     <section className={css.team} data-team-id={team.teamId}>
       <header className={css.teamHead}>
         <span className={css.teamName} title={team.name}>{team.name}</span>
-        {historic && <span className={css.historicPill}>已结束</span>}
+        {historic && <span className={css.historicPill}>Ended</span>}
         <span className={css.teamStats}>
-          <span data-stat="members">{team.members.length} 成员</span>
-          <span data-stat="tasks">{completedCount}/{team.tasks.length} 完成</span>
-          <span data-stat="messages">{team.messageCount} 消息</span>
+          <span data-stat="members">{team.members.length} members</span>
+          <span data-stat="tasks">{completedCount}/{team.tasks.length} done</span>
+          <span data-stat="messages">{team.messageCount} messages</span>
         </span>
       </header>
 
-      <section className={css.delegationSection} aria-label="队长派工关系" data-delegation-map>
+      <section className={css.delegationSection} aria-label="Captain delegation" data-delegation-map>
         <div className={css.captainNode}>
           <span className={css.captainAvatar}>
             <img className={css.leadAvatar} src={LEAD_ART} alt="" aria-hidden />
           </span>
           <span className={css.captainInfo}>
             <span className={css.captainLine}>
-              <span className={css.captainName}>队长</span>
-              <span className={css.captainRole}>拆解 · 派发 · 汇总</span>
+              <span className={css.captainName}>Captain</span>
+              <span className={css.captainRole}>Break down · Assign · Consolidate</span>
             </span>
-            <span className={css.captainSummary}>已派发 {assignedCount} 项任务给 {team.members.length} 名成员</span>
+            <span className={css.captainSummary}>Assigned {assignedCount} tasks to {team.members.length} members</span>
           </span>
           <span className={css.captainState} data-busy={busyCount > 0}>
             <WorkGlyph active={busyCount > 0} />
-            {busyCount > 0 ? `${busyCount} 人执行中` : allCompleted ? '已收齐' : '等待回报'}
+            {busyCount > 0 ? `${busyCount} working` : allCompleted ? 'All collected' : 'Waiting for reports'}
           </span>
         </div>
 
         <ProgressOverview team={team} />
 
         <button type="button" className={css.membersToggle} onClick={() => { setMembersOpen((current) => !current) }} aria-expanded={membersOpen} data-members-toggle>
-          <span><Chevron open={membersOpen} />成员 {team.members.length}</span>
-          <span>{membersOpen ? '收起' : '展开'}</span>
+          <span><Chevron open={membersOpen} />Members {team.members.length}</span>
+          <span>{membersOpen ? 'Collapse' : 'Expand'}</span>
         </button>
 
         {membersOpen && <div className={css.delegationTree}>
-          {team.members.length === 0 && <span className={css.emptyHint}>暂无成员，等待队长组建团队</span>}
+          {team.members.length === 0 && <span className={css.emptyHint}>No members yet — waiting for the captain to build the team</span>}
           {team.members.map((member) => {
             const owned = team.tasks.filter((task) => task.assignee === member.name)
             return (
@@ -417,10 +417,10 @@ function TeamSection({ team, onNavigate, historic = false }: {
                   <span className={css.memberCount}>{member.done}/{member.total}</span>
                 </button>
                 <div className={css.assignmentLine}>
-                  <span className={css.assignmentLabel}>队长派发</span>
+                  <span className={css.assignmentLabel}>Assigned by captain</span>
                   <span className={css.assignmentTasks}>
                     {owned.length === 0
-                      ? <span className={css.taskEmpty}>暂无任务</span>
+                      ? <span className={css.taskEmpty}>No tasks</span>
                       : owned.map((task) => (
                         <span key={task.id} className={css.assignmentChip} data-state={taskTone(task.state, task.status)} title={task.subject}>
                           {task.id}
@@ -633,7 +633,7 @@ export function ActivityPanel({ sessionsList, openSession }: {
         <aside className={css.panel} data-agent-teams-activity>
           <header className={css.panelHead}>
             <span className={css.panelTitle}>
-              AgentTeams 活动
+              AgentTeams activity
               <span className={css.panelDot} data-busy={busy} aria-hidden />
             </span>
             <button
@@ -643,14 +643,14 @@ export function ActivityPanel({ sessionsList, openSession }: {
                 setOpen(false)
                 setOpenOwner(undefined)
               }}
-              aria-label="关闭"
+              aria-label="Close"
             >
               <IconCloseOutline16 />
             </button>
           </header>
           <div className={css.teams}>
             {visibleCount === 0
-              ? <span className={css.emptyHint}>暂无团队活动</span>
+              ? <span className={css.emptyHint}>No team activity</span>
               : (
                 <>
                   {visibleTeams.map((team) => (

@@ -1093,7 +1093,7 @@
   font-size: 9.5px;
   font-weight: 600;
   line-height: 14px;
-  content: '已结束 · 历史归档';
+  content: 'Ended · Archived';
 }
 
 @media (prefers-reduced-motion: reduce) {

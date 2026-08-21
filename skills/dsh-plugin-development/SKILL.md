@@ -1,89 +1,89 @@
 ---
 name: dsh-plugin-development
-description: 开发、维护、分发和验证 DeepSeek Harness (DSH) 插件的执行型 Skill。覆盖 host/client 形态判断、bundle/profile 契约、Service 与函数插件、工具、HTTP、持久化、slot、Conversation Node、客户端构建、HMR、GitHub 安装和真实组合验证。
+description: An execution-oriented Skill for developing, maintaining, distributing, and verifying DeepSeek Harness (DSH) plugins. Covers host/client shape detection, bundle/profile contracts, Service and function plugins, tools, HTTP, persistence, slots, Conversation Nodes, client builds, HMR, GitHub installation, and real composition verification.
 metadata:
   version: "3.1.0"
   date: "2026-08-13"
   reference: "https://github.com/NanmiCoder/dsh-agent-teams"
 ---
 
-# DSH 插件开发
+# DSH Plugin Development
 
-这是正式版导向的执行清单。先判断运行面，再选择官方模板，实现后必须从真实组合和用户安装路径验证。不要把某个项目的偶然实现当成框架契约。
+This is an execution checklist oriented to the release version. First determine the runtime surface, then choose the official template; after implementing, you must verify against a real composition and the user install path. Don't treat one project's incidental implementation as a framework contract.
 
-## 1. 开始前
+## 1. Before you start
 
-1. 用 `pwd`、`git rev-parse --show-toplevel`、`git status --short --branch` 确认项目与用户改动。
-2. 读取 `package.json`、`cordis.patch.yml`、`tsconfig*.json`、构建配置、相关 `src/` 和测试。
-3. 不覆盖用户改动，不操作用户明确排除的 profile、端口或实例。
-4. 判断最小运行面：
-   - 工具、system prompt、HTTP、持久化、provider：host。
-   - slot、Conversation Node、浏览器状态和浮层：client。
-   - host 能力且需要 Web 可视化：host + client。
-   - 没有 Web 需求：不要声明 `dsh.client`，也不要构建 client bundle。
-5. 写下插件唯一职责、依赖的 service、贡献的配置行、持久化 owner 和用户可见验证面，再开始编码。
+1. Use `pwd`, `git rev-parse --show-toplevel`, `git status --short --branch` to confirm the project and the user's changes.
+2. Read `package.json`, `cordis.patch.yml`, `tsconfig*.json`, build config, relevant `src/`, and tests.
+3. Don't overwrite the user's changes; don't touch profiles, ports, or instances the user explicitly excluded.
+4. Determine the minimal runtime surface:
+   - tools, system prompt, HTTP, persistence, provider: host.
+   - slots, Conversation Nodes, browser state and floaters: client.
+   - host capabilities needing Web visualization: host + client.
+   - no Web need: don't declare `dsh.client` and don't build a client bundle.
+5. Write down the plugin's single responsibility, the services it depends on, the config rows it contributes, the persistence owner, and the user-visible verification surface before coding.
 
-## 2. 证据与官方参考
+## 2. Evidence and official references
 
-### 2.1 取证顺序
+### 2.1 Evidence-gathering order
 
-行为不确定时按顺序取证，不猜：
+When behavior is uncertain, gather evidence in order — don't guess:
 
-1. 当前项目及已安装 `node_modules/@deepseek-ai/*` 的 `package.json`、exports、types、README。
-2. 环境明确提供的 DeepSeek Harness checkout；只读分析，不修改。
-3. 克隆官方仓库取证（见 §2.3）。
-4. 信息仍不足时，以当前正式版 exports/types 为边界，选择可安全失败的最小实现并标注假设。
+1. `package.json`, exports, types, README of the current project and installed `node_modules/@deepseek-ai/*`.
+2. The DeepSeek Harness checkout explicitly provided by the environment; read-only analysis, no modification.
+3. Clone the official repository for evidence (see §2.3).
+4. If information is still insufficient, use the current release exports/types as the boundary, choose a minimal implementation that fails safely, and annotate the assumptions.
 
-不要写死本机绝对路径，也不要访问或转述未授权的私有仓库内容。
+Don't hardcode local absolute paths, and don't access or relay unauthorized private-repository content.
 
-### 2.2 官方模板选择
+### 2.2 Choosing official templates
 
-若提供了 Harness checkout（环境提供或按 §2.3 克隆），优先按插件形态阅读这些模板；路径以 checkout 根目录为基准：
+If a Harness checkout is available (provided by the environment or cloned per §2.3), read these templates by plugin shape first; paths are relative to the checkout root:
 
-| 目标 | 主参考 | 学习重点 |
+| Goal | Primary reference | Learning focus |
 |---|---|---|
-| Host Service / HTTP | `packages/host/webserver` | `Service`、`static Config`、`Service.init`、route disposer、连接清理 |
-| 最小 client 插件 | `packages/client/ui-message-feedback` | `inject`、`apply`、locale、per-session controller、slot 注册与清理 |
-| Slot / Conversation Node | `packages/client/ui-conversation` + `packages/client/ui-slots` | `SlotMap`、slot kind/scope、children 认领、keyed node renderer |
-| Bundle 分层 | `packages/bundle/base` + `packages/bundle/web-app` | 顶层 patch 数组、行 id 覆盖、整段 config 替换、加载顺序 |
-| 简单持久化 backend | `packages/storage/storage-json` | register → disposer → close、显式 root、并发打开门禁 |
-| 崩溃安全日志 | `packages/session/session-persistence-jsonl` | 原子发布、fsync、并发 no-clobber、torn-tail 处理 |
-| 工具插件 | `packages/fs/tool-fs` | `defineTool`、schema、render、可选能力挂载 |
-| Client 测试 | `packages/test-support/client-runtime` | jsdom、SlotTestRuntime、mount/dispose、fake service |
+| Host Service / HTTP | `packages/host/webserver` | `Service`, `static Config`, `Service.init`, route disposer, connection cleanup |
+| Minimal client plugin | `packages/client/ui-message-feedback` | `inject`, `apply`, locale, per-session controller, slot registration and cleanup |
+| Slot / Conversation Node | `packages/client/ui-conversation` + `packages/client/ui-slots` | `SlotMap`, slot kind/scope, children claiming, keyed node renderer |
+| Bundle layering | `packages/bundle/base` + `packages/bundle/web-app` | top-level patch arrays, row id overrides, whole-section config replacement, load order |
+| Simple persistence backend | `packages/storage/storage-json` | register → disposer → close, explicit root, concurrent-open gating |
+| Crash-safe logging | `packages/session/session-persistence-jsonl` | atomic publish, fsync, concurrent no-clobber, torn-tail handling |
+| Tool plugin | `packages/fs/tool-fs` | `defineTool`, schema, render, optional capability mounting |
+| Client testing | `packages/test-support/client-runtime` | jsdom, SlotTestRuntime, mount/dispose, fake services |
 
-复杂插件只用于补证据，不作为起步模板。若要委派只读调研，提示词必须要求给出文件、行区间、契约与最小建议。
+Complex plugins are only supplementary evidence, not starter templates. When delegating read-only research, the prompt must require files, line ranges, contracts, and minimal suggestions.
 
-### 2.3 官方仓库兜底层
+### 2.3 Official repository fallback
 
-官方仓库 `https://github.com/deepseek-ai/deepseek-harness` 是公开、MIT 许可的可引用证据源（默认分支 `master`；开发者预览阶段无 release tag，不 pin 版本）。需要兜底取证时：
+The official repository `https://github.com/deepseek-ai/deepseek-harness` is a public, MIT-licensed, citable evidence source (default branch `master`; developer preview has no release tags, so no version pinning). When fallback evidence is needed:
 
-1. 选临时目录：用用户或环境提供的目录，例如 `SCRATCH="$(mktemp -d)"`；不要写死本机绝对路径。
-2. 复用已有 checkout：若 `$SCRATCH/dsh-official` 已存在，且 `git remote -v` 指向官方、根目录含 `AGENTS.md` 与 `LICENSE`，直接复用；需要更新时 `git -C "$SCRATCH/dsh-official" fetch --depth 1 origin master && git -C "$SCRATCH/dsh-official" reset --hard origin/master`（或删除后重克隆）。同一任务只维护这一个目录，避免反复克隆。
-3. 浅克隆（只读取证，无需 `pnpm install`）：
+1. Pick a temp directory: use one provided by the user or environment, e.g. `SCRATCH="$(mktemp -d)"`; don't hardcode local absolute paths.
+2. Reuse an existing checkout: if `$SCRATCH/dsh-official` already exists, `git remote -v` points to the official repo, and the root contains `AGENTS.md` and `LICENSE`, reuse it; to update: `git -C "$SCRATCH/dsh-official" fetch --depth 1 origin master && git -C "$SCRATCH/dsh-official" reset --hard origin/master` (or delete and re-clone). Keep only this one directory per task to avoid repeated clones.
+3. Shallow clone (read-only evidence, no `pnpm install` needed):
 
    ```sh
    git clone --depth 1 https://github.com/deepseek-ai/deepseek-harness.git "$SCRATCH/dsh-official"
    ```
 
-4. 只克隆官方 `deepseek-ai/deepseek-harness`；不要访问或转述未授权的私有仓库内容。对克隆内容同样只读分析，不修改。
+4. Only clone the official `deepseek-ai/deepseek-harness`; don't access or relay unauthorized private-repository content. Analyze the clone read-only too, no modification.
 
-进入后定位：
+Once inside, orient:
 
-1. 先读根 `AGENTS.md`（`CLAUDE.md` 是它的符号链接）：仓库布局、命令与约定一次讲清，是官方给 agent 的入口。
-2. 再用 `packages/README.md` 的 group 表确认目标包位于哪个 `packages/<group>/<pkg>`。
-3. 按 §2.2 模板表读对应包的 `README.md` 与 `src/`；取证结论给出文件与行区间。
+1. Read the root `AGENTS.md` first (`CLAUDE.md` is its symlink): repo layout, commands, and conventions in one go — it's the official agent entry point.
+2. Use the group table in `packages/README.md` to confirm which `packages/<group>/<pkg>` the target package lives in.
+3. Read the corresponding package's `README.md` and `src/` per the §2.2 template table; evidence conclusions give files and line ranges.
 
-演进兜底：官方仓库处于开发者预览、迭代极快、无兼容承诺、无 release tag，§2.2 的模板路径只是索引，一切以当前 checkout 的实际代码为准；路径或名称漂移时，用 `packages/README.md` 定位新位置并回报修正，不要凭旧文档猜。需要复现一致证据时记录 `git rev-parse HEAD`。
+Evolution fallback: the official repo is in developer preview, iterating extremely fast, with no compatibility promises and no release tags; the §2.2 template paths are only an index — everything defers to the actual code in the current checkout; when paths or names drift, locate the new position with `packages/README.md` and report the correction, don't guess from old docs. Record `git rev-parse HEAD` when reproducible evidence is needed.
 
-## 3. Bundle、Profile 与 package 契约
+## 3. Bundle, Profile, and package contracts
 
-### 3.1 两个概念
+### 3.1 Two concepts
 
-- **Bundle** 是作者分发的包：`package.json.dsh.bundle.patch` 指向配置层。
-- **Profile** 是用户运行的组合：`$DSH_HOME/profiles/<name>/package.json.dsh.profile.bundles` 保存有序 bundle 列表。
-- 插件作者写 bundle；`dsh plugin` 创建和维护 profile。不要手写用户 profile manifest。
+- A **Bundle** is the package the author distributes: `package.json.dsh.bundle.patch` points to a config layer.
+- A **Profile** is the composition the user runs: `$DSH_HOME/profiles/<name>/package.json.dsh.profile.bundles` holds the ordered bundle list.
+- Plugin authors write bundles; `dsh plugin` creates and maintains profiles. Don't hand-edit user profile manifests.
 
-### 3.2 最小双面 package
+### 3.2 Minimal two-sided package
 
 ```jsonc
 {
@@ -97,7 +97,7 @@ metadata:
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
   },
-  "files": ["lib", "cordis.patch.yml", "README.md"], // 目录或显式清单均可；官方仓库常用显式文件清单
+  "files": ["lib", "cordis.patch.yml", "README.md"], // either directories or explicit lists; the official repo commonly uses explicit file lists
   "dsh": {
     "bundle": { "patch": "./cordis.patch.yml" },
     "client": {
@@ -108,19 +108,19 @@ metadata:
 }
 ```
 
-规则：
+Rules:
 
-- Host-only 包删除 `./client` 与 `dsh.client`。
-- Client 包必须同时有 `dsh.client.platform: "web"` 和真实存在的 `exports["./client"]`。
-- `dsh.client.inject` 是随图下发的信息性元数据（预检展示 / HMR diff 用），不决定 client fiber 的激活顺序；预取由 `dsh.client.immediately` 驱动，真正的依赖等待来自 client bundle 导出的 `export const inject`（§5.1），两者互不替代。
-- `dsh.client.immediately` 是仅供启动关键入口使用的可选预取标记；普通第三方插件不要默认开启。
-- 当前权威字段是 `dsh.client`；历史兼容字段只有在目标正式部署仍明确读取时才添加。
-- exports、`files` 和 Git/发布产物必须一致；任何入口都不能指向不存在的文件。
-- DSH、Cordis、React 等共享运行时优先声明为 peer，避免复制 runtime identity；版本范围从目标正式版 package metadata 取证。
+- Host-only packages remove `./client` and `dsh.client`.
+- Client packages must have both `dsh.client.platform: "web"` and a really existing `exports["./client"]`.
+- `dsh.client.inject` is informational metadata sent with the graph (for preflight display / HMR diffs); it doesn't decide the client fiber's activation order; prefetch is driven by `dsh.client.immediately`, and the real dependency wait comes from the `export const inject` the client bundle exports (§5.1) — the two don't replace each other.
+- `dsh.client.immediately` is an optional prefetch marker only for boot-critical entry points; ordinary third-party plugins shouldn't enable it by default.
+- The current authoritative field is `dsh.client`; legacy compatibility fields are only added when the target release deployment explicitly still reads them.
+- exports, `files`, and Git/publish artifacts must be consistent; no entry may point at a nonexistent file.
+- Shared runtimes like DSH, Cordis, React should be declared as peers first to avoid duplicated runtime identity; version ranges come from evidence in the target release package metadata.
 
-### 3.3 Patch 层
+### 3.3 Patch layers
 
-`cordis.patch.yml` 必须是顶层数组：
+`cordis.patch.yml` must be a top-level array:
 
 ```yaml
 - insert:
@@ -129,18 +129,18 @@ metadata:
       config: {}
 ```
 
-注意：
+Notes:
 
-- `id` 是配置树中稳定的行身份；`name` 是 Node 可解析的包名或导出路径。
-- 后层按 `id` 覆盖前层；目标行的 `config` 是整段替换，不是深合并，因此覆盖时要重述所需键。
-- 生效顺序是 profile bundles → profile `cordis.patch.yml` → `$DSH_HOME/cordis.patch.yml` → 命令行 `--patch`；后者获胜。
-- 包没有 `dsh.bundle` 时只会成为普通依赖，不会自动成为 profile 层。
+- `id` is the stable row identity in the config tree; `name` is a Node-resolvable package name or export path.
+- Later layers override earlier ones by `id`; the target row's `config` is whole-section replacement, not a deep merge, so restate the needed keys when overriding.
+- Effective order is profile bundles → profile `cordis.patch.yml` → `$DSH_HOME/cordis.patch.yml` → command-line `--patch`; the latter wins.
+- A package without `dsh.bundle` only becomes an ordinary dependency, never automatically a profile layer.
 
-## 4. Host 面实现
+## 4. Host-side implementation
 
-### 4.1 函数插件
+### 4.1 Function plugins
 
-普通插件通常导出：
+An ordinary plugin usually exports:
 
 ```ts
 export const name = 'my-plugin'
@@ -150,14 +150,14 @@ export const Config = z.object({ enabled: z.boolean().default(true) })
 export function apply(ctx: Context, config: Config): void {}
 ```
 
-- `z` 从 `@deepseek-ai/schemastery` 导入（不是 zod）；`static Config = Config` 引用导出的 schema，与官方内联的 `static Config: z<Config> = z.object({...})` 等价。
-- `inject` 是必需 service；未满足时 fiber 保持 pending，框架会在服务就绪后激活，不要用轮询模拟依赖注入。
-- Config 默认值放 schema；任何部署可能需要改变的值都应成为配置，而不是源码常量。
-- 可选 service 用 `ctx.get()` 判断或 `ctx.inject([...], childCtx => ...)` 惰性挂载；不要在 `apply()` 中抢跑兄弟 provider。
+- `z` is imported from `@deepseek-ai/schemastery` (not zod); `static Config = Config` references the exported schema, equivalent to the official inline `static Config: z<Config> = z.object({...})`.
+- `inject` is a required service; when unsatisfied the fiber stays pending and the framework activates it once the service is ready — don't simulate dependency injection with polling.
+- Config defaults go in the schema; any value a deployment might need to change should be config, not a source constant.
+- Optional services use `ctx.get()` checks or lazy mounting via `ctx.inject([...], childCtx => ...)`; don't race sibling providers inside `apply()`.
 
-### 4.2 Service 插件
+### 4.2 Service plugins
 
-当插件提供稳定 service 时，参考 `host/webserver`：
+When a plugin provides a stable service, reference `host/webserver`:
 
 ```ts
 export class MyService extends Service {
@@ -169,52 +169,52 @@ export class MyService extends Service {
 }
 ```
 
-- 构造器声明 service key；异步启动放在 `Service.init`。
-- 初始化失败应让 fiber 失败并由启动方报告，不要吞掉组合错误。
-- 注册方法返回 disposer；拥有资源的一方负责关闭资源。
+- The constructor declares the service key; async startup goes in `Service.init`.
+- Init failures should fail the fiber and be reported by the starter, not swallowed as composition errors.
+- Registration methods return disposers; the party owning the resource is responsible for closing it.
 
-### 4.3 Effect 所有权
+### 4.3 Effect ownership
 
-所有长生命周期资源必须归当前 fiber：
+All long-lived resources must belong to the current fiber:
 
-- route、listener、watcher、timer、React root、DOM、socket、临时 service 都必须可清理。
-- 用 `ctx.on()` 或 `ctx.effect(() => disposer, label)`。
-- disposer 顺序通常是：停止外部入口/注销 registry → 等待或取消在途工作 → 关闭资源。
-- 需要服务后绑定时，用“立即尝试 + service 事件/`ctx.inject` 重试 + 幂等 guard”，不要重复注册。
+- routes, listeners, watchers, timers, React roots, DOM, sockets, temporary services must all be cleanable.
+- Use `ctx.on()` or `ctx.effect(() => disposer, label)`.
+- Disposer order is usually: stop external entry points / unregister registries → wait for or cancel in-flight work → close resources.
+- For services that bind later, use "try immediately + retry on service event/`ctx.inject` + idempotent guard", don't register twice.
 
-### 4.4 工具
+### 4.4 Tools
 
-使用 `ctx.tools.register(defineTool(...))`：
+Use `ctx.tools.register(defineTool(...))`:
 
-- `description` 写清何时调用、必要前置条件、失败语义和副作用。
-- `parameters` 与 `output.schema` 都用 `@deepseek-ai/dsh-tools` 的 value-schema DSL（编译后是受支持的 JSON Schema 子集）：`parameters` 是隐式开放对象根、必填用属性内联 `required: true`；`output.schema` 声明 canonical 返回值并在注册时被 `assertSupportedJsonSchema` 强制校验。二者是同一 DSL 的两个面，不是两套语言。
-- `output.render` 给模型稳定、紧凑、可判定的文本。
-- 从 `exec.agent` 获取当前会话、工作区和 owner，不从全局进程状态猜。
-- 异步工作观察或转发 `exec.signal`；写操作要有幂等、锁或冲突策略。
+- `description` must state when to call, necessary prerequisites, failure semantics, and side effects.
+- Both `parameters` and `output.schema` use the `@deepseek-ai/dsh-tools` value-schema DSL (a supported JSON Schema subset after compilation): `parameters` is an implicitly open object root, required fields inline `required: true`; `output.schema` declares the canonical return value and is validated at registration by `assertSupportedJsonSchema`. They are two faces of the same DSL, not two languages.
+- `output.render` gives the model stable, compact, decidable text.
+- Get the current session, workspace, and owner from `exec.agent`, never guess from global process state.
+- Async work observes or forwards `exec.signal`; write operations need idempotency, locks, or conflict strategies.
 
 ### 4.5 HTTP
 
-- 注入当前正式版 Web server service，并用结构化最小接口降低耦合。
-- 路由通过 `ctx.effect(() => ctx.webServer.register({ kind: 'exact' | 'prefix', path, handler }))` 注册；重复 (kind, path) 会抛错。
-- 状态接口显式设置缓存策略：敏感或实时快照优先 `Cache-Control: no-store`，可重验证资源使用 `no-cache`；静态资源使用明确白名单和正确 content type。
-- path decode、请求体解析和 handler rejection 都要转成明确 4xx/5xx，不能成为未处理 rejection。
-- exact route、最长 prefix、fallback 的所有权不能冲突；未知插件资源返回 404，不落入 SPA fallback。
-- 涉及权限或本机能力时采用最小暴露、回环/信任边界和方法白名单。
+- Inject the current release Web server service and decouple with a minimal structured interface.
+- Routes register via `ctx.effect(() => ctx.webServer.register({ kind: 'exact' | 'prefix', path, handler }))`; duplicate (kind, path) throws.
+- State interfaces set cache policy explicitly: sensitive or real-time snapshots prefer `Cache-Control: no-store`, revalidatable resources use `no-cache`; static assets use an explicit allowlist and correct content type.
+- path decoding, request-body parsing, and handler rejections must all convert to explicit 4xx/5xx, never become unhandled rejections.
+- exact routes, longest prefixes, and fallback ownership must not conflict; unknown plugin assets return 404, never fall into the SPA fallback.
+- For permissions or local capabilities, use minimal exposure, loopback/trust boundaries, and method allowlists.
 
-### 4.6 持久化与并发
+### 4.6 Persistence and concurrency
 
-先判断应复用正式版 storage/session persistence service，还是插件拥有独立介质。无论哪种：
+First decide whether to reuse the release storage/session persistence service or own a separate medium. Either way:
 
-- 路径配置显式指定；不要用 `process.cwd()` 默认值散落用户数据。
-- 状态按 workspace、session、owner 或业务 id 建立清晰隔离维度。
-- 同一资源的读改写串行化；并发创建采用 no-clobber 语义。
-- 人可读 JSON 要用同目录临时文件 + fsync + 原子发布；追加日志要处理 torn tail。并发创建用 `link()`+`unlink()` 的 no-clobber 协议，勿用 `rename()` 静默覆盖。
-- Registry backend 的清理顺序是 unregister 再 close。
-- 恢复与 HMR 不能假设创建事件会重放；需要时显式扫描和回填已有对象。
+- Paths are configured explicitly; don't scatter user data with `process.cwd()` defaults.
+- State has clear isolation dimensions by workspace, session, owner, or business id.
+- Read-modify-write on the same resource is serialized; concurrent creation uses no-clobber semantics.
+- Human-readable JSON uses same-directory temp file + fsync + atomic publish; append logs handle torn tails. Concurrent creation uses the `link()`+`unlink()` no-clobber protocol, not `rename()` silent overwrites.
+- Registry backend cleanup order is unregister, then close.
+- Recovery and HMR must not assume creation events replay; explicitly scan and backfill existing objects when needed.
 
-## 5. Client 面实现
+## 5. Client-side implementation
 
-### 5.1 最小入口
+### 5.1 Minimal entry
 
 ```ts
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
@@ -224,164 +224,164 @@ export const inject = ['slots']
 export function apply(ctx: ClientContext): void {}
 ```
 
-- 类型贡献使用 type-only import 拉入 Context/SlotMap merge。
-- client 注册、controller、listener、style 和 DOM 都必须随 client fiber dispose。
-- per-session 状态按 `SessionId` 分桶；连接重置时只重同步已经读过的对象。
+- Type contributions use type-only imports to pull in Context/SlotMap merges.
+- Client registrations, controllers, listeners, styles, and DOM must all dispose with the client fiber.
+- per-session state is bucketed by `SessionId`; on connection reset, only resync objects already read.
 
-### 5.2 Slot 四步契约
+### 5.2 The four-step slot contract
 
-1. **声明**：从提供 slot 的官方包拉入类型；自定义 owner 才通过 module augmentation 扩展 `SlotMap`。
-2. **认领**：父 entry 的 `children` 表声明子 slot；声明即占有渲染权，不要争抢别人的 seat。
-3. **注册**：owner 与贡献者的激活顺序不保证，使用 `ctx.slots.inject(key, () => ctx.slots.register({ name, children?, store?, locale?, inject?, ...kind 参数 }, Component))` 等待声明；`children` 同时是子 slot 的认领表（认领即占有渲染权）。kind 参数：keyed 必填 `key`、list 必填 `id`（可加 `order`/`label`）、chain 必填 `select`；single/keyed/list 可加 `priority` 做 cell 隐藏（同 cell 同 priority 会抛错）。向未声明 slot 直接 register 会抛错。
-4. **渲染**：owner 使用 `renderSlot`/`renderSlotChain`；贡献者不 import owner 的实现组件。
+1. **Declare**: pull types in from the official package providing the slot; only custom owners extend `SlotMap` via module augmentation.
+2. **Claim**: the parent entry's `children` table declares child slots; declaring claims the render right — don't fight over someone else's seat.
+3. **Register**: owner and contributor activation order isn't guaranteed; use `ctx.slots.inject(key, () => ctx.slots.register({ name, children?, store?, locale?, inject?, ...kind params }, Component))` to wait for the declaration; `children` is simultaneously the claim table for child slots (claiming = owning the render right). Kind params: keyed requires `key`, list requires `id` (can add `order`/`label`), chain requires `select`; single/keyed/list can add `priority` for cell hiding (same cell + same priority throws). Registering directly to an undeclared slot throws.
+4. **Render**: owners use `renderSlot`/`renderSlotChain`; contributors don't import the owner's implementation components.
 
-选择接缝时先检查当前正式版类型。常见会话 UI 接缝包括：`conversation.session.header.actions`/`.utilities`、`conversation.view`、`conversation.chat.node`、`conversation.chat.commandview`、`conversation.chat.assistant-actions`、`conversation.chat.turnTail`、`conversation.input.dock`、`conversation.composer.dock`、`conversation.composer.bar`、`conversation.input.left`/`conversation.input.right`/`conversation.input.plan`/`conversation.input.model`。全局浮层用 `shell.overlay`（list/root），不要碰 `root` 单槽。不要仅凭旧文档写 slot 名，以当前正式版 `ui-conversation/src/client/contract/slots.ts` 的 SlotMap 为准。
+Check the current release types before choosing a seam. Common session UI seams include: `conversation.session.header.actions`/`.utilities`, `conversation.view`, `conversation.chat.node`, `conversation.chat.commandview`, `conversation.chat.assistant-actions`, `conversation.chat.turnTail`, `conversation.input.dock`, `conversation.composer.dock`, `conversation.composer.bar`, `conversation.input.left`/`conversation.input.right`/`conversation.input.plan`/`conversation.input.model`. Global floaters use `shell.overlay` (list/root), never touch the `root` single slot. Don't write slot names from old docs alone — the authority is the current release `ui-conversation/src/client/contract/slots.ts` SlotMap.
 
-### 5.3 Conversation Node
+### 5.3 Conversation Nodes
 
-Conversation Node 是“事件折叠 + keyed slot renderer”的组合：
+A Conversation Node is the combination of "event folding + keyed slot renderer":
 
-1. 定义共享事件类型，并 merge 到 session event map。
-2. `conversationEvents.register(definition)`：
-   - `match` 选择事件；
-   - `start` 创建节点状态；
-   - `update` 按 seq 确定性折叠；
-   - `buildViewNode` 生成稳定的 view node。
-3. merge `ChatNodeDataMap`/节点 kind 类型。
-4. 向 `conversation.chat.node` 注册相同 key 的 renderer。
+1. Define shared event types and merge them into the session event map.
+2. `conversationEvents.register(definition)`:
+   - `match` selects events;
+   - `start` creates node state;
+   - `update` folds deterministically by seq;
+   - `buildViewNode` produces a stable view node.
+3. Merge `ChatNodeDataMap`/node kind types.
+4. Register a renderer with the same key into `conversation.chat.node`.
 
-红线：
+Red lines:
 
-- 重放同一事件序列必须得到同一节点，不读时间、随机数或当前磁盘状态。
-- `match` 返回稳定业务 id 和 `start|update` 角色；节点引擎在当前会话内使用 `conversationContextKey(kind, businessId)` 去重。跨会话持久化缓存另行把 owner session 纳入 key，不能混成引擎契约。
-- 事件写入业务 owner 会话；共享 host/client 事件文件保持 type-only、最好零运行时 import，避免双 tsconfig 的 Context augmentation 相互污染。
-- 磁盘/服务端快照可作为实时 UI 真相；事件流用于对话投影、审计和确定性历史，两者职责不要混淆。
+- Replaying the same event sequence must produce the same node; don't read time, random numbers, or current disk state.
+- `match` returns a stable business id and a `start|update` role; the node engine deduplicates within the current session using `conversationContextKey(kind, businessId)`. Cross-session persistent caches additionally fold the owner session into the key; don't conflate that into the engine contract.
+- Events are written into the business owner session; shared host/client event files stay type-only, ideally zero runtime imports, to avoid dual-tsconfig Context augmentation cross-contamination.
+- Disk/server snapshots can be the real-time UI truth; the event stream is for conversation projection, audit, and deterministic history — don't confuse the two responsibilities.
 
-### 5.4 Portal 兜底
+### 5.4 Portal fallback
 
-能用语义正确的 slot 就不用 fixed portal。全应用浮层优先注册 `shell.overlay`（list/root，click-through 直到你的 entry 主动开启 pointer events）；确无全局角落 slot 时才 body portal：
+Prefer a semantically correct slot over a fixed portal. Full-app floaters register `shell.overlay` first (list/root, click-through until your entry actively enables pointer events); only when no global corner slot exists use a body portal:
 
-- React root、host DOM、window listener、全局 attribute 都有 disposer。
-- 跟随 session list，按当前 owner 过滤；导航时立即收起。
-- 宽屏可让主列礼让，窄屏退回 overlay；只依赖稳定 `data-*`，不要耦合哈希 class。
-- 首屏恢复的已有活动只显示徽标，避免首次请求返回后自动展开造成大幅布局位移；稳定后出现的新活动再自动展开。
-- 面板限制为容器/视口的一部分高度，内容区内部滚动；窄屏单独设上限。
-- 轮询使用 `no-store`、in-flight guard、响应形状校验和 unmount 防护；失败保留最后成功快照。
-- 支持键盘、`:focus-visible`、`aria-*`、Escape、reduced motion；hover/focus 只预览，click 才固定状态。
+- React root, host DOM, window listeners, and global attributes all have disposers.
+- Follow the session list, filter by the current owner; collapse immediately on navigation.
+- On wide screens let the main column yield, narrow screens fall back to overlay; rely only on stable `data-*` attributes, don't couple to hashed classes.
+- Restored activity on first paint shows only the badge, avoiding large layout shifts from auto-expanding right after the first request returns; new activity that appears after settling auto-expands.
+- The panel is limited to a fraction of the container/viewport height with internal scrolling; narrow screens get their own cap.
+- Polling uses `no-store`, an in-flight guard, response shape validation, and unmount protection; on failure keep the last successful snapshot.
+- Support keyboard, `:focus-visible`, `aria-*`, Escape, reduced motion; hover/focus only previews, click pins state.
 
-## 6. TypeScript 与 Client 构建
+## 6. TypeScript and client builds
 
-### 6.1 双 tsc program
+### 6.1 Dual tsc programs
 
-Host 和 client 使用两个 program；文件名可按项目布局选择，官方仓库用 `tsconfig.host.json` 与 `tsconfig.client.json` 两个聚合 program 分别做 host/client 检查：host 排除 `packages/client/*/src/**` 与 `*.client.*` 测试；client 聚合含各 client 包的 CSS module 声明、client 测试与构建脚本，共享 leaf 经 project references 进入，每个 `packages/client/*` 包还各自维护一个 composite tsconfig 做包内类型检查。JSX 使用 `.tsx` 和 `react-jsx`；相对 TS import 必须能正确重写为 emitted JS。
+Host and client use two programs; file names can follow the project layout. The official repo uses `tsconfig.host.json` and `tsconfig.client.json` as two aggregate programs for host/client checking respectively: host excludes `packages/client/*/src/**` and `*.client.*` tests; the client aggregate includes each client package's CSS module declarations, client tests, and build scripts, shared leaves enter via project references, and each `packages/client/*` package also maintains its own composite tsconfig for in-package type checking. JSX uses `.tsx` and `react-jsx`; relative TS imports must rewrite correctly to emitted JS.
 
-这样避免 host session 与 browser runtime 对同名 Context service 的 declaration merge 冲突。
+This avoids declaration-merge conflicts between the host session and the browser runtime for same-named Context services.
 
-### 6.2 Client bundle
+### 6.2 Client bundles
 
-优先复用当前正式版 Harness 的 client tsdown helper或已验证模板，不手写 loader 协议。产物应由构建自动包装为：
+Prefer reusing the current release Harness client tsdown helper or a verified template; don't hand-write loader protocols. The build should automatically wrap the output as:
 
 ```js
 window.__ModuleLoader__.load({ id, factory: (require) => { /* bundle */ } })
 ```
 
-构建必须保留：
+The build must preserve:
 
-- host/client 两半产物并存（client build 不清空 host 输出）；
-- sourcemap；
-- CSS Modules 编译与 `style[data-plugin]` 注入；
-- 从 emitted `lib/` 找回 `src/` 资源的路径回退；
-- client bundle purity gate。
+- host/client halves coexisting (the client build doesn't clear host output);
+- sourcemaps;
+- CSS Modules compilation and `style[data-plugin]` injection;
+- path fallback from emitted `lib/` back to `src/` assets;
+- the client bundle purity gate.
 
-### 6.3 Client import 纯度
+### 6.3 Client import purity
 
-浏览器模块表只回答正式版平台 seed 模块和明确豁免。规则：
+The browser module table only answers release platform seed modules and explicit exemptions. Rules:
 
-- 平台模块以正式版 `packages/client/web/src/platform.ts` 和官方 client 构建配置为准；React、Cordis、slots、web-react、primitives、attachment、schema-form 等由模块表提供。
-- `@deepseek-ai/dsh-client-runtime/client` 是官方构建配置中明确标注的临时豁免，不是普通平台模块；不要把它泛化为可任意导入 runtime 值的许可。
-- 纯类型 import 会被擦除，可以跨包拉入类型贡献。
-- wire types、生成 remote codec 或明确 vendored 的纯库只有在官方模板允许时才 inline。
-- 其他跨插件值 import 禁止；协作必须走 Cordis service/remote/slot。否则构建期纯度门或运行时 require 都会失败。
+- Platform modules follow the release `packages/client/web/src/platform.ts` and official client build config; React, Cordis, slots, web-react, primitives, attachment, schema-form etc. are provided by the module table.
+- `@deepseek-ai/dsh-client-runtime/client` is an explicitly marked temporary exemption in the official build config, not an ordinary platform module; don't generalize it into a license to import arbitrary runtime values.
+- Pure type imports are erased and may pull in type contributions across packages.
+- Wire types, generated remote codecs, or explicitly vendored pure libraries may only be inlined when official templates allow it.
+- Other cross-plugin value imports are forbidden; collaboration must go through cordis services/remotes/slots. Otherwise the build-time purity gate or the runtime require fails.
 
-## 7. 分发、安装与生效边界
+## 7. Distribution, installation, and activation boundaries
 
-### 7.1 安装
+### 7.1 Installation
 
-`dsh plugin --profile <name> <args...>` 是 profile 目录里的 pnpm 转发层，成功后按安装状态和 `dsh.bundle` 对账 bundle 列表。因此支持 npm、路径、tarball 和 Git：
+`dsh plugin --profile <name> <args...>` is a pnpm forwarding layer in the profile directory; on success it reconciles the bundle list by install state and `dsh.bundle`. So npm, paths, tarballs, and Git are all supported:
 
 ```sh
 npx -p @deepseek-ai/dsh dsh plugin --profile web add github:<owner>/<repo>
 ```
 
-GitHub 分发不要求发布 npm，但必须选择一种构建策略（Git 获取的是源码，不是构建产物）：
+GitHub distribution doesn't require publishing to npm, but you must choose a build strategy (Git fetches source, not build artifacts):
 
-- **官方主推**：提供自包含 `prepare`（官方 turtle-ui 模式）；pnpm ≥10 默认拦截 Git 依赖的构建脚本，用户需在 profile 的 `pnpm-workspace.yaml` 显式 `allowBuilds` 后重跑 `add`。这会执行第三方代码，应固定 commit 并只信任已审查仓库。
-- **备选（无交互安装）**：把 exports 指向的完整、最新 `lib/` 提交进 Git；用户无需执行依赖脚本，但非官方推荐路径。
+- **Official recommendation**: provide a self-contained `prepare` (the official turtle-ui pattern); pnpm ≥10 blocks Git dependency build scripts by default, so the user must explicitly `allowBuilds` in the profile's `pnpm-workspace.yaml` and re-run `add`. This executes third-party code, so pin the commit and only trust reviewed repositories.
+- **Alternative (no-interaction install)**: commit the complete, up-to-date `lib/` that exports point to into Git; users don't execute dependency scripts, but it's not the officially recommended path.
 
-README 只给经过全新 profile 验证的推荐命令。安装后重启目标 profile。
+The README only gives recommended commands verified against a fresh profile. Restart the target profile after installing.
 
-### 7.2 HMR 与重启
+### 7.2 HMR and restarts
 
-- client HMR 需要 `tsdown --watch` 等构建 watcher 持续重写 `lib/client.js`；host HMR 只负责 stat 检测文件变化，再通过 rev/SSE 触发 browser fiber 的 dispose/reload。
-- 只有 bundle 内容变化可以 client HMR；package manifest、exports、插件集合、profile bundles 和 host 代码变化需要重启。
-- 普通 build 后没有 watcher 时，刷新现有 DSH 页面。
-- 不启动独立 Vite server 替代 DSH GUI；Web shell 依赖 host 注入的 `window.__DSH_BOOT__`。
+- Client HMR needs a build watcher like `tsdown --watch` continuously rewriting `lib/client.js`; host HMR only stat-detects file changes, then triggers browser fiber dispose/reload via rev/SSE.
+- Only bundle content changes can client-HMR; package manifest, exports, plugin sets, profile bundles, and host code changes require a restart.
+- After an ordinary build with no watcher, refresh the existing DSH page.
+- Don't start a standalone Vite server to replace the DSH GUI; the web shell depends on the host-injected `window.__DSH_BOOT__`.
 
-## 8. 验证矩阵
+## 8. Verification matrix
 
-### 8.1 基线
+### 8.1 Baseline
 
 ```sh
 pnpm typecheck
 pnpm build
-pnpm test             # package.json 声明时运行
-pnpm verify           # package.json 声明时运行
+pnpm test             # run when package.json declares it
+pnpm verify           # run when package.json declares it
 git diff --check
 ```
 
-先读取 `package.json.scripts`，不要假设所有仓库都有同名聚合脚本：官方 Harness 使用 `check:ci`/`check:all` 与多个 `verify-*` gate；第三方插件可自定义 `verify`。项目级 verify/check 至少覆盖：
+Read `package.json.scripts` first; don't assume every repo has same-named aggregate scripts: official Harness uses `check:ci`/`check:all` and multiple `verify-*` gates; third-party plugins may define their own `verify`. Project-level verify/check covers at least:
 
-- 纯业务规则和状态迁移；
-- 临时目录中的文件往返、锁、归档/恢复；
-- client 可独立测试的投影/折叠纯函数；
-- canonical Skill 与镜像一致性（若项目提供镜像）。
+- pure business rules and state transitions;
+- file round-trips, locks, archive/restore in temp directories;
+- client-side independently testable projection/folding pure functions;
+- canonical Skill and mirror consistency (when the project provides a mirror).
 
-### 8.2 Host 与真实组合
+### 8.2 Host and real composition
 
-- 单元测试覆盖 schema、service、失败和 disposer。
-- 有 registry/backend 接口时使用共享 contract suite。
-- 不只手搓 `ctx.plugin()`：至少一个测试通过真实 Loader/patch 组合启动，断言用户可见表面。
-- 先用 `dsh plugin --profile <scratch> add <pkg>` 创建非内置 scratch profile，再执行 `dsh --profile <scratch> --dump-config`，确认 bundle 层、行 id、name、config 和注入顺序；内置 `web`/`headless` profile 可由 launcher 初始化。另有 `--dump-default-config`：只打印 bundle 层、跳过用户层与 `--patch`，可作坏 `cordis.patch.yml` 时的恢复诊断。
-- 真实任务使用 `dsh --profile headless "一个小而可判定的任务"`；不要发明 `dsh run` 子命令。
+- Unit tests cover schemas, services, failures, and disposers.
+- Use shared contract suites when a registry/backend interface exists.
+- Don't only hand-roll `ctx.plugin()`: at least one test boots via a real Loader/patch composition and asserts a user-visible surface.
+- First create a non-built-in scratch profile with `dsh plugin --profile <scratch> add <pkg>`, then run `dsh --profile <scratch> --dump-config` to confirm bundle layers, row ids, names, configs, and injection order; built-in `web`/`headless` profiles can be initialized by the launcher. There's also `--dump-default-config`: prints only bundle layers, skipping user layers and `--patch`, useful as a recovery diagnostic for a broken `cordis.patch.yml`.
+- Real tasks use `dsh --profile headless "a small, decidable task"`; don't invent a `dsh run` subcommand.
 
 ### 8.3 Client
 
-- client 测试使用 jsdom lane；通过 SlotTestRuntime 或最小 fake services mount 插件。
-- 断言 slot 注册、渲染、session 隔离、connection reset、dispose 后 registry/DOM/style/controller 均清理。
-- 每个 registry 贡献至少有一个 HMR/dispose 安全测试。
-- GUI 使用独立 web profile 和真实浏览器，验证名册、路由、交互、刷新、宽窄屏、滚动、焦点和 reduced motion。
+- Client tests use the jsdom lane; mount the plugin via SlotTestRuntime or minimal fake services.
+- Assert slot registration, rendering, session isolation, connection reset, and that registry/DOM/style/controller are all cleaned up after dispose.
+- Every registry contribution has at least one HMR/dispose safety test.
+- GUI uses an independent web profile and a real browser, verifying roster, routes, interactions, refresh, wide/narrow screens, scrolling, focus, and reduced motion.
 
-### 8.4 从零安装与 Git 分发
+### 8.4 Fresh install and Git distribution
 
-1. 使用全新临时 `DSH_HOME`/profile。
-2. 按 README 的精确命令安装。
-3. 断言 profile dependency 与 `dsh.profile.bundles`。
-4. 断言所有 exports、host/client bundle、patch 和静态资源存在。
-5. `--dump-config` 必须出现插件层。
-6. 启动后检查 host route、client roster 和真实 UI。
+1. Use a fresh temporary `DSH_HOME`/profile.
+2. Install with the README's exact commands.
+3. Assert the profile dependency and `dsh.profile.bundles`.
+4. Assert all exports, host/client bundles, patches, and static assets exist.
+5. `--dump-config` must show the plugin layer.
+6. After startup, check the host route, client roster, and real UI.
 
-仓库仍私有时，可把待发布内容复制到临时 Git repo 并提交，再通过 `git+file://...` 安装；这能验证“Git 获取的内容”而不是当前 checkout 的未提交文件。前提：`git` 在 PATH、目录是已提交的真实 Git 仓库；若包声明了 `prepare`，还需在 profile 的 `pnpm-workspace.yaml` 加 `allowBuilds`（与 §7.1 相同门禁）。只删除本任务创建的精确临时目录。
+While the repo is still private, copy the to-be-published content into a temporary Git repo and commit it, then install via `git+file://...`; this verifies "what Git fetches" rather than the current checkout's uncommitted files. Prerequisites: `git` on PATH, the directory is a committed real Git repo; if the package declares `prepare`, also add `allowBuilds` to the profile's `pnpm-workspace.yaml` (the same gate as §7.1). Only delete the exact temporary directories this task created.
 
-## 9. 完成标准
+## 9. Completion criteria
 
-完成前逐项确认：
+Confirm each item before finishing:
 
-- 运行面最小，manifest、exports、patch 与产物一致。
-- 必需 inject 和可选 service 边界清楚；pending/failed 状态可诊断。
-- route、registry、timer、watcher、DOM、React root 和存储均可清理。
-- Conversation Node 可确定性重放，owner 与去重维度正确。
-- client import 未越过模块表，host/client 类型隔离。
-- 持久化有并发与崩溃语义，不依赖偶然 cwd。
-- typecheck、build、verify、真实组合、从零安装和需要的 GUI 验证通过。
-- README 安装命令与实际分发形态一致。
-- 未执行未经授权的 commit、push、发布或 visibility 变更。
+- Minimal runtime surface; manifest, exports, patch, and artifacts consistent.
+- Required inject and optional service boundaries clear; pending/failed states diagnosable.
+- Routes, registries, timers, watchers, DOM, React roots, and storage all cleanable.
+- Conversation Nodes replay deterministically, with correct owner and deduplication dimensions.
+- Client imports don't cross the module table; host/client types isolated.
+- Persistence has concurrency and crash semantics, not dependent on incidental cwd.
+- typecheck, build, verify, real composition, fresh install, and required GUI verification pass.
+- README install commands match the actual distribution shape.
+- No unauthorized commit, push, publish, or visibility change.

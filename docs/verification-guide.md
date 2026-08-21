@@ -1,42 +1,42 @@
-## 验证 DSH 插件真的可用（实战方法）
+## Verifying a DSH plugin actually works (hands-on)
 
-> 本文从 dsh-agent-teams 插件（多智能体团队协作 + Web UI 活动面板）的完整验证历程蒸馏而来。
-> 全部命令都真实执行过；每一层都踩过坑，坑已标注在对应步骤。原则：**不碰正在运行的实例，验证在独立 profile / 独立端口 / 临时目录上进行，测完清理**。
+> This document is distilled from the complete verification journey of the dsh-agent-teams plugin (multi-agent team collaboration + Web UI activity panel).
+> Every command has actually been executed; every layer has its pitfalls, marked at the corresponding step. Principle: **never touch a running instance — verify on an independent profile / independent port / temporary directory, then clean up**.
 
-### 验证金字塔总览
+### Verification pyramid overview
 
-自底向上四层，每层通过再进下一层；任何一层失败都要先修再继续：
+Four layers bottom-up; pass one layer before moving to the next; any failure must be fixed before continuing:
 
-1. **离线**：双 program typecheck + 构建 + 冒烟脚本（纯逻辑、临时目录、自清理）
-2. **组合**：`dsh --profile <scratch> --dump-config` 验证 bundle 补丁能组合进配置树（不 boot、不碰实例）
-3. **真实端到端**：独立 headless profile + 真实 LLM 任务 + 落盘/事件检查
-4. **GUI**：独立 web 实例 + ego-browser 驱动真实浏览器（名册 → 路由 → DOM 探针 → 截图）
+1. **Offline**: dual-program typecheck + build + smoke script (pure logic, temp dirs, self-cleaning)
+2. **Composition**: `dsh --profile <scratch> --dump-config` verifies the bundle patch composes into the config tree (no boot, no touching instances)
+3. **Real e2e**: independent headless profile + real LLM task + on-disk/event checks
+4. **GUI**: independent web instance + ego-browser driving a real browser (roster → routes → DOM probes → screenshots)
 
 ---
 
-### 1. 离线验证
+### 1. Offline verification
 
-#### 1.1 双 program typecheck
+#### 1.1 Dual-program typecheck
 
-DSH 插件往往同时有 **host 侧**（Node：工具、路由）与**浏览器侧**（React 组件、Conversation Node）。两边会拉进互相冲突的类型声明（典型：host 侧 `dsh-session` 的 index 声明 `Context.sessions: SessionStore`，与浏览器 runtime 的 `ISessions` 同名冲突），**必须拆成两个独立 tsc program**：
+DSH plugins usually have both a **host side** (Node: tools, routes) and a **browser side** (React components, Conversation Node). Both pull in mutually conflicting type declarations (typical: the host-side `dsh-session` index declares `Context.sessions: SessionStore`, conflicting with the browser runtime's same-named `ISessions`), so **they must be split into two independent tsc programs**:
 
 ```jsonc
-// tsconfig.json（host）：include src，exclude ["src/client"]
-// tsconfig.client.json：extends ./tsconfig.json + jsx react-jsx + lib DOM + types []
+// tsconfig.json (host): include src, exclude ["src/client"]
+// tsconfig.client.json: extends ./tsconfig.json + jsx react-jsx + lib DOM + types []
 //     include ["src/client", "src/event-types.ts", "src/css-modules.d.ts"]
 ```
 
 ```sh
-tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit   # 两个都要 0 错误
+tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit   # both must be 0 errors
 ```
 
-坑（都真实踩过）：
-- **`.ts` 文件不解析 JSX**：客户端入口含 JSX 必须命名为 `index.tsx`（`index.ts` 会把 `<Component` 当小于号报 `TS1005 '>' expected`，且与 jsx 配置无关）。
-- **`declare module` 合并需要目标模块先被加载**：`declare module '@deepseek-ai/dsh-session/types'` 扩展 `SessionEventMap` 前，该模块必须已作为模块存在于 program 中——在文件顶部加 `import type {} from '...'`（类型导入会加载模块声明，产物中被擦除）。
-- **闭包内窄化失效**：`match.event.data.x` 在 `.map((m) => ...)` 回调里使用时，判别联合窄化不保留——先在守卫后提取 `const x = match.event.data.x` 再用。
-- **类型链接目标**：`profiles/node_modules/@deepseek-ai/*` 的链接指向不稳定（staging 快照可能是旧构建，声明 `module 'cordis'` 而非 rescoped 的 `'@deepseek-ai/cordis'`）。开发时把 `node_modules/@deepseek-ai/<pkg>` 直接链接到 **checkout 源码包的目录**（其 `lib/types` 是声明正确的构建）；若 client 包 lib 过期（缺 `Context` 声明合并），优先链接到运行实例同版本的 staging 构建，或直接映射源码。
+Pitfalls (all actually hit):
+- **`.ts` files don't parse JSX**: a client entry with JSX must be named `index.tsx` (`index.ts` treats `<Component` as a less-than sign and reports `TS1005 '>' expected`, independent of the jsx config).
+- **`declare module` merging needs the target module loaded first**: before `declare module '@deepseek-ai/dsh-session/types'` can extend `SessionEventMap`, that module must already exist in the program — add `import type {} from '...'` at the top of the file (a type import loads the module declarations and is erased from the output).
+- **Narrowing fails inside closures**: `match.event.data.x` used inside a `.map((m) => ...)` callback does not retain discriminated-union narrowing — extract `const x = match.event.data.x` after the guard and use the local.
+- **Type link targets**: links at `profiles/node_modules/@deepseek-ai/*` are unstable (staging snapshots may be old builds declaring `module 'cordis'` instead of the rescoped `'@deepseek-ai/cordis'`). During development, link `node_modules/@deepseek-ai/<pkg>` directly to the **checkout source package directory** (its `lib/types` is the correctly-declared build); if the client package's lib is stale (missing `Context` declaration merge), prefer linking to the same-version staging build of the running instance, or map the source directly.
 
-#### 1.2 构建（tsc + tsdown client bundle）
+#### 1.2 Build (tsc + tsdown client bundle)
 
 ```jsonc
 // package.json scripts
@@ -45,22 +45,22 @@ tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit   # 两个
 "verify": "node scripts/verify.mjs"
 ```
 
-- tsc 产出 `lib/`（host 可执行 ESM）与 `lib/types/`（声明）
-- `tsdown` 把 `lib/client/index.js` 打包成浏览器 bundle `lib/client.js`（协议：CJS closure-factory，`window.__ModuleLoader__.load({ id, factory })`；外部化平台模块 react / `@deepseek-ai/dsh-client-*`；CSS Modules 经 lightningcss 内联并注入 `<style data-plugin>`）
-- 构建后冒烟：`node -e "import('./lib/index.js').then(m => console.log(Object.keys(m)))"` 应看到 `name/inject/Config/apply`
+- tsc produces `lib/` (host executable ESM) and `lib/types/` (declarations)
+- `tsdown` bundles `lib/client/index.js` into the browser bundle `lib/client.js` (protocol: CJS closure-factory, `window.__ModuleLoader__.load({ id, factory })`; externalizes platform modules react / `@deepseek-ai/dsh-client-*`; CSS Modules inlined via lightningcss and injected as `<style data-plugin>`)
+- Post-build smoke: `node -e "import('./lib/index.js').then(m => console.log(Object.keys(m)))"` should show `name/inject/Config/apply`
 
-坑：当前 DSH preset 从 `lib/types/...` rebase 到 `src/...`；外部插件应按自己的 emitted 布局实现，不能机械写死任意 `/lib/`。tsdown 0.22 已弃用 `external/noExternal`，但当前 checkout preset 仍在使用；迁移 `deps.neverBundle/alwaysBundle` 前先验证函数匹配语义，不要只把 warning 当成永久可忽略。
+Pitfall: the current DSH preset rebases from `lib/types/...` back to `src/...`; external plugins should implement their own emitted layout and not mechanically hardcode any `/lib/`. tsdown 0.22 deprecates `external/noExternal`, but the current checkout preset still uses them; before migrating to `deps.neverBundle/alwaysBundle`, verify the function-matching semantics — don't treat a warning as permanently ignorable.
 
-#### 1.3 冒烟脚本（scripts/verify.mjs）
+#### 1.3 Smoke script (scripts/verify.mjs)
 
-零依赖、临时目录自清理、纯逻辑可测。模板（直接照抄骨架）：
+Zero dependencies, self-cleaning temp dirs, pure logic that can be tested. Template (copy the skeleton as-is):
 
 ```js
 #!/usr/bin/env node
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { /* 被测的纯函数 */ } from '../lib/state.js'
+import { /* the pure functions under test */ } from '../lib/state.js'
 
 let failures = 0
 function check(label, condition, detail = '') {
@@ -68,111 +68,111 @@ function check(label, condition, detail = '') {
   else { failures += 1; console.error(`  FAIL  ${label}${detail ? ` — ${detail}` : ''}`) }
 }
 
-// 1) 纯规则：状态机迁移、依赖门禁、sanitize——输入输出都写成断言
-// 2) 文件持久化：mkdtemp 临时根 → createTeamDir/readTeam/mailbox 往返 →
-//    归档/删除 → finally { rm(stateRoot, { recursive: true, force: true }) }
-// 3) 状态函数：从 lib/ 导入（如 taskVisualState/taskDepthsById），构造 fixtures 断言
-// 4) 浏览器 fold：import('../lib/client/xxx.js') 直接跑纯 fold 逻辑（不依赖 React）
+// 1) Pure rules: state-machine transitions, dependency gating, sanitize — assert input and output
+// 2) File persistence: mkdtemp temp root → createTeamDir/readTeam/mailbox round-trip →
+//    archive/delete → finally { rm(stateRoot, { recursive: true, force: true }) }
+// 3) State functions: import from lib/ (e.g. taskVisualState/taskDepthsById), build fixtures and assert
+// 4) Browser fold: import('../lib/client/xxx.js') to run pure fold logic directly (no React)
 
 if (failures > 0) { console.error(`\n${failures} check(s) FAILED`); process.exit(1) }
 console.log('\nall checks passed')
 ```
 
-要求：断言 label 必须与输入和条件一致；覆盖缺失依赖、空目录、终态拒绝迁移并在 `finally` 清理临时目录。关系 UI 的纯投影还要断言 stage 顺序、自然 id 排序、非有限 depth 回退、上下游包含、sibling 排除和 cycle safety。`pnpm verify` 进 CI/提交前。
+Requirements: assertion labels must match the input and condition; cover missing dependencies, empty dirs, terminal-status transition rejections, and clean up temp dirs in `finally`. For UI-related pure projections, also assert stage ordering, natural id ordering, non-finite depth fallback, upstream/downstream inclusion, sibling exclusion, and cycle safety. Run `pnpm verify` before CI/commit.
 
-#### 1.4 组合验证：dump-config（不 boot、不碰实例）
+#### 1.4 Composition check: dump-config (no boot, no touching instances)
 
-用**独立 scratch profile** 验证 bundle 补丁能组合进配置树：
+Verify the bundle patch composes into the config tree with an **independent scratch profile**:
 
 ```sh
-# 手动构造 scratch profile（不必走 pnpm）
+# Manually construct the scratch profile (no need to go through pnpm)
 mkdir -p ~/.dsh/profiles/agent-teams-check/node_modules
 ln -sfn /absolute/path/to/plugin ~/.dsh/profiles/agent-teams-check/node_modules/<pkg>
 cat > ~/.dsh/profiles/agent-teams-check/package.json <<'EOF'
 { "name": "dsh-profile-check", "private": true, "dependencies": {},
   "dsh": { "profile": { "bundles": ["@deepseek-ai/dsh-base", "@deepseek-ai/dsh-web-app", "<pkg>"] } } }
 EOF
-printf '[]\n' > ~/.dsh/profiles/agent-teams-check/cordis.patch.yml   # 必须是顶层数组！
+printf '[]\n' > ~/.dsh/profiles/agent-teams-check/cordis.patch.yml   # must be a top-level array!
 
 dsh --profile agent-teams-check --dump-config | grep -A 4 "id: agent-teams"
 ```
 
-- `--dump-config` **离线组合**（`composeEntries` 应用 patch 层），不 boot 服务、不动运行实例
-- 输出应看到 `- id: <插件行>` 与其 config
-- 坑：`cordis.patch.yml` 不是顶层数组会报 "must be a top-level YAML array"。组合了 web-app 的自定义 profile 可直接接收 app-level `--host/--port`；`--patch` 是可审计的固化方式，但不是唯一入口。
+- `--dump-config` is **offline composition** (`composeEntries` applies the patch layers), no service boot, no touching running instances
+- Output should show `- id: <plugin row>` with its config
+- Pitfall: a non-top-level-array `cordis.patch.yml` reports "must be a top-level YAML array". Custom profiles composing web-app can directly take app-level `--host/--port`; `--patch` is an auditable, pinned approach, but not the only entry point.
 
 ---
 
-### 2. 真实端到端验证（独立 profile + 真实 LLM）
+### 2. Real e2e verification (independent profile + real LLM)
 
-#### 2.1 安装到独立 profile
+#### 2.1 Install into an independent profile
 
 ```sh
-# headless 模板自动初始化；pnpm link 语义 + 自动 reconcile 进 dsh.profile.bundles
+# headless template auto-initializes; pnpm link semantics + auto-reconcile into dsh.profile.bundles
 dsh plugin --profile headless add /absolute/path/to/plugin
-dsh --profile headless --dump-config   # 确认组合树含插件行
+dsh --profile headless --dump-config   # confirm the composition tree contains the plugin row
 ```
 
-首次真实运行通常立刻暴露 **mount 时序 bug**：Loader 并发激活下，插件 apply 时兄弟插件（如 `subagent-spawn` 的 provider 注册）可能尚未完成——**mount 时的 fail-loud 校验要移到首次使用点**（如第一次 spawn 成员时再 `ctx.subagents.getProvider(name)` 校验），错误信息要可操作。
+A first real run usually exposes **mount-timing bugs** immediately: under Loader concurrent activation, sibling plugins (e.g. the `subagent-spawn` provider registration) may not have finished when your plugin's `apply` runs — **move fail-loud validation at mount time to the first use point** (e.g. check `ctx.subagents.getProvider(name)` at the first member spawn), and make the error actionable.
 
-#### 2.2 真实 LLM 任务设计
+#### 2.2 Designing the real LLM task
 
 ```sh
 mkdir -p /tmp/agent-teams-e2e && cd /tmp/agent-teams-e2e
-dsh --profile headless "用 AgentTeams 完成一个小任务：创建团队'标题方案'，加 2 个成员（alice 负责研究，bob 负责撰写），创建 2 个任务（t2 依赖 t1）分配给他们，唤醒他们完成，最后汇总产出。任务要小，每个成员只做一个简单任务。"
+dsh --profile headless "Use AgentTeams for a small task: create a team 'title brainstorm', add 2 members (alice does research, bob does writing), create 2 tasks (t2 depends on t1) assigned to them, wake them, and finally consolidate the output. Keep tasks small — each member does one simple task."
 ```
 
-设计要点（控制 token 与可判定性）：
-- **任务要小**：明确写"任务要小/每个成员只做一个简单任务"（成员 spawn + 多轮工具调用会跑 1–3 分钟）
-- **明确要求走插件流程**：点名要调用的工具与顺序（创建团队→加成员→建依赖任务→唤醒→汇总），否则模型可能跳过
-- 在**专用工作目录**跑（`/tmp/...`），落盘产物可预期；后台运行（`run_in_background`）并 `task_output --wait` 收集
-- 判定成功：任务输出包含完整流程叙述（建队/成员/任务/产出/删队），且**事件流落盘**（见 2.3）
+Design points (control tokens and decidability):
+- **Keep tasks small**: explicitly say "tasks should be small / each member does one simple task" (member spawn + multiple tool calls can run 1–3 minutes)
+- **Explicitly require the plugin flow**: name the tools and order to call (create team → add members → create dependent tasks → wake → consolidate), otherwise the model may skip it
+- Run in a **dedicated working directory** (`/tmp/...`) so on-disk artifacts are predictable; run in the background (`run_in_background`) and collect with `task_output --wait`
+- Success criteria: the task output contains the full flow narrative (team/members/tasks/output/delete team), and the **event stream landed on disk** (see 2.3)
 
-#### 2.3 落盘检查（数据真相）
+#### 2.3 On-disk checks (the data truth)
 
 ```sh
-# 团队状态文件（headless 的 cwd = 调用目录；团队删除后会归档/清空）
+# Team state files (headless cwd = invocation dir; archived/emptied after team deletion)
 ls -la /tmp/agent-teams-e2e/.agent-teams/
 
-# 会话日志：每个会话一个目录，成员子会话是独立 uuid 目录
+# Session logs: one dir per session; member sub-sessions are separate uuid dirs
 ls -lt ~/.dsh/sessions/--private-tmp-agent-teams-e2e--/
 
-# 事件流（zstd 压缩，用 zstdcat 解压后数 agent-teams/* 事件）
+# Event stream (zstd-compressed; decompress with zstdcat and count agent-teams/* events)
 zstdcat ~/.dsh/sessions/<ws>/session-<id>/session.jsonl.zstd \
   | grep -o '"type":"agent-teams/[^"]*"' | sort | uniq -c
-# 预期：team-created ×1, member-added ×2, task-created ×2, task-updated ×N,
-#       message-sent ×N, team-deleted ×1（数量与流程一一对应）
+# Expected: team-created ×1, member-added ×2, task-created ×2, task-updated ×N,
+#       message-sent ×N, team-deleted ×1 (counts match the flow 1:1)
 ```
 
-事件流是 UI 与重放的数据源——**事件数量与流程步骤对不上就是 bug**（如成员没走 `update_task` 仪式时事件缺失，要与磁盘真相区分）。
+The event stream is the data source for the UI and replay — **event counts that don't match the flow steps are a bug** (e.g. missing events when a member skips the `update_task` ritual; distinguish this from disk truth).
 
 ---
 
-### 3. GUI 验证（ego-browser + 独立 web 实例）
+### 3. GUI verification (ego-browser + independent web instance)
 
-#### 3.1 启动独立 web 实例（不触碰用户指定的运行实例）
+#### 3.1 Start an independent web instance (never touch the user's running instance)
 
 ```sh
-# 从零安装（内测 npm 流程，peer 从内测 registry 解析）：
+# Fresh install (beta npm flow; peers resolve from the beta registry):
 npx -p @deepseek-ai/dsh@0.0.1-rc.1 dsh plugin --profile agent-teams-beta add @deepseek-ai/dsh-base
 npx -p @deepseek-ai/dsh@0.0.1-rc.1 dsh plugin --profile agent-teams-beta add @deepseek-ai/dsh-web-app
 npx -p @deepseek-ai/dsh@0.0.1-rc.1 dsh plugin --profile agent-teams-beta add /abs/path/to/dsh-agent-teams
-# 启动（managed background task，保存 task id；CLI 与 bundle 同通道）：
+# Start (managed background task, keep the task id; CLI and bundle share the same channel):
 npx -p @deepseek-ai/dsh@0.0.1-rc.1 dsh --profile agent-teams-beta --host 127.0.0.1 --port 3081
-# 看到精确 URL 后再 curl
+# curl only after you see the exact URL
 curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:3081/
 ```
 
-- 组合了 web-app 的自定义 profile 可直接传 app-level `--host/--port`；也可用 `--patch` 固化 webserver config。
-- **版本对齐坑**：npx 默认 CLI 是 rc.2（next 通道），`dsh plugin add` 默认装 latest（rc.1）——混装时 rc.2 独有的 `ui-plugin-config` 等待 rc.2 才提供的 `settingsScope`，页面报 "Failed to load plugins"。固定 CLI 为 `@0.0.1-rc.1`（与 latest bundle 对齐），或全部升级 `next`。
-- 内测 registry 的 `latest`（rc.1）与 `next`（rc.2）服务键不同（`httpServer` vs `webServer`）——插件双键兼容，两个通道都要抽验。
-- client HMR 需要 watcher 持续重建 `lib/client.js`；否则 `pnpm build` 后刷新页面。host/package manifest/profile bundles 改动才重启。
-- apps/web shell/普通 packages 不走 client-plugin HMR；不要启动独立 Vite server 替代 DSH GUI。
+- Custom profiles composing web-app can directly take app-level `--host/--port`; `--patch` can also pin the webserver config.
+- **Version-alignment pitfall**: the default npx CLI is rc.2 (next channel), while `dsh plugin add` installs latest (rc.1) by default — mixing them makes rc.2-only `ui-plugin-config` wait for `settingsScope`, which only rc.2 provides, and the page reports "Failed to load plugins". Pin the CLI to `@0.0.1-rc.1` (aligned with the latest bundle), or upgrade everything to `next`.
+- The beta registry's `latest` (rc.1) and `next` (rc.2) have different service keys (`httpServer` vs `webServer`) — the plugin is dual-key compatible, so spot-check both channels.
+- Client HMR needs a watcher continuously rebuilding `lib/client.js`; otherwise refresh the page after `pnpm build`. Only host/package manifest/profile bundle changes require a restart.
+- apps/web shell/ordinary packages don't go through client-plugin HMR; don't start a standalone Vite server to replace the DSH GUI.
 
-#### 3.2 名册与路由探活
+#### 3.2 Roster and route liveness
 
 ```sh
-# 浏览器名册必须包含插件（client-modules 扫描组合树中声明 dsh.client 的包）
+# The browser roster must contain the plugin (client-modules scans packages declaring dsh.client in the composition tree)
 curl -s http://127.0.0.1:3081/ | python3 -c "
 import sys, json, re
 html = sys.stdin.read()
@@ -180,22 +180,22 @@ m = re.search(r'window.__DSH_BOOT__ = (.*?)</script>', html, re.S)
 g = json.loads(m.group(1))
 print(any('agent-teams' in e['id'] for e in g.get('entries', [])))
 "
-# client bundle 与自定义数据路由
+# Client bundle and custom data routes
 curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:3081/plugins/<pkg>/client.js
 curl -s http://127.0.0.1:3081/plugins/<pkg>/state
 curl -s "http://127.0.0.1:3081/plugins/<pkg>/state?archived=1"
 ```
 
-坑：当前源码读取 package.json `dsh.client`，并要求合法的 `exports["./client"]` 与实际 bundle；声明畸形或 bundle 缺失会 fail loud。包元数据负结论不自动过期，修正 manifest/export 后重启 host。
+Pitfall: the current source reads package.json `dsh.client` and requires a valid `exports["./client"]` plus an actual bundle; malformed declarations or missing bundles fail loud. Negative package-metadata conclusions don't expire on their own — restart the host after fixing the manifest/export.
 
-#### 3.3 DOM 探针（ego-browser）
+#### 3.3 DOM probes (ego-browser)
 
 ```js
-// 每个 heredoc 先复用任务空间 + 打开/复用 tab
+// Each heredoc reuses the task space first + opens/reuses a tab
 const task = await useOrCreateTaskSpace('agent-teams webui test')
 await openOrReuseTab('http://127.0.0.1:3081', { wait: true, timeout: 30 })
 
-// 组件必须挂 data-* 探针属性（data-agent-teams-activity / data-task-state / data-member-running ...）
+// Components must expose data-* probe attributes (data-agent-teams-activity / data-task-state / data-member-running ...)
 const probe = await js(String.raw`(() => {
   const panel = document.querySelector('[data-agent-teams-activity]')
   if (!panel) return { panel: false }
@@ -213,64 +213,64 @@ const probe = await js(String.raw`(() => {
 cliLog(JSON.stringify(probe, null, 1))
 ```
 
-坑：
-- **snapshotText 的 `@N` ref 每次快照都会失效**：填输入框/点按钮前先重新 `snapshotText()` 取 ref；找不到精确 ref 用 `aria-label` 或按钮文本兜底（`.match(/\[ref=(\d+), loc=[^\]]*发送[^\]]*\]/)`）
-- **composer 选择器会变**：placeholder 可能从"描述你想要构建的内容"变成"给智能体发消息"——先列出所有 textbox 再精确定位
-- CSS module 子串选择器容易过宽；探针优先使用稳定 `data-*`、role 和 aria 属性。
-- 验证 hover preview、click pin、第二次 click/`Escape` unpin；`aria-pressed` 只落在 pin 源任务，focused chain 排除 sibling。
-- 宽屏断言 main padding 非 0 且 panel/composer overlap 为 0；≤960px padding 回 0、无 body 横向溢出；关闭时采样中间帧确认不是瞬移。
-- 卡片激活事件可用 CustomEvent 模拟，但至少保留一次真实按钮路径。轮询状态用 browser wait/re-probe，不用 shell sleep 忙等。
+Pitfalls:
+- **snapshotText's `@N` refs go stale on every snapshot**: re-run `snapshotText()` to get a fresh ref before filling inputs/clicking buttons; when no exact ref exists, fall back to `aria-label` or button text (`.match(/\[ref=(\d+), loc=[^\]]*send[^\]]*\]/)`)
+- **composer selectors change**: the placeholder may change from "describe what you want to build" to "message the agent" — list all textboxes first, then target precisely
+- CSS-module substring selectors are easy to over-match; probes should prefer stable `data-*`, role, and aria attributes.
+- Verify hover preview, click pin, second click/`Escape` unpin; `aria-pressed` lands only on the pin source task, the focused chain excludes siblings.
+- On wide screens assert main padding is non-zero and panel/composer overlap is 0; at ≤960px padding returns to 0 with no body horizontal overflow; when closing, sample intermediate frames to confirm no jump-cut.
+- The card activation event can be simulated with a CustomEvent, but keep at least one real button path. Use browser wait/re-probe for polling states, not shell sleep busy-waiting.
 
-#### 3.4 截图存档
+#### 3.4 Screenshot archive
 
 ```js
-await captureScreenshot('/tmp/agent-teams-panel.png')   // 返回文件路径
+await captureScreenshot('/tmp/agent-teams-panel.png')   // returns the file path
 ```
 
-每轮关键状态各存一张（运行中 / 终态 / 归档复盘），供人类核对视觉；DOM 探针的文本证据与截图互补（探针是断言，截图是人工目检）。
+Save one screenshot per key state (running / terminal / archived review) for human visual checks; DOM probe text evidence and screenshots complement each other (probes are assertions, screenshots are manual inspection).
 
 ---
 
-### 4. 验证纪律
+### 4. Verification discipline
 
-- **不碰用户指定的运行实例**：先明确其 profile/URL；用户说“不要管某实例”时，不做 curl、重启或旁路检查。
-- **全链路重跑**：typecheck → build → verify → diff check；按 HMR 条件决定热换或 page reload，host/package manifest/profile bundles 改动才重启。
-- **后台任务可追踪**：用 managed background task 启动并保存 task id；若用户未要求保留，用该 id 精确停止，避免宽泛 `pkill -f`。
-- ego-browser task space 按目标复用，完成后关闭；仅删除本任务创建的精确临时路径。
-- commit/push 按用户授权；用户要求 commit 就报告 hash，未要求 push 就不 push。
+- **Never touch the user-specified running instance**: first identify its profile/URL; when the user says "don't touch instance X", do not curl, restart, or bypass-check it.
+- **Full-chain rerun**: typecheck → build → verify → diff check; decide hot-swap vs page reload by HMR conditions; only host/package manifest/profile bundle changes require restart.
+- **Background tasks traceable**: start with a managed background task and save the task id; if the user didn't ask to keep it, stop it precisely by that id, avoiding broad `pkill -f`.
+- Reuse the ego-browser task space per target and close it when done; only delete the exact temp paths this task created.
+- commit/push per user authorization; when the user asks for a commit, report the hash; don't push unless asked.
 
 ---
 
-### 5. 验证清单模板（可复制）
+### 5. Verification checklist template (copyable)
 
 ```markdown
-## 验证清单：<插件名>
+## Verification checklist: <plugin name>
 
-### 构建与离线
-- [ ] pnpm typecheck        # host + client 双 program 均 0 错误
-- [ ] pnpm build             # lib/ + lib/client.js（closure-factory）产出
-- [ ] node -e "import('./lib/index.js')..."  # 导出 name/inject/Config/apply
-- [ ] pnpm verify            # 冒烟全 PASS（纯规则/持久化/状态函数/fold）
-- [ ] dsh --profile agent-teams-check --dump-config | grep "id: <插件>"   # 组合树含插件行
+### Build and offline
+- [ ] pnpm typecheck        # host + client dual program, both 0 errors
+- [ ] pnpm build             # lib/ + lib/client.js (closure-factory) artifacts
+- [ ] node -e "import('./lib/index.js')..."  # exports name/inject/Config/apply
+- [ ] pnpm verify            # all smoke checks PASS (pure rules/persistence/state functions/fold)
+- [ ] dsh --profile agent-teams-check --dump-config | grep "id: <plugin>"   # composition tree contains the plugin row
 
-### 真实端到端（独立 headless profile）
+### Real e2e (independent headless profile)
 - [ ] dsh plugin --profile headless add /abs/path/<pkg>
-- [ ] dsh --profile headless "<小任务，明确要求走插件流程>"
-- [ ] 任务输出含完整流程叙述（建队/成员/任务/产出/删队）
-- [ ] 落盘：.agent-teams 状态文件存在（或按预期归档）
-- [ ] zstdcat 会话日志：agent-teams/* 事件数量与流程一一对应
+- [ ] dsh --profile headless "<small task, explicitly requiring the plugin flow>"
+- [ ] task output contains the full flow narrative (team/members/tasks/output/delete team)
+- [ ] on disk: .agent-teams state files exist (or archived as expected)
+- [ ] zstdcat session log: agent-teams/* event counts match the flow 1:1
 
-### GUI（独立 web 实例 3081 + ego-browser）
-- [ ] dsh --profile agent-teams-web --patch port.patch.yml 启动，index 200
-- [ ] window.__DSH_BOOT__ 名册含插件（无则查 dsh.client + ./client export + bundle）
-- [ ] /plugins/<pkg>/client.js 200；自定义路由（state/assets）200 且内容正确
-- [ ] 新建会话跑任务 → 面板/卡片出现（DOM 探针 data-* 断言通过）
-- [ ] 关键交互闭环（跳转隐藏/会话跟随/归档复盘）逐项探针验证
-- [ ] 截图存档（运行中/终态/复盘）
+### GUI (independent web instance 3081 + ego-browser)
+- [ ] dsh --profile agent-teams-web --patch port.patch.yml starts, index 200
+- [ ] window.__DSH_BOOT__ roster contains the plugin (if not, check dsh.client + ./client export + bundle)
+- [ ] /plugins/<pkg>/client.js 200; custom routes (state/assets) 200 with correct content
+- [ ] run a task in a new session → panel/card appear (DOM probe data-* assertions pass)
+- [ ] key interaction loops (jump-hide/session-follow/archive review) probed item by item
+- [ ] screenshots archived (running/terminal/review)
 
-### 清理与收尾
-- [ ] 用保存的 background task id 停止独立实例（若用户未要求保留）
-- [ ] completeTaskSpace(keep: false)；仅删除本任务创建的临时路径
-- [ ] 未操作用户指定的其他运行实例
-- [ ] 按用户授权 commit；未要求则未 push
+### Cleanup and wrap-up
+- [ ] stop the independent instance with the saved background task id (unless the user asked to keep it)
+- [ ] completeTaskSpace(keep: false); only delete temp paths this task created
+- [ ] did not touch other running instances the user specified
+- [ ] commit per user authorization; no push unless asked
 ```

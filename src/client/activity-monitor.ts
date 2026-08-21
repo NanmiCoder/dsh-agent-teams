@@ -172,6 +172,12 @@ interface ActivityFetchResponse {
 
 /** Injectable browser primitives used by the poll controller and its tests. */
 export interface ActivityPollingRuntime {
+  /**
+   * Current captain session to discover after a cold client/host restart.
+   * This one-time scope restores teams whose older conversation log has no
+   * AgentTeams card capable of registering an explicit monitor target.
+   */
+  readonly discoverySessionId?: string
   readonly fetchState?: (
     url: string,
     init: { readonly cache: 'no-store'; readonly signal: AbortSignal },
@@ -193,15 +199,20 @@ export interface ActivityPollingController {
 /**
  * Start the single polling loop for the current session's requested targets.
  *
- * With no targets this is deliberately inert: installing the plugin must not
- * touch the state route. Live state is polled at the normal cadence; archive
- * state is fetched only as a one-time fallback for targets no longer live.
+ * With neither targets nor a discovery session this is deliberately inert.
+ * A discovery session performs one live+archive pass after selection/restart;
+ * it keeps polling only while that captain still owns a live team. This
+ * restores legacy/cardless history without turning every ordinary session
+ * into a permanent one-second filesystem scan. Explicit card targets retain
+ * the normal cadence, and archive state is refreshed when a target or a
+ * previously discovered live team disappears.
  */
 export function startActivityPolling(
   monitorTargets: readonly ActivityMonitorTarget[],
   runtime: ActivityPollingRuntime = {},
 ): ActivityPollingController {
-  if (monitorTargets.length === 0) {
+  const discoverySessionId = runtime.discoverySessionId?.trim()
+  if (monitorTargets.length === 0 && (discoverySessionId === undefined || discoverySessionId === '')) {
     return { firstTick: Promise.resolve(), stop: () => {} }
   }
   const fetchState = runtime.fetchState ?? ((url, init) => fetch(url, init))
@@ -211,9 +222,14 @@ export function startActivityPolling(
   const settleTargets = runtime.settleTargets ?? settleActivityMonitorTargets
   let cancelled = false
   let inFlight = false
+  let discoveryComplete = false
+  let discoveredLiveKeys = new Set<string>()
   let controller: AbortController | undefined
   const tick = async (): Promise<void> => {
     if (inFlight || cancelled) return
+    // A cardless ordinary or archive-only session needs one recovery pass,
+    // then stays dormant until the component is recreated for another session.
+    if (discoveryComplete && monitorTargets.length === 0 && discoveredLiveKeys.size === 0) return
     inFlight = true
     controller = new AbortController()
     try {
@@ -226,13 +242,26 @@ export function startActivityPolling(
       if (cancelled || !Array.isArray(body.teams)) return
       const liveTeams = body.teams as readonly ActivityTeam[]
       publishSnapshots({ teams: liveTeams })
+      const previousDiscoveredKeys = discoveredLiveKeys
+      discoveredLiveKeys = new Set(discoverySessionId === undefined || discoverySessionId === ''
+        ? []
+        : liveTeams
+          .filter((team) => team.captainSessionId === discoverySessionId)
+          .map((team) => team.teamId))
+      const discoveredTeamArchived = [...previousDiscoveredKeys]
+        .some((teamId) => !discoveredLiveKeys.has(teamId))
       const missing = monitorTargets.filter((target) => !liveTeams.some((team) =>
         team.captainSessionId === target.sessionId && team.teamId === target.teamId,
       ))
-      if (missing.length === 0) return
+      const needsDiscoveryArchive = discoverySessionId !== undefined
+        && discoverySessionId !== ''
+        && !discoveryComplete
+      if (missing.length === 0 && !needsDiscoveryArchive && !discoveredTeamArchived) return
 
-      // Archives are immutable. A successful fallback retires every missing
-      // target, including legacy cards whose host archive no longer exists.
+      // Archives are immutable per team generation. A successful fallback
+      // retires every missing explicit target, including legacy cards whose
+      // host archive no longer exists; discovery remains available from the
+      // shared snapshot after this controller becomes dormant.
       const archivedResponse = await fetchState(`${ACTIVITY_STATE_URL}?archived=1`, {
         cache: 'no-store',
         signal: controller.signal,
@@ -241,6 +270,7 @@ export function startActivityPolling(
       const archivedBody = (await archivedResponse.json()) as { teams?: unknown }
       if (cancelled || !Array.isArray(archivedBody.teams)) return
       publishSnapshots({ archivedTeams: archivedBody.teams as readonly ActivityTeam[] })
+      discoveryComplete = true
       settleTargets(new Set(missing.map((target) => target.key)))
     } catch (error: unknown) {
       if ((error as { name?: unknown })?.name === 'AbortError') return

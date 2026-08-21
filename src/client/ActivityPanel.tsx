@@ -382,7 +382,7 @@ function DependencyMap({ tasks }: { readonly tasks: readonly ActivityTask[] }) {
 function TeamSection({ team, onNavigate, historic = false }: {
   readonly team: ActivityTeam
   /** Navigate to a member transcript (floater hides immediately). */
-  readonly onNavigate: (id: SessionId) => void
+  readonly onNavigate: (parentId: SessionId, childId: SessionId) => void
   readonly historic?: boolean
 }) {
   const [membersOpen, setMembersOpen] = useState(true)
@@ -438,7 +438,11 @@ function TeamSection({ team, onNavigate, historic = false }: {
                   type="button"
                   className={css.memberRow}
                   data-activity={member.activity}
-                  onClick={() => { if (member.id !== '') onNavigate(member.id as SessionId) }}
+                  onClick={() => {
+                    if (member.id !== '') {
+                      onNavigate(team.captainSessionId as SessionId, member.id as SessionId)
+                    }
+                  }}
                 >
                   <span className={css.memberAvatar} data-unread={member.unread > 0}>
                     {memberArtUrl(member.name, member.role) !== null ? (
@@ -511,17 +515,17 @@ function historicCardTeam(data: AgentTeamsCardData, owner: string): ActivityTeam
 /** The top-right activity floater. Teams follow the current session: live
  * snapshots and historic card summaries are only shown while their captain
  * session is the one currently open. */
-export function ActivityPanel({ sessionsList, openSession }: {
+export function ActivityPanel({ sessionsList, openMember }: {
   readonly sessionsList: ObservableSnapshot<SessionListState>
-  readonly openSession: (id: SessionId) => void
+  readonly openMember: (parentId: SessionId, childId: SessionId) => void
 }) {
   // Navigating to a member's subagent transcript is an explicit departure:
   // hide the floater immediately instead of waiting out the autocollapse
   // grace, so the panel never lingers over the member session.
-  const navigateToSession = (id: SessionId): void => {
+  const navigateToSession = (parentId: SessionId, childId: SessionId): void => {
     setOpen(false)
     setWasActive(false)
-    openSession(id)
+    openMember(parentId, childId)
   }
   const [open, setOpen] = useState(false)
   const [openOwner, setOpenOwner] = useState<SessionId | undefined>()
@@ -641,12 +645,13 @@ export function ActivityPanel({ sessionsList, openSession }: {
   }, [compact, expanded, geometry.mode, geometry.width])
 
   useEffect(() => {
-    // Installing the plugin alone must not touch the state route. A successful
-    // AgentTeams conversation card registers the demand that reaches here.
-    if (currentTargets.length === 0) return
-    const controller = startActivityPolling(currentTargets)
+    if (current === undefined) return
+    // Cards keep live teams on the normal cadence. The current-session scope
+    // also performs one cold-start discovery pass so archived/cardless teams
+    // survive a browser or `dsh web` restart.
+    const controller = startActivityPolling(currentTargets, { discoverySessionId: current })
     return () => { controller.stop() }
-  }, [currentTargets])
+  }, [current, currentTargets])
 
   useEffect(() => {
     const onOpenPanel = (event: Event): void => {

@@ -9,9 +9,9 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
+import { memberActivity } from './members.ts'
 import {
   CAPTAIN_KEY, listArchivedTeamIds, readArchivedTeam, readUnreadMailbox, readTeam,
   taskDepthsById, taskVisualState,
@@ -101,20 +101,9 @@ export async function assembleTeamSnapshot(
   const roster = options.includeRemoved === true
     ? state.members
     : state.members.filter((member) => member.status !== 'removed')
-  const activity = new Map<string, 'running' | 'idle' | 'ready'>()
-  if (options.historic !== true) {
-    try {
-      const children = await ctx.subagents.listChildren(state.captainSessionId as SessionId)
-      for (const entry of children) {
-        if (entry.kind === 'child') {
-          const live = ctx.agents.get(entry.id)
-          activity.set(entry.id, live === undefined ? 'ready' : live.status)
-        }
-      }
-    } catch (error: unknown) {
-      ctx.logger.warn(`agent-teams: activity listing failed for ${state.name}: ${String(error)}`)
-    }
-  }
+  const activity = options.historic === true
+    ? new Map<string, 'running' | 'idle' | 'ready'>()
+    : memberActivity(ctx, roster.map((member) => member.id))
   const unreadByMember = new Map<string, number>()
   for (const member of roster) {
     try {

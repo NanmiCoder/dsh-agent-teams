@@ -27,7 +27,7 @@ export const OPEN_PANEL_EVENT = 'agent-teams:open-panel'
 
 /** Navigation action injected from the plugin's own SessionsService access. */
 export interface AgentTeamsCardInjected {
-  readonly openSession: (id: SessionId) => void
+  readonly openMember: (parentId: SessionId, childId: SessionId) => void
 }
 
 /** Complete keyed Chat renderer props. */
@@ -51,7 +51,7 @@ function openActivityPanel(data: AgentTeamsCardData): void {
 }
 
 /** Render one durable team as a compact conversation card. */
-export function AgentTeamsCard({ node, openSession, sessionId }: AgentTeamsCardProps) {
+export function AgentTeamsCard({ node, openMember, sessionId }: AgentTeamsCardProps) {
   const data = node.data as AgentTeamsCardData
   // `conversation.chat.node` is session-scoped, so its framework-owned id is
   // a stable owner even while another conversation becomes current.
@@ -94,7 +94,9 @@ export function AgentTeamsCard({ node, openSession, sessionId }: AgentTeamsCardP
               type="button"
               key={member.id}
               className={css.member}
-              onClick={() => { if (member.id !== '') openSession(member.id as SessionId) }}
+              onClick={() => {
+                if (member.id !== '') openMember(owner as SessionId, member.id as SessionId)
+              }}
               title={member.role === '' ? member.name : `${member.name} · ${member.role}`}
             >
               {memberArtUrl(member.name, member.role) !== null ? (

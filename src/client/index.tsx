@@ -10,6 +10,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import { ActivityPanel } from './ActivityPanel.tsx'
 import { AgentTeamsCard, type AgentTeamsCardInjected } from './AgentTeamsCard.tsx'
 import { agentTeamsCardDefinition } from './agent-teams-card-definition.ts'
+import { openAgentTeamMember } from './session-navigation.ts'
 
 /** Required services: conversation nodes, slots, and sessions navigation. */
 export const inject = ['conversationEvents', 'slots', 'sessions']
@@ -25,9 +26,14 @@ function HiddenAgentTeamsCommand(): null {
  * monitor via a window event — the recovery path for an old session.
  */
 export function apply(ctx: ClientContext): void {
+  const openMember = (parentId: SessionId, childId: SessionId): void => {
+    void openAgentTeamMember(ctx.sessions, parentId, childId).catch((error: unknown) => {
+      console.warn(`agent-teams: failed to open member transcript ${childId}: ${String(error)}`)
+    })
+  }
   const Panel = () => <ActivityPanel
     sessionsList={ctx.sessions.list}
-    openSession={(id: SessionId) => { ctx.sessions.open(id) }}
+    openMember={openMember}
   />
   ctx.slots.inject('shell.overlay', () => ctx.slots.register({
     name: 'shell.overlay',
@@ -49,7 +55,7 @@ export function apply(ctx: ClientContext): void {
     name: 'conversation.chat.node',
     key: 'agent-teams',
     inject: (): AgentTeamsCardInjected => ({
-      openSession: (id: SessionId) => { ctx.sessions.open(id) },
+      openMember,
     }),
   }, AgentTeamsCard))
 }

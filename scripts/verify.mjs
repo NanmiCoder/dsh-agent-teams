@@ -59,6 +59,7 @@ import {
 } from '../lib/client/panel-geometry.js'
 import { memberArtUrl } from '../lib/client/artwork.js'
 import { parseAgentTeamsCreateArgs } from '../lib/client/agent-teams-card-definition.js'
+import { openAgentTeamMember } from '../lib/client/session-navigation.js'
 import { steerCaptainReport } from '../lib/tools.js'
 import {
   installMemberSelectionRuntime,
@@ -251,13 +252,13 @@ check(
   'running work should stay visible in both normal and dependency-focus states',
 )
 check(
-  'activity polling is dormant until a successful team card requests monitoring',
-  activityPanelSource.includes('if (currentTargets.length === 0) return')
-    && activityPanelSource.includes('startActivityPolling(currentTargets)')
+  'activity polling combines card demand with current-session cold discovery',
+  activityPanelSource.includes('if (current === undefined) return')
+    && activityPanelSource.includes('startActivityPolling(currentTargets, { discoverySessionId: current })')
     && agentTeamsCardSource.includes('monitorAgentTeam(owner, data.teamId)')
     && !agentTeamsCardSource.includes('setInterval(')
     && !agentTeamsCardSource.includes('fetch('),
-  'the global panel must be demand-gated and cards must not start duplicate polling loops',
+  'the global panel must recover cardless sessions without duplicate card pollers',
 )
 
 console.log('2/8 pure rules')
@@ -583,6 +584,32 @@ check(
   dormantFetches === 0 && dormantSchedules === 0,
 )
 
+const discoveryUrls = []
+let scheduledDiscoveryTick
+const discoveryPoller = startActivityPolling([], {
+  discoverySessionId: 'cold-captain',
+  fetchState: async (url) => {
+    discoveryUrls.push(url)
+    return { ok: true, json: async () => ({ teams: [] }) }
+  },
+  schedule: (callback) => {
+    scheduledDiscoveryTick = callback
+    return 'discovery-timer'
+  },
+  cancel: () => {},
+  publishSnapshots: () => {},
+})
+await discoveryPoller.firstTick
+scheduledDiscoveryTick?.()
+await Promise.resolve()
+discoveryPoller.stop()
+check(
+  'a cardless cold session restores live and archive state once, then becomes dormant',
+  discoveryUrls.length === 2
+    && discoveryUrls[0] === '/plugins/dsh-agent-teams/state'
+    && discoveryUrls[1]?.endsWith('?archived=1'),
+)
+
 const pollTarget = { key: 'poll-target', sessionId: 'poll-session', teamId: 'poll-team' }
 let resolveSlowLive
 const slowLive = new Promise((resolve) => { resolveSlowLive = resolve })
@@ -642,6 +669,30 @@ check(
     && fallbackUrls[1]?.endsWith('?archived=1')
     && settledFallbackKeys.length === 1
     && settledFallbackKeys[0] === pollTarget.key,
+)
+const navigationCalls = []
+const addressedNavigation = await openAgentTeamMember({
+  open: (id) => { navigationCalls.push(['open', id]) },
+  refreshSubagents: async (id) => { navigationCalls.push(['refresh', id]) },
+  subagentAddress: () => undefined,
+  openSubagent: (address) => { navigationCalls.push(['openSubagent', address]) },
+}, 'captain-session', 'member-session')
+check(
+  'rc.8 member navigation refreshes the parent catalog and opens an addressed continuable child',
+  addressedNavigation === 'subagent'
+    && navigationCalls[0]?.[0] === 'refresh'
+    && navigationCalls[1]?.[0] === 'openSubagent'
+    && navigationCalls[1]?.[1]?.parentSessionId === 'captain-session'
+    && navigationCalls[1]?.[1]?.childSessionId === 'member-session'
+    && navigationCalls[1]?.[1]?.mode === 'continuable',
+)
+const legacyNavigationCalls = []
+const legacyNavigation = await openAgentTeamMember({
+  open: (id) => { legacyNavigationCalls.push(id) },
+}, 'captain-session', 'member-session')
+check(
+  'pre-rc.8 member navigation keeps the ordinary session fallback',
+  legacyNavigation === 'session' && legacyNavigationCalls[0] === 'member-session',
 )
 check(
   'agent team cards derive a stable id from the standard create tool call',

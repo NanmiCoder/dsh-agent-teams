@@ -404,46 +404,22 @@ export function interruptMember(ctx: Context, captain: Agent, childId: string): 
   }
 }
 
-/** Resolve one live parent's workspace-scoped retirement index. */
-async function retiredForParent(ctx: Context, parentId: SessionId, stateDir: string): Promise<Set<string>> {
-  const parent = ctx.agents.get(parentId)
-  return parent === undefined
-    ? new Set()
-    : readRetiredMemberIds(join(parent.session.header.cwd ?? process.cwd(), stateDir))
-}
-
 /**
  * Install the missing per-child retirement boundary above Harness rc.6.
  *
  * Upstream `interrupt()` deliberately preserves continuable sessions and the
  * upstream seam exposes no targeted forget/retire method. The durable
- * AgentTeams index therefore guards all three public continuation boundaries:
- * retired rows disappear from `list_agents` (children and descendants), and a
- * direct `followup()` is rejected before it can cold-resume the member. Exact
- * ids keep unrelated subagents untouched; transcripts remain in persistence
- * for archived-team review.
+ * AgentTeams index therefore rejects `followup()` before it can cold-resume a
+ * retired member. Catalog rows deliberately remain discoverable: Harness rc.8
+ * uses the direct-child catalog to authorize historical transcript reads and
+ * `openSubagent()`, so filtering those rows would make an archived member's
+ * persisted conversation inaccessible. Exact ids keep unrelated subagents
+ * untouched while the followup boundary still prevents further model turns.
  */
 export function installRetiredMemberGuard(ctx: Context, stateDir: string): void {
   const runtime = ctx.subagents
   ctx.effect(() => {
-    const listChildren = runtime.listChildren
-    const listDescendants = runtime.listDescendants
     const followup = runtime.followup
-
-    const guardedChildren: typeof runtime.listChildren = async (parentId, signal) => {
-      const [entries, retired] = await Promise.all([
-        listChildren.call(runtime, parentId, signal),
-        retiredForParent(ctx, parentId, stateDir),
-      ])
-      return entries.filter(entry => !retired.has(entry.id))
-    }
-    const guardedDescendants: typeof runtime.listDescendants = async (rootId, signal) => {
-      const [entries, retired] = await Promise.all([
-        listDescendants.call(runtime, rootId, signal),
-        retiredForParent(ctx, rootId, stateDir),
-      ])
-      return entries.filter(entry => !retired.has(entry.id))
-    }
     const guardedFollowup: typeof runtime.followup = async (parent, childId, content, options) => {
       const retired = await readRetiredMemberIds(join(parent.session.header.cwd ?? process.cwd(), stateDir))
       if (retired.has(childId)) {
@@ -455,36 +431,34 @@ export function installRetiredMemberGuard(ctx: Context, stateDir: string): void 
       return followup.call(runtime, parent, childId, content, options)
     }
 
-    runtime.listChildren = guardedChildren
-    runtime.listDescendants = guardedDescendants
     runtime.followup = guardedFollowup
     return () => {
-      if (runtime.listChildren === guardedChildren) runtime.listChildren = listChildren
-      if (runtime.listDescendants === guardedDescendants) runtime.listDescendants = listDescendants
       if (runtime.followup === guardedFollowup) runtime.followup = followup
     }
   }, 'agent-teams: retired member guard')
 }
 
 /**
- * Snapshot each direct continuable child's real driver activity under the
- * captain's session. `listChildren().activity` is only session residency, so
- * live children are refined through the Agent registry exactly like Harness's
- * shipped `list_agents` tool.
- * @param ctx - the plugin context (injects `subagents`).
- * @param captainSessionId - the captain's session id.
- * @returns child id → activity, missing entries are unknown children.
+ * Snapshot the real driver activity for durable member ids.
+ *
+ * The team record is the membership authority, so this path intentionally no
+ * longer depends on `listChildren()`'s versioned projection shape. Harness
+ * rc.8 changed those rows to branded `SessionId` values plus residency-only
+ * `activity`; neither is needed to answer whether the live Agent driver is
+ * running, idle, or absent/ready.
+ * @param ctx - the plugin context (injects `agents`).
+ * @param memberIds - child ids restored from the durable team record.
+ * @returns child id → live activity.
  */
-export async function memberActivity(
+export function memberActivity(
   ctx: Context,
-  captainSessionId: string,
-): Promise<Map<string, 'running' | 'idle' | 'ready'>> {
-  const entries = await ctx.subagents.listChildren(brandedSessionId(captainSessionId))
+  memberIds: readonly string[],
+): Map<string, 'running' | 'idle' | 'ready'> {
   const activity = new Map<string, 'running' | 'idle' | 'ready'>()
-  for (const entry of entries) {
-    if (entry.kind !== 'child') continue
-    const live = ctx.agents.get(entry.id)
-    activity.set(entry.id, live === undefined ? 'ready' : live.status)
+  for (const id of memberIds) {
+    if (id === '') continue
+    const live = ctx.agents.get(brandedSessionId(id))
+    activity.set(id, live === undefined ? 'ready' : live.status)
   }
   return activity
 }

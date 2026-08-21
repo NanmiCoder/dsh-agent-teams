@@ -523,11 +523,11 @@ try {
     await readTeam(stateRoot, teamId) === undefined
       && archived?.tasks.length === 38
       && archived.tasks.every(task => task.status === 'completed'))
-  check('shutdown retires all eight durable member catalog entries',
+  check('shutdown keeps all eight retired members catalog-visible for history',
     (await runtime.ctx.subagents.listChildren(runtime.captain.id))
       .filter(child => child.kind === 'child'
         && child.mode === 'continuable'
-        && child.label.startsWith('agent-teams:')).length === 0)
+        && child.label.startsWith('agent-teams:')).length === 8)
 } finally {
   await rm(workspace, { recursive: true, force: true })
 }

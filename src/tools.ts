@@ -956,7 +956,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
         teamLockKey(stateRoot, located.id),
         () => requireFreshParticipant(stateRoot, located.id, caller.id),
       )
-      const activity = await memberActivity(ctx, team.captainSessionId)
+      const activity = memberActivity(ctx, team.members.map((member) => member.id))
       const members = team.members
         .filter((member) => member.status !== 'removed')
         .map((member) => ({

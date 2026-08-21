@@ -329,8 +329,8 @@ try {
   check('removing a member revokes and redispatches its unfinished task',
     afterRemoval?.members.find(member => member.name === 'alpha')?.status === 'removed'
       && recovered?.assignee !== 'alpha')
-  check('removing a member removes its continuable catalog entry',
-    (await ctx.subagents.listChildren(captain.id)).every(child => child.id !== alpha.id))
+  check('removing a member preserves its catalog entry for transcript history',
+    (await ctx.subagents.listChildren(captain.id)).some(child => child.id === alpha.id))
   let removedFollowupRejected = false
   const deliveriesBeforeRemovedFollowup = deliveries.length
   try {
@@ -451,11 +451,11 @@ try {
     archivedSnapshot?.members.length === 3
       && ['alpha', 'beta', 'gamma'].every(name => archivedSnapshot.members.some(member => member.name === name))
       && archivedSnapshot.members.every(member => member.activity === 'idle'))
-  check('team shutdown retires live, cold, and previously removed members',
+  check('team shutdown keeps retired members catalog-visible for historical transcripts',
     (await ctx.subagents.listChildren(captain.id))
       .filter(child => child.kind === 'child'
         && child.mode === 'continuable'
-        && child.label.startsWith('agent-teams:')).length === 0)
+        && child.label.startsWith('agent-teams:')).length === 3)
   let coldFollowupRejected = false
   const deliveriesBeforeColdFollowup = deliveries.length
   try {

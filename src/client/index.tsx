@@ -14,6 +14,11 @@ import { agentTeamsCardDefinition } from './agent-teams-card-definition.ts'
 /** Required services: conversation nodes, slots, and sessions navigation. */
 export const inject = ['conversationEvents', 'slots', 'sessions']
 
+/** The replayed user message is the canonical transcript entry. */
+function HiddenAgentTeamsCommand(): null {
+  return null
+}
+
 /**
  * Register the activity monitor in the shell's additive overlay and the
  * in-conversation team card. The card's activity button re-opens a folded
@@ -30,6 +35,14 @@ export function apply(ctx: ClientContext): void {
     order: 80,
     label: 'AgentTeams activity',
   }, Panel))
+
+  // The host command is only the slash-menu/admission surface. Its input is
+  // replayed as the visible user message, so the generic result row would be
+  // a duplicate placed before that message by command lifecycle ordering.
+  ctx.slots.inject('conversation.chat.commandview', () => ctx.slots.register({
+    name: 'conversation.chat.commandview',
+    key: 'agent-teams',
+  }, HiddenAgentTeamsCommand))
 
   ctx.conversationEvents.register(agentTeamsCardDefinition)
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register({

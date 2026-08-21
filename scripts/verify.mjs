@@ -129,6 +129,11 @@ const clientIndexSource = await readFile(new URL('../src/client/index.tsx', impo
 const agentTeamsCardSource = await readFile(new URL('../src/client/AgentTeamsCard.tsx', import.meta.url), 'utf8')
 const artworkSource = await readFile(new URL('../src/client/artwork.ts', import.meta.url), 'utf8')
 const hostSource = await readFile(new URL('../src/index.ts', import.meta.url), 'utf8')
+check(
+  'slash command transcript hides the duplicate pre-message result row',
+  clientIndexSource.includes('HiddenAgentTeamsCommand')
+    && /name:\s*'conversation\.chat\.commandview',\s*key:\s*'agent-teams'/u.test(clientIndexSource),
+)
 const expectedArtwork = [
   'team-lead-v2.png',
   'member-researcher-v2.png', 'member-engineer-v2.png',

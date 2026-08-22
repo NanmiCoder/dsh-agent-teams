@@ -53,7 +53,12 @@ export function appendTeamEvent(
     return
   }
   try {
-    session.append(type, data)
+    // Mark every team event `ignorable`: these records are purely informational
+    // (the team state is also durably persisted under `.agent-teams/`), and the
+    // `agent-teams/*` types are outside the harness core's known-event catalog.
+    // Without the marker a reader that does not recognize them refuses the whole
+    // session log with SessionFormatUnsupportedError instead of skipping them.
+    session.append(type, data, { ignorable: true })
   } catch (error: unknown) {
     ctx.logger.warn(`agent-teams: session record failed after ${type}: ${String(error)}`)
   }

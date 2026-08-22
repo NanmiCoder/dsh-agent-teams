@@ -39,6 +39,8 @@ import {
   usesParallelTaskGrid,
 } from '../lib/client/activity-model.js'
 import {
+  ACTIVITY_POLL_MS,
+  ACTIVITY_PROBE_MS,
   getActivityMonitorTargetsSnapshot,
   monitorAgentTeam,
   settleActivityMonitorTargets,
@@ -607,6 +609,7 @@ check(
 )
 
 const discoveryUrls = []
+const discoveryIntervals = []
 let scheduledDiscoveryTick
 const discoveryPoller = startActivityPolling([], {
   discoverySessionId: 'cold-captain',
@@ -614,8 +617,9 @@ const discoveryPoller = startActivityPolling([], {
     discoveryUrls.push(url)
     return { ok: true, json: async () => ({ teams: [] }) }
   },
-  schedule: (callback) => {
+  schedule: (callback, intervalMs) => {
     scheduledDiscoveryTick = callback
+    discoveryIntervals.push(intervalMs)
     return 'discovery-timer'
   },
   cancel: () => {},
@@ -626,19 +630,23 @@ scheduledDiscoveryTick?.()
 await new Promise((resolve) => setImmediate(resolve))
 discoveryPoller.stop()
 check(
-  'a cardless cold session restores live and archive once, then keeps polling for a later team',
+  'a cardless cold session restores live and archive once, then probes at the discovery cadence',
   discoveryUrls.length === 3
     && discoveryUrls[0] === '/plugins/dsh-agent-teams/state'
     && discoveryUrls[1]?.endsWith('?archived=1')
-    && discoveryUrls[2] === '/plugins/dsh-agent-teams/state',
+    && discoveryUrls[2] === '/plugins/dsh-agent-teams/state'
+    && discoveryIntervals.length === 1
+    && discoveryIntervals[0] === ACTIVITY_PROBE_MS,
 )
 
 // Regression (GitHub #57): a team created AFTER the cold-start discovery pass
 // (e.g. a run_code-wrapped agent_teams_create) must be discovered without a
-// manual reload. The controller keeps polling while its discovery session is
-// active, even after the empty first pass, so a later team is published.
+// manual reload. The controller keeps probing while its discovery session owns
+// no team yet, so a later team is published — and once found, the probe
+// upgrades to the live cadence so the panel stays fresh.
 const latePublished = []
 const lateUrls = []
+const lateIntervals = []
 let lateLiveTeams = []
 let lateTick = () => {}
 const latePoller = startActivityPolling([], {
@@ -650,8 +658,9 @@ const latePoller = startActivityPolling([], {
     }
     return { ok: true, json: async () => ({ teams: [] }) }
   },
-  schedule: (callback) => {
+  schedule: (callback, intervalMs) => {
     lateTick = callback
+    lateIntervals.push(intervalMs)
     return 'late-timer'
   },
   cancel: () => {},
@@ -660,7 +669,12 @@ const latePoller = startActivityPolling([], {
 await latePoller.firstTick
 lateTick()
 await new Promise((resolve) => setImmediate(resolve))
-check('discovery keeps polling after an empty first pass', lateUrls.length === 3)
+check(
+  'a cardless session keeps probing at the discovery cadence after an empty first pass',
+  lateUrls.length === 3
+    && lateIntervals.length === 1
+    && lateIntervals[0] === ACTIVITY_PROBE_MS,
+)
 lateLiveTeams = [{
   workspace: '',
   teamId: 'post-discovery-team',
@@ -675,9 +689,34 @@ lateTick()
 await new Promise((resolve) => setImmediate(resolve))
 latePoller.stop()
 check(
-  'a team created after the discovery pass is picked up without a reload',
+  'a team created after the discovery pass is picked up without a reload and upgrades to the live cadence',
   lateUrls.length === 4
-    && latePublished.some((update) => update.teams?.some((team) => team.teamId === 'post-discovery-team')),
+    && latePublished.some((update) => update.teams?.some((team) => team.teamId === 'post-discovery-team'))
+    && lateIntervals.length === 2
+    && lateIntervals[1] === ACTIVITY_POLL_MS,
+)
+
+// Explicit card targets are demanded work: they start at the live cadence and
+// are never downgraded to the low-frequency probe.
+const cardIntervals = []
+const cardPoller = startActivityPolling([{
+  key: 'card-target',
+  sessionId: 'card-session',
+  teamId: 'card-team',
+}], {
+  fetchState: async () => ({ ok: true, json: async () => ({ teams: [] }) }),
+  schedule: (_callback, intervalMs) => {
+    cardIntervals.push(intervalMs)
+    return 'card-timer'
+  },
+  cancel: () => {},
+  publishSnapshots: () => {},
+})
+await cardPoller.firstTick
+cardPoller.stop()
+check(
+  'explicit card targets poll at the live cadence from the start',
+  cardIntervals.length === 1 && cardIntervals[0] === ACTIVITY_POLL_MS,
 )
 
 const pollTarget = { key: 'poll-target', sessionId: 'poll-session', teamId: 'poll-team' }

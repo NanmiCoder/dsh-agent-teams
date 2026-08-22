@@ -162,6 +162,13 @@ export function updateActivitySnapshots(update: Partial<ActivitySnapshots>): voi
 
 /** Poll cadence for the live host snapshot route. */
 export const ACTIVITY_POLL_MS = 1000
+/**
+ * Low-frequency probe cadence while a cardless discovery session still owns
+ * no team. The probe keeps the panel able to pick up a team created later in
+ * that session (e.g. a run_code-wrapped agent_teams_create) without turning
+ * every ordinary session into a one-second filesystem scan.
+ */
+export const ACTIVITY_PROBE_MS = 5000
 /** Host route serving live and archived team snapshots. */
 export const ACTIVITY_STATE_URL = '/plugins/dsh-agent-teams/state'
 
@@ -200,15 +207,17 @@ export interface ActivityPollingController {
  * Start the single polling loop for the current session's requested targets.
  *
  * With neither targets nor a discovery session this is deliberately inert.
- * A discovery session performs one live+archive pass after selection/restart,
- * then keeps polling for the lifetime of this controller so a team created
+ * Explicit card targets poll at the live cadence from the start. A discovery
+ * session performs an immediate live+archive restore pass, then — while it
+ * still owns no team — probes on a low-frequency cadence, so a team created
  * later in that session (e.g. a run_code-wrapped agent_teams_create) is
- * discovered without a manual reload. The caller — the session view, which
- * stops the controller when the session is no longer current — bounds the
- * lifetime, so the one-second scan is limited to an open session and never
- * turns every ordinary session into a permanent filesystem scan. Explicit
- * card targets retain the normal cadence, and archive state is refreshed
- * when a target or a previously discovered live team disappears.
+ * discovered without a manual reload, without turning every ordinary session
+ * into a one-second filesystem scan. The moment a team for the discovery
+ * session appears, the controller upgrades to the live one-second cadence for
+ * the rest of its lifetime. The caller — the session view, which stops the
+ * controller when the session is no longer current — bounds the lifetime, and
+ * archive state is refreshed when a target or a previously discovered live
+ * team disappears.
  */
 export function startActivityPolling(
   monitorTargets: readonly ActivityMonitorTarget[],
@@ -225,19 +234,20 @@ export function startActivityPolling(
   const settleTargets = runtime.settleTargets ?? settleActivityMonitorTargets
   let cancelled = false
   let inFlight = false
+  // Explicit card targets are demanded work: start at the live cadence. A
+  // discovery session starts probing low-frequency and upgrades on detection.
+  let hot = monitorTargets.length > 0
   let discoveryComplete = false
   let discoveredLiveKeys = new Set<string>()
   let controller: AbortController | undefined
+  let timer: unknown
+  const intervalMs = (): number => (hot ? ACTIVITY_POLL_MS : ACTIVITY_PROBE_MS)
+  const reschedule = (): void => {
+    cancel(timer)
+    timer = schedule(() => { void tick() }, intervalMs())
+  }
   const tick = async (): Promise<void> => {
     if (inFlight || cancelled) return
-    // While a discovery session is active, keep polling so a team created
-    // later in that session is picked up without a reload; the caller (the
-    // session view) stops the controller when the session is no longer
-    // current. Only a truly cardless, non-discovery session goes dormant
-    // after its one recovery pass.
-    if (discoveryComplete && monitorTargets.length === 0
-      && discoveredLiveKeys.size === 0
-      && (discoverySessionId === undefined || discoverySessionId === '')) return
     inFlight = true
     controller = new AbortController()
     try {
@@ -256,6 +266,12 @@ export function startActivityPolling(
         : liveTeams
           .filter((team) => team.captainSessionId === discoverySessionId)
           .map((team) => team.teamId))
+      // A discovery session found its first team: upgrade from the low-frequency
+      // probe to the live cadence for the rest of the controller lifetime.
+      if (!hot && discoveredLiveKeys.size > 0) {
+        hot = true
+        reschedule()
+      }
       const discoveredTeamArchived = [...previousDiscoveredKeys]
         .some((teamId) => !discoveredLiveKeys.has(teamId))
       const missing = monitorTargets.filter((target) => !liveTeams.some((team) =>
@@ -268,9 +284,9 @@ export function startActivityPolling(
 
       // Archives are immutable per team generation. A successful fallback
       // retires every missing explicit target, including legacy cards whose
-      // host archive no longer exists; the discovery session keeps polling so
-      // discovery (and any team created later in the same session) stays
-      // available from the shared snapshot for the life of this controller.
+      // host archive no longer exists; a discovery session that already
+      // upgraded keeps polling, and a still-probing one keeps probing, so a
+      // team created later in the same session stays discoverable.
       const archivedResponse = await fetchState(`${ACTIVITY_STATE_URL}?archived=1`, {
         cache: 'no-store',
         signal: controller.signal,
@@ -289,7 +305,7 @@ export function startActivityPolling(
     }
   }
   const firstTick = tick()
-  const timer = schedule(() => { void tick() }, ACTIVITY_POLL_MS)
+  if (timer === undefined) timer = schedule(() => { void tick() }, intervalMs())
   return {
     firstTick,
     stop: () => {

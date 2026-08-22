@@ -74,6 +74,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json && tsc -p tsconfig.client.json && tsdown",
+    "prepare": "npm run build",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit",
     "sync:skill": "node scripts/sync-skill.mjs",
     "verify:skill": "node scripts/sync-skill.mjs --check",

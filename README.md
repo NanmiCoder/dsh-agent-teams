@@ -45,7 +45,7 @@ Read the [latest release notes](https://github.com/NanmiCoder/dsh-agent-teams/re
 ### npm
 
 ```sh
-dsh plugin --profile web add @nanmicoder/dsh-agent-teams
+dsh plugin --profile web add @nanmicoder/dsh-agent-teams@latest
 ```
 
 ### Build from source

@@ -45,7 +45,7 @@
 ### npm
 
 ```sh
-dsh plugin --profile web add @nanmicoder/dsh-agent-teams
+dsh plugin --profile web add @nanmicoder/dsh-agent-teams@latest
 ```
 
 ### 从源码构建

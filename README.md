@@ -78,7 +78,7 @@ Then ask for a team directly:
 1. The current session creates a team and becomes its captain.
 2. The captain adds role-specific members backed by continuable sub-agents.
 3. The goal becomes tasks with owners and explicit dependencies.
-4. The shared scheduler uses real `running / idle / ready` state to atomically claim one ready task per idle member and wake it. If an idle/ready member still owns an open task after an interrupted turn or process restart, the scheduler retries it with a fresh attempt.
+4. The shared scheduler uses real `running / idle / ready` state to atomically claim one ready task per idle member and wake it. An interrupted resident attempt stays parked and can resume through a direct message without losing its capability; after a cold process restart, the scheduler retries stranded open work with a fresh attempt.
 5. Members update with the current `attempt_id`; reassignment or captain takeover revokes the old attempt and waits for the old worker to quiesce before a new attempt starts.
 6. The captain presents the combined result, then archives the complete team record.
 
@@ -129,7 +129,7 @@ Defaults work without extra setup. A trusted profile can override member behavio
 ## Boundaries
 
 - One captain leads one active team at a time.
-- Idle members are automatically reused for ready work; messages that cannot be delivered live remain durable and are retried at a later status boundary.
+- Idle members with no open task are automatically reused for ready work. An idle member that still owns an open attempt is parked until messaged or explicitly reassigned; messages that cannot be delivered live remain durable and are retried at a later status boundary.
 - State is file-backed and serialized within one DSH process; concurrent processes editing the same team are not coordinated.
 - The activity panel reports persisted state as-is. Models may occasionally finish work without performing the expected task-state update.
 

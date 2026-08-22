@@ -5,7 +5,10 @@
  * continuable agents instead expose explicit idle/running edges, so this
  * scheduler closes the same loop without keeping a polling turn alive: every
  * idle edge and every task-graph mutation attempts one atomic claim and wakes
- * the selected durable member.
+ * the selected durable member. A resident member that becomes idle while it
+ * still owns an open attempt is parked: only an explicit captain reassignment
+ * may rotate that capability. Automatic retry is reserved for cold recovery,
+ * when the durable owner is no longer resident in the live Agent registry.
  * @module dsh-agent-teams/scheduler
  */
 
@@ -63,8 +66,12 @@ function liveCaptain(ctx: Context, captainSessionId: string, supplied?: Agent): 
   return ctx.agents.get(captainSessionId as SessionId)
 }
 
+function liveMember(ctx: Context, member: TeamMember): Agent | undefined {
+  return ctx.agents.get(member.id as SessionId)
+}
+
 function isMemberAvailable(ctx: Context, member: TeamMember): boolean {
-  const live = ctx.agents.get(member.id as SessionId)
+  const live = liveMember(ctx, member)
   return live === undefined || live.status === 'idle'
 }
 
@@ -105,6 +112,16 @@ function fallbackMailboxPrompt(messages: Awaited<ReturnType<typeof readUnreadMai
 /** Install one scheduler and its member activity observer. */
 export function installTeamScheduler(ctx: Context, config: SchedulerConfig): TeamScheduler {
   const memberQueues = new Map<string, Promise<unknown>>()
+  // An idle edge in this process proves that the resident member ended its
+  // turn while the current attempt was still open. Remember that capability
+  // even after Harness disposes the continuable AgentHandle: later status or
+  // graph kicks must keep it parked. A cold process starts with an empty map,
+  // so durable open attempts are still recovered after restart.
+  const parkedAttempts = new Map<string, string>()
+
+  const memberQueueKey = (stateRoot: string, teamId: string, memberName: string): string => (
+    `${stateRoot}\u0000${teamId}\u0000${memberName}`
+  )
 
   const serializeMember = async <T>(key: string, operation: () => Promise<T>): Promise<T> => {
     const previous = memberQueues.get(key) ?? Promise.resolve()
@@ -136,7 +153,7 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
 
     async kickMember(workspace, teamId, memberName, suppliedCaptain) {
       const stateRoot = stateRootOf(workspace, config)
-      const queueKey = `${stateRoot}\u0000${teamId}\u0000${memberName}`
+      const queueKey = memberQueueKey(stateRoot, teamId, memberName)
       await serializeMember(queueKey, async () => {
         let team = await readTeam(stateRoot, teamId)
         if (team === undefined) return
@@ -176,12 +193,20 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
           if (fresh === undefined) return undefined
           const currentMember = fresh.members.find(candidate => candidate.name === memberName && candidate.status !== 'removed')
           if (currentMember === undefined || currentMember.id === '' || !isMemberAvailable(ctx, currentMember)) return undefined
-          // An idle/ready member that still owns an open task lost the turn
-          // that was executing it (model stopped early, interrupt settlement,
-          // or process restart). Retry that task with a fresh capability
-          // instead of permanently treating the durable claim as "busy".
-          const task = ownedOpenTask(fresh.tasks, currentMember.name)
-            ?? nextReadyTask(fresh.tasks, currentMember.name)
+          const owned = ownedOpenTask(fresh.tasks, currentMember.name)
+          // A resident idle member can intentionally leave an attempt open
+          // while waiting for guidance, or because the user paused its turn.
+          // Re-dispatching here would revoke still-valid work on every idle
+          // edge and every status kick. The idle observer remembers that exact
+          // capability across normal continuable disposal; only an unobserved
+          // durable capability (cold process recovery) or a legacy open task
+          // with no capability is retried.
+          const parkedAttemptId = parkedAttempts.get(currentMember.id)
+          const recoverOwned = owned !== undefined
+            && (owned.attemptId === undefined || owned.attemptId !== parkedAttemptId)
+          const task = recoverOwned ? owned : owned === undefined
+            ? nextReadyTask(fresh.tasks, currentMember.name)
+            : undefined
           if (task === undefined) {
             if (currentMember.status !== 'idle') {
               currentMember.status = 'idle'
@@ -191,6 +216,7 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
           }
           const previousAssignee = task.assignee
           const attemptId = beginTaskAttempt(task, currentMember.name)
+          parkedAttempts.delete(currentMember.id)
           currentMember.status = 'working'
           await writeTeam(stateRoot, fresh)
           return {
@@ -240,14 +266,28 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
     const workspace = agent.session.header.cwd ?? process.cwd()
     const stateRoot = stateRootOf(workspace, config)
     const located = await findTeamByParticipant(stateRoot, agent.id)
-    if (located === undefined || located.captainSessionId === agent.id) return
+    if (located === undefined) {
+      parkedAttempts.delete(agent.id)
+      return
+    }
+    if (located.captainSessionId === agent.id) return
     const member = located.members.find(candidate => candidate.id === agent.id && candidate.status !== 'removed')
-    if (member === undefined) return
+    if (member === undefined) {
+      parkedAttempts.delete(agent.id)
+      return
+    }
     await withTeamLock(teamLockKey(stateRoot, located.id), async () => {
       const fresh = await readTeam(stateRoot, located.id)
       const current = fresh?.members.find(candidate => candidate.id === agent.id && candidate.status !== 'removed')
       if (fresh === undefined || current === undefined) return
       const next = status === 'running' ? 'working' : 'idle'
+      if (next === 'idle') {
+        const owned = ownedOpenTask(fresh.tasks, current.name)
+        if (owned?.attemptId === undefined) parkedAttempts.delete(agent.id)
+        else parkedAttempts.set(agent.id, owned.attemptId)
+      } else {
+        parkedAttempts.delete(agent.id)
+      }
       if (current.status === next) return
       current.status = next
       await writeTeam(stateRoot, fresh)

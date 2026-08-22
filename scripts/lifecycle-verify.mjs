@@ -251,6 +251,44 @@ try {
   }, beta)
   check('dependency gate stays pending before both branches complete', (await task(t3.task_id))?.status === 'pending')
 
+  // A normal turn may end while its task is intentionally parked waiting for
+  // guidance, and a user can explicitly pause a running member. Neither case
+  // authorizes the scheduler to revoke the live attempt. Repeated status kicks
+  // must be idempotent until the captain performs an explicit reassignment.
+  publishStatus(alpha, 'idle')
+  await new Promise(resolve => setTimeout(resolve, 20))
+  // Normal continuable settlement disposes its live AgentHandle between
+  // turns. The process-local idle observation must still distinguish this
+  // parked attempt from a cold process restart.
+  liveAgents.delete(alpha.id)
+  const deliveriesBeforeParkedKicks = deliveries.length
+  await Promise.all([
+    call('agent_teams_status', {}),
+    call('agent_teams_status', {}),
+    call('agent_teams_status', {}),
+  ])
+  await new Promise(resolve => setTimeout(resolve, 20))
+  const parkedAlpha = await task(t1.task_id)
+  check('resident idle owner keeps its open attempt across repeated scheduler kicks',
+    parkedAlpha?.status === 'in_progress'
+      && parkedAlpha.attempt === alphaClaim.attempt
+      && parkedAlpha.attemptId === alphaClaim.attempt_id
+      && deliveries.length === deliveriesBeforeParkedKicks)
+  liveAgents.set(alpha.id, alpha)
+
+  publishStatus(beta, 'idle')
+  await new Promise(resolve => setTimeout(resolve, 20))
+  const deliveriesBeforeResume = deliveries.length
+  const resumedBeta = await call('agent_teams_send_message', {
+    to: 'beta', content: 'Continue the same parked task and keep its current attempt id.',
+  })
+  const resumedBetaTask = await task(t2.task_id)
+  check('captain message resumes a parked owner without rotating its attempt',
+    resumedBeta.delivered === 'wake'
+      && deliveries.length === deliveriesBeforeResume + 1
+      && resumedBetaTask?.attempt === betaClaim.attempt
+      && resumedBetaTask.attemptId === betaClaim.attempt_id)
+
   let unsafeCaptainTakeoverRejected = false
   try {
     await call('agent_teams_update_task', {
@@ -289,6 +327,9 @@ try {
   await call('agent_teams_update_task', {
     task_id: t2.task_id, status: 'completed', output: 'beta result', attempt_id: betaClaim.attempt_id,
   }, beta)
+  check('resumed member completes with the original parked capability',
+    (await task(t2.task_id))?.status === 'completed'
+      && (await task(t2.task_id))?.attemptId === betaClaim.attempt_id)
   publishStatus(beta, 'idle')
   publishStatus(gamma, 'idle')
   await new Promise(resolve => setTimeout(resolve, 20))

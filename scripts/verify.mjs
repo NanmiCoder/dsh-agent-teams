@@ -623,13 +623,61 @@ const discoveryPoller = startActivityPolling([], {
 })
 await discoveryPoller.firstTick
 scheduledDiscoveryTick?.()
-await Promise.resolve()
+await new Promise((resolve) => setImmediate(resolve))
 discoveryPoller.stop()
 check(
-  'a cardless cold session restores live and archive state once, then becomes dormant',
-  discoveryUrls.length === 2
+  'a cardless cold session restores live and archive once, then keeps polling for a later team',
+  discoveryUrls.length === 3
     && discoveryUrls[0] === '/plugins/dsh-agent-teams/state'
-    && discoveryUrls[1]?.endsWith('?archived=1'),
+    && discoveryUrls[1]?.endsWith('?archived=1')
+    && discoveryUrls[2] === '/plugins/dsh-agent-teams/state',
+)
+
+// Regression (GitHub #57): a team created AFTER the cold-start discovery pass
+// (e.g. a run_code-wrapped agent_teams_create) must be discovered without a
+// manual reload. The controller keeps polling while its discovery session is
+// active, even after the empty first pass, so a later team is published.
+const latePublished = []
+const lateUrls = []
+let lateLiveTeams = []
+let lateTick = () => {}
+const latePoller = startActivityPolling([], {
+  discoverySessionId: 'cold-captain',
+  fetchState: async (url) => {
+    lateUrls.push(url)
+    if (url === '/plugins/dsh-agent-teams/state') {
+      return { ok: true, json: async () => ({ teams: lateLiveTeams }) }
+    }
+    return { ok: true, json: async () => ({ teams: [] }) }
+  },
+  schedule: (callback) => {
+    lateTick = callback
+    return 'late-timer'
+  },
+  cancel: () => {},
+  publishSnapshots: (update) => { latePublished.push(update) },
+})
+await latePoller.firstTick
+lateTick()
+await new Promise((resolve) => setImmediate(resolve))
+check('discovery keeps polling after an empty first pass', lateUrls.length === 3)
+lateLiveTeams = [{
+  workspace: '',
+  teamId: 'post-discovery-team',
+  name: 'Post Discovery Team',
+  captainSessionId: 'cold-captain',
+  members: [],
+  tasks: [],
+  messageCount: 0,
+  captainInbox: [],
+}]
+lateTick()
+await new Promise((resolve) => setImmediate(resolve))
+latePoller.stop()
+check(
+  'a team created after the discovery pass is picked up without a reload',
+  lateUrls.length === 4
+    && latePublished.some((update) => update.teams?.some((team) => team.teamId === 'post-discovery-team')),
 )
 
 const pollTarget = { key: 'poll-target', sessionId: 'poll-session', teamId: 'poll-team' }

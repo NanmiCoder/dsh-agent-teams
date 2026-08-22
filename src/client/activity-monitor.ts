@@ -200,12 +200,15 @@ export interface ActivityPollingController {
  * Start the single polling loop for the current session's requested targets.
  *
  * With neither targets nor a discovery session this is deliberately inert.
- * A discovery session performs one live+archive pass after selection/restart;
- * it keeps polling only while that captain still owns a live team. This
- * restores legacy/cardless history without turning every ordinary session
- * into a permanent one-second filesystem scan. Explicit card targets retain
- * the normal cadence, and archive state is refreshed when a target or a
- * previously discovered live team disappears.
+ * A discovery session performs one live+archive pass after selection/restart,
+ * then keeps polling for the lifetime of this controller so a team created
+ * later in that session (e.g. a run_code-wrapped agent_teams_create) is
+ * discovered without a manual reload. The caller — the session view, which
+ * stops the controller when the session is no longer current — bounds the
+ * lifetime, so the one-second scan is limited to an open session and never
+ * turns every ordinary session into a permanent filesystem scan. Explicit
+ * card targets retain the normal cadence, and archive state is refreshed
+ * when a target or a previously discovered live team disappears.
  */
 export function startActivityPolling(
   monitorTargets: readonly ActivityMonitorTarget[],
@@ -227,9 +230,14 @@ export function startActivityPolling(
   let controller: AbortController | undefined
   const tick = async (): Promise<void> => {
     if (inFlight || cancelled) return
-    // A cardless ordinary or archive-only session needs one recovery pass,
-    // then stays dormant until the component is recreated for another session.
-    if (discoveryComplete && monitorTargets.length === 0 && discoveredLiveKeys.size === 0) return
+    // While a discovery session is active, keep polling so a team created
+    // later in that session is picked up without a reload; the caller (the
+    // session view) stops the controller when the session is no longer
+    // current. Only a truly cardless, non-discovery session goes dormant
+    // after its one recovery pass.
+    if (discoveryComplete && monitorTargets.length === 0
+      && discoveredLiveKeys.size === 0
+      && (discoverySessionId === undefined || discoverySessionId === '')) return
     inFlight = true
     controller = new AbortController()
     try {
@@ -260,8 +268,9 @@ export function startActivityPolling(
 
       // Archives are immutable per team generation. A successful fallback
       // retires every missing explicit target, including legacy cards whose
-      // host archive no longer exists; discovery remains available from the
-      // shared snapshot after this controller becomes dormant.
+      // host archive no longer exists; the discovery session keeps polling so
+      // discovery (and any team created later in the same session) stays
+      // available from the shared snapshot for the life of this controller.
       const archivedResponse = await fetchState(`${ACTIVITY_STATE_URL}?archived=1`, {
         cache: 'no-store',
         signal: controller.signal,

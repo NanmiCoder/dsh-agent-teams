@@ -37,6 +37,8 @@ Read the [latest release notes](https://github.com/NanmiCoder/dsh-agent-teams/re
 | **Direct messaging** | Members send durable mailbox messages directly to teammates or the captain—no relay required. |
 | **Live activity panel** | The Web UI combines segmented progress, a collapsible roster, and an interactive task DAG; completed archives retain their full member and task history. |
 
+The conversation card and activity panel use Harness's official locale service. They follow live language changes between English and Simplified Chinese—including status labels, dynamic summaries, controls, archive markers, and accessibility text—without a page reload or a separate plugin setting.
+
 ## Install
 
 > [!NOTE]

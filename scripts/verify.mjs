@@ -59,6 +59,11 @@ import {
 } from '../lib/client/panel-geometry.js'
 import { memberArtUrl } from '../lib/client/artwork.js'
 import { parseAgentTeamsCreateArgs } from '../lib/client/agent-teams-card-definition.js'
+import {
+  AGENT_TEAMS_LOCALE_NAMESPACE,
+  en as agentTeamsEn,
+  zh as agentTeamsZh,
+} from '../lib/client/locales.js'
 import { openAgentTeamMember } from '../lib/client/session-navigation.js'
 import { steerCaptainReport } from '../lib/tools.js'
 import {
@@ -131,6 +136,23 @@ const agentTeamsCardCss = await readFile(new URL('../src/client/AgentTeamsCard.m
 const agentTeamsCardSource = await readFile(new URL('../src/client/AgentTeamsCard.tsx', import.meta.url), 'utf8')
 const artworkSource = await readFile(new URL('../src/client/artwork.ts', import.meta.url), 'utf8')
 const hostSource = await readFile(new URL('../src/index.ts', import.meta.url), 'utf8')
+const localeKeys = Object.keys(agentTeamsZh).sort()
+const englishLocaleKeys = Object.keys(agentTeamsEn).sort()
+const placeholders = value => [...value.matchAll(/\{(\w+)\}/gu)].map(match => match[1]).sort()
+check(
+  'AgentTeams locale dictionaries have identical keys and template placeholders',
+  localeKeys.length > 0
+    && JSON.stringify(localeKeys) === JSON.stringify(englishLocaleKeys)
+    && localeKeys.every(key => JSON.stringify(placeholders(agentTeamsZh[key]))
+      === JSON.stringify(placeholders(agentTeamsEn[key]))),
+)
+check(
+  'client registers the official locale namespace on both visible slots',
+  AGENT_TEAMS_LOCALE_NAMESPACE === 'agentTeams'
+    && clientIndexSource.includes("'conversationEvents', 'slots', 'sessions', 'locale'")
+    && clientIndexSource.includes('ctx.locale.register(AGENT_TEAMS_LOCALE_NAMESPACE, { zh, en })')
+    && clientIndexSource.match(/locale:\s*AGENT_TEAMS_LOCALE_NAMESPACE/gu)?.length === 2,
+)
 check(
   'slash command transcript hides the duplicate pre-message result row',
   clientIndexSource.includes('HiddenAgentTeamsCommand')

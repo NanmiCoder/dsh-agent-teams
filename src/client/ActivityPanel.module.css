@@ -1171,14 +1171,13 @@
   gap: 3px;
 }
 
-.archivedWrap::before {
+.archiveLabel {
   display: block;
   padding: 5px 14px 0;
   color: var(--dsw-alias-label-tertiary);
   font-size: 9.5px;
   font-weight: 600;
   line-height: 14px;
-  content: '已结束 · 历史归档';
 }
 
 @media (prefers-reduced-motion: reduce) {

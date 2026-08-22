@@ -51,7 +51,7 @@ function openActivityPanel(data: AgentTeamsCardData): void {
 }
 
 /** Render one durable team as a compact conversation card. */
-export function AgentTeamsCard({ node, openMember, sessionId }: AgentTeamsCardProps) {
+export function AgentTeamsCard({ node, openMember, sessionId, t }: AgentTeamsCardProps) {
   const data = node.data as AgentTeamsCardData
   // `conversation.chat.node` is session-scoped, so its framework-owned id is
   // a stable owner even while another conversation becomes current.
@@ -76,15 +76,15 @@ export function AgentTeamsCard({ node, openMember, sessionId }: AgentTeamsCardPr
       <header className={css.head}>
         <img className={css.leadAvatar} src={LEAD_ART} alt="" aria-hidden />
         <span className={css.teamName} title={resolved.teamName}>{resolved.teamName}</span>
-        <span className={css.memberCount}>{resolved.members.length} 名成员</span>
+        <span className={css.memberCount}>{t('card.memberCount', { count: resolved.members.length })}</span>
         <button
           type="button"
           className={css.panelButton}
           onClick={() => { openActivityPanel(resolved) }}
-          aria-label="打开活动面板"
-          title="打开活动面板"
+          aria-label={t('action.openActivityPanel')}
+          title={t('action.openActivityPanel')}
         >
-          活动面板
+          {t('activity.panelButton')}
         </button>
       </header>
       {resolved.members.length > 0 && (

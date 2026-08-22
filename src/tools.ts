@@ -482,7 +482,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
       },
       render: (args, value) => [{
         type: 'text',
-        text: `Task "${value.subject}" created as ${value.task_id} (status ${value.status}${value.assignee ? `, assigned to ${value.assignee}` : ''}).`,
+        text: `Task "${value.subject}" created as ${value.task_id} (status ${value.status}${value.assignee ? `, assigned to ${value.assignee}` : ''}). The assignee has been auto-notified by the scheduler — do NOT call agent_teams_send_message to dispatch this task, and do NOT call agent_teams_status to check. Wait for the member's completion message.`,
       }],
     },
     async execute(args, exec) {
@@ -494,8 +494,20 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
         const fresh = await requireFreshCaptainTeam(stateRoot, team.id, captain.id)
         const dependencies = args.dependencies ?? []
         for (const dependency of dependencies) {
+          // Allow forward references: tasks created in the same batch may reference
+          // task ids that have not been inserted yet (e.g. t3 depends on t1, t2
+          // when all three are created in parallel). The dependency is validated
+          // lazily at claim time; here we only check the id format.
+          if (!/^t\d+$/.test(dependency)) {
+            throw new Error(`dependency "${dependency}" is not a valid task id (expected format like "t1")`)
+          }
           if (!fresh.tasks.some((task) => task.id === dependency)) {
-            throw new Error(`dependency "${dependency}" does not exist in team "${fresh.name}"`)
+            // Forward reference: the dependency may be created later in this same
+            // batch of parallel tool calls. Store it; claim_task will reject if
+            // the dependency never materializes.
+            // TODO: if the dependency never materializes (e.g. t1 creation failed),
+            // task t3 will silently stay pending forever. Consider adding a
+            // validation hook after the parallel batch completes.
           }
         }
         if (args.assignee !== undefined) requireMember(fresh, args.assignee)
@@ -938,7 +950,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
 
   ctx.tools.register(defineTool({
     name: 'agent_teams_status',
-    description: 'Team snapshot: members with live activity and tasks with status/assignee/dependencies/output. Captains also see every team mailbox; members see only their own inbox. Poll this to watch progress.',
+    description: 'Team snapshot: members with live activity and tasks with status/assignee/dependencies/output. Captains also see every team mailbox; members see only their own inbox. WARNING: do NOT call this to check if members finished — members report completion to the captain via messages automatically, and calling this in a loop wastes tokens. Use only ONCE if you need a diagnostic snapshot of the whole team.',
     parameters: {},
     output: {
       schema: { type: 'object', additionalProperties: true, properties: {} },

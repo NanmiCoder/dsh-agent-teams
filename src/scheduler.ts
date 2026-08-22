@@ -48,6 +48,7 @@ interface DispatchTicket {
   readonly previousAssignee?: string
   readonly subject: string
   readonly description?: string
+  readonly dependencyOutputs?: readonly { taskId: string; output: string }[]
 }
 
 function stateRootOf(workspace: string, config: SchedulerConfig): string {
@@ -83,13 +84,16 @@ function nextReadyTask(tasks: readonly TeamTask[], memberName: string): TeamTask
 
 function assignmentPrompt(ticket: DispatchTicket, stateDir: string, teamId: string): string {
   const description = ticket.description === undefined ? '' : `\n\n${ticket.description}`
+  const depOutputs = ticket.dependencyOutputs && ticket.dependencyOutputs.length > 0
+    ? `\n\nPrerequisite task results (outputs from tasks this task depends on):\n${ticket.dependencyOutputs.map(d => `--- ${d.taskId} ---\n${d.output.length > 2000 ? d.output.slice(0, 2000) + '\n...(truncated)' : d.output}`).join('\n\n')}`
+    : ''
   return `AgentTeams automatic task assignment from the shared task list.
 
-Task: ${ticket.taskId} — ${ticket.subject}${description}
+Task: ${ticket.taskId} — ${ticket.subject}${description}${depOutputs}
 Attempt: ${ticket.attempt}
 Attempt id: ${ticket.attemptId}
 
-Call agent_teams_claim_task for ${ticket.taskId}; it will return this same attempt_id. Include attempt_id=${ticket.attemptId} in every agent_teams_update_task call. If it is rejected as stale, stop work because the task was reassigned. Work only this task in this turn, report the result to the captain, then become idle so the scheduler can select your next ready task.
+Call agent_teams_claim_task for ${ticket.taskId}; it will return this same attempt_id. Include attempt_id=${ticket.attemptId} in every agent_teams_update_task call. You already know the attempt_id (${ticket.attemptId}) from this message, so call agent_teams_claim_task AND agent_teams_update_task(status=in_progress) in the SAME response (parallel tool calls) — do NOT do them in separate steps. If claim is rejected as stale, stop work because the task was reassigned. Work only this task in this turn, then call agent_teams_update_task(completed) and agent_teams_send_message(to=captain) together in one response (parallel), and become idle.
 
 State policy: ${stateDir}/${teamId}/ is read-only diagnostics; mutate team state only through agent_teams_* tools.`
 }
@@ -193,6 +197,16 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
           const attemptId = beginTaskAttempt(task, currentMember.name)
           currentMember.status = 'working'
           await writeTeam(stateRoot, fresh)
+          // Collect outputs of completed dependency tasks so the assignee
+          // has the prerequisite results inline (avoids reading files).
+          const dependencyOutputs = task.dependencies
+            ?.map(depId => {
+              const dep = fresh.tasks.find(t => t.id === depId)
+              return dep?.status === 'completed' && dep.output
+                ? { taskId: depId, output: dep.output }
+                : undefined
+            })
+            .filter((x): x is { taskId: string; output: string } => x !== undefined)
           return {
             taskId: task.id,
             memberName: currentMember.name,
@@ -202,6 +216,7 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
             previousAssignee,
             subject: task.subject,
             description: task.description,
+            dependencyOutputs: dependencyOutputs?.length ? dependencyOutputs : undefined,
           }
         })
         if (ticket === undefined) return

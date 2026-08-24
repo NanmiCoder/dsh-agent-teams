@@ -262,17 +262,20 @@ try {
   // parked attempt from a cold process restart.
   liveAgents.delete(alpha.id)
   const deliveriesBeforeParkedKicks = deliveries.length
-  await Promise.all([
-    call('agent_teams_status', {}),
-    call('agent_teams_status', {}),
-    call('agent_teams_status', {}),
-  ])
+  const parkedAttemptBeforeRateLimitRecovery = await task(t1.task_id)
+  // Model the provider-facing failure boundary from #66: the member's turn
+  // has ended after a rate-limit response, but its durable task capability is
+  // still open. Repeated scheduler/status kicks must park that capability
+  // instead of minting a fresh attempt and inference request each time.
+  for (let kick = 0; kick < 20; kick += 1) {
+    await call('agent_teams_status', {})
+  }
   await new Promise(resolve => setTimeout(resolve, 20))
   const parkedAlpha = await task(t1.task_id)
-  check('resident idle owner keeps its open attempt across repeated scheduler kicks',
+  check('rate-limited idle owner does not enter an unbounded retry loop (#66)',
     parkedAlpha?.status === 'in_progress'
-      && parkedAlpha.attempt === alphaClaim.attempt
-      && parkedAlpha.attemptId === alphaClaim.attempt_id
+      && parkedAlpha.attempt === parkedAttemptBeforeRateLimitRecovery?.attempt
+      && parkedAlpha.attemptId === parkedAttemptBeforeRateLimitRecovery?.attemptId
       && deliveries.length === deliveriesBeforeParkedKicks)
   liveAgents.set(alpha.id, alpha)
 

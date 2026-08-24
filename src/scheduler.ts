@@ -29,10 +29,16 @@ import {
   withTeamLock,
   writeTeam,
 } from './state.ts'
-import type { TeamMember, TeamTask } from './types.ts'
+import type { TeamMember, TeamState, TeamTask } from './types.ts'
+
+/** Per-dependency output cap in the assignment prompt. */
+export const DEPENDENCY_OUTPUT_MAX_CHARS = 2_000
+/** Combined dependency-output budget in the assignment prompt. */
+export const DEPENDENCY_OUTPUTS_TOTAL_MAX_CHARS = 12_000
 
 export interface SchedulerConfig {
   readonly stateDir: string
+  readonly executionPrompt?: string
 }
 
 export interface TeamScheduler {
@@ -42,7 +48,15 @@ export interface TeamScheduler {
   kickMember(workspace: string, teamId: string, memberName: string, captain?: Agent): Promise<void>
 }
 
-interface DispatchTicket {
+/** One completed recursive dependency shown to the assignee. */
+export interface DependencyOutput {
+  readonly id: string
+  readonly subject: string
+  readonly profileSeedId?: string
+  readonly output?: string
+}
+
+export interface DispatchTicket {
   readonly taskId: string
   readonly memberName: string
   readonly memberId: string
@@ -51,6 +65,87 @@ interface DispatchTicket {
   readonly previousAssignee?: string
   readonly subject: string
   readonly description?: string
+  readonly teamDescription?: string
+  readonly profileProtocol?: string
+  readonly profileSeedId?: string
+  readonly dependencyOutputs: readonly DependencyOutput[]
+  readonly executionPrompt?: string
+}
+
+function taskProfileSeedId(task: TeamTask): string | undefined {
+  const seed = task.profileSeedId?.trim()
+  return seed === undefined || seed === '' ? undefined : seed
+}
+
+function teamProfileProtocol(team: TeamState): string | undefined {
+  return team.profile?.protocol
+}
+
+/**
+ * Recursively collect `status=completed` ancestors of `taskId` in topological
+ * order (dependencies before dependents). Cycles stop that branch only.
+ */
+export function collectCompletedDependencyOutputs(
+  tasks: readonly TeamTask[],
+  taskId: string,
+  warn?: (message: string) => void,
+): DependencyOutput[] {
+  const byId = new Map(tasks.map(task => [task.id, task]))
+  const visiting = new Set<string>()
+  const visited = new Set<string>()
+  const ordered: TeamTask[] = []
+
+  const walk = (id: string): void => {
+    if (visiting.has(id)) {
+      warn?.(`agent-teams: dependency cycle involving "${id}" while collecting outputs; stopping this branch`)
+      return
+    }
+    if (visited.has(id)) return
+    visiting.add(id)
+    const task = byId.get(id)
+    if (task !== undefined) {
+      for (const dependency of task.dependencies) walk(dependency)
+      if (id !== taskId) ordered.push(task)
+    }
+    visiting.delete(id)
+    visited.add(id)
+  }
+
+  walk(taskId)
+  return ordered
+    .filter(task => task.status === 'completed')
+    .map((task) => {
+      const profileSeedId = taskProfileSeedId(task)
+      return {
+        id: task.id,
+        subject: task.subject,
+        ...profileSeedId === undefined ? {} : { profileSeedId },
+        ...task.output === undefined ? {} : { output: task.output },
+      }
+    })
+}
+
+/** Format completed-dependency outputs with per-item and total truncation. */
+export function formatDependencyOutputs(items: readonly DependencyOutput[]): string {
+  if (items.length === 0) return '(none)'
+  const formatted = items.map((item) => {
+    const seed = item.profileSeedId === undefined ? '' : ` [${item.profileSeedId}]`
+    const raw = item.output === undefined || item.output === ''
+      ? '(no output recorded)'
+      : item.output
+    const truncated = raw.length > DEPENDENCY_OUTPUT_MAX_CHARS
+    const body = truncated ? `${raw.slice(0, DEPENDENCY_OUTPUT_MAX_CHARS)} [truncated]` : raw
+    return `- ${item.id}${seed} ${item.subject}:\n  ${body}`
+  })
+  let selected = formatted
+  while (selected.length > 1 && selected.join('\n').length > DEPENDENCY_OUTPUTS_TOTAL_MAX_CHARS) {
+    selected = selected.slice(1)
+  }
+  const last = selected[0]
+  if (selected.length === 1 && last !== undefined && last.length > DEPENDENCY_OUTPUTS_TOTAL_MAX_CHARS) {
+    selected = [`${last.slice(0, DEPENDENCY_OUTPUTS_TOTAL_MAX_CHARS)} [truncated]`]
+  }
+  return selected.join('\n')
 }
 
 function stateRootOf(workspace: string, config: SchedulerConfig): string {
@@ -88,15 +183,35 @@ function nextReadyTask(tasks: readonly TeamTask[], memberName: string): TeamTask
     ?? ready.find(task => task.assignee === undefined)
 }
 
-function assignmentPrompt(ticket: DispatchTicket, stateDir: string, teamId: string): string {
+export function assignmentPrompt(ticket: DispatchTicket, stateDir: string, teamId: string): string {
   const description = ticket.description === undefined ? '' : `\n\n${ticket.description}`
+  const seed = ticket.profileSeedId === undefined ? '' : ` [${ticket.profileSeedId}]`
+  const goal = ticket.teamDescription?.trim() || '(not provided)'
+  const protocol = ticket.profileProtocol?.trim() || '(none)'
+  const executionPrompt = ticket.executionPrompt?.trim()
   return `AgentTeams automatic task assignment from the shared task list.
 
-Task: ${ticket.taskId} — ${ticket.subject}${description}
+You are executing as configured member "${ticket.memberName}".
+Do not start a teammate's assigned task.
+
+Team goal:
+${goal}
+
+Profile protocol:
+${protocol}
+${executionPrompt === undefined || executionPrompt === '' ? '' : `
+Execution guidance:
+${executionPrompt}
+`}
+Completed dependency results:
+${formatDependencyOutputs(ticket.dependencyOutputs)}
+
+Task: ${ticket.taskId}${seed} — ${ticket.subject}${description}
 Attempt: ${ticket.attempt}
 Attempt id: ${ticket.attemptId}
 
-Call agent_teams_claim_task for ${ticket.taskId}; it will return this same attempt_id. Include attempt_id=${ticket.attemptId} in every agent_teams_update_task call. If it is rejected as stale, stop work because the task was reassigned. Work only this task in this turn, report the result to the captain, then become idle so the scheduler can select your next ready task.
+Call agent_teams_claim_task for ${ticket.taskId}; it will return this same attempt_id. Include attempt_id=${ticket.attemptId} in every agent_teams_update_task call. If it is rejected as stale, stop work because the task was reassigned. claimed cannot jump to completed. Mark in_progress first, then completed or failed. Include attempt_id on every update. Then send_message to captain and become idle.
+When finishing: use status=completed only when the task's success criteria are satisfied; use status=failed when blocking findings or validation failures mean downstream work must not proceed; include a concise output in either case. Treat the dependency results above as source material. Do not ignore them. Work only this task in this turn.
 
 State policy: ${stateDir}/${teamId}/ is read-only diagnostics; mutate team state only through agent_teams_* tools.`
 }
@@ -142,7 +257,7 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
     async kickTeam(workspace, teamId, suppliedCaptain) {
       const stateRoot = stateRootOf(workspace, config)
       const team = await readTeam(stateRoot, teamId)
-      if (team === undefined) return
+      if (team === undefined || team.halted === true) return
       const captain = liveCaptain(ctx, team.captainSessionId, suppliedCaptain)
       if (captain === undefined) return
       for (const member of team.members) {
@@ -156,7 +271,7 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
       const queueKey = memberQueueKey(stateRoot, teamId, memberName)
       await serializeMember(queueKey, async () => {
         let team = await readTeam(stateRoot, teamId)
-        if (team === undefined) return
+        if (team === undefined || team.halted === true) return
         const captain = liveCaptain(ctx, team.captainSessionId, suppliedCaptain)
         if (captain === undefined) return
         let member = team.members.find(candidate => candidate.name === memberName && candidate.status !== 'removed')
@@ -190,7 +305,7 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
 
         const ticket = await withTeamLock(teamLockKey(stateRoot, team.id), async (): Promise<DispatchTicket | undefined> => {
           const fresh = await readTeam(stateRoot, team!.id)
-          if (fresh === undefined) return undefined
+          if (fresh === undefined || fresh.halted === true) return undefined
           const currentMember = fresh.members.find(candidate => candidate.name === memberName && candidate.status !== 'removed')
           if (currentMember === undefined || currentMember.id === '' || !isMemberAvailable(ctx, currentMember)) return undefined
           const owned = ownedOpenTask(fresh.tasks, currentMember.name)
@@ -219,6 +334,8 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
           parkedAttempts.delete(currentMember.id)
           currentMember.status = 'working'
           await writeTeam(stateRoot, fresh)
+          const profileSeedId = taskProfileSeedId(task)
+          const protocol = teamProfileProtocol(fresh)
           return {
             taskId: task.id,
             memberName: currentMember.name,
@@ -228,6 +345,17 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
             previousAssignee,
             subject: task.subject,
             description: task.description,
+            teamDescription: fresh.description,
+            ...protocol === undefined ? {} : { profileProtocol: protocol },
+            ...profileSeedId === undefined ? {} : { profileSeedId },
+            ...fresh.profile?.executionPrompt === undefined && config.executionPrompt === undefined
+              ? {}
+              : { executionPrompt: fresh.profile?.executionPrompt ?? config.executionPrompt },
+            dependencyOutputs: collectCompletedDependencyOutputs(
+              fresh.tasks,
+              task.id,
+              (message) => ctx.logger.warn(message),
+            ),
           }
         })
         if (ticket === undefined) return

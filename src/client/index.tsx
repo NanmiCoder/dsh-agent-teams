@@ -12,6 +12,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import { ActivityPanel } from './ActivityPanel.tsx'
 import { AgentTeamsCard, type AgentTeamsCardInjected } from './AgentTeamsCard.tsx'
+import { TeamProgressBanner } from './TeamProgressBanner.tsx'
 import { agentTeamsCardDefinition } from './agent-teams-card-definition.ts'
 import {
   AGENT_TEAMS_LOCALE_NAMESPACE, en, zh, type AgentTeamsLocaleKey,
@@ -70,6 +71,13 @@ export function apply(ctx: ClientContext): void {
     name: 'conversation.chat.commandview',
     key: 'agent-teams',
   }, HiddenAgentTeamsCommand))
+
+  ctx.slots.inject('conversation.input.dock', () => ctx.slots.register({
+    name: 'conversation.input.dock',
+    id: 'agent-teams-progress',
+    order: 40,
+    locale: AGENT_TEAMS_LOCALE_NAMESPACE,
+  }, TeamProgressBanner))
 
   ctx.conversationEvents.register(agentTeamsCardDefinition)
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register({

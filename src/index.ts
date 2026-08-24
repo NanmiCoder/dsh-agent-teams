@@ -25,12 +25,14 @@ import type {} from '@deepseek-ai/dsh-subagent'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import type { WorkspaceRegistry } from '@deepseek-ai/dsh-workspace'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { registerAgentTeamsTools, type ToolsConfig } from './tools.ts'
+import { haltTeamWork, registerAgentTeamsTools, type ToolsConfig } from './tools.ts'
 import { installAgentTeamsGestureBoundary, registerAgentTeamsCommand } from './command.ts'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { collectArchivedTeamsActivity, collectTeamsActivity } from './snapshot.ts'
+import { findTeamByCaptain } from './state.ts'
+import { formatProfilesForPrompt, type TeamProfileConfig } from './profiles.ts'
 
 /**
  * Structural slice of the web server service, compatible with both the
@@ -66,10 +68,16 @@ export interface Config {
   memberProvider?: string
   /** Optional model override applied to every member. */
   memberModel?: string
+  /** Prompt injected into member personas and automatic task assignments. */
+  executionPrompt?: string
+  /** Plugin-wide fallback route for unavailable member models. */
+  fallback?: import('./profiles.ts').TeamModelFallbackConfig
   /** Member delegation depth cap (default `1`; `0` forbids delegation entirely). */
   memberMaxDepth?: number
   /** Team size cap in members (default `8`). */
   maxMembers?: number
+  /** Named multi-role team profiles. */
+  profiles?: Record<string, TeamProfileConfig>
   /** Prompt-section order for the usage policy (default `117`, after delegation policy). */
   promptSectionOrder?: number
   /**
@@ -80,10 +88,43 @@ export interface Config {
   slashCommand?: boolean
 }
 
+// `z.object()` has an implicit `{}` default in Schemastery.  Fallback routes
+// are optional, so model absence explicitly; otherwise a missing route is
+// validated as an empty object and fails on the required provider/model keys.
+const fallbackRouteConfig = z.union([
+  z.object({ provider: z.string().required(), model: z.string().required() }),
+  z.const(undefined),
+])
+
 export const Config: z<Config> = z.object({
   stateDir: z.string().default('.agent-teams'),
   memberProvider: z.string().default('spawn'),
   memberModel: z.string(),
+  executionPrompt: z.string(),
+  fallback: fallbackRouteConfig,
+  profiles: z.dict(z.object({
+    description: z.string(),
+    protocol: z.string(),
+    executionPrompt: z.string(),
+    fallback: fallbackRouteConfig,
+    members: z.array(z.object({
+      name: z.string().required(),
+      role: z.string(),
+      provider: z.string(),
+      model: z.string(),
+      reasoning_effort: z.string(),
+      executionPrompt: z.string(),
+      fallback: fallbackRouteConfig,
+    })).min(1).required(),
+    taskPlanning: z.union([z.const('captain'), z.const('seed')]),
+    tasks: z.array(z.object({
+      id: z.string().required(),
+      subject: z.string().required(),
+      description: z.string(),
+      assignee: z.string(),
+      dependencies: z.array(z.string()),
+    })),
+  })).default({}),
   memberMaxDepth: z.natural().default(1),
   maxMembers: z.natural().min(1).default(8),
   promptSectionOrder: z.natural().default(117),
@@ -91,17 +132,18 @@ export const Config: z<Config> = z.object({
 })
 
 /** The model-facing usage policy: when and how to drive AgentTeams. */
-function usageSectionText(toolNames: string): string {
+function usageSectionText(toolNames: string, profilesText = ''): string {
   return `When the user asks to run something with AgentTeams (e.g. "use AgentTeams to do X"), or an activation message from the /agent-teams slash command arrives, you are the captain of a multi-agent team. Follow this protocol:
 1. Call agent_teams_create with a team name and the goal as description. You become the captain and may lead one team at a time.
 2. Call agent_teams_add_member once per role the goal needs (researcher, engineer, reviewer, ...). Members are durable subagents: they wait for your messages, then work a full turn. By default a member on your current provider/model snapshots your current reasoning effort; a member routed to a different provider or model automatically uses that target model's default effort. Never ask the user to choose these per member; only pass provider/model when the user explicitly requests a different route for that role, and reasoning_effort only when the user explicitly requests a particular effort ("default" explicitly selects the target model's default).
-3. Break the goal into tasks with agent_teams_create_task and wire dependencies. Assign role-specific work when useful; unassigned ready work belongs to the shared pool. The scheduler automatically claims one ready task for each truly idle member and wakes it, including across later rounds.
+3. After the team exists, analyze the goal and decide the smallest useful task graph yourself. Do not ask the user whether to split, merge, serialize, or parallelize. If one worker is enough, create one task. Otherwise create independent ready tasks for work that does not need another task's conclusion, data, or artifact — the scheduler assigns those in parallel to idle members. Add dependencies only for genuine prerequisites, plus a later synthesis, decision, or integration task when results must be combined. Assign role-specific work when useful; unassigned ready work belongs to the shared pool. The scheduler automatically claims one ready task for each truly idle member and wakes it, including across later rounds.
 4. Lead by delegation: monitor with agent_teams_status, send guidance with agent_teams_send_message, and let idle teammates execute ready work. Do not duplicate a teammate's work merely because its turn is slow. If the user requires every member to contribute or report, create one task per required contribution (or message each member directly); never wait for an unassigned member to produce work it was never given.
 5. If the user explicitly asks to pause a running member, its open attempt remains parked after interruption; after answering the user, send that same member guidance with agent_teams_send_message so it continues the same attempt. Do not interrupt members for an ordinary user question that did not request a pause. If work must change owner, restart from scratch, or be taken over, call agent_teams_reassign_task first. Reassign to another idle member, retry with the same member, or use assignee=captain before doing it yourself. Reassignment revokes the old attempt and waits for that member to quiesce, preventing late results from overwriting the new attempt.
 6. Tasks carry attempt_id capabilities. Members must use the current attempt_id for updates; stale-attempt errors mean ownership changed. Check status after progress notifications until every required task is terminal and every member is idle/ready; do not busy-poll or require reports from members with no assigned work.
-7. Present the team's results to the user, then agent_teams_delete the team unless the user wants to keep working with it.
+7. If the user names a configured profile / template / fixed roster, pass that name as profile= to agent_teams_create. After a successful profile create, do not recreate the same members. If the named profile does not exist, list the configured names and do not guess. Follow any snapshot protocol. If create returns seed tasks, those are only the starting graph — do not recreate them. If create returns task_planning=captain or an empty task list, you must create the task graph from the goal. Add repair or retry tasks when review/test fails, but never make a new task depend on a failed task. Do not send_message to start the next stage; the scheduler assigns ready work. Watch every required task until it is terminal before deleting the team. Never perform a real deployment without explicit user confirmation. Subagent final replies are not program-readable; use status outputs, member send_message, and your inbox.
+8. Present the team's results to the user, then agent_teams_delete the team unless the user wants to keep working with it.
 
-Tools: ${toolNames}`
+Tools: ${toolNames}${profilesText === '' ? '' : `\n\n${profilesText}`}`
 }
 
 export function apply(ctx: Context, config: Config): void {
@@ -109,8 +151,11 @@ export function apply(ctx: Context, config: Config): void {
     stateDir: config.stateDir ?? '.agent-teams',
     memberProvider: config.memberProvider ?? 'spawn',
     memberModel: config.memberModel,
+    executionPrompt: config.executionPrompt,
+    fallback: config.fallback,
     memberMaxDepth: config.memberMaxDepth ?? 1,
     maxMembers: config.maxMembers ?? 8,
+    profiles: config.profiles ?? {},
   }
 
   // Provider registration is a sibling plugin's effect (`subagent-spawn` /
@@ -134,7 +179,7 @@ export function apply(ctx: Context, config: Config): void {
   ctx.systemPrompt.section({
     name: 'agent-teams:usage',
     order: config.promptSectionOrder ?? 117,
-    text: usageSectionText(toolNames),
+    text: () => usageSectionText(toolNames, formatProfilesForPrompt(config.profiles ?? {})),
   })
 
   registerAgentTeamsTools(ctx, resolved)
@@ -151,9 +196,9 @@ export function apply(ctx: Context, config: Config): void {
   // never pends on it and simply never gains the slash command.
   if (config.slashCommand ?? true) {
     ctx.inject(['commands'], (commandCtx) => {
-      registerAgentTeamsCommand(commandCtx)
+      registerAgentTeamsCommand(commandCtx, () => config.profiles ?? {})
     })
-    installAgentTeamsGestureBoundary(ctx)
+    installAgentTeamsGestureBoundary(ctx, () => config.profiles ?? {})
   }
 
   // The activity panel data/artwork routes need the Web server and the
@@ -193,6 +238,74 @@ export function apply(ctx: Context, config: Config): void {
       res.end(body)
     },
   }), 'agent-teams: activity route')
+
+    ctx.effect(() => webServer.register({
+      kind: 'exact',
+      path: '/plugins/dsh-agent-teams/halt',
+      handler: async (req, res) => {
+        if (req.method !== 'POST') {
+          res.writeHead(405, { allow: 'POST', 'cache-control': 'no-store' })
+          res.end()
+          return
+        }
+        let raw = ''
+        try {
+          raw = await new Promise<string>((resolve, reject) => {
+            const chunks: Buffer[] = []
+            req.on('data', (chunk) => { chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)) })
+            req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')))
+            req.on('error', reject)
+          })
+        } catch {
+          res.writeHead(400, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
+          res.end(JSON.stringify({ error: 'invalid request body' }))
+          return
+        }
+        let payload: { sessionId?: unknown; teamId?: unknown }
+        try {
+          payload = raw.trim() === '' ? {} : JSON.parse(raw) as { sessionId?: unknown; teamId?: unknown }
+        } catch {
+          res.writeHead(400, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
+          res.end(JSON.stringify({ error: 'invalid JSON' }))
+          return
+        }
+        const sessionId = typeof payload.sessionId === 'string' ? payload.sessionId.trim() : ''
+        const teamId = typeof payload.teamId === 'string' ? payload.teamId.trim() : ''
+        if (sessionId === '' || teamId === '') {
+          res.writeHead(400, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
+          res.end(JSON.stringify({ error: 'sessionId and teamId are required' }))
+          return
+        }
+        const captain = ctx.agents.get(sessionId as import('@deepseek-ai/dsh-session').SessionId)
+        if (captain === undefined) {
+          res.writeHead(409, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
+          res.end(JSON.stringify({ error: 'captain session is not attached' }))
+          return
+        }
+        const workspace = captain.session.header.cwd ?? process.cwd()
+        const stateRoot = join(workspace, resolved.stateDir)
+        const team = await findTeamByCaptain(stateRoot, captain.id)
+        if (team === undefined || team.id !== teamId) {
+          res.writeHead(404, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
+          res.end(JSON.stringify({ error: 'team not found for this captain' }))
+          return
+        }
+        try {
+          const result = await haltTeamWork({
+            ctx,
+            stateRoot,
+            teamId,
+            captain,
+          })
+          res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
+          res.end(JSON.stringify(result))
+        } catch (error: unknown) {
+          ctx.logger.warn(`agent-teams: halt failed for ${teamId}: ${String(error)}`)
+          res.writeHead(500, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
+          res.end(JSON.stringify({ error: 'failed to stop the team' }))
+        }
+      },
+    }), 'agent-teams: halt route')
 
   // Whale mascot artwork: serve the packaged V2 role/action images to the
   // activity panel. An explicit allowlist guards the route (no path

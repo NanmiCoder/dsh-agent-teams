@@ -17,6 +17,7 @@ export interface AgentTeamsTeamCreatedData {
   readonly captainSessionId: string
   readonly name: string
   readonly description?: string
+  readonly profile?: string
 }
 
 /** Records one member after its continuable subagent is spawned. */
@@ -51,6 +52,12 @@ export interface AgentTeamsTaskUpdatedData {
   readonly output?: string
   readonly attempt?: number
   readonly attemptId?: string
+}
+
+/** Records a human halt from the captain chat. */
+export interface AgentTeamsTeamHaltedData {
+  readonly teamId: string
+  readonly cancelledTasks: number
 }
 
 /** Closes one team record: the team was deleted. */
@@ -103,6 +110,11 @@ declare module '@deepseek-ai/dsh-session/types' {
      */
     'agent-teams/message-sent': AgentTeamsMessageSentData
     /**
+     * Records a human halt from the captain chat.
+     * @param data - team identity and how many unfinished tasks were cancelled.
+     */
+    'agent-teams/team-halted': AgentTeamsTeamHaltedData
+    /**
      * Closes one team record after deletion.
      * @param data - stable team identity.
      */
@@ -118,4 +130,5 @@ export type AgentTeamsEventType =
   | 'agent-teams/task-created'
   | 'agent-teams/task-updated'
   | 'agent-teams/message-sent'
+  | 'agent-teams/team-halted'
   | 'agent-teams/team-deleted'

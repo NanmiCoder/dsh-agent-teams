@@ -450,6 +450,17 @@
   white-space: nowrap;
 }
 
+.memberModel,
+.taskDetailModel {
+  overflow: hidden;
+  color: var(--dsw-alias-label-tertiary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9.5px;
+  line-height: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .captainState,
 .memberState {
   display: inline-flex;
@@ -831,8 +842,10 @@
 .assignmentChip {
   display: inline-flex;
   align-items: center;
+  max-width: 100%;
   min-height: 16px;
   padding: 0 5px;
+  overflow: hidden;
   border-radius: 4px;
   background: var(--dsw-alias-bg-fill-neutral);
   color: var(--dsw-alias-label-secondary);
@@ -840,6 +853,8 @@
   font-size: 9px;
   font-weight: 600;
   line-height: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .assignmentChip[data-state='running'] {

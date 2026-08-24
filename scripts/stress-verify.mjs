@@ -158,6 +158,7 @@ function mountRuntime() {
     memberProvider: 'spawn',
     memberMaxDepth: 1,
     maxMembers: 8,
+    profiles: {},
   })
 
   return {

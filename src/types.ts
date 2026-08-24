@@ -22,6 +22,8 @@ export const TERMINAL_TASK_STATUSES: readonly TaskStatus[] = ['completed', 'fail
 
 /** One task of a team's task list. */
 export interface TeamTask {
+  /** Stable task id from the profile template; absent for ad-hoc tasks. */
+  profileSeedId?: string
   /** Stable task id within the team (`t1`, `t2`, …). */
   id: string
   /** Brief title for the task. */
@@ -64,6 +66,15 @@ export interface TeamMember {
   model?: string
   /** Resolved reasoning effort captured from the captain or target model default. */
   reasoningEffort?: string
+  /** Prompt specific to this member's execution turns. */
+  executionPrompt?: string
+  /** Configured second-choice route. */
+  fallback?: TeamModelFallback
+  /** Active route after fallback, without changing the primary descriptor route. */
+  activeProvider?: string
+  activeModel?: string
+  /** Whether the fallback route is currently active. */
+  fallbackActive?: boolean
   joinedAt: number
   status: MemberStatus
 }
@@ -85,6 +96,22 @@ export interface TeamMessage {
   readAt?: number
 }
 
+/** Snapshot of the named profile used to seed a team. */
+export interface TeamModelFallback {
+  provider: string
+  model: string
+}
+
+export interface TeamProfileSnapshot {
+  name: string
+  description?: string
+  protocol?: string
+  executionPrompt?: string
+  fallback?: TeamModelFallback
+  /** Frozen planning mode: captain plans the graph; seed keeps template tasks. */
+  taskPlanning?: 'captain' | 'seed'
+}
+
 /** The full durable team record. */
 export interface TeamState {
   /** Original team name. */
@@ -93,6 +120,8 @@ export interface TeamState {
   id: string
   /** Team purpose/goal. */
   description?: string
+  /** Immutable named profile snapshot, when created from a profile. */
+  profile?: TeamProfileSnapshot
   /** Session id of the captain agent that owns this team. */
   captainSessionId: string
   createdAt: number
@@ -101,4 +130,11 @@ export interface TeamState {
   tasks: TeamTask[]
   /** Monotonic task id counter. */
   taskSeq: number
+  /**
+   * Human halt from the captain chat. The team remains on disk, members stay
+   * available, and unfinished work is cancelled until the captain resumes.
+   */
+  halted?: boolean
+  /** Timestamp of the latest human halt, when present. */
+  haltedAt?: number
 }

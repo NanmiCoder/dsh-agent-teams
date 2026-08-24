@@ -27,6 +27,7 @@ import {
   createTeamDir,
   findTeamByCaptain,
   findTeamByParticipant,
+  cancelUnfinishedTask,
   invalidateTaskAttempt,
   readUnreadMailbox,
   recordRetiredMemberIds,
@@ -37,6 +38,7 @@ import {
   unsatisfiedDependencies,
   withTeamLock,
   writeTeam,
+  removeTeamDir,
 } from './state.ts'
 import {
   deliverToMember,
@@ -50,6 +52,7 @@ import {
 } from './members.ts'
 import { TERMINAL_TASK_STATUSES, type TeamMember, type TeamState, type TeamTask } from './types.ts'
 import { installTeamScheduler } from './scheduler.ts'
+import { resolveTeamProfile } from './profiles.ts'
 
 /** Resolved plugin config consumed by the tools. */
 export interface ToolsConfig {
@@ -59,10 +62,16 @@ export interface ToolsConfig {
   memberProvider: string
   /** Optional member model override. */
   memberModel?: string
+  /** Prompt injected into member personas and assignments. */
+  executionPrompt?: string
+  /** Plugin fallback route. */
+  fallback?: import('./profiles.ts').TeamModelFallbackConfig
   /** Member delegation depth cap. */
   memberMaxDepth?: number
   /** Team size cap (members). */
   maxMembers: number
+  /** Named team profiles from the active DSH profile. */
+  profiles: Record<string, import('./profiles.ts').TeamProfileConfig>
 }
 
 /** The caller agent, or a loud failure for non-agent callers. */
@@ -203,6 +212,66 @@ async function waitForMemberIdle(ctx: Context, member: TeamMember, signal: Abort
  * activity to `next-turn`. This prevents reports from waiting behind the
  * captain's entire orchestration turn.
  */
+export async function haltTeamWork(input: {
+  ctx: Context
+  stateRoot: string
+  teamId: string
+  captain: Agent
+  signal?: AbortSignal
+}): Promise<{ teamName: string; cancelledTasks: number; alreadyHalted: boolean }> {
+  const halted = await withTeamLock(teamLockKey(input.stateRoot, input.teamId), async () => {
+    const fresh = await requireFreshCaptainTeam(input.stateRoot, input.teamId, input.captain.id)
+    if (fresh.halted === true) {
+      return {
+        teamName: fresh.name,
+        cancelledTasks: fresh.tasks.filter((task) => task.status === 'cancelled').length,
+        alreadyHalted: true,
+        members: fresh.members.filter((member) => member.id !== '' && member.status !== 'removed').map((member) => ({ ...member })),
+      }
+    }
+    const now = Date.now()
+    let cancelledTasks = 0
+    for (const task of fresh.tasks) {
+      if (TERMINAL_TASK_STATUSES.includes(task.status)) continue
+      cancelUnfinishedTask(task, 'Stopped from the captain chat.')
+      cancelledTasks += 1
+    }
+    for (const member of fresh.members) {
+      if (member.status === 'removed') continue
+      member.status = 'idle'
+    }
+    fresh.halted = true
+    fresh.haltedAt = now
+    await writeTeam(input.stateRoot, fresh)
+    appendTeamEvent(input.ctx, captainSessionOf(input.ctx, fresh.captainSessionId, input.captain.session), 'agent-teams/team-halted', {
+      teamId: fresh.id,
+      cancelledTasks,
+    })
+    return {
+      teamName: fresh.name,
+      cancelledTasks,
+      alreadyHalted: false,
+      members: fresh.members.filter((member) => member.id !== '' && member.status !== 'removed').map((member) => ({ ...member })),
+    }
+  })
+  for (const member of halted.members) {
+    interruptMember(input.ctx, input.captain, member.id)
+  }
+  if (input.signal !== undefined) {
+    const quiescence = await Promise.allSettled(halted.members.map((member) => waitForMemberIdle(input.ctx, member, input.signal!)))
+    for (const result of quiescence) {
+      if (result.status === 'rejected') {
+        input.ctx.logger.warn(`agent-teams: member did not quiesce after halt: ${String(result.reason)}`)
+      }
+    }
+  }
+  return {
+    teamName: halted.teamName,
+    cancelledTasks: halted.cancelledTasks,
+    alreadyHalted: halted.alreadyHalted,
+  }
+}
+
 export function steerCaptainReport(captain: Pick<Agent, 'steer'>, from: string, content: string): boolean {
   try {
     captain.steer(createUserMessage({
@@ -224,14 +293,15 @@ export function steerCaptainReport(captain: Pick<Agent, 'steer'>, from: string, 
 export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void {
   installRetiredMemberGuard(ctx, config.stateDir)
   const memberSelections = installMemberSelectionRuntime(ctx, config.stateDir)
-  const scheduler = installTeamScheduler(ctx, { stateDir: config.stateDir })
+  const scheduler = installTeamScheduler(ctx, { stateDir: config.stateDir, executionPrompt: config.executionPrompt })
 
   ctx.tools.register(defineTool({
     name: 'agent_teams_create',
-    description: 'Create a new AgentTeams team: you (the calling agent) become the captain. A captain leads one team at a time; create tasks and members afterwards with agent_teams_add_member and agent_teams_create_task.',
+    description: 'Create a team. Optional profile expands the configured roster in one in-process transactional create. Seed-planning profiles also expand their template tasks; captain-planning profiles create members only, so you must then derive the task graph from the goal. If profile is omitted, create an empty team and add members/tasks afterwards. If profile is set, do not recreate the same members. A successful create means the team now exists on disk; do not retry create for the same captain.',
     parameters: {
       name: { type: 'string', required: true, description: 'Name for the new team (used as its stable id).' },
       description: { type: 'string', description: 'Team purpose / the goal the team will work on.' },
+      profile: { type: 'string', description: 'Optional configured profile name.' },
     },
     output: {
       schema: {
@@ -241,11 +311,15 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
           team_id: { type: 'string', required: true },
           team_name: { type: 'string', required: true },
           state_dir: { type: 'string', required: true },
+          profile: { type: 'string' },
+          task_planning: { type: 'string' },
+          members: { type: 'array', items: { type: 'object', additionalProperties: false, properties: { member_name: { type: 'string', required: true }, member_id: { type: 'string', required: true }, provider: { type: 'string', required: true }, model: { type: 'string', required: true }, reasoning_effort: { type: 'string' }, status: { type: 'string', required: true } } } },
+          tasks: { type: 'array', items: { type: 'object', additionalProperties: false, properties: { task_id: { type: 'string', required: true }, seed_id: { type: 'string', required: true }, subject: { type: 'string', required: true }, status: { type: 'string', required: true }, assignee: { type: 'string' }, dependencies: { type: 'array', items: { type: 'string' }, required: true } } } },
         },
       },
       render: (args, value) => [{
         type: 'text',
-        text: `Team "${value.team_name}" created (id ${value.team_id}) under ${value.state_dir}. You are the captain.`,
+        text: `Team "${value.team_name}" created (id ${value.team_id}) under ${value.state_dir}. You are the captain${value.task_planning === 'captain' ? '. This profile uses captain planning: create the task graph from the goal now.' : ''}.`,
       }],
     },
     async execute(args, exec) {
@@ -255,7 +329,11 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
       const teamName = args.name.trim()
       if (teamName === '') throw new Error('team name must not be empty')
       const teamId = sanitizeKey(teamName)
-      return withTeamLock(captainLockKey(stateRoot, captain.id), async () => {
+      const profileName = args.profile?.trim()
+      if (args.profile !== undefined && profileName === '') {
+        throw new Error('AgentTeams profile name must not be empty')
+      }
+      const created = await withTeamLock(captainLockKey(stateRoot, captain.id), async () => {
         const current = await findTeamByParticipant(stateRoot, captain.id)
         if (current !== undefined) {
           const relationship = current.captainSessionId === captain.id ? 'lead' : 'belong to'
@@ -266,26 +344,101 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
           if (existing !== undefined) {
             throw new Error(`team id "${teamId}" is taken by another captain — pick a different team name`)
           }
-          const state: TeamState = {
-            name: teamName,
-            id: teamId,
-            description: args.description,
-            captainSessionId: captain.id,
-            createdAt: Date.now(),
-            members: [],
-            tasks: [],
-            taskSeq: 0,
+          if (profileName === undefined) {
+            const state: TeamState = {
+              name: teamName,
+              id: teamId,
+              description: args.description,
+              captainSessionId: captain.id,
+              createdAt: Date.now(),
+              members: [],
+              tasks: [],
+              taskSeq: 0,
+            }
+            await createTeamDir(stateRoot, state)
+            return { committed: true as const, state }
           }
-          await createTeamDir(stateRoot, state)
-          appendTeamEvent(ctx, captain.session, 'agent-teams/team-created', {
-            teamId: state.id,
-            captainSessionId: captain.id,
-            name: state.name,
-            ...state.description !== undefined ? { description: state.description } : {},
+          return initializeProfileTeam({
+            ctx,
+            config,
+            memberSelections,
+            captain,
+            exec,
+            stateRoot,
+            teamName,
+            teamId,
+            profileName,
+            description: args.description,
           })
-          return { team_id: state.id, team_name: state.name, state_dir: join(stateRoot, state.id) }
         })
       })
+      if (created.committed) {
+        try {
+          await scheduler.kickTeam(workspace, created.state.id, captain)
+        } catch (error: unknown) {
+          ctx.logger.warn(`agent-teams: post-create kick failed for "${created.state.id}": ${String(error)}`)
+        }
+        try {
+          appendTeamEvent(ctx, captain.session, 'agent-teams/team-created', {
+            teamId: created.state.id,
+            captainSessionId: captain.id,
+            name: created.state.name,
+            ...created.state.description !== undefined ? { description: created.state.description } : {},
+            ...created.state.profile?.name === undefined ? {} : { profile: created.state.profile.name },
+          })
+          for (const member of created.state.members) {
+            appendTeamEvent(ctx, captain.session, 'agent-teams/member-added', {
+              teamId: created.state.id,
+              memberId: member.id,
+              name: member.name,
+              ...member.role === undefined ? {} : { role: member.role },
+            })
+          }
+          for (const task of created.state.tasks) {
+            appendTeamEvent(ctx, captain.session, 'agent-teams/task-created', {
+              teamId: created.state.id,
+              taskId: task.id,
+              subject: task.subject,
+              dependencies: task.dependencies,
+              ...task.assignee === undefined ? {} : { assignee: task.assignee },
+            })
+          }
+        } catch (error: unknown) {
+          ctx.logger.warn(`agent-teams: post-create events failed for "${created.state.id}": ${String(error)}`)
+        }
+      }
+      const persisted = await readTeam(stateRoot, created.state.id).catch(() => undefined)
+      const snapshot = persisted ?? created.state
+      if (snapshot.profile === undefined) {
+        return {
+          team_id: snapshot.id,
+          team_name: snapshot.name,
+          state_dir: join(stateRoot, snapshot.id),
+        }
+      }
+      return {
+        team_id: snapshot.id,
+        team_name: snapshot.name,
+        state_dir: join(stateRoot, snapshot.id),
+        profile: snapshot.profile.name,
+        task_planning: snapshot.profile.taskPlanning ?? 'seed',
+        members: snapshot.members.map((member) => ({
+          member_name: member.name,
+          member_id: member.id,
+          provider: member.provider ?? '',
+          model: member.model ?? '',
+          ...member.reasoningEffort === undefined ? {} : { reasoning_effort: member.reasoningEffort },
+          status: member.status,
+        })),
+        tasks: snapshot.tasks.map((task) => ({
+          task_id: task.id,
+          seed_id: task.profileSeedId ?? '',
+          subject: task.subject,
+          status: task.status,
+          ...task.assignee === undefined ? {} : { assignee: task.assignee },
+          dependencies: task.dependencies,
+        })),
+      }
     },
   }))
 
@@ -341,6 +494,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
           model: args.model,
           defaultModel: config.memberModel,
           reasoningEffort: args.reasoning_effort,
+          fallback: config.fallback,
         }, exec.signal)
         const member: TeamMember = {
           id: '',
@@ -492,6 +646,10 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
       const team = await requireCaptainTeam(workspace, config, captain)
       const created = await withTeamLock(teamLockKey(stateRoot, team.id), async () => {
         const fresh = await requireFreshCaptainTeam(stateRoot, team.id, captain.id)
+        if (fresh.halted === true) {
+          fresh.halted = false
+          fresh.haltedAt = undefined
+        }
         const dependencies = args.dependencies ?? []
         for (const dependency of dependencies) {
           if (!fresh.tasks.some((task) => task.id === dependency)) {
@@ -977,6 +1135,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
         attempt: task.attempt ?? 0,
         attempt_id: task.attemptId ?? '',
         reassigning: task.reassigning === true,
+        ...task.profileSeedId === undefined ? {} : { seed_id: task.profileSeedId },
         ...task.output !== undefined ? { output: task.output } : {},
       }))
       const mailboxWarnings: string[] = []
@@ -1012,6 +1171,15 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
         team_id: team.id,
         team_name: team.name,
         description: team.description ?? '',
+        ...team.profile === undefined ? {} : {
+          profile: {
+            name: team.profile.name,
+            ...team.profile.protocol === undefined
+              ? {}
+              : { protocol: team.profile.protocol.slice(0, 240) },
+            ...team.profile.taskPlanning === undefined ? {} : { task_planning: team.profile.taskPlanning },
+          },
+        },
         viewer: identity.name,
         members,
         tasks,
@@ -1099,11 +1267,129 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
   }))
 }
 
+async function initializeProfileTeam(input: {
+  ctx: Context
+  config: ToolsConfig
+  memberSelections: ReturnType<typeof installMemberSelectionRuntime>
+  captain: Agent
+  exec: ToolRunContext
+  stateRoot: string
+  teamName: string
+  teamId: string
+  profileName: string
+  description?: string
+}): Promise<{ committed: true; state: TeamState }> {
+  const profile = resolveTeamProfile(input.config.profiles, input.profileName, input.config.maxMembers)
+  const selections: Awaited<ReturnType<typeof resolveMemberLlmSelection>>[] = []
+  for (const template of profile.members) {
+    selections.push(await resolveMemberLlmSelection(input.ctx, input.captain, {
+      provider: template.provider,
+      model: template.model,
+      defaultModel: input.config.memberModel,
+      reasoningEffort: template.reasoningEffort,
+      fallback: template.fallback ?? profile.fallback ?? input.config.fallback,
+    }, input.exec.signal))
+  }
+  const now = Date.now()
+  const seedToActual = new Map(profile.tasks.map((template, index) => [template.id, `t${index + 1}`] as const))
+  const draft: TeamState = {
+    name: input.teamName,
+    id: input.teamId,
+    description: input.description,
+    profile: {
+      name: profile.name,
+      ...profile.description === undefined ? {} : { description: profile.description },
+      ...profile.protocol === undefined ? {} : { protocol: profile.protocol },
+      ...profile.executionPrompt === undefined ? {} : { executionPrompt: profile.executionPrompt },
+      ...profile.fallback === undefined ? {} : { fallback: profile.fallback },
+      taskPlanning: profile.taskPlanning,
+    },
+    captainSessionId: input.captain.id,
+    createdAt: now,
+    members: profile.members.map((template, index) => {
+      const selection = selections[index]!
+      return {
+        id: '',
+        name: template.name,
+        role: template.role,
+        provider: selection.provider,
+        model: selection.model,
+        reasoningEffort: selection.reasoningEffort,
+        executionPrompt: template.executionPrompt ?? profile.executionPrompt ?? input.config.executionPrompt,
+        ...selection.fallback === undefined ? {} : { fallback: selection.fallback },
+        joinedAt: now,
+        status: 'idle' as const,
+      }
+    }),
+    tasks: profile.tasks.map((template, index) => ({
+      id: `t${index + 1}`,
+      profileSeedId: template.id,
+      subject: template.subject,
+      description: template.description,
+      status: 'pending' as const,
+      assignee: template.assignee,
+      dependencies: template.dependencies.map((dependency) => seedToActual.get(dependency) ?? dependency),
+      attempt: 0,
+      createdAt: now,
+      updatedAt: now,
+    })),
+    taskSeq: profile.tasks.length,
+  }
+  const spawned: TeamMember[] = []
+  try {
+    for (const member of draft.members) {
+      const selection = selections[spawned.length]!
+      await spawnMember(
+        input.ctx,
+        memberRuntime(input.config),
+        input.memberSelections,
+        selection,
+        input.captain,
+        draft,
+        member,
+        input.config.stateDir,
+        input.exec.signal,
+      )
+      spawned.push(member)
+    }
+    if (draft.members.some((member) => member.id === '')) {
+      throw new Error(`failed to initialize profile "${profile.name}": a spawned member is missing its child id`)
+    }
+    await createTeamDir(input.stateRoot, draft)
+    return { committed: true, state: draft }
+  } catch (error: unknown) {
+    const cleanupErrors: unknown[] = []
+    try {
+      await removeTeamDir(input.stateRoot, draft.id)
+    } catch (cleanupError: unknown) {
+      cleanupErrors.push(cleanupError)
+    }
+    try {
+      await recordRetiredMemberIds(input.stateRoot, spawned.map((member) => member.id))
+    } catch (cleanupError: unknown) {
+      cleanupErrors.push(cleanupError)
+    }
+    for (const member of spawned) {
+      try {
+        interruptMember(input.ctx, input.captain, member.id)
+      } catch (cleanupError: unknown) {
+        cleanupErrors.push(cleanupError)
+      }
+    }
+    if (cleanupErrors.length > 0) {
+      throw new AggregateError([error, ...cleanupErrors], `failed to initialize profile "${profile.name}"`)
+    }
+    throw error
+  }
+}
+
 /** Build the `memberRuntime` config handed to member helpers. */
 function memberRuntime(config: ToolsConfig): MemberRuntimeConfig {
   return {
     provider: config.memberProvider,
     maxDepth: config.memberMaxDepth,
+    executionPrompt: config.executionPrompt,
+    fallback: config.fallback,
   }
 }
 
@@ -1112,6 +1398,7 @@ function renderStatus(value: JsonValue): string {
   const team = value as {
     team_name: string
     description?: string
+    profile?: { name: string; protocol?: string; task_planning?: string }
     viewer: string
     members: {
       name: string
@@ -1122,7 +1409,7 @@ function renderStatus(value: JsonValue): string {
       status: string
       activity: string
     }[]
-    tasks: { id: string; subject: string; status: string; assignee: string; dependencies: string[]; attempt: number; attempt_id: string; reassigning: boolean; output?: string }[]
+    tasks: { id: string; subject: string; status: string; assignee: string; dependencies: string[]; attempt: number; attempt_id: string; reassigning: boolean; seed_id?: string; output?: string }[]
     captain_inbox: { from: string; content: string }[]
     member_inboxes: Record<string, { count: number; latest: string }>
     mailbox_warnings: string[]
@@ -1130,6 +1417,7 @@ function renderStatus(value: JsonValue): string {
   }
   const lines: string[] = [
     `Team "${team.team_name}"${team.description ? ` — ${team.description}` : ''}`,
+    ...team.profile === undefined ? [] : [`Profile: ${team.profile.name}${team.profile.task_planning ? ` [${team.profile.task_planning}]` : ''}${team.profile.protocol ? ` — ${team.profile.protocol}` : ''}`],
     `Viewing as: ${team.viewer}`,
     `Members (${team.members.length}):`,
     ...team.members.map((member) => {
@@ -1142,7 +1430,8 @@ function renderStatus(value: JsonValue): string {
       const deps = task.dependencies.length > 0 ? ` (deps: ${task.dependencies.join(',')})` : ''
       const output = task.output !== undefined ? `\n      output: ${task.output.slice(0, 300)}` : ''
       const handoff = task.reassigning ? ' (reassigning)' : ''
-      return `  - ${task.id} [${task.status}] attempt ${task.attempt}${handoff} ${task.subject} → ${task.assignee || 'unassigned'}${deps}${output}`
+      const seed = task.seed_id === undefined || task.seed_id === '' ? '' : ` seed ${task.seed_id}`
+      return `  - ${task.id} [${task.status}] attempt ${task.attempt}${handoff}${seed} ${task.subject} → ${task.assignee || 'unassigned'}${deps}${output}`
     }),
     `Captain inbox (${team.captain_inbox.length}):`,
     ...team.captain_inbox.map((message) => `  - [${message.from}] ${message.content.slice(0, 200)}`),

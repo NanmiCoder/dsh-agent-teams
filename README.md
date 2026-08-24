@@ -35,7 +35,7 @@ Read the [latest release notes](https://github.com/NanmiCoder/dsh-agent-teams/re
 | **Dependency-aware tasks** | Tasks move through explicit states and cannot be claimed before their dependencies finish. |
 | **Automatic reuse and safe takeover** | Idle members claim the next ready task; reassignment revokes stale attempts before new work starts, and cold recovery retries stranded open attempts. |
 | **Direct messaging** | Members send durable mailbox messages directly to teammates or the captain—no relay required. |
-| **Live activity panel** | The Web UI combines segmented progress, a collapsible roster, and an interactive task DAG; completed archives retain their full member and task history. |
+| **Live activity panel** | The Web UI combines segmented progress, a collapsible roster, and an interactive task DAG; running tasks show the member's model, and completed archives retain their full member and task history. |
 
 The conversation card and activity panel use Harness's official locale service. They follow live language changes between English and Simplified Chinese—including status labels, dynamic summaries, controls, archive markers, and accessibility text—without a page reload or a separate plugin setting.
 
@@ -159,6 +159,34 @@ pnpm install
 pnpm build
 pnpm verify
 ```
+
+## Named multi-role profiles
+
+Configure one or more complete team profiles in `cordis.patch.yml`. A profile always supplies the roster (independent provider/model/role/reasoning effort). Set `taskPlanning: captain` when the Captain should derive the task graph from the user's goal; omit it or set `taskPlanning: seed` to keep a fixed template workflow:
+
+```yaml
+profiles:
+  demo-delivery:
+    description: Ship a small feature
+    protocol: Discuss requirements, review, test, then prepare release; do not deploy automatically.
+    members:
+      - name: analyst
+        model: gpt-5.6-sol
+        role: Analyze requirements
+      - name: implementer
+        model: gpt-5.6-terra
+        role: Implement the approved solution
+    tasks:
+      - id: requirements
+        subject: Requirements discussion
+        assignee: analyst
+      - id: implementation
+        subject: Implement solution
+        assignee: implementer
+        dependencies: [requirements]
+```
+
+Use an explicit profile flag: `/agent-teams --profile demo-delivery implement the feature`. The first ordinary token is never treated as an implicit profile. `agent_teams_create({ profile })` expands the configured roster transactionally. Seed-planning profiles also expand their template tasks; captain-planning profiles create members only, and the Captain must then build the DAG from the goal. Do not ask the user how to split, merge, serialize, or parallelize. Failed review/test tasks do not unlock downstream work; the captain should add repair tasks and new review tasks without depending on the failed task. `memberProvider` remains the spawn/fork backend, not an LLM provider. Profiles prepare releases only; real deployment requires explicit user confirmation.
 
 ## License
 

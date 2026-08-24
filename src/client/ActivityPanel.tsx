@@ -30,10 +30,13 @@ import type { ObservableSnapshot, SessionListState } from '@deepseek-ai/dsh-clie
 import {
   activityPanelExpandedForSession,
   compactDagLayout,
+  compactModelLabel,
   COMPACT_DAG_NODE_HEIGHT,
   COMPACT_DAG_NODE_WIDTH,
   dependencyFocusTaskId,
+  memberRouteLabel,
   relatedTaskIds,
+  taskModelLabel,
   usesParallelTaskGrid,
 } from './activity-model.ts'
 import {
@@ -212,7 +215,12 @@ function memberStatusText(
   const owned = tasks.filter((task) => task.assignee === member.name)
   const current = owned.find((task) => task.id === member.currentTask)
   const blocked = owned.find((task) => task.state === 'blocked')
-  if (member.activity === 'working' && current !== undefined) return t('member.status.executing', { taskId: current.id })
+  if (member.activity === 'working' && current !== undefined) {
+    const model = taskModelLabel(current, [member])
+    return model === ''
+      ? t('member.status.executing', { taskId: current.id })
+      : t('member.status.executingModel', { taskId: current.id, model })
+  }
   if (member.activity === 'working') return t('member.status.working')
   if (blocked !== undefined) {
     const dependency = tasks.find((task) => blocked.dependencies.includes(task.id) && task.state !== 'completed')
@@ -280,8 +288,9 @@ function ProgressOverview({ team, t }: { readonly team: ActivityTeam; readonly t
   )
 }
 
-function DependencyMap({ tasks, t }: {
+function DependencyMap({ tasks, members, t }: {
   readonly tasks: readonly ActivityTask[]
+  readonly members: readonly ActivityMember[]
   readonly t: AgentTeamsTranslate
 }) {
   const [open, setOpen] = useState(true)
@@ -325,6 +334,7 @@ function DependencyMap({ tasks, t }: {
     ?? tasks.find((task) => task.state === 'running')
     ?? tasks[0]!
   const detailTask = tasks.find((task) => task.id === focusedTaskId) ?? fallbackTask
+  const detailModel = taskModelLabel(detailTask, members)
   const waitingOn = detailTask.dependencies.filter((dependency) => (
     tasks.find((task) => task.id === dependency)?.status !== 'completed'
   ))
@@ -353,35 +363,42 @@ function DependencyMap({ tasks, t }: {
                   return <path key={`${edge.from}:${edge.to}`} d={edge.path} data-active={active} data-dimmed={related !== null && !active} />
                 })}
               </svg>}
-              {layout.nodes.map(({ task, x, y }) => (
-                <button
-                  key={task.id}
-                  type="button"
-                  className={css.dagNode}
-                  style={parallel
-                    ? { height: COMPACT_DAG_NODE_HEIGHT }
-                    : { left: x, top: y, width: COMPACT_DAG_NODE_WIDTH, height: COMPACT_DAG_NODE_HEIGHT }}
-                  data-task-id={task.id}
-                  data-state={taskTone(task.state, task.status)}
-                  data-focused={related?.has(task.id) ?? false}
-                  data-dimmed={related !== null && !related.has(task.id)}
-                  aria-pressed={pinnedTaskId === task.id}
-                  title={`${task.id} · ${task.subject}`}
-                  onClick={() => { setPinnedTaskId((current) => current === task.id ? null : task.id) }}
-                  onMouseEnter={() => { scheduleHover(task.id) }}
-                  onMouseLeave={() => { scheduleHover(null) }}
-                  onFocus={() => { setKeyboardTaskId(task.id) }}
-                  onBlur={() => { setKeyboardTaskId(null) }}
-                >
-                  <span className={css.dagNodeHead}><span className={css.dagNodeDot} />{task.id}</span>
-                  <span className={css.dagNodeLabel}>{compactTaskLabel(task.subject)}</span>
-                  {task.state === 'running' && (
-                    <span className={css.dagRunningState} aria-label={t('task.runningAria')}>
-                      <WorkGlyph active />
+              {layout.nodes.map(({ task, x, y }) => {
+                const model = taskModelLabel(task, members)
+                const shortModel = compactModelLabel(model)
+                return (
+                  <button
+                    key={task.id}
+                    type="button"
+                    className={css.dagNode}
+                    style={parallel
+                      ? { height: COMPACT_DAG_NODE_HEIGHT }
+                      : { left: x, top: y, width: COMPACT_DAG_NODE_WIDTH, height: COMPACT_DAG_NODE_HEIGHT }}
+                    data-task-id={task.id}
+                    data-state={taskTone(task.state, task.status)}
+                    data-task-model={model || undefined}
+                    data-focused={related?.has(task.id) ?? false}
+                    data-dimmed={related !== null && !related.has(task.id)}
+                    aria-pressed={pinnedTaskId === task.id}
+                    title={model === '' ? `${task.id} · ${task.subject}` : `${task.id} · ${task.subject} · ${model}`}
+                    onClick={() => { setPinnedTaskId((current) => current === task.id ? null : task.id) }}
+                    onMouseEnter={() => { scheduleHover(task.id) }}
+                    onMouseLeave={() => { scheduleHover(null) }}
+                    onFocus={() => { setKeyboardTaskId(task.id) }}
+                    onBlur={() => { setKeyboardTaskId(null) }}
+                  >
+                    <span className={css.dagNodeHead}><span className={css.dagNodeDot} />{task.id}</span>
+                    <span className={css.dagNodeLabel}>
+                      {task.state === 'running' && shortModel !== '' ? shortModel : compactTaskLabel(task.subject)}
                     </span>
-                  )}
-                </button>
-              ))}
+                    {task.state === 'running' && (
+                      <span className={css.dagRunningState} aria-label={t('task.runningAria')}>
+                        <WorkGlyph active />
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
             </div>
           </div>
           <section className={css.taskDetail} data-task-detail={detailTask.id}>
@@ -399,6 +416,11 @@ function DependencyMap({ tasks, t }: {
                   ? t('task.detail.ready')
                   : t('task.detail.waitingOn', { tasks: formatTaskIds(waitingOn, t) })}
             </span>
+            {detailModel !== '' && (
+              <span className={css.taskDetailModel} data-task-model={detailModel}>
+                {t('task.model', { model: detailModel })}
+              </span>
+            )}
             <span className={css.taskDetailMeta}>{dependents.length === 0
               ? t('task.detail.noDownstream')
               : t('task.detail.unlocks', { tasks: formatTaskIds(dependents.map((task) => task.id), t) })}</span>
@@ -467,6 +489,7 @@ function TeamSection({ team, onNavigate, t, historic = false }: {
           {team.members.length === 0 && <span className={css.emptyHint}>{t('members.empty')}</span>}
           {team.members.map((member) => {
             const owned = team.tasks.filter((task) => task.assignee === member.name)
+            const memberModel = memberRouteLabel(member)
             return (
               <div key={member.id} className={css.memberBlock} data-activity={member.activity}>
                 <span className={css.memberBranch} aria-hidden><span /></span>
@@ -498,6 +521,11 @@ function TeamSection({ team, onNavigate, t, historic = false }: {
                       </span>
                     </span>
                     <span className={css.memberStatusLine}>{memberStatusText(member, team.tasks, t)}</span>
+                    {memberModel !== '' && (
+                      <span className={css.memberModel} data-member-model={memberModel}>
+                        {t('member.model', { model: memberModel })}
+                      </span>
+                    )}
                   </span>
                   <span className={css.memberCount}>{member.done}/{member.total}</span>
                 </button>
@@ -506,11 +534,21 @@ function TeamSection({ team, onNavigate, t, historic = false }: {
                   <span className={css.assignmentTasks}>
                     {owned.length === 0
                       ? <span className={css.taskEmpty}>{t('assignment.empty')}</span>
-                      : owned.map((task) => (
-                        <span key={task.id} className={css.assignmentChip} data-state={taskTone(task.state, task.status)} title={task.subject}>
-                          {task.id}
-                        </span>
-                      ))}
+                      : owned.map((task) => {
+                          const model = taskModelLabel(task, team.members)
+                          const shortModel = compactModelLabel(model)
+                          return (
+                            <span
+                              key={task.id}
+                              className={css.assignmentChip}
+                              data-state={taskTone(task.state, task.status)}
+                              data-task-model={model || undefined}
+                              title={model === '' ? task.subject : `${task.subject} · ${model}`}
+                            >
+                              {task.state === 'running' && shortModel !== '' ? `${task.id} · ${shortModel}` : task.id}
+                            </span>
+                          )
+                        })}
                   </span>
                 </div>
               </div>
@@ -519,7 +557,7 @@ function TeamSection({ team, onNavigate, t, historic = false }: {
         </div>}
       </section>
 
-      <DependencyMap tasks={team.tasks} t={t} />
+      <DependencyMap tasks={team.tasks} members={team.members} t={t} />
     </section>
   )
 }

@@ -11,8 +11,8 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { registerAgentTeamsTools } from '../lib/tools.js'
-import { buildActivationDirective, invokedAgentTeamsGoal, registerAgentTeamsCommand } from '../lib/command.js'
+import { haltTeamWork, registerAgentTeamsTools } from '../lib/tools.js'
+import { buildActivationDirective, invokedAgentTeamsGoal, invokedAgentTeamsInvocation, installAgentTeamsGestureBoundary, profileCommandName, registerAgentTeamsCommand } from '../lib/command.js'
 import { readArchivedTeam, readTeam, readUnreadMailbox } from '../lib/state.js'
 import { collectArchivedTeamsActivity } from '../lib/snapshot.js'
 
@@ -140,7 +140,10 @@ const ctx = {
     },
     interrupt(childId) {
       const child = liveAgents.get(childId)
-      if (child) publishStatus(child, 'idle')
+      if (child) {
+        child.interruptCount = (child.interruptCount ?? 0) + 1
+        publishStatus(child, 'idle')
+      }
     },
   },
   logger: { debug() {}, warn() {} },
@@ -151,6 +154,33 @@ registerAgentTeamsTools(ctx, {
   memberProvider: 'spawn',
   memberMaxDepth: 1,
   maxMembers: 8,
+  profiles: {
+    'demo-delivery': {
+      description: 'tiny delivery team',
+      protocol: 'Discuss, then implement. Do not invent unanswered questions.',
+      members: [
+        { name: 'analyst', role: 'requirements', model: 'fake-analyst' },
+        { name: 'implementer', role: 'builder', model: 'fake-implementer' },
+      ],
+      tasks: [
+        { id: 'requirements', subject: 'Requirements', assignee: 'analyst', description: 'Write the first cut.' },
+        { id: 'implement', subject: 'Implement', assignee: 'implementer', dependencies: ['requirements'], description: 'Build from the approved requirements.' },
+      ],
+    },
+    'dynamic-delivery': {
+      description: 'roster only',
+      protocol: 'Plan from the goal. Do not invent unanswered questions.',
+      taskPlanning: 'captain',
+      members: [
+        { name: 'researcher', role: 'research', model: 'fake-researcher' },
+        { name: 'critic', role: 'challenge', model: 'fake-critic' },
+      ],
+      tasks: [
+        { id: 'research', subject: 'Research', assignee: 'researcher' },
+        { id: 'challenge', subject: 'Challenge', assignee: 'critic', dependencies: ['research'] },
+      ],
+    },
+  },
 })
 
 function execFor(subject) {
@@ -177,13 +207,34 @@ ctx.commands = {
     commandDefinitions.set(definition.name, definition)
   },
 }
-registerAgentTeamsCommand(ctx)
+const liveProfiles = {
+  'demo-delivery': {
+    description: 'tiny delivery team',
+    protocol: 'Discuss, then implement. Do not invent unanswered questions.',
+    members: [
+      { name: 'analyst', role: 'requirements', model: 'fake-analyst' },
+      { name: 'implementer', role: 'builder', model: 'fake-implementer' },
+    ],
+    tasks: [
+      { id: 'requirements', subject: 'Requirements', assignee: 'analyst' },
+      { id: 'implement', subject: 'Implement', assignee: 'implementer', dependencies: ['requirements'] },
+    ],
+  },
+}
+registerAgentTeamsCommand(ctx, () => liveProfiles)
+installAgentTeamsGestureBoundary(ctx, () => liveProfiles)
 
 const command = commandDefinitions.get('agent-teams')
+const profileCommand = commandDefinitions.get('agent-teams-demo-delivery')
 check('slash command registers as /agent-teams',
   command !== undefined && typeof command.description === 'string' && command.description.length > 0)
 check('slash command advertises an input hint for the menu placeholder',
   typeof command?.input?.hint === 'string' && command.input.hint.length > 0)
+check('configured profile registers a concise dedicated slash command',
+  profileCommand !== undefined && profileCommandName('demo-delivery') === 'agent-teams-demo-delivery'
+    && typeof profileCommand.description === 'string' && profileCommand.description.includes('demo-delivery'))
+check('unsafe profile names do not generate ambiguous commands',
+  profileCommandName('delivery team') === undefined && profileCommandName('delivery_team') === undefined)
 
 const bare = command.handler({
   agent: captain, rawInput: '   ', signal: new AbortController().signal, commandId: 'cmd-bare',
@@ -206,10 +257,25 @@ check('slash command preserves the exact submitted line as user-authored chat',
 check('preserved slash command still activates through the gesture boundary',
   invokedAgentTeamsGoal([submittedCommand]) === goal)
 check('activation directive names the protocol', buildActivationDirective(goal).includes('AgentTeams protocol'))
+const profileGoal = 'ship the prepared release'
+const profileActivated = profileCommand.handler({
+  agent: captain, rawInput: ` ${profileGoal}`, signal: new AbortController().signal, commandId: 'cmd-profile-alias',
+})
+check('profile command queues a visible profile-specific user turn',
+  profileActivated.kind === 'success' && captain.followups.length === 2
+    && captain.followups[1]?.content.some(block => block.type === 'text' && block.text === `/agent-teams-demo-delivery ${profileGoal}`))
 
 const userMessage = text => ({ id: 'm', role: 'user', content: [{ type: 'text', text }], source: { kind: 'user' } })
 check('gesture recognizes a leading /agent-teams token',
   invokedAgentTeamsGoal([userMessage('/agent-teams ship a CLI')]) === 'ship a CLI')
+check('profile command gesture selects its configured profile and goal',
+  invokedAgentTeamsInvocation([userMessage('/agent-teams-demo-delivery ship a CLI')], () => liveProfiles)?.profile === 'demo-delivery'
+    && invokedAgentTeamsInvocation([userMessage('/agent-teams-demo-delivery ship a CLI')], () => liveProfiles)?.goal === 'ship a CLI')
+check('bare profile command gesture asks for the goal',
+  invokedAgentTeamsInvocation([userMessage('/agent-teams-demo-delivery')], () => liveProfiles)?.profile === 'demo-delivery'
+    && invokedAgentTeamsInvocation([userMessage('/agent-teams-demo-delivery')], () => liveProfiles)?.goal === '')
+check('unknown profile command stays ordinary prose',
+  invokedAgentTeamsInvocation([userMessage('/agent-teams-missing ship a CLI')], () => liveProfiles) === undefined)
 check('bare gesture yields an empty goal', invokedAgentTeamsGoal([userMessage('  /agent-teams')]) === '')
 check('mid-sentence mention stays ordinary prose',
   invokedAgentTeamsGoal([userMessage('how do I use /agent-teams here?')]) === undefined)
@@ -217,8 +283,169 @@ check('non-user sources cannot forge the gesture',
   invokedAgentTeamsGoal([{ ...userMessage('/agent-teams x'), source: { kind: 'plugin', plugin: 'fake' } }]) === undefined)
 check('latest user gesture wins in a batch',
   invokedAgentTeamsGoal([userMessage('/agent-teams first'), userMessage('/agent-teams second')]) === 'second')
+const profileOnly = command.handler({
+  agent: captain, rawInput: '--profile demo-delivery', signal: new AbortController().signal, commandId: 'cmd-profile-only',
+})
+check('slash --profile without a goal still activates',
+  profileOnly.kind === 'success' && captain.followups.length === 3)
+check('profile-only activation asks for the goal',
+  buildActivationDirective('', 'demo-delivery').includes('The goal was not given')
+    && buildActivationDirective('', 'demo-delivery').includes('Use configured AgentTeams profile "demo-delivery"'))
+check('captain-planning activation tells the captain to derive the graph',
+  buildActivationDirective('ship it', 'dynamic-delivery', 'captain').includes('create the task graph yourself')
+    && buildActivationDirective('ship it', 'dynamic-delivery', 'captain').includes('run in parallel')
+    && !buildActivationDirective('ship it', 'dynamic-delivery', 'captain').includes('seed tasks'))
+const unknownProfile = command.handler({
+  agent: captain, rawInput: '--profile missing 做X', signal: new AbortController().signal, commandId: 'cmd-unknown',
+})
+check('unknown slash profile reports error and does not followup',
+  unknownProfile.kind === 'error' && captain.followups.length === 3)
+check('leading ordinary token is never treated as a profile',
+  invokedAgentTeamsInvocation([userMessage('/agent-teams research this bug')])?.goal === 'research this bug'
+    && invokedAgentTeamsInvocation([userMessage('/agent-teams research this bug')])?.profile === undefined)
+liveProfiles['hot-reload'] = { members: [{ name: 'solo', model: 'fake' }] }
+check('command getter sees HMR profile names',
+  command.handler({
+    agent: captain, rawInput: '--profile hot-reload', signal: new AbortController().signal, commandId: 'cmd-hmr',
+  }).kind === 'success')
+delete liveProfiles['hot-reload']
 
 try {
+  const createdProfile = await call('agent_teams_create', {
+    name: 'Profile Demo',
+    description: 'ship a tiny demo',
+    profile: 'demo-delivery',
+  })
+  const profileTeam = await readTeam(stateRoot, 'profile-demo')
+  check('create(profile) returns profile members tasks and seed ids',
+    createdProfile.profile === 'demo-delivery'
+      && createdProfile.members?.length === 2
+      && createdProfile.tasks?.length === 2
+      && createdProfile.tasks?.[0]?.seed_id === 'requirements'
+      && createdProfile.tasks?.[1]?.seed_id === 'implement')
+  check('create(profile) persists snapshot members and mapped dependencies',
+    profileTeam?.profile?.name === 'demo-delivery'
+      && profileTeam.members.map(member => member.name).join(',') === 'analyst,implementer'
+      && profileTeam.tasks[1]?.dependencies.join(',') === 't1'
+      && profileTeam.tasks[1]?.assignee === 'implementer')
+  const analyst = liveAgents.get(createdProfile.members[0].member_id)
+  const implementer = liveAgents.get(createdProfile.members[1].member_id)
+  analyst.status = 'idle'
+  implementer.status = 'idle'
+  await call('agent_teams_status', {})
+  const afterKick = await readTeam(stateRoot, 'profile-demo')
+  const firstSeed = afterKick?.tasks[0]
+  check('first-stage seed is assigned only to the configured member',
+    firstSeed?.status === 'claimed' && firstSeed.assignee === 'analyst'
+      && deliveries.some(delivery => delivery.childId === analyst.id)
+      && !deliveries.some(delivery => delivery.childId === implementer.id && String(delivery.content?.[0]?.text ?? '').includes('Implement')))
+  const firstAssignment = deliveries.find(delivery => delivery.childId === analyst.id)
+  const assignmentText = Array.isArray(firstAssignment?.content)
+    ? firstAssignment.content.map(block => block.text ?? '').join('\n')
+    : String(firstAssignment?.content ?? '')
+  check('first assignment includes team goal and protocol',
+    assignmentText.includes('ship a tiny demo')
+      && assignmentText.includes('Discuss, then implement'))
+  const analystClaim = await call('agent_teams_claim_task', { task_id: firstSeed.id }, analyst)
+  await call('agent_teams_update_task', { task_id: firstSeed.id, status: 'in_progress', attempt_id: analystClaim.attempt_id }, analyst)
+  await call('agent_teams_update_task', {
+    task_id: firstSeed.id,
+    status: 'failed',
+    attempt_id: analystClaim.attempt_id,
+    output: 'Need a user decision before design.',
+  }, analyst)
+  publishStatus(analyst, 'idle')
+  publishStatus(implementer, 'idle')
+  check('failed upstream does not unlock the next configured stage',
+    (await readTeam(stateRoot, 'profile-demo'))?.tasks[1]?.status === 'pending'
+      && !deliveries.some(delivery => delivery.childId === implementer.id && String(delivery.content?.[0]?.text ?? '').includes('Implement')))
+  await call('agent_teams_reassign_task', { task_id: firstSeed.id, assignee: 'analyst', reason: 'retry after user answer' })
+  const retryClaim = await call('agent_teams_claim_task', { task_id: firstSeed.id }, analyst)
+  await call('agent_teams_update_task', { task_id: firstSeed.id, status: 'in_progress', attempt_id: retryClaim.attempt_id }, analyst)
+  await call('agent_teams_update_task', {
+    task_id: firstSeed.id,
+    status: 'completed',
+    attempt_id: retryClaim.attempt_id,
+    output: 'Scope confirmed: ship the tiny demo.',
+  }, analyst)
+  publishStatus(analyst, 'idle')
+  publishStatus(implementer, 'idle')
+  const secondSeed = (await readTeam(stateRoot, 'profile-demo'))?.tasks[1]
+  check('completed upstream dispatches the configured downstream assignee',
+    secondSeed?.status === 'claimed' && secondSeed.assignee === 'implementer')
+  const secondAssignment = [...deliveries].reverse().find(delivery => delivery.childId === implementer.id)
+  const secondText = Array.isArray(secondAssignment?.content)
+    ? secondAssignment.content.map(block => block.text ?? '').join('\n')
+    : String(secondAssignment?.content ?? '')
+  check('downstream assignment includes dependency output and seed id',
+    secondText.includes('Scope confirmed')
+      && secondText.includes('[requirements]'))
+  await call('agent_teams_send_message', { to: 'implementer', content: 'stop and wait for a user answer' })
+  const deliveriesAfterMail = deliveries.length
+  await call('agent_teams_status', {})
+  check('unread mailbox prevents a same-kick new assignment',
+    deliveries.length >= deliveriesAfterMail
+      && (await readTeam(stateRoot, 'profile-demo'))?.tasks[1]?.assignee === 'implementer')
+  const profileStatus = await call('agent_teams_status', {})
+  check('status exposes profile snapshot and task seed ids',
+    profileStatus.profile?.name === 'demo-delivery'
+      && profileStatus.tasks.some(item => item.seed_id === 'requirements')
+      && profileStatus.tasks.some(item => item.seed_id === 'implement'))
+  await call('agent_teams_delete', {})
+
+  const createdDynamic = await call('agent_teams_create', {
+    name: 'Dynamic Demo',
+    description: 'goal only',
+    profile: 'dynamic-delivery',
+  })
+  const dynamicTeam = await readTeam(stateRoot, 'dynamic-demo')
+  check('captain-planning create expands members without seed tasks',
+    createdDynamic.profile === 'dynamic-delivery'
+      && createdDynamic.task_planning === 'captain'
+      && createdDynamic.members?.length === 2
+      && createdDynamic.tasks?.length === 0
+      && dynamicTeam?.profile?.taskPlanning === 'captain'
+      && dynamicTeam.tasks.length === 0)
+  const researcher = liveAgents.get(createdDynamic.members[0].member_id)
+  const critic = liveAgents.get(createdDynamic.members[1].member_id)
+  researcher.status = 'idle'
+  critic.status = 'idle'
+  const research = await call('agent_teams_create_task', { subject: 'independent research', assignee: 'researcher' })
+  const critique = await call('agent_teams_create_task', { subject: 'independent critique', assignee: 'critic' })
+  const afterParallel = await readTeam(stateRoot, 'dynamic-demo')
+  const researchTask = afterParallel?.tasks.find(item => item.id === research.task_id)
+  const critiqueTask = afterParallel?.tasks.find(item => item.id === critique.task_id)
+  check('captain-created independent tasks dispatch in parallel',
+    researchTask?.status === 'claimed' && researchTask.assignee === 'researcher'
+      && critiqueTask?.status === 'claimed' && critiqueTask.assignee === 'critic'
+      && deliveries.some(delivery => delivery.childId === researcher.id)
+      && deliveries.some(delivery => delivery.childId === critic.id))
+  const interruptedBeforeHalt = researcher.interruptCount ?? 0
+  const halt = await haltTeamWork({
+    ctx,
+    stateRoot,
+    teamId: 'dynamic-demo',
+    captain,
+    signal: new AbortController().signal,
+  })
+  const haltedTeam = await readTeam(stateRoot, 'dynamic-demo')
+  check('captain halt cancels unfinished work and keeps the team',
+    halt.alreadyHalted === false
+      && halt.cancelledTasks === 2
+      && haltedTeam?.halted === true
+      && haltedTeam.tasks.every(item => item.status === 'cancelled'))
+  check('captain halt interrupts live members',
+    (researcher.interruptCount ?? 0) > interruptedBeforeHalt
+      && (critic.interruptCount ?? 0) > 0)
+  const deliveriesAfterHalt = deliveries.length
+  researcher.status = 'idle'
+  critic.status = 'idle'
+  await call('agent_teams_status', {})
+  check('halted team does not redispatch cancelled work',
+    deliveries.length === deliveriesAfterHalt
+      && (await readTeam(stateRoot, 'dynamic-demo'))?.tasks.every(item => item.status === 'cancelled'))
+  await call('agent_teams_delete', {})
+
   await call('agent_teams_create', { name: 'Lifecycle', description: 'adversarial DAG' })
   const addedAlpha = await call('agent_teams_add_member', { name: 'alpha', role: 'slow implementer' })
   const addedBeta = await call('agent_teams_add_member', { name: 'beta', role: 'researcher' })
@@ -492,11 +719,16 @@ try {
     archivedSnapshot?.members.length === 3
       && ['alpha', 'beta', 'gamma'].every(name => archivedSnapshot.members.some(member => member.name === name))
       && archivedSnapshot.members.every(member => member.activity === 'idle'))
+  check('archived activity projects each member model onto assigned tasks',
+    archivedSnapshot?.members.every(member => member.provider === 'fake' && member.model === 'fake-model')
+      && archivedSnapshot.tasks
+        .filter(task => ['alpha', 'beta', 'gamma'].includes(task.assignee))
+        .every(task => task.model === 'fake/fake-model'))
   check('team shutdown keeps retired members catalog-visible for historical transcripts',
     (await ctx.subagents.listChildren(captain.id))
       .filter(child => child.kind === 'child'
         && child.mode === 'continuable'
-        && child.label.startsWith('agent-teams:')).length === 3)
+        && child.label.startsWith('agent-teams:lifecycle:')).length === 3)
   let coldFollowupRejected = false
   const deliveriesBeforeColdFollowup = deliveries.length
   try {

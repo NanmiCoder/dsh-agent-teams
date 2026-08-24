@@ -5,6 +5,8 @@ export interface ActivityMember {
   readonly id: string
   readonly name: string
   readonly role: string
+  readonly provider?: string
+  readonly model?: string
   readonly status?: 'idle' | 'working' | 'removed'
   readonly activity: 'working' | 'idle' | 'unknown'
   readonly progress: number
@@ -21,6 +23,7 @@ export interface ActivityTask {
   readonly status: string
   readonly state: 'blocked' | 'open' | 'running' | 'completed'
   readonly assignee: string
+  readonly model?: string
   readonly dependencies: readonly string[]
   readonly depth: number
 }
@@ -38,6 +41,7 @@ export interface ActivityTeam {
   readonly name: string
   readonly description?: string
   readonly captainSessionId: string
+  readonly halted?: boolean
   readonly members: readonly ActivityMember[]
   readonly tasks: readonly ActivityTask[]
   readonly messageCount: number
@@ -171,6 +175,7 @@ export const ACTIVITY_POLL_MS = 1000
 export const ACTIVITY_PROBE_MS = 5000
 /** Host route serving live and archived team snapshots. */
 export const ACTIVITY_STATE_URL = '/plugins/dsh-agent-teams/state'
+export const ACTIVITY_HALT_URL = '/plugins/dsh-agent-teams/halt'
 
 interface ActivityFetchResponse {
   readonly ok: boolean

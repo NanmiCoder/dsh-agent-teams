@@ -31,6 +31,7 @@ export const zh = {
   'member.state.pending': '待执行',
   'member.state.unassigned': '待派工',
   'member.status.executing': '正在执行 {taskId}',
+  'member.status.executingModel': '正在执行 {taskId} · {model}',
   'member.status.working': '正在处理已派任务',
   'member.status.waitingOn': '等待 {taskId} · {assignee}',
   'member.status.waitingPrerequisite': '等待前置任务',
@@ -59,6 +60,8 @@ export const zh = {
   'dependency.hint.chain': '悬停高亮依赖链 · 点击固定',
   'dependency.hint.pinned': '{taskId} 已固定 · Esc 取消',
   'task.runningAria': '运行中',
+  'task.model': '{model}',
+  'member.model': '{model}',
   'task.detail.completed': '已完成并交付',
   'task.detail.noPrerequisite': '无前置，可立即开工',
   'task.detail.ready': '前置已就绪，可开工',
@@ -83,6 +86,14 @@ export const zh = {
   'assignment.label': '队长派发',
   'assignment.empty': '暂无任务',
   'archive.label': '已结束 · 历史归档',
+  'banner.title': '团队进行中',
+  'banner.planning': '队长正在拆解任务',
+  'banner.waiting': '等待下一轮调度',
+  'banner.working': '{count} 人执行中',
+  'banner.workingDetail': '{count} 人执行中 · {detail}',
+  'banner.stop': '停止团队',
+  'banner.stopping': '正在停止…',
+  'banner.stopFailed': '停止失败，请重试',
 } satisfies Record<string, string>
 
 /** AgentTeams namespace key union. */
@@ -116,6 +127,7 @@ export const en = {
   'member.state.pending': 'Pending',
   'member.state.unassigned': 'Awaiting assignment',
   'member.status.executing': 'Working on {taskId}',
+  'member.status.executingModel': 'Working on {taskId} · {model}',
   'member.status.working': 'Working on assigned tasks',
   'member.status.waitingOn': 'Waiting for {taskId} · {assignee}',
   'member.status.waitingPrerequisite': 'Waiting for prerequisites',
@@ -144,6 +156,8 @@ export const en = {
   'dependency.hint.chain': 'Hover to highlight dependencies · Click to pin',
   'dependency.hint.pinned': '{taskId} pinned · Esc to clear',
   'task.runningAria': 'Running',
+  'task.model': '{model}',
+  'member.model': '{model}',
   'task.detail.completed': 'Completed and delivered',
   'task.detail.noPrerequisite': 'No prerequisites; ready to start',
   'task.detail.ready': 'Prerequisites ready; can start',
@@ -168,6 +182,14 @@ export const en = {
   'assignment.label': 'Captain assigned',
   'assignment.empty': 'No tasks',
   'archive.label': 'Ended · Archived history',
+  'banner.title': 'Team in progress',
+  'banner.planning': 'The captain is breaking down the work',
+  'banner.waiting': 'Waiting for the next scheduling round',
+  'banner.working': '{count} working',
+  'banner.workingDetail': '{count} working · {detail}',
+  'banner.stop': 'Stop team',
+  'banner.stopping': 'Stopping…',
+  'banner.stopFailed': 'Could not stop the team. Try again.',
 } satisfies Record<AgentTeamsLocaleKey, string>
 
 /** Translation function consumed by pure view helpers. */

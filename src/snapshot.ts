@@ -26,6 +26,8 @@ export interface TeamActivityMember {
   readonly id: string
   readonly name: string
   readonly role: string
+  readonly provider: string
+  readonly model: string
   readonly status: MemberStatus
   readonly activity: 'working' | 'idle' | 'unknown'
   readonly progress: number
@@ -42,6 +44,7 @@ export interface TeamActivityTask {
   readonly status: string
   readonly state: VisualTaskState
   readonly assignee: string
+  readonly model: string
   readonly dependencies: readonly string[]
   readonly depth: number
 }
@@ -59,6 +62,7 @@ export interface TeamActivitySnapshot {
   readonly name: string
   readonly description?: string
   readonly captainSessionId: string
+  readonly halted?: boolean
   readonly members: readonly TeamActivityMember[]
   readonly tasks: readonly TeamActivityTask[]
   readonly messageCount: number
@@ -79,6 +83,15 @@ function currentTaskOf(memberName: string, tasks: readonly TeamTask[]): string {
     if (task.status === 'in_progress' && task.assignee === memberName) return task.id
   }
   return ''
+}
+
+/** Compact `provider/model` route for the activity panel, or just the model. */
+export function memberModelRoute(member: { provider?: string; model?: string } | undefined): string {
+  if (member === undefined) return ''
+  const provider = member.provider?.trim() ?? ''
+  const model = member.model?.trim() ?? ''
+  if (provider !== '' && model !== '') return `${provider}/${model}`
+  return model
 }
 
 /**
@@ -120,6 +133,8 @@ export async function assembleTeamSnapshot(
       id: member.id,
       name: member.name,
       role: member.role ?? '',
+      provider: member.provider?.trim() ?? '',
+      model: member.model?.trim() ?? '',
       status: member.status,
       activity: options.historic === true
         ? 'idle'
@@ -144,6 +159,7 @@ export async function assembleTeamSnapshot(
     name: state.name,
     ...state.description !== undefined ? { description: state.description } : {},
     captainSessionId: state.captainSessionId,
+    ...state.halted === true ? { halted: true } : {},
     members,
     tasks: tasks.map((task) => ({
       id: task.id,
@@ -151,6 +167,7 @@ export async function assembleTeamSnapshot(
       status: task.status,
       state: taskVisualState(task.status, task.dependencies, tasks),
       assignee: task.assignee ?? '',
+      model: memberModelRoute(roster.find((member) => member.name === task.assignee)),
       dependencies: task.dependencies,
       depth: depths.get(task.id) ?? 0,
     })),

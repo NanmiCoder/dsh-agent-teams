@@ -52,7 +52,7 @@ const WEB_SERVER_KEYS = ['webServer', 'httpServer'] as const
 /** Workspace registry service key candidates, newest first. */
 const WORKSPACE_KEYS = ['workspaceRegistry', 'workspace'] as const
 
-export const name = 'agent-teams'
+export const name = '@nanmicoder/dsh-agent-teams'
 export const inject = ['tools', 'llm', 'subagents', 'systemPrompt', 'agents']
 
 /** Plugin configuration. */

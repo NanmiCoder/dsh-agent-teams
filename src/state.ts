@@ -47,6 +47,13 @@ export const CAPTAIN_KEY = 'captain'
 const MAILBOX_DELIVERY_LEASE_MS = 60_000
 /** Durable deny-list for AgentTeams members that must never be resumed. */
 const RETIRED_MEMBERS_FILE = 'retired-members.json'
+const PURGED_TEAMS_FILE = 'purged-teams.json'
+
+export interface PurgedTeamIdentity {
+  readonly captainSessionId: string
+  readonly teamId: string
+  readonly generationId?: string
+}
 
 /** In-process per-team mutation queues (promise chains). */
 const locks = new Map<string, Promise<unknown>>()
@@ -844,6 +851,53 @@ function isTeamMessage(value: unknown): value is TeamMessage {
  */
 export async function removeTeamDir(stateRoot: string, teamId: string): Promise<void> {
   await rm(join(stateRoot, teamId), { recursive: true, force: true })
+}
+
+/** Atomically undo retirement for exactly the supplied ids after a failed archive. */
+export async function unrecordRetiredMemberIds(stateRoot: string, memberIds: readonly string[]): Promise<void> {
+  const removals = new Set(memberIds.filter(id => id !== ''))
+  if (removals.size === 0) return
+  await withTeamLock(`retired-members:${stateRoot}`, async () => {
+    const retired = await readRetiredMemberIds(stateRoot)
+    for (const id of removals) retired.delete(id)
+    await mkdir(stateRoot, { recursive: true })
+    await atomicWriteText(join(stateRoot, RETIRED_MEMBERS_FILE), `${JSON.stringify([...retired].sort(), null, 2)}\n`)
+  })
+}
+
+export async function readPurgedTeams(stateRoot: string): Promise<PurgedTeamIdentity[]> {
+  try {
+    const value: unknown = JSON.parse(stripLeadingBom(await readFile(join(stateRoot, PURGED_TEAMS_FILE), 'utf8')))
+    if (!Array.isArray(value)) throw new Error('invalid AgentTeams purged-team registry')
+    return value.filter((entry): entry is PurgedTeamIdentity => isRecord(entry)
+      && typeof entry.captainSessionId === 'string' && entry.captainSessionId !== ''
+      && typeof entry.teamId === 'string' && entry.teamId !== ''
+      && (entry.generationId === undefined || typeof entry.generationId === 'string'))
+  } catch (error: unknown) {
+    if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') return []
+    throw error
+  }
+}
+
+export async function recordPurgedTeam(stateRoot: string, identity: PurgedTeamIdentity): Promise<void> {
+  await withTeamLock(`purged-teams:${stateRoot}`, async () => {
+    await mkdir(stateRoot, { recursive: true })
+    const current = await readPurgedTeams(stateRoot)
+    if (current.some((entry) => entry.captainSessionId === identity.captainSessionId
+      && entry.teamId === identity.teamId && entry.generationId === identity.generationId)) return
+    await atomicWriteText(join(stateRoot, PURGED_TEAMS_FILE), JSON.stringify([...current, identity], null, 2))
+  })
+}
+
+export async function clearPurgedTeam(stateRoot: string, identity: PurgedTeamIdentity): Promise<void> {
+  await withTeamLock(`purged-teams:${stateRoot}`, async () => {
+    const current = await readPurgedTeams(stateRoot)
+    const next = current.filter((entry) => !(entry.captainSessionId === identity.captainSessionId
+      && entry.teamId === identity.teamId && entry.generationId === identity.generationId))
+    if (next.length === current.length) return
+    if (next.length === 0) { await rm(join(stateRoot, PURGED_TEAMS_FILE), { force: true }); return }
+    await atomicWriteText(join(stateRoot, PURGED_TEAMS_FILE), JSON.stringify(next, null, 2))
+  })
 }
 
 /**

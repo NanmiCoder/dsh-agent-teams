@@ -292,6 +292,7 @@
   flex-direction: column;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   overscroll-behavior: contain;
   scrollbar-color: color-mix(in srgb, var(--dsw-alias-label-tertiary) 28%, transparent) transparent;
   scrollbar-width: thin;
@@ -334,8 +335,18 @@
 
 .teamHead {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
+  width: 100%;
+  min-width: 0;
+}
+
+.teamSummary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
   min-width: 0;
 }
 
@@ -438,6 +449,23 @@
   flex: none;
   margin-top: 1px;
 }
+
+.teamActionRow { width: 100%; min-width: 0; }
+.teamActions { display: flex; flex-wrap: wrap; gap: 6px; width: 100%; min-width: 0; }
+.actionButton, .dangerButton {
+  flex: 1 1 88px; min-width: 0; padding: 3px 7px; border: 1px solid var(--dsw-alias-line-normal);
+  border-radius: 5px; background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-secondary);
+  font: inherit; font-size: 10px; line-height: 16px; cursor: pointer;
+}
+.dangerButton { color: var(--dsw-alias-state-danger); border-color: var(--dsw-alias-state-danger); }
+.historyGroup { border-bottom: 1px solid var(--dsw-alias-line-normal); }
+.historyToggle {
+  display: flex; align-items: center; gap: 6px; width: 100%; padding: 9px 14px;
+  border: 0; background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-secondary);
+  font: inherit; font-size: 11px; font-weight: 600; cursor: pointer;
+}
+.hiddenRow { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 14px; color: var(--dsw-alias-label-secondary); font-size: 11px; }
+.actionError { display: block; padding: 7px 14px; color: var(--dsw-alias-state-danger); font-size: 10px; line-height: 15px; }
 
 .sectionHead {
   display: flex;

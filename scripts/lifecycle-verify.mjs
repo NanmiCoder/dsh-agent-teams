@@ -511,6 +511,27 @@ try {
       && profileStatus.tasks.some(item => item.seed_id === 'implement'))
   await call('agent_teams_delete', {})
 
+  // Preset staged team must not spawn members before explicit approval
+  const deliveriesBeforeStagedProfile = deliveries.length
+  const createdStagedProfile = await call('agent_teams_create', {
+    name: 'Staged Preset Demo',
+    description: 'preset plan requiring approval',
+    profile: 'demo-delivery',
+    approval: 'required',
+  })
+  const stagedPresetTeam = await readTeam(stateRoot, 'staged-preset-demo')
+  check('preset staged does not spawn members or dispatch tasks before approval',
+    createdStagedProfile.profile === 'demo-delivery'
+      && createdStagedProfile.phase === 'staged'
+      && createdStagedProfile.members?.length === 2
+      && createdStagedProfile.members.every(member => member.member_id === '')
+      && stagedPresetTeam?.phase === 'staged'
+      && stagedPresetTeam.members.every(member => member.id === '')
+      && stagedPresetTeam.tasks.length === 2
+      && stagedPresetTeam.tasks.every(task => task.status === 'pending')
+      && deliveries.length === deliveriesBeforeStagedProfile)
+  await agentTeamsRuntime.discardStagedTeam(captain, 'staged-preset-demo')
+
   const deliveriesBeforeDiscard = deliveries.length
   const captainCancelsBeforeDiscard = captain.cancelCount ?? 0
   const captainInjectionsBeforeDiscard = captain.injections.length

@@ -193,6 +193,17 @@ export const zh = {
   'assignment.empty': '暂无任务',
   'archive.label': '已结束 · 历史归档',
   'archive.discardedLabel': '计划已放弃 · 历史归档',
+  'archive.group': '历史团队（{count}）',
+  'archive.hiddenGroup': '已隐藏团队（{count}）',
+  'archive.expand': '展开历史',
+  'archive.collapse': '收起历史',
+  'archive.hide': '从面板隐藏',
+  'archive.restore': '重新显示',
+  'archive.purge': '永久删除',
+  'archive.purgeConfirm': '永久删除归档团队“{name}”？任务、成员和消息归档将被删除，此操作无法撤销。',
+  'team.archive': '结束并归档',
+  'team.archiveConfirm': '结束并归档团队“{name}”？系统将请求成员停止，历史记录会保留。',
+  'action.failed': '操作失败：{message}',
 } satisfies Record<string, string>
 
 /** AgentTeams namespace key union. */
@@ -388,6 +399,17 @@ export const en = {
   'assignment.empty': 'No tasks',
   'archive.label': 'Ended · Archived history',
   'archive.discardedLabel': 'Plan discarded · Archived history',
+  'archive.group': 'Historic teams ({count})',
+  'archive.hiddenGroup': 'Hidden teams ({count})',
+  'archive.expand': 'Expand history',
+  'archive.collapse': 'Collapse history',
+  'archive.hide': 'Hide from panel',
+  'archive.restore': 'Show again',
+  'archive.purge': 'Permanently delete',
+  'archive.purgeConfirm': 'Permanently delete archived team “{name}”? Its tasks, members, and messages will be removed. This cannot be undone.',
+  'team.archive': 'End and archive',
+  'team.archiveConfirm': 'End and archive team “{name}”? Members will be asked to stop and history will be retained.',
+  'action.failed': 'Action failed: {message}',
 } satisfies Record<AgentTeamsLocaleKey, string>
 
 /** Translation function consumed by pure view helpers. */

@@ -44,6 +44,7 @@ export interface ActivityMessage {
 export interface ActivityTeam {
   readonly workspace: string
   readonly teamId: string
+  readonly generationId: string
   readonly name: string
   readonly description?: string
   readonly captainSessionId: string
@@ -67,6 +68,14 @@ export interface ActivityMonitorTarget {
 export interface ActivitySnapshots {
   readonly teams: readonly ActivityTeam[]
   readonly archivedTeams: readonly ActivityTeam[]
+  readonly purgedTeams: readonly PurgedTeamIdentity[]
+  readonly actionToken: string
+}
+
+export interface PurgedTeamIdentity {
+  readonly captainSessionId: string
+  readonly teamId: string
+  readonly generationId?: string
 }
 
 interface RegisteredTarget extends ActivityMonitorTarget {
@@ -78,7 +87,7 @@ const targets = new Map<string, RegisteredTarget>()
 const targetListeners = new Set<() => void>()
 const snapshotListeners = new Set<() => void>()
 let targetSnapshot: readonly ActivityMonitorTarget[] = []
-let activitySnapshots: ActivitySnapshots = { teams: [], archivedTeams: [] }
+let activitySnapshots: ActivitySnapshots = { teams: [], archivedTeams: [], purgedTeams: [], actionToken: '' }
 
 function targetKey(sessionId: string, teamId: string): string {
   return `${sessionId}\u0000${teamId}`
@@ -166,10 +175,29 @@ export function updateActivitySnapshots(update: Partial<ActivitySnapshots>): voi
   const next = {
     teams: update.teams ?? activitySnapshots.teams,
     archivedTeams: update.archivedTeams ?? activitySnapshots.archivedTeams,
+    purgedTeams: update.purgedTeams ?? activitySnapshots.purgedTeams,
+    actionToken: update.actionToken ?? activitySnapshots.actionToken,
   }
-  if (next.teams === activitySnapshots.teams && next.archivedTeams === activitySnapshots.archivedTeams) return
+  if (next.teams === activitySnapshots.teams && next.archivedTeams === activitySnapshots.archivedTeams
+    && next.purgedTeams === activitySnapshots.purgedTeams && next.actionToken === activitySnapshots.actionToken) return
   activitySnapshots = next
   for (const listener of snapshotListeners) listener()
+}
+
+/** Apply a successful destructive panel action without waiting for polling. */
+export function removeActivityTeam(captainSessionId: string, teamId: string, generationId: string, purged: boolean): void {
+  const matches = (team: ActivityTeam): boolean => team.captainSessionId === captainSessionId
+    && team.teamId === teamId && team.generationId === generationId
+  const removedLive = activitySnapshots.teams.find(matches)
+  updateActivitySnapshots({
+    teams: activitySnapshots.teams.filter((team) => !matches(team)),
+    archivedTeams: purged
+      ? activitySnapshots.archivedTeams.filter((team) => !matches(team))
+      : removedLive === undefined ? activitySnapshots.archivedTeams : [...activitySnapshots.archivedTeams, removedLive],
+    purgedTeams: purged
+      ? [...activitySnapshots.purgedTeams, { captainSessionId, teamId, generationId }]
+      : activitySnapshots.purgedTeams,
+  })
 }
 
 /** Poll cadence for the live host snapshot route. */
@@ -269,10 +297,10 @@ export function startActivityPolling(
         signal: controller.signal,
       })
       if (!liveResponse.ok) return
-      const body = (await liveResponse.json()) as { teams?: unknown }
+      const body = (await liveResponse.json()) as { teams?: unknown; purgedTeams?: unknown; actionToken?: unknown }
       if (cancelled || !Array.isArray(body.teams)) return
       const liveTeams = body.teams as readonly ActivityTeam[]
-      publishSnapshots({ teams: liveTeams })
+      publishSnapshots({ teams: liveTeams, purgedTeams: Array.isArray(body.purgedTeams) ? body.purgedTeams as readonly PurgedTeamIdentity[] : [], actionToken: typeof body.actionToken === 'string' ? body.actionToken : '' })
       const previousDiscoveredKeys = discoveredLiveKeys
       discoveredLiveKeys = new Set(discoverySessionId === undefined || discoverySessionId === ''
         ? []
@@ -305,9 +333,13 @@ export function startActivityPolling(
         signal: controller.signal,
       })
       if (!archivedResponse.ok) return
-      const archivedBody = (await archivedResponse.json()) as { teams?: unknown }
+      const archivedBody = (await archivedResponse.json()) as { teams?: unknown; purgedTeams?: unknown; actionToken?: unknown }
       if (cancelled || !Array.isArray(archivedBody.teams)) return
-      publishSnapshots({ archivedTeams: archivedBody.teams as readonly ActivityTeam[] })
+      publishSnapshots({
+        archivedTeams: archivedBody.teams as readonly ActivityTeam[],
+        purgedTeams: Array.isArray(archivedBody.purgedTeams) ? archivedBody.purgedTeams as readonly PurgedTeamIdentity[] : [],
+        actionToken: typeof archivedBody.actionToken === 'string' ? archivedBody.actionToken : '',
+      })
       discoveryComplete = true
       settleTargets(new Set(missing.map((target) => target.key)))
     } catch (error: unknown) {

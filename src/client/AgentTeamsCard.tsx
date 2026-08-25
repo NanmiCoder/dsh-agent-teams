@@ -43,6 +43,7 @@ function openActivityPanel(data: AgentTeamsCardData): void {
   window.dispatchEvent(new CustomEvent(OPEN_PANEL_EVENT, {
     detail: {
       teamId: data.teamId,
+      generationId: data.generationId,
       captainSessionId: data.captainSessionId,
       teamName: data.teamName,
       members: data.members,
@@ -56,7 +57,7 @@ export function AgentTeamsCard({ node, openMember, sessionId, t }: AgentTeamsCar
   // `conversation.chat.node` is session-scoped, so its framework-owned id is
   // a stable owner even while another conversation becomes current.
   const owner = data.captainSessionId || sessionId
-  const { teams, archivedTeams } = useSyncExternalStore(
+  const { teams, archivedTeams, purgedTeams } = useSyncExternalStore(
     subscribeActivitySnapshots,
     getActivitySnapshotsSnapshot,
   )
@@ -71,6 +72,8 @@ export function AgentTeamsCard({ node, openMember, sessionId, t }: AgentTeamsCar
     teamName: snapshot?.name ?? data.teamName,
     members: snapshot?.members.map((member) => ({ id: member.id, name: member.name, role: member.role })) ?? data.members,
   }), [data, owner, snapshot])
+  if (purgedTeams.some((team) => team.captainSessionId === owner && team.teamId === data.teamId
+    && (data.generationId === '' || team.generationId === undefined || team.generationId === data.generationId))) return null
   return (
     <section className={css.root} data-agent-teams-card data-team-id={resolved.teamId}>
       <header className={css.head}>

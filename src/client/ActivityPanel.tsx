@@ -48,6 +48,7 @@ import {
   ACTIVITY_HALT_URL,
   getActivityMonitorTargetsSnapshot,
   getActivitySnapshotsSnapshot,
+  removeActivityTeam,
   startActivityPolling,
   subscribeActivityMonitorTargets,
   subscribeActivitySnapshots,
@@ -471,7 +472,7 @@ function DependencyMap({ tasks, members, t, discarded = false }: {
   )
 }
 
-function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscarded, onNavigate, t, historic = false }: {
+function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscarded, onNavigate, t, historic = false, actions, compactHistory = false }: {
   readonly team: ActivityTeam
   readonly modelDirectory?: ModelDirectory
   readonly onContinuePlanning?: () => void
@@ -480,6 +481,8 @@ function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscarded, on
   readonly onNavigate: (parentId: SessionId, childId: SessionId) => void
   readonly t: AgentTeamsTranslate
   readonly historic?: boolean
+  readonly actions?: React.ReactNode
+  readonly compactHistory?: boolean
 }) {
   const [membersOpen, setMembersOpen] = useState(true)
   const [stopOpen, setStopOpen] = useState(false)
@@ -531,28 +534,32 @@ function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscarded, on
   return (
     <>
       <section className={css.team} data-team-id={team.teamId}>
-        <header className={css.teamHead}>
-          <span className={css.teamName} title={team.name}>{team.name}</span>
-          {historic && <span className={css.historicPill}>{t(discarded ? 'team.discarded' : 'team.ended')}</span>}
-          {stopped && <span className={css.historicPill}>{t('team.stopped')}</span>}
-          <span className={css.teamStats}>
-            <span data-stat="members">{t('team.stats.members', { count: team.members.length })}</span>
-            <span data-stat="tasks">{t('team.stats.completed', { completed: completedCount, total: team.tasks.length })}</span>
-            <span data-stat="messages">{t('team.stats.messages', { count: team.messageCount })}</span>
+        <header className={css.teamHead} data-historic={historic || undefined}>
+          <span className={css.teamSummary}>
+            <span className={css.teamName} title={team.name}>{team.name}</span>
+            {historic && <span className={css.historicPill}>{t(discarded ? 'team.discarded' : 'team.ended')}</span>}
+            {stopped && <span className={css.historicPill}>{t('team.stopped')}</span>}
+            <span className={css.teamStats}>
+              <span data-stat="members">{t('team.stats.members', { count: team.members.length })}</span>
+              <span data-stat="tasks">{t('team.stats.completed', { completed: completedCount, total: team.tasks.length })}</span>
+              <span data-stat="messages">{t('team.stats.messages', { count: team.messageCount })}</span>
+            </span>
+            {canStop && (
+              <button
+                type="button"
+                className={css.teamStopButton}
+                aria-label={t('team.stop')}
+                title={t('team.stop')}
+                onClick={() => { setStopError(''); setStopOpen(true) }}
+              >
+                <IconStopFill16 />
+              </button>
+            )}
           </span>
-          {canStop && (
-            <button
-              type="button"
-              className={css.teamStopButton}
-              aria-label={t('team.stop')}
-              title={t('team.stop')}
-              onClick={() => { setStopError(''); setStopOpen(true) }}
-            >
-              <IconStopFill16 />
-            </button>
-          )}
+          {actions !== undefined && <span className={css.teamActionRow}>{actions}</span>}
         </header>
 
+        {compactHistory ? null : <>
         {team.phase === 'staged' && !historic && modelDirectory !== undefined && onContinuePlanning !== undefined && onDiscarded !== undefined && (
           <StagingPlanEditor
             team={team}
@@ -562,7 +569,6 @@ function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscarded, on
             t={t}
           />
         )}
-
       <section className={css.delegationSection} aria-label={t('delegation.aria')} data-delegation-map>
         <div className={css.captainNode}>
           <span className={css.captainAvatar}>
@@ -704,8 +710,8 @@ function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscarded, on
           })}
         </div>}
       </section>
-
       <DependencyMap tasks={team.tasks} members={team.members} t={t} discarded={discarded} />
+      </>}
       </section>
       <Modal
         open={stopOpen}
@@ -735,6 +741,7 @@ function historicCardTeam(data: AgentTeamsCardData, owner: string): ActivityTeam
   return {
     workspace: '',
     teamId: data.teamId,
+    generationId: data.generationId,
     name: data.teamName,
     captainSessionId: data.captainSessionId || owner,
     phase: 'running',
@@ -777,6 +784,13 @@ export function ActivityPanel({ sessionsList, modelDirectories, openMember, t }:
   const [autoOpened, setAutoOpened] = useState(false)
   const [wasActive, setWasActive] = useState(false)
   const [historic, setHistoric] = useState<ReadonlyMap<string, { data: AgentTeamsCardData; owner: string }>>(new Map())
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [hiddenOpen, setHiddenOpen] = useState(false)
+  const [expandedHistoric, setExpandedHistoric] = useState<ReadonlySet<string>>(new Set())
+  const [hiddenHistoric, setHiddenHistoric] = useState<ReadonlySet<string>>(() => {
+    try { return new Set(JSON.parse(window.localStorage.getItem('dsh-agent-teams:hidden-archives:v1') ?? '[]') as string[]) } catch { return new Set() }
+  })
+  const [actionError, setActionError] = useState('')
   const [layout, setLayout] = useState<PanelLayout>(initialPanelLayout)
   const [bounds, setBounds] = useState<PanelBounds>(initialPanelBounds)
   const [interaction, setInteraction] = useState<'dragging' | 'resizing' | null>(null)
@@ -805,7 +819,7 @@ export function ActivityPanel({ sessionsList, modelDirectories, openMember, t }:
       document.querySelector<HTMLTextAreaElement>('[data-composer-card] textarea')?.focus()
     })
   }
-  const { teams, archivedTeams } = useSyncExternalStore(
+  const { teams, archivedTeams, purgedTeams, actionToken } = useSyncExternalStore(
     subscribeActivitySnapshots,
     getActivitySnapshotsSnapshot,
   )
@@ -966,28 +980,53 @@ export function ActivityPanel({ sessionsList, modelDirectories, openMember, t }:
   )
   const visibleHistoric = useMemo(
     () => (current === undefined ? [] : [...historic.values()].filter(({ data, owner }) =>
-      owner === current && !teams.some((live) =>
+      !purgedTeams.some((purged) => purged.captainSessionId === owner && purged.teamId === data.teamId
+        && (purged.generationId === undefined || data.generationId === undefined || purged.generationId === data.generationId))
+      && owner === current && !teams.some((live) =>
         live.captainSessionId === current && live.teamId === data.teamId,
       ) && !archivedTeams.some((archived) =>
         archived.captainSessionId === current && archived.teamId === data.teamId,
       ),
     )),
-    [historic, current, teams, archivedTeams],
+    [historic, current, teams, archivedTeams, purgedTeams],
   )
   const visibleArchived = useMemo(
     () => (current === undefined ? [] : archivedTeams.filter((team) =>
-      team.captainSessionId === current && !teams.some((live) =>
+      !purgedTeams.some((purged) => purged.captainSessionId === current && purged.teamId === team.teamId
+        && (purged.generationId === undefined || purged.generationId === team.generationId))
+      && team.captainSessionId === current && !teams.some((live) =>
         live.captainSessionId === current && live.teamId === team.teamId,
       ),
     )),
-    [archivedTeams, current, teams],
+    [archivedTeams, current, teams, purgedTeams],
   )
-  const visibleCount = visibleTeams.length + visibleArchived.length + visibleHistoric.length
+  const historicTeams = useMemo(() => [
+    ...visibleArchived,
+    ...visibleHistoric.map(({ data, owner }) => historicCardTeam(data, owner)),
+  ], [visibleArchived, visibleHistoric])
+  const shownHistoric = historicTeams.filter((team) => !hiddenHistoric.has(`${team.captainSessionId}:${team.teamId}:${team.generationId}`))
+  const hiddenTeams = historicTeams.filter((team) => hiddenHistoric.has(`${team.captainSessionId}:${team.teamId}:${team.generationId}`))
+  const visibleCount = visibleTeams.length + shownHistoric.length + hiddenTeams.length
   const visibleLiveTeamIds = useMemo(
     () => visibleTeams.map((team) => team.teamId).sort(),
     [visibleTeams],
   )
   const visibleLiveTeamKey = visibleLiveTeamIds.join('\u0000')
+
+  useEffect(() => {
+    window.localStorage.setItem('dsh-agent-teams:hidden-archives:v1', JSON.stringify([...hiddenHistoric]))
+  }, [hiddenHistoric])
+
+  const runTeamAction = async (team: ActivityTeam, action: 'archive' | 'purge'): Promise<void> => {
+    setActionError('')
+    const response = await fetch('/plugins/dsh-agent-teams/team-action', {
+      method: 'POST', headers: { 'content-type': 'application/json', 'x-agent-teams-action-token': actionToken },
+      body: JSON.stringify({ action, workspace: team.workspace, captainSessionId: team.captainSessionId, teamId: team.teamId, generationId: team.generationId }),
+    })
+    const result = await response.json() as { ok?: boolean; error?: string }
+    if (!response.ok || result.ok !== true) throw new Error(result.error ?? `HTTP ${response.status}`)
+    removeActivityTeam(team.captainSessionId, team.teamId, team.generationId, action === 'purge')
+  }
 
   useEffect(() => {
     const tracker = autoOpenTrackerRef.current
@@ -1242,20 +1281,49 @@ export function ActivityPanel({ sessionsList, modelDirectories, openMember, t }:
                       onDiscarded={returnToComposer}
                       onNavigate={navigateToSession}
                       t={t}
+                      actions={
+                        <button className={css.actionButton} type="button" onClick={() => {
+                          if (!window.confirm(t('team.archiveConfirm', { name: team.name }))) return
+                          void runTeamAction(team, 'archive').catch((error: unknown) => { setActionError(t('action.failed', { message: String(error) })) })
+                        }}>{t('team.archive')}</button>
+                      }
                     />
                   ))}
-                  {visibleArchived.map((team) => (
-                    <div key={`${team.captainSessionId}:${team.teamId}`} data-team-id={team.teamId} data-historic className={css.archivedWrap}>
-                      <span className={css.archiveLabel}>{t(team.phase === 'staged' ? 'archive.discardedLabel' : 'archive.label')}</span>
-                      <TeamSection team={team} onNavigate={navigateToSession} t={t} historic />
-                    </div>
-                  ))}
-                  {visibleHistoric.map(({ data: team, owner }) => {
-                    const teamKey = `${owner}:${team.teamId}`
-                    return (
-                      <TeamSection key={teamKey} team={historicCardTeam(team, owner)} onNavigate={navigateToSession} t={t} historic />
-                    )
-                  })}
+                  {shownHistoric.length > 0 && <section className={css.historyGroup}>
+                    <button className={css.historyToggle} type="button" onClick={() => { setHistoryOpen((value) => !value) }}>
+                      <Chevron open={historyOpen} />{t('archive.group', { count: shownHistoric.length })}
+                    </button>
+                    {historyOpen && shownHistoric.map((team) => {
+                      const key = `${team.captainSessionId}:${team.teamId}:${team.generationId}`
+                      const expanded = expandedHistoric.has(key)
+                      return <div key={key} className={css.archivedWrap}>
+                        <span className={css.archiveLabel}>{t(team.phase === 'staged' ? 'archive.discardedLabel' : 'archive.label')}</span>
+                        <TeamSection
+                          team={team}
+                          onNavigate={navigateToSession}
+                          t={t}
+                          historic
+                          compactHistory={!expanded}
+                          actions={<span className={css.teamActions}>
+                            <button className={css.actionButton} type="button" onClick={() => { setExpandedHistoric((previous) => { const next = new Set(previous); expanded ? next.delete(key) : next.add(key); return next }) }}>{t(expanded ? 'archive.collapse' : 'archive.expand')}</button>
+                            <button className={css.actionButton} type="button" onClick={() => { setHiddenHistoric((previous) => new Set(previous).add(key)) }}>{t('archive.hide')}</button>
+                            <button className={css.dangerButton} type="button" onClick={() => {
+                              if (!window.confirm(t('archive.purgeConfirm', { name: team.name }))) return
+                              void runTeamAction(team, 'purge').catch((error: unknown) => { setActionError(t('action.failed', { message: String(error) })) })
+                            }}>{t('archive.purge')}</button>
+                          </span>}
+                        />
+                      </div>
+                    })}
+                  </section>}
+                  {hiddenTeams.length > 0 && <section className={css.historyGroup}>
+                    <button className={css.historyToggle} type="button" onClick={() => { setHiddenOpen((value) => !value) }}><Chevron open={hiddenOpen} />{t('archive.hiddenGroup', { count: hiddenTeams.length })}</button>
+                    {hiddenOpen && hiddenTeams.map((team) => {
+                      const key = `${team.captainSessionId}:${team.teamId}:${team.generationId}`
+                      return <div key={key} className={css.hiddenRow}><span>{team.name}</span><button className={css.actionButton} type="button" onClick={() => { setHiddenHistoric((previous) => { const next = new Set(previous); next.delete(key); return next }) }}>{t('archive.restore')}</button></div>
+                    })}
+                  </section>}
+                  {actionError !== '' && <span className={css.actionError}>{actionError}</span>}
                 </>
               )}
           </div>

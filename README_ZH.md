@@ -16,7 +16,7 @@
 
 `dsh-agent-teams` 让当前 DeepSeek Harness 会话成为队长：创建可续聊的子 Agent、把目标拆成有依赖的任务，并通过直达消息协调成员工作。
 
-你只需用自然语言提出目标。插件会提供团队协议、10 个协作工具、持久化状态、自动共享任务调度和实时 Web UI，不需要额外的 Workflow 引擎。
+你只需用自然语言提出目标。插件会提供团队协议、11 个协作工具、持久化状态、自动共享任务调度和实时 Web UI，不需要额外的 Workflow 引擎。
 
 <p align="center">
   <img src="./assets/ui.png" width="100%" alt="DeepSeek Harness 对话与 AgentTeams 实时活动面板，展示成员、任务依赖和回报">
@@ -36,6 +36,7 @@
 | **自动续领与安全接管** | 成员空闲后自动领取下一项就绪任务；转派会撤销旧 attempt，冷恢复会重试遗留任务，迟到结果无法覆盖。 |
 | **成员直达消息** | 成员通过持久化邮箱直接联系队友或队长，不需要队长中转。 |
 | **实时活动面板** | Web UI 用分段进度、可折叠成员树和可交互 DAG 展示实时工作；运行中的子任务会标出使用的模型，团队结束后仍保留完整成员与任务历史。 |
+| **质量门禁** | 人只提供目标和约束。默认任务顺序是需求 → 实现 → 验证 → 审查 → 集成，失败后自动修复/复审，恢复团队必须显式 resume。第一版范围控制是完成时审计，不是 host 写入拦截。详见 [docs/quality-gates.md](./docs/quality-gates.md)。 |
 
 对话卡片与活动面板接入 Harness 官方多语言服务，会随宿主在简体中文和英文之间实时切换；任务/成员状态、动态摘要、操作按钮、历史归档标识和无障碍文案都会同步更新，无需刷新页面，也不增加插件自己的语言设置。
 
@@ -152,9 +153,9 @@ pnpm verify
 
 ## 命名多角色团队配置
 
-在 `cordis.patch.yml` 的 `profiles` 中配置完整团队模板。每个 profile 都提供成员阵容，可独立指定 provider、model、role、reasoning_effort。`taskPlanning: captain` 表示只提供阵容与门禁，由 Captain 根据用户目标自行决定任务拆分、依赖和并行；省略该字段或设为 `seed` 时，仍会展开模板中的固定任务图。使用 `/agent-teams --profile <名称> <目标>` 显式激活；不会把首个普通 token 隐式识别为 profile。
+在 `cordis.patch.yml` 的 `profiles` 中配置完整团队模板。每个 profile 都提供成员阵容，可独立指定 provider、model、role、reasoning_effort。`taskPlanning: captain` 表示程序按用户目标自动生成 requirements → implementation → verification → review → integration 质量图，Captain 负责引导而不重复手工建图；省略该字段或设为 `seed` 时，仍会展开模板中的固定任务图。使用 `/agent-teams --profile <名称> <目标>` 显式激活；不会把首个普通 token 隐式识别为 profile。
 
-`agent_teams_create({ profile })` 会在同一进程内事务式展开成员；seed 模式还会展开种子任务，captain 模式则只建成员，随后由 Captain 根据目标创建任务图。不要询问用户如何拆分、合并、串行或并行。审查或测试失败不会解锁下游；Captain 应创建修复任务和新的审查任务，修复任务不得依赖 failed 任务。`memberProvider` 仍表示 spawn/fork 后端，不是 LLM provider。模板只负责发布准备，真实部署必须等待用户明确确认。首次落盘前进程崩溃可能留下无法恢复的 orphan child，这是已知限制。
+`agent_teams_create({ profile })` 会在同一进程内事务式展开成员；seed 模式还会展开种子任务，captain 模式会自动落盘 requirements → implementation → verification → review → integration 五段质量图。Captain 引导该图，不重复手工创建；角色不唯一时任务保持未指派，绝不派给 Captain。审查或测试失败不会解锁下游；自动 repair/review 不依赖 failed review。`memberProvider` 仍表示 spawn/fork 后端，不是 LLM provider。模板只负责发布准备，真实部署必须等待用户明确确认。首次落盘前进程崩溃可能留下无法恢复的 orphan child，这是已知限制。
 
 ## 许可证
 

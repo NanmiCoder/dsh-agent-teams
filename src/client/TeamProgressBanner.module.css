@@ -4,7 +4,10 @@
   align-items: center;
   gap: 8px 12px;
   box-sizing: border-box;
-  width: 100%;
+  /* InputBar owns the same composer max width but applies 16px side
+     clearance as parent padding. Mirror its content width here so this
+     standalone input-dock row is exactly aligned with the input card. */
+  width: calc(100% - var(--dsh-composer-side-clearance) - var(--dsh-composer-side-clearance));
   max-width: var(--dsh-composer-card-max-width);
   min-width: 0;
   margin: 0 auto 8px;

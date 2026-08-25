@@ -145,6 +145,17 @@ const ctx = {
         publishStatus(child, 'idle')
       }
     },
+    async drainContinuableChildren(parent, childIds) {
+      for (const childId of childIds) {
+        const child = liveAgents.get(childId)
+        if (child) {
+          child.drainCount = (child.drainCount ?? 0) + 1
+          publishStatus(child, 'idle')
+          liveAgents.delete(childId)
+        }
+      }
+      void parent
+    },
   },
   logger: { debug() {}, warn() {} },
 }
@@ -172,13 +183,13 @@ registerAgentTeamsTools(ctx, {
       protocol: 'Plan from the goal. Do not invent unanswered questions.',
       taskPlanning: 'captain',
       members: [
-        { name: 'researcher', role: 'research', model: 'fake-researcher' },
-        { name: 'critic', role: 'challenge', model: 'fake-critic' },
+        { name: 'analyst', role: 'requirements analyst', model: 'fake-analyst' },
+        { name: 'implementer', role: 'implementer', model: 'fake-implementer' },
+        { name: 'tester', role: 'test engineer', model: 'fake-tester' },
+        { name: 'reviewer', role: 'code reviewer', model: 'fake-reviewer' },
+        { name: 'release', role: 'release engineer', model: 'fake-release' },
       ],
-      tasks: [
-        { id: 'research', subject: 'Research', assignee: 'researcher' },
-        { id: 'challenge', subject: 'Challenge', assignee: 'critic', dependencies: ['research'] },
-      ],
+      tasks: [],
     },
   },
 })
@@ -291,8 +302,8 @@ check('slash --profile without a goal still activates',
 check('profile-only activation asks for the goal',
   buildActivationDirective('', 'demo-delivery').includes('The goal was not given')
     && buildActivationDirective('', 'demo-delivery').includes('Use configured AgentTeams profile "demo-delivery"'))
-check('captain-planning activation tells the captain to derive the graph',
-  buildActivationDirective('ship it', 'dynamic-delivery', 'captain').includes('create the task graph yourself')
+check('captain-planning activation tells the captain to guide the automatic graph',
+  buildActivationDirective('ship it', 'dynamic-delivery', 'captain').includes('program creates requirements')
     && buildActivationDirective('ship it', 'dynamic-delivery', 'captain').includes('run in parallel')
     && !buildActivationDirective('ship it', 'dynamic-delivery', 'captain').includes('seed tasks'))
 const unknownProfile = command.handler({
@@ -399,28 +410,29 @@ try {
     profile: 'dynamic-delivery',
   })
   const dynamicTeam = await readTeam(stateRoot, 'dynamic-demo')
-  check('captain-planning create expands members without seed tasks',
+  check('captain-planning create instantiates the fixed quality graph',
     createdDynamic.profile === 'dynamic-delivery'
       && createdDynamic.task_planning === 'captain'
-      && createdDynamic.members?.length === 2
-      && createdDynamic.tasks?.length === 0
+      && createdDynamic.members?.length === 5
+      && createdDynamic.tasks?.map(item => item.kind).join('>') === 'requirements>implementation>verification>review>integration'
       && dynamicTeam?.profile?.taskPlanning === 'captain'
-      && dynamicTeam.tasks.length === 0)
-  const researcher = liveAgents.get(createdDynamic.members[0].member_id)
-  const critic = liveAgents.get(createdDynamic.members[1].member_id)
-  researcher.status = 'idle'
-  critic.status = 'idle'
-  const research = await call('agent_teams_create_task', { subject: 'independent research', assignee: 'researcher' })
-  const critique = await call('agent_teams_create_task', { subject: 'independent critique', assignee: 'critic' })
-  const afterParallel = await readTeam(stateRoot, 'dynamic-demo')
-  const researchTask = afterParallel?.tasks.find(item => item.id === research.task_id)
-  const critiqueTask = afterParallel?.tasks.find(item => item.id === critique.task_id)
-  check('captain-created independent tasks dispatch in parallel',
-    researchTask?.status === 'claimed' && researchTask.assignee === 'researcher'
-      && critiqueTask?.status === 'claimed' && critiqueTask.assignee === 'critic'
-      && deliveries.some(delivery => delivery.childId === researcher.id)
-      && deliveries.some(delivery => delivery.childId === critic.id))
-  const interruptedBeforeHalt = researcher.interruptCount ?? 0
+      && dynamicTeam.tasks.length === 5
+      && dynamicTeam.tasks[1]?.dependencies.join(',') === 't1'
+      && dynamicTeam.tasks[2]?.dependencies.join(',') === 't2'
+      && dynamicTeam.tasks[3]?.dependencies.join(',') === 't3'
+      && dynamicTeam.tasks[3]?.reviewedTaskId === 't2'
+      && dynamicTeam.tasks[1]?.inScope?.length > 0
+      && dynamicTeam.tasks[1]?.verify?.length > 0)
+  check('captain quality graph maps unique roles without assigning captain',
+    dynamicTeam?.tasks[0]?.assignee === 'analyst'
+      && dynamicTeam.tasks[1]?.assignee === 'implementer'
+      && dynamicTeam.tasks[2]?.assignee === 'tester'
+      && dynamicTeam.tasks[3]?.assignee === 'reviewer'
+      && dynamicTeam.tasks[4]?.assignee === 'release'
+      && dynamicTeam.tasks.every(item => item.assignee !== 'captain'))
+  const dynamicAnalyst = liveAgents.get(createdDynamic.members.find(member => member.member_name === 'analyst')?.member_id)
+  const dynamicImplementer = liveAgents.get(createdDynamic.members.find(member => member.member_name === 'implementer')?.member_id)
+  const interruptedBeforeHalt = dynamicAnalyst.interruptCount ?? 0
   const halt = await haltTeamWork({
     ctx,
     stateRoot,
@@ -429,21 +441,123 @@ try {
     signal: new AbortController().signal,
   })
   const haltedTeam = await readTeam(stateRoot, 'dynamic-demo')
-  check('captain halt cancels unfinished work and keeps the team',
+  check('captain halt cancels default graph and keeps the team',
     halt.alreadyHalted === false
-      && halt.cancelledTasks === 2
+      && halt.cancelledTasks === 5
       && haltedTeam?.halted === true
       && haltedTeam.tasks.every(item => item.status === 'cancelled'))
-  check('captain halt interrupts live members',
-    (researcher.interruptCount ?? 0) > interruptedBeforeHalt
-      && (critic.interruptCount ?? 0) > 0)
+  check('captain halt interrupts and drains graph members',
+    (dynamicAnalyst.interruptCount ?? 0) > interruptedBeforeHalt
+      && (dynamicImplementer.interruptCount ?? 0) > 0
+      && (dynamicAnalyst.drainCount ?? 0) > 0
+      && (dynamicImplementer.drainCount ?? 0) > 0
+      && !liveAgents.has(dynamicAnalyst.id)
+      && !liveAgents.has(dynamicImplementer.id))
   const deliveriesAfterHalt = deliveries.length
-  researcher.status = 'idle'
-  critic.status = 'idle'
   await call('agent_teams_status', {})
-  check('halted team does not redispatch cancelled work',
+  check('halted team does not redispatch cancelled graph',
     deliveries.length === deliveriesAfterHalt
       && (await readTeam(stateRoot, 'dynamic-demo'))?.tasks.every(item => item.status === 'cancelled'))
+  let silentCreateUnhalted = false
+  try {
+    await call('agent_teams_create_task', { subject: 'must stay halted' })
+    silentCreateUnhalted = (await readTeam(stateRoot, 'dynamic-demo'))?.halted !== true
+  } catch {
+    silentCreateUnhalted = (await readTeam(stateRoot, 'dynamic-demo'))?.halted !== true
+  }
+  check('halted create_task does not silently resume',
+    silentCreateUnhalted === false && (await readTeam(stateRoot, 'dynamic-demo'))?.halted === true)
+  const resume = await call('agent_teams_resume', { reason: 'continue after user answer' })
+  check('explicit resume clears halt and keeps cancelled tasks cancelled',
+    resume.status === 'resumed'
+      && (await readTeam(stateRoot, 'dynamic-demo'))?.halted !== true
+      && (await readTeam(stateRoot, 'dynamic-demo'))?.tasks.every(item => item.status === 'cancelled'))
+  await call('agent_teams_delete', {})
+
+  await call('agent_teams_create', { name: 'Quality Loop', description: 'review loop' })
+  await call('agent_teams_add_member', { name: 'builder', role: 'implementer' })
+  await call('agent_teams_add_member', { name: 'critic', role: 'reviewer' })
+  const impl = await call('agent_teams_create_task', {
+    subject: 'implement parser',
+    assignee: 'builder',
+    kind: 'implementation',
+    objective: 'Ship the parser',
+    inScope: ['src/parser.ts'],
+    acceptance: ['parser accepts empty input'],
+    verify: ['pnpm test'],
+  })
+  let missingContractRejected = false
+  try {
+    await call('agent_teams_create_task', { subject: 'impl without contract', kind: 'implementation' })
+  } catch {
+    missingContractRejected = true
+  }
+  check('quality implementation without contract is rejected', missingContractRejected)
+  const qualityTeam = await readTeam(stateRoot, 'quality-loop')
+  const builder = [...liveAgents.values()].find(agent => qualityTeam?.members.some(member => member.id === agent.id && member.name === 'builder'))
+  const criticMember = [...liveAgents.values()].find(agent => qualityTeam?.members.some(member => member.id === agent.id && member.name === 'critic'))
+  const implClaim = await call('agent_teams_claim_task', { task_id: impl.task_id }, builder)
+  await call('agent_teams_update_task', { task_id: impl.task_id, status: 'in_progress', attempt_id: implClaim.attempt_id }, builder)
+  let illegalCompleteRejected = false
+  try {
+    await call('agent_teams_update_task', {
+      task_id: impl.task_id,
+      status: 'completed',
+      attempt_id: implClaim.attempt_id,
+      output: 'looks fine',
+    }, builder)
+  } catch {
+    illegalCompleteRejected = true
+  }
+  check('illegal completed without acceptance evidence is rejected', illegalCompleteRejected)
+  await call('agent_teams_update_task', {
+    task_id: impl.task_id,
+    status: 'completed',
+    attempt_id: implClaim.attempt_id,
+    output: 'parser shipped',
+    changedPaths: ['src/parser.ts'],
+    acceptanceResults: [{ criterion: 'parser accepts empty input', status: 'passed' }],
+    commandsRun: [{ command: 'pnpm test', status: 'passed' }],
+  }, builder)
+  const review = await call('agent_teams_create_task', {
+    subject: 'review parser',
+    assignee: 'critic',
+    kind: 'review',
+    objective: 'Review the parser',
+    acceptance: ['no blocker or high findings'],
+    reviewedTaskId: impl.task_id,
+  })
+  const reviewClaim = await call('agent_teams_claim_task', { task_id: review.task_id }, criticMember)
+  await call('agent_teams_update_task', { task_id: review.task_id, status: 'in_progress', attempt_id: reviewClaim.attempt_id }, criticMember)
+  let needsRevisionCompleteRejected = false
+  try {
+    await call('agent_teams_update_task', {
+      task_id: review.task_id,
+      status: 'completed',
+      attempt_id: reviewClaim.attempt_id,
+      verdict: 'needs_revision',
+      findings: [{ id: 'C-001', severity: 'high', problem: 'null crash', requiredFix: 'guard empty input', file: 'src/parser.ts' }],
+    }, criticMember)
+  } catch {
+    needsRevisionCompleteRejected = true
+  }
+  check('review needs_revision cannot complete', needsRevisionCompleteRejected)
+  await call('agent_teams_update_task', {
+    task_id: review.task_id,
+    status: 'failed',
+    attempt_id: reviewClaim.attempt_id,
+    verdict: 'needs_revision',
+    findings: [{ id: 'C-001', severity: 'high', problem: 'null crash', requiredFix: 'guard empty input', file: 'src/parser.ts' }],
+  }, criticMember)
+  const afterReview = await readTeam(stateRoot, 'quality-loop')
+  const repair = afterReview?.tasks.find(item => item.kind === 'repair')
+  const nextReview = afterReview?.tasks.find(item => item.kind === 'review' && item.id !== review.task_id)
+  check('needs_revision opens repair and next review',
+    repair !== undefined && nextReview !== undefined
+      && repair.dependencies.includes(impl.task_id)
+      && !repair.dependencies.includes(review.task_id)
+      && nextReview.assignee === 'critic'
+      && nextReview.assignee !== 'builder')
   await call('agent_teams_delete', {})
 
   await call('agent_teams_create', { name: 'Lifecycle', description: 'adversarial DAG' })

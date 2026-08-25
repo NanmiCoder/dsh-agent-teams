@@ -33,6 +33,7 @@ import { fileURLToPath } from 'node:url'
 import { collectArchivedTeamsActivity, collectTeamsActivity } from './snapshot.ts'
 import { findTeamByCaptain } from './state.ts'
 import { formatProfilesForPrompt, type TeamProfileConfig } from './profiles.ts'
+import { qualityPlanningPrompt } from './quality-gates.ts'
 
 /**
  * Structural slice of the web server service, compatible with both the
@@ -117,6 +118,13 @@ export const Config: z<Config> = z.object({
       fallback: fallbackRouteConfig,
     })).min(1).required(),
     taskPlanning: z.union([z.const('captain'), z.const('seed')]),
+    reviewPolicy: z.object({
+      requirementsMinRounds: z.natural().min(1),
+      requirementsMaxRounds: z.natural().min(1),
+      codeMaxRounds: z.natural().min(1),
+      maxRepairAttempts: z.natural().min(1),
+      requiredReviewers: z.array(z.string()),
+    }),
     tasks: z.array(z.object({
       id: z.string().required(),
       subject: z.string().required(),
@@ -132,7 +140,7 @@ export const Config: z<Config> = z.object({
 })
 
 /** The model-facing usage policy: when and how to drive AgentTeams. */
-function usageSectionText(toolNames: string, profilesText = ''): string {
+export function usageSectionText(toolNames: string, profilesText = ''): string {
   return `When the user asks to run something with AgentTeams (e.g. "use AgentTeams to do X"), or an activation message from the /agent-teams slash command arrives, you are the captain of a multi-agent team. Follow this protocol:
 1. Call agent_teams_create with a team name and the goal as description. You become the captain and may lead one team at a time.
 2. Call agent_teams_add_member once per role the goal needs (researcher, engineer, reviewer, ...). Members are durable subagents: they wait for your messages, then work a full turn. By default a member on your current provider/model snapshots your current reasoning effort; a member routed to a different provider or model automatically uses that target model's default effort. Never ask the user to choose these per member; only pass provider/model when the user explicitly requests a different route for that role, and reasoning_effort only when the user explicitly requests a particular effort ("default" explicitly selects the target model's default).
@@ -140,8 +148,10 @@ function usageSectionText(toolNames: string, profilesText = ''): string {
 4. Lead by delegation: monitor with agent_teams_status, send guidance with agent_teams_send_message, and let idle teammates execute ready work. Do not duplicate a teammate's work merely because its turn is slow. If the user requires every member to contribute or report, create one task per required contribution (or message each member directly); never wait for an unassigned member to produce work it was never given.
 5. If the user explicitly asks to pause a running member, its open attempt remains parked after interruption; after answering the user, send that same member guidance with agent_teams_send_message so it continues the same attempt. Do not interrupt members for an ordinary user question that did not request a pause. If work must change owner, restart from scratch, or be taken over, call agent_teams_reassign_task first. Reassign to another idle member, retry with the same member, or use assignee=captain before doing it yourself. Reassignment revokes the old attempt and waits for that member to quiesce, preventing late results from overwriting the new attempt.
 6. Tasks carry attempt_id capabilities. Members must use the current attempt_id for updates; stale-attempt errors mean ownership changed. Check status after progress notifications until every required task is terminal and every member is idle/ready; do not busy-poll or require reports from members with no assigned work.
-7. If the user names a configured profile / template / fixed roster, pass that name as profile= to agent_teams_create. After a successful profile create, do not recreate the same members. If the named profile does not exist, list the configured names and do not guess. Follow any snapshot protocol. If create returns seed tasks, those are only the starting graph — do not recreate them. If create returns task_planning=captain or an empty task list, you must create the task graph from the goal. Add repair or retry tasks when review/test fails, but never make a new task depend on a failed task. Do not send_message to start the next stage; the scheduler assigns ready work. Watch every required task until it is terminal before deleting the team. Never perform a real deployment without explicit user confirmation. Subagent final replies are not program-readable; use status outputs, member send_message, and your inbox.
-8. Present the team's results to the user, then agent_teams_delete the team unless the user wants to keep working with it.
+7. If the user names a configured profile / template / fixed roster, pass that name as profile= to agent_teams_create. After a successful profile create, do not recreate the same members. If the named profile does not exist, list the configured names and do not guess. Follow any snapshot protocol. If create returns seed tasks or the default captain-planning quality graph, those are the starting graph — do not recreate them. Only a profile-less empty team requires you to create its task graph from the goal. Add repair or retry tasks when review/test fails, but never make a new task depend on a failed task. Do not send_message to start the next stage; the scheduler assigns ready work. Watch every required task until it is terminal before deleting the team. Never perform a real deployment without explicit user confirmation. Subagent final replies are not program-readable; use status outputs, member send_message, and your inbox.
+8. Quality kinds (requirements, implementation, verification, review, repair, integration) need a contract: non-empty objective and acceptance; implementation/repair also need inScope and verify. Review/requirements can complete only with verdict=pass; needs_revision/reject must fail with findings. The system then opens repair + next review that depend on the successful source, never the failed review. Do not approve your own implementation. create_task no longer silently resumes a halted team — call agent_teams_resume with a reason, or create_task({resume:true, resumeReason}).
+9. ${qualityPlanningPrompt()}
+10. Present the team's results to the user, then agent_teams_delete the team unless the user wants to keep working with it.
 
 Tools: ${toolNames}${profilesText === '' ? '' : `\n\n${profilesText}`}`
 }
@@ -174,6 +184,7 @@ export function apply(ctx: Context, config: Config): void {
     'agent_teams_update_task',
     'agent_teams_send_message',
     'agent_teams_status',
+    'agent_teams_resume',
     'agent_teams_delete',
   ].join(', ')
   ctx.systemPrompt.section({
@@ -181,6 +192,8 @@ export function apply(ctx: Context, config: Config): void {
     order: config.promptSectionOrder ?? 117,
     text: () => usageSectionText(toolNames, formatProfilesForPrompt(config.profiles ?? {})),
   })
+
+  // Exported for TDD / docs checks. Not a public runtime API.
 
   registerAgentTeamsTools(ctx, resolved)
 

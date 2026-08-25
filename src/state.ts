@@ -18,6 +18,27 @@ import { readFileSync } from 'node:fs'
 import { mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { TERMINAL_TASK_STATUSES, type TaskStatus, type TeamMember, type TeamMessage, type TeamProfileSnapshot, type TeamState, type TeamTask } from './types.ts'
+import { hasValidQualityTaskFields, isReviewPolicy } from './quality-gates.ts'
+
+export {
+  buildCoverageMatrix,
+  canDeclareDelivery,
+  classifyChangedPath,
+  collectChangedPaths,
+  defaultQualityDeliveryGraph,
+  describeQualityLoop,
+  evaluateQualityCompletion,
+  hasValidQualityTaskFields,
+  isQualityKind,
+  pathMatchesScope,
+  planQualityFollowUp,
+  qualityPlanningPrompt,
+  resumeTeamState,
+  sanitizeReviewAcceptance,
+  sanitizeReviewObjective,
+  taskKindOf,
+  validateCreateTask,
+} from './quality-gates.ts'
 
 /** Mailbox key of the captain. */
 export const CAPTAIN_KEY = 'captain'
@@ -670,6 +691,7 @@ function isTeamProfileSnapshot(value: unknown): value is TeamProfileSnapshot {
     && (value['executionPrompt'] === undefined || typeof value['executionPrompt'] === 'string')
     && (value['fallback'] === undefined || (isRecord(value['fallback']) && typeof value['fallback']['provider'] === 'string' && typeof value['fallback']['model'] === 'string'))
     && (value['taskPlanning'] === undefined || value['taskPlanning'] === 'captain' || value['taskPlanning'] === 'seed')
+    && (value['reviewPolicy'] === undefined || isReviewPolicy(value['reviewPolicy']))
 }
 
 function coerceProfileSnapshot(value: unknown): TeamProfileSnapshot | undefined {
@@ -719,7 +741,7 @@ function coerceTeamState(value: unknown, expectedId: string): TeamState | undefi
   return isTeamState(coerced, expectedId) ? coerced : undefined
 }
 
-function isTeamTask(value: unknown): value is TeamTask {
+export function isTeamTask(value: unknown): value is TeamTask {
   if (!isRecord(value)) return false
   return typeof value['id'] === 'string'
     && isOptionalString(value['profileSeedId'])
@@ -743,6 +765,7 @@ function isTeamTask(value: unknown): value is TeamTask {
     && (value['reassigning'] === undefined || typeof value['reassigning'] === 'boolean')
     && isFiniteNumber(value['createdAt'])
     && isFiniteNumber(value['updatedAt'])
+    && hasValidQualityTaskFields(value)
 }
 
 /** Validate the full team record before it can participate in authorization. */
@@ -764,6 +787,8 @@ function isTeamState(value: unknown, expectedId: string): value is TeamState {
     && (value['taskSeq'] as number) >= 0
     && (value['halted'] === undefined || typeof value['halted'] === 'boolean')
     && (value['haltedAt'] === undefined || isFiniteNumber(value['haltedAt']))
+    && (value['reviewPolicy'] === undefined || isReviewPolicy(value['reviewPolicy']))
+    && (value['escalated'] === undefined || typeof value['escalated'] === 'boolean')
   if (!validShape) return false
 
   const members = value['members'] as TeamMember[]
@@ -913,11 +938,12 @@ export async function listArchivedTeamIds(stateRoot: string): Promise<string[]> 
 // ── activity snapshot (server-side, like the Claude Code desktop watcher) ──
 
 /** Visual task state for the activity panel. */
-export type VisualTaskState = 'blocked' | 'open' | 'running' | 'completed'
+export type VisualTaskState = 'blocked' | 'open' | 'running' | 'completed' | 'failed' | 'cancelled'
 
 /**
  * The visual state of one task: `running` while in_progress, `completed`
- * when done, `blocked` while any dependency is unfinished, else `open`.
+ * when done, `failed`/`cancelled` when terminal without success, `blocked`
+ * while any dependency is unfinished, else `open`.
  */
 export function taskVisualState(
   status: string,
@@ -925,6 +951,8 @@ export function taskVisualState(
   tasks: readonly TeamTask[],
 ): VisualTaskState {
   if (status === 'completed') return 'completed'
+  if (status === 'failed') return 'failed'
+  if (status === 'cancelled') return 'cancelled'
   if (status === 'in_progress') return 'running'
   const byId = new Map(tasks.map((task) => [task.id, task]))
   const openDependency = dependencies.some((dependencyId) => {

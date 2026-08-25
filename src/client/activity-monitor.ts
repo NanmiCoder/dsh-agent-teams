@@ -21,11 +21,14 @@ export interface ActivityTask {
   readonly id: string
   readonly subject: string
   readonly status: string
-  readonly state: 'blocked' | 'open' | 'running' | 'completed'
+  readonly state: 'blocked' | 'open' | 'running' | 'completed' | 'failed' | 'cancelled'
   readonly assignee: string
   readonly model?: string
   readonly dependencies: readonly string[]
   readonly depth: number
+  readonly kind?: string
+  readonly round?: number
+  readonly verdict?: string
 }
 
 /** One captain-inbox preview row. */

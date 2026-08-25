@@ -16,7 +16,7 @@
 
 `dsh-agent-teams` turns the current DeepSeek Harness session into a captain that can assemble durable sub-agents, split a goal into dependency-aware tasks, and coordinate work through direct messages.
 
-Ask in natural language. The plugin provides the team protocol, ten coordination tools, persistent state, an automatic shared-task scheduler, and a live Web UI—without requiring a separate workflow engine.
+Ask in natural language. The plugin provides the team protocol, eleven coordination tools, persistent state, an automatic shared-task scheduler, and a live Web UI—without requiring a separate workflow engine.
 
 <p align="center">
   <img src="./assets/ui.png" width="100%" alt="DeepSeek Harness conversation with the AgentTeams live activity panel, members, tasks, dependencies, and reports">
@@ -36,6 +36,7 @@ Read the [latest release notes](https://github.com/NanmiCoder/dsh-agent-teams/re
 | **Automatic reuse and safe takeover** | Idle members claim the next ready task; reassignment revokes stale attempts before new work starts, and cold recovery retries stranded open attempts. |
 | **Direct messaging** | Members send durable mailbox messages directly to teammates or the captain—no relay required. |
 | **Live activity panel** | The Web UI combines segmented progress, a collapsible roster, and an interactive task DAG; running tasks show the member's model, and completed archives retain their full member and task history. |
+| **Quality gates** | Give a goal and constraints. The default quality graph is requirements → implementation → verification → review → integration, with automatic repair/re-review and explicit resume. First-version scope control is a completion-time audit, not host write interception. See [docs/quality-gates.md](./docs/quality-gates.md). |
 
 The conversation card and activity panel use Harness's official locale service. They follow live language changes between English and Simplified Chinese—including status labels, dynamic summaries, controls, archive markers, and accessibility text—without a page reload or a separate plugin setting.
 
@@ -162,7 +163,7 @@ pnpm verify
 
 ## Named multi-role profiles
 
-Configure one or more complete team profiles in `cordis.patch.yml`. A profile always supplies the roster (independent provider/model/role/reasoning effort). Set `taskPlanning: captain` when the Captain should derive the task graph from the user's goal; omit it or set `taskPlanning: seed` to keep a fixed template workflow:
+Configure one or more complete team profiles in `cordis.patch.yml`. A profile always supplies the roster (independent provider/model/role/reasoning effort). Set `taskPlanning: captain` to have the program instantiate the quality graph from the user's goal; omit it or set `taskPlanning: seed` to keep a fixed template workflow:
 
 ```yaml
 profiles:
@@ -186,7 +187,7 @@ profiles:
         dependencies: [requirements]
 ```
 
-Use an explicit profile flag: `/agent-teams --profile demo-delivery implement the feature`. The first ordinary token is never treated as an implicit profile. `agent_teams_create({ profile })` expands the configured roster transactionally. Seed-planning profiles also expand their template tasks; captain-planning profiles create members only, and the Captain must then build the DAG from the goal. Do not ask the user how to split, merge, serialize, or parallelize. Failed review/test tasks do not unlock downstream work; the captain should add repair tasks and new review tasks without depending on the failed task. `memberProvider` remains the spawn/fork backend, not an LLM provider. Profiles prepare releases only; real deployment requires explicit user confirmation.
+Use an explicit profile flag: `/agent-teams --profile demo-delivery implement the feature`. The first ordinary token is never treated as an implicit profile. `agent_teams_create({ profile })` expands the configured roster transactionally. Seed-planning profiles expand their template tasks; captain-planning profiles automatically persist requirements → implementation → verification → review → integration, with quality contracts from the goal. The Captain guides this graph and does not recreate it manually. Failed review/test tasks do not unlock downstream work; automatic repair/review tasks do not depend on the failed review. `memberProvider` remains the spawn/fork backend, not an LLM provider. Profiles prepare releases only; real deployment requires explicit user confirmation.
 
 ## License
 

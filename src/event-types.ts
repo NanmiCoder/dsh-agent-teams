@@ -41,6 +41,8 @@ export interface AgentTeamsTaskCreatedData {
   readonly subject: string
   readonly dependencies: readonly string[]
   readonly assignee?: string
+  readonly kind?: string
+  readonly round?: number
 }
 
 /** Records one task status/assignee/output transition. */
@@ -52,12 +54,20 @@ export interface AgentTeamsTaskUpdatedData {
   readonly output?: string
   readonly attempt?: number
   readonly attemptId?: string
+  readonly verdict?: string
+  readonly round?: number
 }
 
 /** Records a human halt from the captain chat. */
 export interface AgentTeamsTeamHaltedData {
   readonly teamId: string
   readonly cancelledTasks: number
+}
+
+/** Records an explicit captain resume of a halted team. */
+export interface AgentTeamsTeamResumedData {
+  readonly teamId: string
+  readonly reason: string
 }
 
 /** Closes one team record: the team was deleted. */
@@ -115,6 +125,11 @@ declare module '@deepseek-ai/dsh-session/types' {
      */
     'agent-teams/team-halted': AgentTeamsTeamHaltedData
     /**
+     * Records an explicit captain resume.
+     * @param data - team identity and the resume reason.
+     */
+    'agent-teams/team-resumed': AgentTeamsTeamResumedData
+    /**
      * Closes one team record after deletion.
      * @param data - stable team identity.
      */
@@ -131,4 +146,5 @@ export type AgentTeamsEventType =
   | 'agent-teams/task-updated'
   | 'agent-teams/message-sent'
   | 'agent-teams/team-halted'
+  | 'agent-teams/team-resumed'
   | 'agent-teams/team-deleted'

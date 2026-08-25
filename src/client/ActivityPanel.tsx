@@ -151,6 +151,16 @@ function formatTaskIds(ids: readonly string[], t: AgentTeamsTranslate): string {
   return ids.join(t('format.listSeparator'))
 }
 
+function taskTitle(task: ActivityTask, model: string): string {
+  const extras = [
+    task.kind,
+    task.round === undefined ? undefined : `r${task.round}`,
+    task.verdict,
+    model === '' ? undefined : model,
+  ].filter((item): item is string => item !== undefined)
+  return extras.length === 0 ? `${task.id} · ${task.subject}` : `${task.id} · ${task.subject} · ${extras.join(' · ')}`
+}
+
 /** Badge/bar coloring key: visual state, widened for terminal statuses. */
 function taskTone(state: ActivityTask['state'], status: string): string {
   if (status === 'failed') return 'failed'
@@ -247,9 +257,13 @@ function taskSummary(team: ActivityTeam, t: AgentTeamsTranslate): string {
   const completed = team.tasks.filter((task) => task.status === 'completed')
   const running = team.tasks.filter((task) => task.state === 'running')
   const blocked = team.tasks.filter((task) => task.state === 'blocked')
-  const ready = team.tasks.filter((task) => task.state === 'open' && task.status !== 'completed')
+  const ready = team.tasks.filter((task) => task.state === 'open' && task.status !== 'completed' && task.status !== 'failed' && task.status !== 'cancelled')
+  const failed = team.tasks.filter((task) => task.status === 'failed')
   if (team.tasks.length === 0) return t('task.summary.waitingBreakdown')
   if (completed.length === team.tasks.length) return t('task.summary.allDelivered', { count: completed.length })
+  if (failed.length > 0 && running.length === 0 && ready.length === 0 && blocked.length === 0) {
+    return t('task.summary.failedSettled', { count: failed.length })
+  }
   if (blocked.length > 0 && running.length > 0) {
     return t('task.summary.blockedAndRunning', {
       tasks: formatTaskIds(blocked.slice(0, 3).map((task) => task.id), t),
@@ -380,7 +394,7 @@ function DependencyMap({ tasks, members, t }: {
                     data-focused={related?.has(task.id) ?? false}
                     data-dimmed={related !== null && !related.has(task.id)}
                     aria-pressed={pinnedTaskId === task.id}
-                    title={model === '' ? `${task.id} · ${task.subject}` : `${task.id} · ${task.subject} · ${model}`}
+                    title={taskTitle(task, model)}
                     onClick={() => { setPinnedTaskId((current) => current === task.id ? null : task.id) }}
                     onMouseEnter={() => { scheduleHover(task.id) }}
                     onMouseLeave={() => { scheduleHover(null) }}
@@ -543,7 +557,7 @@ function TeamSection({ team, onNavigate, t, historic = false }: {
                               className={css.assignmentChip}
                               data-state={taskTone(task.state, task.status)}
                               data-task-model={model || undefined}
-                              title={model === '' ? task.subject : `${task.subject} · ${model}`}
+                              title={taskTitle(task, model)}
                             >
                               {task.state === 'running' && shortModel !== '' ? `${task.id} · ${shortModel}` : task.id}
                             </span>

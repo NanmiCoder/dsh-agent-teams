@@ -535,6 +535,8 @@ const vtasks = [
   { id: 't4', subject: 'd', status: 'pending', assignee: 'alice', dependencies: ['t9'], createdAt: 0, updatedAt: 0 },
 ]
 check('completed -> completed visual state', taskVisualState('completed', [], vtasks) === 'completed')
+check('failed -> failed visual state', taskVisualState('failed', [], vtasks) === 'failed')
+check('cancelled -> cancelled visual state', taskVisualState('cancelled', [], vtasks) === 'cancelled')
 check('in_progress -> running visual state', taskVisualState('in_progress', [], vtasks) === 'running')
 check('pending with completed dep -> open', taskVisualState('pending', ['t1'], vtasks) === 'open')
 check('pending with open dep -> blocked', taskVisualState('pending', ['t2'], vtasks) === 'blocked')
@@ -597,6 +599,13 @@ check('planning roster with no tasks still shows the banner', teamIsActive({
   tasks: [],
 }) === true)
 check('halted team is not active', teamIsActive({ ...liveTeam, halted: true }) === false)
+check('settled failed/completed team is not waiting to be scheduled', teamIsActive({
+  members: [{ name: 'analyst', status: 'idle', activity: 'idle' }],
+  tasks: [
+    { id: 't1', status: 'completed' },
+    { id: 't2', status: 'failed' },
+  ],
+}) === false)
 check('progress summary prefers running task titles', teamProgressSummary(liveTeam, '、').detail === 'Clarify requirements')
 check('a real dependency keeps the layered DAG layout', !usesParallelTaskGrid([
   { id: 't1', dependencies: [], depth: 0 },

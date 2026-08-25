@@ -39,7 +39,20 @@ import {
   withTeamLock,
   writeTeam,
   removeTeamDir,
+  validateCreateTask,
+  evaluateQualityCompletion,
+  planQualityFollowUp,
+  resumeTeamState,
+  buildCoverageMatrix,
+  canDeclareDelivery,
+  describeQualityLoop,
+  defaultQualityDeliveryGraph,
+  hasValidQualityTaskFields,
+  sanitizeReviewAcceptance,
+  sanitizeReviewObjective,
+  taskKindOf,
 } from './state.ts'
+import type { AcceptanceResult, CommandResult, ReviewFinding, ReviewVerdict, TaskKind } from './types.ts'
 import {
   deliverToMember,
   installRetiredMemberGuard,
@@ -204,14 +217,48 @@ async function waitForMemberIdle(ctx: Context, member: TeamMember, signal: Abort
   }
 }
 
-/**
- * Deliver a durable member report at the captain's nearest model boundary.
+/** Stop every currently-resident member activation for one halted team.
  *
- * `Agent.steer()` targets the next step while the captain is running, wakes a
- * new turn when it is idle, and lets the Agent runtime reclassify an aborted
- * activity to `next-turn`. This prevents reports from waiting behind the
- * captain's entire orchestration turn.
+ * Interrupt requests only cancel the member's current model turn and retain its
+ * activation. Draining the selected direct children is the stronger lifecycle
+ * boundary: it waits for the activation handles to release, so a child cannot
+ * keep executing after the captain-chat Stop control has reported success.
  */
+async function stopTeamMemberActivations(
+  ctx: Context,
+  captain: Agent,
+  members: readonly TeamMember[],
+  signal?: AbortSignal,
+): Promise<void> {
+  const activeMembers = members.filter((member) => member.id !== '' && member.status !== 'removed')
+  const memberIds = activeMembers.map((member) => member.id as SessionId)
+  if (memberIds.length === 0) return
+
+  for (const memberId of memberIds) interruptMember(ctx, captain, memberId)
+  // `drainContinuableChildren` is available in the current runtime and releases
+  // the selected activation handles. Keep the quiescence fallback for pre-rc.8
+  // hosts, where interrupt is the strongest available lifecycle operation.
+  const runtime = ctx.subagents as typeof ctx.subagents & {
+    drainContinuableChildren?: (parent: Agent, childIds: readonly SessionId[]) => Promise<void>
+  }
+  if (runtime.drainContinuableChildren !== undefined) {
+    try {
+      await runtime.drainContinuableChildren(captain, memberIds)
+      return
+    } catch (error: unknown) {
+      // Do not claim the browser action stopped work when the runtime could not
+      // release all selected child activations. The HTTP route surfaces this
+      // failure instead of returning a false successful stop.
+      ctx.logger.warn(`agent-teams: failed to drain halted members: ${String(error)}`)
+      throw error
+    }
+  }
+  const fallbackSignal = signal ?? new AbortController().signal
+  const results = await Promise.allSettled(activeMembers.map((member) => waitForMemberIdle(ctx, member, fallbackSignal)))
+  const failed = results.find((result) => result.status === 'rejected')
+  if (failed?.status === 'rejected') throw failed.reason
+}
+
 export async function haltTeamWork(input: {
   ctx: Context
   stateRoot: string
@@ -254,17 +301,7 @@ export async function haltTeamWork(input: {
       members: fresh.members.filter((member) => member.id !== '' && member.status !== 'removed').map((member) => ({ ...member })),
     }
   })
-  for (const member of halted.members) {
-    interruptMember(input.ctx, input.captain, member.id)
-  }
-  if (input.signal !== undefined) {
-    const quiescence = await Promise.allSettled(halted.members.map((member) => waitForMemberIdle(input.ctx, member, input.signal!)))
-    for (const result of quiescence) {
-      if (result.status === 'rejected') {
-        input.ctx.logger.warn(`agent-teams: member did not quiesce after halt: ${String(result.reason)}`)
-      }
-    }
-  }
+  await stopTeamMemberActivations(input.ctx, input.captain, halted.members, input.signal)
   return {
     teamName: halted.teamName,
     cancelledTasks: halted.cancelledTasks,
@@ -297,7 +334,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
 
   ctx.tools.register(defineTool({
     name: 'agent_teams_create',
-    description: 'Create a team. Optional profile expands the configured roster in one in-process transactional create. Seed-planning profiles also expand their template tasks; captain-planning profiles create members only, so you must then derive the task graph from the goal. If profile is omitted, create an empty team and add members/tasks afterwards. If profile is set, do not recreate the same members. A successful create means the team now exists on disk; do not retry create for the same captain.',
+    description: 'Create a team. Optional profile expands the configured roster in one in-process transactional create. Seed-planning profiles expand their template tasks; captain-planning profiles instantiate the fixed quality graph requirements → implementation → verification → review → integration from the goal. If profile is omitted, create an empty team and add members/tasks afterwards. If profile is set, do not recreate the same members. A successful create means the team now exists on disk; do not retry create for the same captain.',
     parameters: {
       name: { type: 'string', required: true, description: 'Name for the new team (used as its stable id).' },
       description: { type: 'string', description: 'Team purpose / the goal the team will work on.' },
@@ -314,12 +351,12 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
           profile: { type: 'string' },
           task_planning: { type: 'string' },
           members: { type: 'array', items: { type: 'object', additionalProperties: false, properties: { member_name: { type: 'string', required: true }, member_id: { type: 'string', required: true }, provider: { type: 'string', required: true }, model: { type: 'string', required: true }, reasoning_effort: { type: 'string' }, status: { type: 'string', required: true } } } },
-          tasks: { type: 'array', items: { type: 'object', additionalProperties: false, properties: { task_id: { type: 'string', required: true }, seed_id: { type: 'string', required: true }, subject: { type: 'string', required: true }, status: { type: 'string', required: true }, assignee: { type: 'string' }, dependencies: { type: 'array', items: { type: 'string' }, required: true } } } },
+          tasks: { type: 'array', items: { type: 'object', additionalProperties: false, properties: { task_id: { type: 'string', required: true }, seed_id: { type: 'string', required: true }, subject: { type: 'string', required: true }, status: { type: 'string', required: true }, kind: { type: 'string' }, assignee: { type: 'string' }, dependencies: { type: 'array', items: { type: 'string' }, required: true } } } },
         },
       },
       render: (args, value) => [{
         type: 'text',
-        text: `Team "${value.team_name}" created (id ${value.team_id}) under ${value.state_dir}. You are the captain${value.task_planning === 'captain' ? '. This profile uses captain planning: create the task graph from the goal now.' : ''}.`,
+        text: `Team "${value.team_name}" created (id ${value.team_id}) under ${value.state_dir}. You are the captain${value.task_planning === 'captain' ? '. This profile instantiated the default quality graph; guide it, do not recreate it manually.' : ''}.`,
       }],
     },
     async execute(args, exec) {
@@ -435,6 +472,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
           seed_id: task.profileSeedId ?? '',
           subject: task.subject,
           status: task.status,
+          ...task.kind === undefined ? {} : { kind: task.kind },
           ...task.assignee === undefined ? {} : { assignee: task.assignee },
           dependencies: task.dependencies,
         })),
@@ -622,6 +660,25 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
         description: 'Task ids this task depends on (must be completed before this task can be claimed).',
       },
       assignee: { type: 'string', description: 'Optional member name this task is intended for.' },
+      kind: {
+        type: 'string',
+        enum: ['work', 'requirements', 'implementation', 'verification', 'review', 'repair', 'integration'],
+        description: 'Task kind. Defaults to work (legacy, no quality gates). Quality kinds require a contract.',
+      },
+      round: { type: 'number', description: '1-based review / requirements / repair round.' },
+      objective: { type: 'string', description: 'Required non-empty objective for quality kinds.' },
+      inScope: { type: 'array', items: { type: 'string' }, description: 'Workspace-relative POSIX paths this task may change.' },
+      outOfScope: { type: 'array', items: { type: 'string' }, description: 'Workspace-relative POSIX paths this task must not change.' },
+      acceptance: { type: 'array', items: { type: 'string' }, description: 'Acceptance criteria. Required for quality kinds.' },
+      verify: { type: 'array', items: { type: 'string' }, description: 'Verification commands. Required for implementation/repair.' },
+      deliverables: { type: 'array', items: { type: 'string' }, description: 'Expected deliverable paths or names.' },
+      nonGoals: { type: 'array', items: { type: 'string' }, description: 'Explicit non-goals.' },
+      reviewedTaskId: { type: 'string', description: 'Task being reviewed. Required for kind=review.' },
+      sourceTaskId: { type: 'string', description: 'Source implementation/artifact. Required for kind=repair.' },
+      sourceFindingIds: { type: 'array', items: { type: 'string' }, description: 'Finding ids this repair must close.' },
+      coverageOf: { type: 'array', items: { type: 'string' }, description: 'User-constraint / goal items this task covers.' },
+      resume: { type: 'boolean', description: 'If true, clear halted in the same lock before creating the task.' },
+      resumeReason: { type: 'string', description: 'Required non-empty reason when resume=true.' },
     },
     output: {
       schema: {
@@ -646,9 +703,39 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
       const team = await requireCaptainTeam(workspace, config, captain)
       const created = await withTeamLock(teamLockKey(stateRoot, team.id), async () => {
         const fresh = await requireFreshCaptainTeam(stateRoot, team.id, captain.id)
+        const gate = validateCreateTask(fresh, {
+          subject: args.subject,
+          description: args.description,
+          dependencies: args.dependencies,
+          assignee: args.assignee,
+          kind: args.kind as TaskKind | undefined,
+          round: args.round,
+          objective: args.objective,
+          inScope: args.inScope,
+          outOfScope: args.outOfScope,
+          acceptance: args.acceptance,
+          verify: args.verify,
+          deliverables: args.deliverables,
+          nonGoals: args.nonGoals,
+          reviewedTaskId: args.reviewedTaskId,
+          sourceTaskId: args.sourceTaskId,
+          sourceFindingIds: args.sourceFindingIds,
+          coverageOf: args.coverageOf,
+          resume: args.resume,
+          resumeReason: args.resumeReason,
+        })
+        if (!gate.ok) throw new Error(gate.error ?? 'create_task rejected by quality gates')
         if (fresh.halted === true) {
+          const resumed = resumeTeamState(fresh, args.resumeReason ?? '')
+          if (resumed.status !== 'resumed' || resumed.team === undefined) {
+            throw new Error(resumed.error ?? 'team is halted; call agent_teams_resume or pass resume=true with resumeReason')
+          }
           fresh.halted = false
           fresh.haltedAt = undefined
+          appendTeamEvent(ctx, captainSessionOf(ctx, fresh.captainSessionId, captain.session), 'agent-teams/team-resumed', {
+            teamId: fresh.id,
+            reason: args.resumeReason ?? '',
+          })
         }
         const dependencies = args.dependencies ?? []
         for (const dependency of dependencies) {
@@ -657,6 +744,13 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
           }
         }
         if (args.assignee !== undefined) requireMember(fresh, args.assignee)
+        const kind = gate.kind ?? 'work'
+        const objective = kind === 'review' || kind === 'requirements'
+          ? sanitizeReviewObjective(args.objective)
+          : args.objective
+        const acceptance = kind === 'review' || kind === 'requirements'
+          ? sanitizeReviewAcceptance(args.acceptance)
+          : args.acceptance
         const task: TeamTask = {
           id: `t${fresh.taskSeq + 1}`,
           subject: args.subject,
@@ -667,6 +761,19 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
           attempt: 0,
           createdAt: Date.now(),
           updatedAt: Date.now(),
+          kind,
+          ...args.round === undefined ? {} : { round: args.round },
+          ...objective === undefined ? {} : { objective },
+          ...args.inScope === undefined ? {} : { inScope: args.inScope },
+          ...args.outOfScope === undefined ? {} : { outOfScope: args.outOfScope },
+          ...acceptance === undefined ? {} : { acceptance },
+          ...args.verify === undefined ? {} : { verify: args.verify },
+          ...args.deliverables === undefined ? {} : { deliverables: args.deliverables },
+          ...args.nonGoals === undefined ? {} : { nonGoals: args.nonGoals },
+          ...args.reviewedTaskId === undefined ? {} : { reviewedTaskId: args.reviewedTaskId },
+          ...args.sourceTaskId === undefined ? {} : { sourceTaskId: args.sourceTaskId },
+          ...args.sourceFindingIds === undefined ? {} : { sourceFindingIds: args.sourceFindingIds },
+          ...args.coverageOf === undefined ? {} : { coverageOf: args.coverageOf },
         }
         fresh.taskSeq += 1
         fresh.tasks.push(task)
@@ -677,6 +784,8 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
           subject: task.subject,
           dependencies: task.dependencies,
           ...task.assignee !== undefined ? { assignee: task.assignee } : {},
+          ...task.kind === undefined ? {} : { kind: task.kind },
+          ...task.round === undefined ? {} : { round: task.round },
         })
         return {
           task_id: task.id,
@@ -901,6 +1010,31 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
       },
       output: { type: 'string', description: 'Result summary; set when completing or failing.' },
       attempt_id: { type: 'string', description: 'Current execution capability returned by claim_task (required for members when present on the task).' },
+      verdict: {
+        type: 'string',
+        enum: ['pass', 'needs_revision', 'reject'],
+        description: 'Required for completing requirements/review. needs_revision and reject must fail the task.',
+      },
+      findings: {
+        type: 'array',
+        items: { type: 'object', additionalProperties: true, properties: {} },
+        description: 'Structured review findings. Required when verdict is needs_revision or reject.',
+      },
+      changedPaths: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Workspace-relative POSIX paths changed by this implementation/repair.',
+      },
+      acceptanceResults: {
+        type: 'array',
+        items: { type: 'object', additionalProperties: true, properties: {} },
+        description: 'Acceptance evidence. Quality kinds require a passed result for every acceptance item.',
+      },
+      commandsRun: {
+        type: 'array',
+        items: { type: 'object', additionalProperties: true, properties: {} },
+        description: 'Verification command evidence. Must cover every verify command.',
+      },
     },
     output: {
       schema: {
@@ -954,13 +1088,41 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
             ...task.output !== undefined ? { output: task.output } : {},
           }
         }
+        const findings = parseFindings(args.findings)
+        const acceptanceResults = parseAcceptanceResults(args.acceptanceResults)
+        const commandsRun = parseCommandResults(args.commandsRun)
+        const gate = evaluateQualityCompletion(task, {
+          status: args.status,
+          output: args.output,
+          verdict: args.verdict as ReviewVerdict | undefined,
+          findings,
+          changedPaths: args.changedPaths,
+          acceptanceResults,
+          commandsRun,
+        })
+        if (!gate.ok) throw new Error(gate.error ?? 'update_task rejected by quality gates')
         if (args.status !== undefined) {
           const transition = transitionError(task.status, args.status)
           if (transition !== undefined) throw new Error(transition)
           task.status = args.status
         }
         if (args.output !== undefined) task.output = args.output
+        if (args.verdict !== undefined) task.verdict = args.verdict as ReviewVerdict
+        if (findings !== undefined) task.findings = findings
+        if (args.changedPaths !== undefined) task.changedPaths = args.changedPaths
+        if (acceptanceResults !== undefined) task.acceptanceResults = acceptanceResults
+        if (commandsRun !== undefined) task.commandsRun = commandsRun
         task.updatedAt = Date.now()
+        const followUp = (task.status === 'failed' && (task.verdict === 'needs_revision' || task.verdict === 'reject'))
+          ? applyQualityFollowUp(fresh, task)
+          : undefined
+        if (followUp?.escalated === true) {
+          await appendMailbox(stateRoot, fresh.id, CAPTAIN_KEY, createMessage(
+            CAPTAIN_KEY,
+            CAPTAIN_KEY,
+            `Quality-gate loop escalated after ${task.id} (${task.kind ?? 'review'} verdict=${task.verdict}). Automatic repair/review stopped.`,
+          ))
+        }
         await writeTeam(stateRoot, fresh)
         appendTeamEvent(ctx, captainSessionOf(ctx, fresh.captainSessionId, caller.session), 'agent-teams/task-updated', {
           teamId: fresh.id,
@@ -968,7 +1130,20 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
           status: task.status,
           ...task.assignee !== undefined ? { assignee: task.assignee } : {},
           ...task.output !== undefined ? { output: task.output } : {},
+          ...task.verdict === undefined ? {} : { verdict: task.verdict },
+          ...task.round === undefined ? {} : { round: task.round },
         })
+        for (const created of followUp?.created ?? []) {
+          appendTeamEvent(ctx, captainSessionOf(ctx, fresh.captainSessionId, caller.session), 'agent-teams/task-created', {
+            teamId: fresh.id,
+            taskId: created.id,
+            subject: created.subject,
+            dependencies: created.dependencies,
+            ...created.assignee === undefined ? {} : { assignee: created.assignee },
+            ...created.kind === undefined ? {} : { kind: created.kind },
+            ...created.round === undefined ? {} : { round: created.round },
+          })
+        }
         return {
           task_id: task.id,
           status: task.status,
@@ -1032,6 +1207,9 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
             ts: message.ts,
           })
           return { kind: 'captain' as const, fresh, identity, message, from }
+        }
+        if (fresh.halted === true) {
+          throw new Error(`team "${fresh.name}" is halted; call agent_teams_resume before waking a member`)
         }
         const recipient = requireMember(fresh, to)
         const message = { ...createMessage(from, recipient.name, args.content), deliveryClaimedAt: Date.now() }
@@ -1135,6 +1313,10 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
         attempt: task.attempt ?? 0,
         attempt_id: task.attemptId ?? '',
         reassigning: task.reassigning === true,
+        kind: taskKindOf(task),
+        ...task.round === undefined ? {} : { round: task.round },
+        ...task.verdict === undefined ? {} : { verdict: task.verdict },
+        findings_open: (task.findings ?? []).filter((finding) => finding.resolved !== true).length,
         ...task.profileSeedId === undefined ? {} : { seed_id: task.profileSeedId },
         ...task.output !== undefined ? { output: task.output } : {},
       }))
@@ -1167,10 +1349,29 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
           }
         }
       }
+      const coverage = buildCoverageMatrix(
+        [...new Set(team.tasks.flatMap((item) => item.coverageOf ?? []))],
+        team.tasks,
+      ).map((row) => ({
+        goal_item: row.goal_item,
+        task_ids: [...row.task_ids],
+        status: row.status,
+        ...row.evidence === undefined ? {} : { evidence: row.evidence },
+      }))
+      const deliveryCheck = canDeclareDelivery(team)
+      const delivery = { ok: deliveryCheck.ok, blockers: [...deliveryCheck.blockers] }
+      const loop = describeQualityLoop(team)
       const result = {
         team_id: team.id,
         team_name: team.name,
         description: team.description ?? '',
+        halted: loop.halted,
+        escalated: loop.escalated,
+        loop_state: loop.state,
+        loop_summary: loop.summary,
+        deliverable: loop.deliverable,
+        coverage,
+        delivery,
         ...team.profile === undefined ? {} : {
           profile: {
             name: team.profile.name,
@@ -1200,6 +1401,58 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
           acknowledgeMailbox(stateRoot, team.id, identity.kind === 'captain' ? CAPTAIN_KEY : identity.name, acknowledged)
         ))
       }
+      return result
+    },
+  }))
+
+  ctx.tools.register(defineTool({
+    name: 'agent_teams_resume',
+    description: 'Explicitly resume a halted team. Requires a non-empty reason. Does not recreate cancelled tasks; only still-pending work is scheduled.',
+    parameters: {
+      reason: { type: 'string', required: true, description: 'Why the team is being resumed.' },
+    },
+    output: {
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          status: { type: 'string', required: true },
+          team_id: { type: 'string', required: true },
+          reason: { type: 'string', required: true },
+        },
+      },
+      render: (_args, value) => [{
+        type: 'text',
+        text: value.status === 'already_running'
+          ? `Team ${value.team_id} is already running.`
+          : `Team ${value.team_id} resumed (${value.reason}).`,
+      }],
+    },
+    async execute(args, exec) {
+      const captain = requireCaptain(exec)
+      const workspace = workspaceOf(captain)
+      const stateRoot = stateRootOf(workspace, config)
+      const team = await requireCaptainTeam(workspace, config, captain)
+      const result = await withTeamLock(teamLockKey(stateRoot, team.id), async () => {
+        const fresh = await requireFreshCaptainTeam(stateRoot, team.id, captain.id)
+        const resumed = resumeTeamState(fresh, args.reason)
+        if (resumed.status === 'rejected') throw new Error(resumed.error ?? 'resume rejected')
+        if (resumed.status === 'resumed') {
+          fresh.halted = false
+          fresh.haltedAt = undefined
+          await writeTeam(stateRoot, fresh)
+          appendTeamEvent(ctx, captainSessionOf(ctx, fresh.captainSessionId, captain.session), 'agent-teams/team-resumed', {
+            teamId: fresh.id,
+            reason: args.reason,
+          })
+        }
+        return {
+          status: resumed.status,
+          team_id: fresh.id,
+          reason: args.reason,
+        }
+      })
+      if (result.status === 'resumed') await scheduler.kickTeam(workspace, team.id, captain)
       return result
     },
   }))
@@ -1267,6 +1520,72 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
   }))
 }
 
+function normalizedRoleTerms(member: Pick<TeamMember, 'name' | 'role'>): string[] {
+  return `${member.name} ${member.role ?? ''}`
+    .toLowerCase()
+    .split(/[^a-z0-9]+/u)
+    .filter(Boolean)
+}
+
+function uniqueRoleAssignee(members: readonly Pick<TeamMember, 'name' | 'role'>[], aliases: readonly string[]): string | undefined {
+  for (const alias of aliases) {
+    const matched = members.filter((member) => normalizedRoleTerms(member).includes(alias))
+    if (matched.length === 1) return matched[0]?.name
+    // A higher-priority role term that names several members is ambiguous;
+    // do not quietly pick a lower-priority, less-specific match.
+    if (matched.length > 1) return undefined
+  }
+  return undefined
+}
+
+/** Instantiate the fixed quality graph that captain-planning profiles deliver. */
+function instantiateCaptainQualityTasks(
+  goal: string,
+  members: readonly Pick<TeamMember, 'name' | 'role'>[],
+  now: number,
+): TeamTask[] {
+  const graph = defaultQualityDeliveryGraph({
+    goal,
+    analyst: uniqueRoleAssignee(members, ['analyst', 'requirements', 'researcher']),
+    implementer: uniqueRoleAssignee(members, ['implementer', 'developer']),
+    tester: uniqueRoleAssignee(members, ['tester', 'test', 'verification']),
+    reviewer: uniqueRoleAssignee(members, ['reviewer', 'review', 'auditor']),
+    integrator: uniqueRoleAssignee(members, ['integrator', 'integration', 'release', 'lead']),
+  })
+  const idBySubject = new Map(graph.map((item, index) => [item.subject, `t${index + 1}`] as const))
+  const tasks = graph.map((item, index): TeamTask => {
+    const id = `t${index + 1}`
+    const task: TeamTask = {
+      id,
+      profileSeedId: item.subject,
+      subject: item.subject,
+      description: item.objective,
+      status: 'pending',
+      ...item.assignee === undefined ? {} : { assignee: item.assignee },
+      dependencies: item.dependencies.map((dependency) => idBySubject.get(dependency) ?? dependency),
+      attempt: 0,
+      kind: item.kind,
+      round: 1,
+      objective: item.objective,
+      acceptance: [...item.acceptance],
+      ...item.inScope === undefined ? {} : { inScope: [...item.inScope] },
+      ...item.verify === undefined ? {} : { verify: [...item.verify] },
+      ...item.coverageOf === undefined ? {} : { coverageOf: [...item.coverageOf] },
+      ...item.kind === 'review' ? { reviewedTaskId: idBySubject.get('implementation')! } : {},
+      createdAt: now,
+      updatedAt: now,
+    }
+    if (!hasValidQualityTaskFields({ ...task })) throw new Error(`default quality graph emitted invalid task "${item.subject}"`)
+    return task
+  })
+  const implementation = tasks.find((task) => task.kind === 'implementation')
+  const review = tasks.find((task) => task.kind === 'review')
+  if (implementation === undefined || review?.reviewedTaskId !== implementation.id) {
+    throw new Error('default quality graph failed to link its review to implementation')
+  }
+  return tasks
+}
+
 async function initializeProfileTeam(input: {
   ctx: Context
   config: ToolsConfig
@@ -1291,6 +1610,9 @@ async function initializeProfileTeam(input: {
     }, input.exec.signal))
   }
   const now = Date.now()
+  const generatedTasks = profile.taskPlanning === 'captain'
+    ? instantiateCaptainQualityTasks(input.description ?? input.teamName, profile.members, now)
+    : undefined
   const seedToActual = new Map(profile.tasks.map((template, index) => [template.id, `t${index + 1}`] as const))
   const draft: TeamState = {
     name: input.teamName,
@@ -1303,7 +1625,9 @@ async function initializeProfileTeam(input: {
       ...profile.executionPrompt === undefined ? {} : { executionPrompt: profile.executionPrompt },
       ...profile.fallback === undefined ? {} : { fallback: profile.fallback },
       taskPlanning: profile.taskPlanning,
+      ...profile.reviewPolicy === undefined ? {} : { reviewPolicy: profile.reviewPolicy },
     },
+    ...profile.reviewPolicy === undefined ? {} : { reviewPolicy: profile.reviewPolicy },
     captainSessionId: input.captain.id,
     createdAt: now,
     members: profile.members.map((template, index) => {
@@ -1321,7 +1645,7 @@ async function initializeProfileTeam(input: {
         status: 'idle' as const,
       }
     }),
-    tasks: profile.tasks.map((template, index) => ({
+    tasks: generatedTasks ?? profile.tasks.map((template, index) => ({
       id: `t${index + 1}`,
       profileSeedId: template.id,
       subject: template.subject,
@@ -1333,7 +1657,7 @@ async function initializeProfileTeam(input: {
       createdAt: now,
       updatedAt: now,
     })),
-    taskSeq: profile.tasks.length,
+    taskSeq: generatedTasks?.length ?? profile.tasks.length,
   }
   const spawned: TeamMember[] = []
   try {
@@ -1383,6 +1707,118 @@ async function initializeProfileTeam(input: {
   }
 }
 
+function parseFindings(value: unknown): ReviewFinding[] | undefined {
+  if (value === undefined) return undefined
+  if (!Array.isArray(value)) throw new Error('findings must be an array')
+  return value.map((item, index) => {
+    if (typeof item !== 'object' || item === null || Array.isArray(item)) {
+      throw new Error(`findings[${index}] must be an object`)
+    }
+    const raw = item as Record<string, unknown>
+    if (typeof raw['id'] !== 'string' || raw['id'].trim() === '') throw new Error(`findings[${index}].id is required`)
+    if (raw['severity'] !== 'low' && raw['severity'] !== 'medium' && raw['severity'] !== 'high' && raw['severity'] !== 'blocker') {
+      throw new Error(`findings[${index}].severity is invalid`)
+    }
+    if (typeof raw['problem'] !== 'string' || raw['problem'].trim() === '') throw new Error(`findings[${index}].problem is required`)
+    if (typeof raw['requiredFix'] !== 'string' || raw['requiredFix'].trim() === '') throw new Error(`findings[${index}].requiredFix is required`)
+    return {
+      id: raw['id'].trim(),
+      severity: raw['severity'],
+      problem: raw['problem'],
+      requiredFix: raw['requiredFix'],
+      ...typeof raw['file'] === 'string' ? { file: raw['file'] } : {},
+      ...typeof raw['line'] === 'number' ? { line: raw['line'] } : {},
+      ...typeof raw['resolved'] === 'boolean' ? { resolved: raw['resolved'] } : {},
+    }
+  })
+}
+
+function parseAcceptanceResults(value: unknown): AcceptanceResult[] | undefined {
+  if (value === undefined) return undefined
+  if (!Array.isArray(value)) throw new Error('acceptanceResults must be an array')
+  return value.map((item, index) => {
+    if (typeof item !== 'object' || item === null || Array.isArray(item)) {
+      throw new Error(`acceptanceResults[${index}] must be an object`)
+    }
+    const raw = item as Record<string, unknown>
+    if (typeof raw['criterion'] !== 'string' || raw['criterion'].trim() === '') {
+      throw new Error(`acceptanceResults[${index}].criterion is required`)
+    }
+    if (raw['status'] !== 'passed' && raw['status'] !== 'failed') {
+      throw new Error(`acceptanceResults[${index}].status must be passed or failed`)
+    }
+    return {
+      criterion: raw['criterion'],
+      status: raw['status'],
+      ...typeof raw['evidence'] === 'string' ? { evidence: raw['evidence'] } : {},
+    }
+  })
+}
+
+function parseCommandResults(value: unknown): CommandResult[] | undefined {
+  if (value === undefined) return undefined
+  if (!Array.isArray(value)) throw new Error('commandsRun must be an array')
+  return value.map((item, index) => {
+    if (typeof item !== 'object' || item === null || Array.isArray(item)) {
+      throw new Error(`commandsRun[${index}] must be an object`)
+    }
+    const raw = item as Record<string, unknown>
+    if (typeof raw['command'] !== 'string' || raw['command'].trim() === '') {
+      throw new Error(`commandsRun[${index}].command is required`)
+    }
+    if (raw['status'] !== 'passed' && raw['status'] !== 'failed') {
+      throw new Error(`commandsRun[${index}].status must be passed or failed`)
+    }
+    return {
+      command: raw['command'],
+      status: raw['status'],
+      ...typeof raw['exitCode'] === 'number' ? { exitCode: raw['exitCode'] } : {},
+      ...typeof raw['evidence'] === 'string' ? { evidence: raw['evidence'] } : {},
+    }
+  })
+}
+
+function applyQualityFollowUp(team: TeamState, closed: TeamTask): { created: TeamTask[]; escalated: boolean } {
+  const planned = planQualityFollowUp(team, closed)
+  if (planned.escalated === true) team.escalated = true
+  const created: TeamTask[] = []
+  const now = Date.now()
+  const idBySubject = new Map<string, string>()
+  for (const draft of planned.created) {
+    team.taskSeq += 1
+    const id = `t${team.taskSeq}`
+    if (draft.id !== undefined) idBySubject.set(draft.id, id)
+    if (draft.subject !== undefined) idBySubject.set(draft.subject, id)
+    const dependencies = (draft.dependencies ?? []).map((dependency) => {
+      if (team.tasks.some((item) => item.id === dependency)) return dependency
+      return idBySubject.get(dependency) ?? dependency
+    })
+    const next: TeamTask = {
+      id,
+      subject: draft.subject ?? `${draft.kind}-round-${draft.round ?? 1}`,
+      status: 'pending',
+      assignee: draft.assignee,
+      dependencies,
+      attempt: 0,
+      createdAt: now,
+      updatedAt: now,
+      kind: draft.kind,
+      ...draft.round === undefined ? {} : { round: draft.round },
+      ...draft.objective === undefined ? {} : { objective: draft.objective },
+      ...draft.inScope === undefined ? {} : { inScope: draft.inScope },
+      ...draft.outOfScope === undefined ? {} : { outOfScope: draft.outOfScope },
+      ...draft.acceptance === undefined ? {} : { acceptance: draft.acceptance },
+      ...draft.verify === undefined ? {} : { verify: draft.verify },
+      ...draft.sourceTaskId === undefined ? {} : { sourceTaskId: draft.sourceTaskId },
+      ...draft.sourceFindingIds === undefined ? {} : { sourceFindingIds: draft.sourceFindingIds },
+      ...draft.reviewedTaskId === undefined ? {} : { reviewedTaskId: idBySubject.get(draft.reviewedTaskId) ?? draft.reviewedTaskId },
+    }
+    team.tasks.push(next)
+    created.push(next)
+  }
+  return { created, escalated: planned.escalated === true }
+}
+
 /** Build the `memberRuntime` config handed to member helpers. */
 function memberRuntime(config: ToolsConfig): MemberRuntimeConfig {
   return {
@@ -1409,15 +1845,31 @@ function renderStatus(value: JsonValue): string {
       status: string
       activity: string
     }[]
-    tasks: { id: string; subject: string; status: string; assignee: string; dependencies: string[]; attempt: number; attempt_id: string; reassigning: boolean; seed_id?: string; output?: string }[]
+    tasks: { id: string; subject: string; status: string; assignee: string; dependencies: string[]; attempt: number; attempt_id: string; reassigning: boolean; seed_id?: string; output?: string; kind?: string; round?: number; verdict?: string; findings_open?: number }[]
     captain_inbox: { from: string; content: string }[]
     member_inboxes: Record<string, { count: number; latest: string }>
     mailbox_warnings: string[]
     mailbox_warning_count: number
+    halted?: boolean
+    escalated?: boolean
+    loop_state?: string
+    loop_summary?: string
+    deliverable?: boolean
+    coverage?: { goal_item: string; status: string; task_ids: string[] }[]
+    delivery?: { ok: boolean; blockers: string[] }
   }
+  const flags = [
+    team.halted ? 'halted' : undefined,
+    team.escalated ? 'escalated' : undefined,
+    team.deliverable ? 'deliverable' : undefined,
+    team.loop_state && team.loop_state !== 'running' && team.loop_state !== 'halted' && team.loop_state !== 'escalated'
+      ? team.loop_state
+      : undefined,
+  ].filter((item): item is string => item !== undefined)
   const lines: string[] = [
-    `Team "${team.team_name}"${team.description ? ` — ${team.description}` : ''}`,
+    `Team "${team.team_name}"${team.description ? ` — ${team.description}` : ''}${flags.length > 0 ? ` [${flags.join(', ')}]` : ''}`,
     ...team.profile === undefined ? [] : [`Profile: ${team.profile.name}${team.profile.task_planning ? ` [${team.profile.task_planning}]` : ''}${team.profile.protocol ? ` — ${team.profile.protocol}` : ''}`],
+    ...team.loop_summary ? [`Loop: ${team.loop_state ?? ''} — ${team.loop_summary}`.replace(/^Loop:  — /u, 'Loop: ')] : [],
     `Viewing as: ${team.viewer}`,
     `Members (${team.members.length}):`,
     ...team.members.map((member) => {
@@ -1431,8 +1883,18 @@ function renderStatus(value: JsonValue): string {
       const output = task.output !== undefined ? `\n      output: ${task.output.slice(0, 300)}` : ''
       const handoff = task.reassigning ? ' (reassigning)' : ''
       const seed = task.seed_id === undefined || task.seed_id === '' ? '' : ` seed ${task.seed_id}`
-      return `  - ${task.id} [${task.status}] attempt ${task.attempt}${handoff}${seed} ${task.subject} → ${task.assignee || 'unassigned'}${deps}${output}`
+      const kind = task.kind ? ` ${task.kind}` : ''
+      const round = task.round === undefined ? '' : ` r${task.round}`
+      const verdict = task.verdict === undefined ? '' : ` verdict ${task.verdict}`
+      return `  - ${task.id} [${task.status}]${kind}${round}${verdict} attempt ${task.attempt}${handoff}${seed} ${task.subject} → ${task.assignee || 'unassigned'}${deps}${output}`
     }),
+    ...team.coverage === undefined || team.coverage.length === 0 ? [] : [
+      'Coverage:',
+      ...team.coverage.map((row) => `  - ${row.goal_item}: ${row.status} (${row.task_ids.join(',') || 'none'})`),
+    ],
+    ...team.delivery === undefined ? [] : [
+      `Delivery: ${team.delivery.ok ? 'ok' : `blocked (${team.delivery.blockers.join('; ')})`}`,
+    ],
     `Captain inbox (${team.captain_inbox.length}):`,
     ...team.captain_inbox.map((message) => `  - [${message.from}] ${message.content.slice(0, 200)}`),
   ]

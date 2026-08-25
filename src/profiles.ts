@@ -18,7 +18,8 @@ export const MAX_PROFILE_TASKS = 32
 /** Protocol excerpt length in the usage / prompt listing. */
 export const PROFILE_PROTOCOL_PROMPT_LIMIT = 240
 
-const PROFILE_KEYS = ['description', 'protocol', 'executionPrompt', 'fallback', 'members', 'tasks', 'taskPlanning'] as const
+const PROFILE_KEYS = ['description', 'protocol', 'executionPrompt', 'fallback', 'members', 'tasks', 'taskPlanning', 'reviewPolicy'] as const
+const REVIEW_POLICY_KEYS = ['requirementsMinRounds', 'requirementsMaxRounds', 'codeMaxRounds', 'maxRepairAttempts', 'requiredReviewers'] as const
 const MEMBER_KEYS = ['name', 'role', 'provider', 'model', 'reasoning_effort', 'executionPrompt', 'fallback'] as const
 const FALLBACK_KEYS = ['provider', 'model'] as const
 const TASK_KEYS = ['id', 'subject', 'description', 'assignee', 'dependencies'] as const
@@ -62,6 +63,7 @@ export interface TeamProfileConfig {
    */
   taskPlanning?: 'captain' | 'seed'
   tasks?: TeamProfileTaskConfig[]
+  reviewPolicy?: import('./types.ts').ReviewPolicy
 }
 
 /** A profile member after trim / pairing / reserved-name checks. */
@@ -95,6 +97,7 @@ export interface NormalizedTeamProfile {
   taskPlanning: 'captain' | 'seed'
   members: NormalizedProfileMember[]
   tasks: NormalizedProfileTask[]
+  reviewPolicy?: import('./types.ts').ReviewPolicy
 }
 
 /** The goal + optional named profile extracted from a slash / gesture line. */
@@ -295,6 +298,7 @@ function normalizeListedProfile(
   const executionPrompt = optionalNonEmptyString(raw['executionPrompt'], `${path}.executionPrompt`)
   const fallback = normalizeFallback(raw['fallback'], `${path}.fallback`)
   const taskPlanning = normalizeTaskPlanning(raw['taskPlanning'], `${path}.taskPlanning`)
+  const reviewPolicy = normalizeReviewPolicy(raw['reviewPolicy'], `${path}.reviewPolicy`)
   const membersRaw = raw['members']
   if (!Array.isArray(membersRaw) || membersRaw.length === 0) {
     throw new Error(`AgentTeams profile "${listed.name}" has no members`)
@@ -331,6 +335,7 @@ function normalizeListedProfile(
       executionPrompt,
       fallback,
       taskPlanning,
+      reviewPolicy,
       members,
       tasks: [],
     })
@@ -382,6 +387,7 @@ function normalizeListedProfile(
     executionPrompt,
     fallback,
     taskPlanning,
+    reviewPolicy,
     members,
     tasks: taskPlanning === 'captain' ? [] : tasks,
   })
@@ -391,6 +397,50 @@ function normalizeTaskPlanning(value: unknown, path: string): 'captain' | 'seed'
   if (value === undefined) return 'seed'
   if (value === 'captain' || value === 'seed') return value
   throw new Error(`${path} must be "captain" or "seed"`)
+}
+
+function normalizeReviewPolicy(value: unknown, path: string): import('./types.ts').ReviewPolicy | undefined {
+  if (value === undefined) return undefined
+  const raw = asRecord(value, path)
+  assertAllowedKeys(raw, REVIEW_POLICY_KEYS, path)
+  const requirementsMinRounds = optionalPositiveInt(raw['requirementsMinRounds'], `${path}.requirementsMinRounds`)
+  const requirementsMaxRounds = optionalPositiveInt(raw['requirementsMaxRounds'], `${path}.requirementsMaxRounds`)
+  const codeMaxRounds = optionalPositiveInt(raw['codeMaxRounds'], `${path}.codeMaxRounds`)
+  const maxRepairAttempts = optionalPositiveInt(raw['maxRepairAttempts'], `${path}.maxRepairAttempts`)
+  if (
+    requirementsMinRounds !== undefined
+    && requirementsMaxRounds !== undefined
+    && requirementsMinRounds > requirementsMaxRounds
+  ) {
+    throw new Error(`${path}.requirementsMinRounds must be <= requirementsMaxRounds`)
+  }
+  let requiredReviewers: string[] | undefined
+  if (raw['requiredReviewers'] !== undefined) {
+    if (!Array.isArray(raw['requiredReviewers'])) {
+      throw new Error(`${path}.requiredReviewers must be an array of strings`)
+    }
+    requiredReviewers = raw['requiredReviewers'].map((item, index) => {
+      if (typeof item !== 'string' || item.trim() === '') {
+        throw new Error(`${path}.requiredReviewers[${index}] must be a non-empty string`)
+      }
+      return item.trim()
+    })
+  }
+  return omitUndefined({
+    requirementsMinRounds,
+    requirementsMaxRounds,
+    codeMaxRounds,
+    maxRepairAttempts,
+    requiredReviewers,
+  })
+}
+
+function optionalPositiveInt(value: unknown, path: string): number | undefined {
+  if (value === undefined) return undefined
+  if (!Number.isSafeInteger(value) || (value as number) < 1) {
+    throw new Error(`${path} must be a positive integer`)
+  }
+  return value as number
 }
 
 function normalizeMember(

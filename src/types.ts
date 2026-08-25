@@ -20,6 +20,72 @@ export type TaskStatus =
 /** Statuses after which a task can no longer be claimed or worked on. */
 export const TERMINAL_TASK_STATUSES: readonly TaskStatus[] = ['completed', 'failed', 'cancelled']
 
+/** Structured quality-gate kind. Absent / unknown values are treated as `work`. */
+export type TaskKind =
+  | 'requirements'
+  | 'implementation'
+  | 'verification'
+  | 'review'
+  | 'repair'
+  | 'integration'
+  | 'work'
+
+export const TASK_KINDS: readonly TaskKind[] = [
+  'requirements',
+  'implementation',
+  'verification',
+  'review',
+  'repair',
+  'integration',
+  'work',
+]
+
+/** Review / requirements conclusion. Only `pass` may complete those kinds. */
+export type ReviewVerdict = 'pass' | 'needs_revision' | 'reject'
+
+export const REVIEW_VERDICTS: readonly ReviewVerdict[] = ['pass', 'needs_revision', 'reject']
+
+/** Finding severity used by review / requirements output. */
+export type FindingSeverity = 'low' | 'medium' | 'high' | 'blocker'
+
+export const FINDING_SEVERITIES: readonly FindingSeverity[] = ['low', 'medium', 'high', 'blocker']
+
+/** One structured review finding. */
+export interface ReviewFinding {
+  /** Stable id, for example `SEC-001`. */
+  id: string
+  severity: FindingSeverity
+  file?: string
+  line?: number
+  problem: string
+  requiredFix: string
+  resolved?: boolean
+}
+
+/** One acceptance criterion result recorded at completion. */
+export interface AcceptanceResult {
+  criterion: string
+  status: 'passed' | 'failed'
+  evidence?: string
+}
+
+/** One verification command result recorded at completion. */
+export interface CommandResult {
+  command: string
+  status: 'passed' | 'failed'
+  exitCode?: number
+  evidence?: string
+}
+
+/** Profile / team review-loop limits. */
+export interface ReviewPolicy {
+  requirementsMinRounds?: number
+  requirementsMaxRounds?: number
+  codeMaxRounds?: number
+  maxRepairAttempts?: number
+  requiredReviewers?: string[]
+}
+
 /** One task of a team's task list. */
 export interface TeamTask {
   /** Stable task id from the profile template; absent for ad-hoc tasks. */
@@ -45,6 +111,29 @@ export interface TeamTask {
   handoffId?: string
   /** A handoff is quiescing the old owner; the scheduler must not dispatch it yet. */
   reassigning?: boolean
+  /** Quality-gate kind. Missing values are treated as `work`. */
+  kind?: TaskKind
+  /** Review / requirements / repair loop index, 1-based when present. */
+  round?: number
+  verdict?: ReviewVerdict
+  findings?: ReviewFinding[]
+  objective?: string
+  inScope?: string[]
+  outOfScope?: string[]
+  acceptance?: string[]
+  verify?: string[]
+  deliverables?: string[]
+  nonGoals?: string[]
+  changedPaths?: string[]
+  acceptanceResults?: AcceptanceResult[]
+  commandsRun?: CommandResult[]
+  reviewedTaskId?: string
+  reviewedAttempt?: number
+  /** Repair source: the implementation / previous successful artifact. */
+  sourceTaskId?: string
+  sourceFindingIds?: string[]
+  /** User-constraint / goal items this task claims to cover. */
+  coverageOf?: string[]
   createdAt: number
   updatedAt: number
 }
@@ -110,6 +199,8 @@ export interface TeamProfileSnapshot {
   fallback?: TeamModelFallback
   /** Frozen planning mode: captain plans the graph; seed keeps template tasks. */
   taskPlanning?: 'captain' | 'seed'
+  /** Frozen review-loop policy from the creating profile. */
+  reviewPolicy?: ReviewPolicy
 }
 
 /** The full durable team record. */
@@ -137,4 +228,8 @@ export interface TeamState {
   halted?: boolean
   /** Timestamp of the latest human halt, when present. */
   haltedAt?: number
+  /** Review-loop policy snapshot copied from the creating profile, when present. */
+  reviewPolicy?: ReviewPolicy
+  /** Set when an automatic review/repair loop hits its configured ceiling. */
+  escalated?: boolean
 }

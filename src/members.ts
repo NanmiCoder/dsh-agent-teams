@@ -32,6 +32,7 @@ const MEMBER_DENIED_TOOLS = [
   'agent_teams_remove_member',
   'agent_teams_reassign_task',
   'agent_teams_create_task',
+  'agent_teams_resume',
   'agent_teams_delete',
 ] as const
 
@@ -388,7 +389,8 @@ Working rules:
 6. After your turn becomes idle, the shared task scheduler may assign your next ready task automatically. Never claim a second task while you still own unfinished work.
 7. If you already own an open attempt (claimed or in_progress) and receive mail, treat it as guidance for that same attempt_id unless the mail explicitly tells you to stop or fail. Do not claim a new task in that turn.
 8. Do not start a teammate's assigned task. Do not privately tell the next-stage member to start; the scheduler assigns unlocked work after you become idle.
-9. You are a worker: do not create or delete teams, reassign tasks, or add/remove members — that is the captain's job.`
+9. You are a worker: do not create or delete teams, reassign tasks, or add/remove members — that is the captain's job.
+10. Quality-gate kinds carry a contract (kind, objective, inScope, acceptance, verify). Stay inside inScope. Do not mark your own implementation as review pass. Review/requirements complete only with verdict=pass; needs_revision/reject must fail with findings. Mail is not a formal next review.`
 }
 
 /**

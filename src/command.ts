@@ -3,6 +3,7 @@ import type { PreStepDecision } from '@deepseek-ai/dsh-agent'
 import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-commands'
 import { createUserMessage, type UserMessage } from '@deepseek-ai/dsh-llm'
 import { parseProfileInvocation, resolveProfileTaskPlanning, type TeamProfileConfig, type AgentTeamsInvocation } from './profiles.ts'
+import { qualityPlanningPrompt } from './quality-gates.ts'
 
 export const AGENT_TEAMS_COMMAND = 'agent-teams'
 const PROFILE_COMMAND_PREFIX = `${AGENT_TEAMS_COMMAND}-`
@@ -68,9 +69,10 @@ export function buildActivationDirective(goal: string, profile?: string, taskPla
     lines.push(`Use configured AgentTeams profile "${profile}" when calling agent_teams_create.`)
     if (taskPlanning === 'captain') {
       lines.push(
-        'This profile supplies the roster and guardrails only. After create, do not recreate members.',
-        'Analyze the goal and create the task graph yourself. Do not ask the user whether to split, merge, serialize, or parallelize.',
-        'Independent work must become separate ready tasks so idle members can run in parallel. Add dependencies only for genuine prerequisites and later synthesis.',
+        'This profile supplies the roster and guardrails. After create, do not recreate members or the default quality graph.',
+        'The program creates requirements → implementation → verification → review → integration from the goal. Guide that graph and add work only when the goal requires it; do not ask the user whether to split, merge, serialize, or parallelize.',
+        'Independent supplemental work must become separate ready tasks so idle members can run in parallel. Add dependencies only for genuine prerequisites and later synthesis.',
+        qualityPlanningPrompt(),
       )
     } else {
       lines.push('Do not recreate the same members or seed tasks manually.')

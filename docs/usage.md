@@ -8,7 +8,7 @@
 
 | DSH 能力 | AgentTeams 用法 |
 |---|---|
-| `ctx.tools` 注册表 | 注册 10 个 `agent_teams_*` 工具（与 `tool-workflow` 同一注册路径） |
+| `ctx.tools` 注册表 | 注册 11 个 `agent_teams_*` 工具（与 `tool-workflow` 同一注册路径） |
 | `ctx.subagents.startContinuable()` | 创建成员：durable 可续聊子代理，带成员 persona |
 | `ctx.subagents.followup()` | 唤醒收件成员（消息进入其下一轮次） |
 | 持久化团队成员表 + `ctx.agents` | 前者保存 durable 成员身份，后者提供真实 `running / idle / ready` 活动状态（不依赖易变的子代理目录投影） |
@@ -42,6 +42,8 @@
 
 任务状态机：`pending → claimed → in_progress → completed | failed | cancelled`。每次执行携带单调 `attempt` + 唯一 `attemptId`；转派先使旧 attempt 失效，再中断并等待旧成员安静，因此迟到更新无法覆盖新结果。领取前校验依赖，并禁止成员同时拥有两个未完成任务。
 
+旧 `kind=work` 任务仍可用自由文本完成。质量 kind（`requirements` / `implementation` / `verification` / `review` / `repair` / `integration`）走结构化合同：创建时要有 objective 和 acceptance；实现/修复还要有 `inScope` 与 `verify`。`review` / `requirements` 只有 `verdict=pass` 才能 `completed`；`needs_revision` / `reject` 必须 `failed`，并带至少一条 finding。审查失败后系统自动创建不依赖 failed review 的 repair + 下一轮 review。第一版范围控制是完成时审计（对照调用方提交的 `changedPaths`），不是 host 写入拦截。halted 团队不能被普通 `create_task` 静默恢复，必须 `agent_teams_resume` 或 `create_task({ resume, resumeReason })`。质量模式下人只提供目标和约束；默认任务顺序是 requirements → implementation → verification → review → integration，审查合同审的是实现是否过关，不要把“请提交 needs_revision”写进任务。`halted` 表示人停止了团队，`escalated` 只表示自动循环到上限，两者不是一回事。详情见 `docs/quality-gates.md`。
+
 ## 工具一览
 
 | 工具 | 作用 |
@@ -49,12 +51,13 @@
 | `agent_teams_create` | 创建团队，调用者成为队长（一个队长同时只带一个团队） |
 | `agent_teams_add_member` | 拉成员入队（spawn 可续聊子代理 + 成员 persona） |
 | `agent_teams_remove_member` | 安全移除成员：撤销 attempt、回收其未完成任务、等待中断收敛后重新调度 |
-| `agent_teams_create_task` | 创建任务，支持 `dependencies` 依赖声明与 `assignee` 指派 |
+| `agent_teams_create_task` | 创建任务，支持合同字段、`dependencies`、`assignee`；halted 时默认拒绝，除非显式 `resume` |
 | `agent_teams_reassign_task` | 原子重试/转派任务；`assignee=captain` 表示队长安全接管 |
 | `agent_teams_claim_task` | 领取任务（校验依赖；队长可代领，成员只能领自己的/未指派的） |
-| `agent_teams_update_task` | 携带当前 `attempt_id` 推进任务；拒绝旧 attempt 和终态结果覆盖 |
+| `agent_teams_update_task` | 携带当前 `attempt_id` 推进任务；质量 kind 按 verdict / acceptanceResults / commandsRun / changedPaths 拒绝非法 completed |
 | `agent_teams_send_message` | 任意成员→任意成员/队长：消息直达对方邮箱并唤醒对方（无队长转发；拒绝冒名 `from`） |
-| `agent_teams_status` | 团队全景：成员活动、任务清单、队长邮箱、各成员待读消息 |
+| `agent_teams_status` | 团队全景：kind/round/verdict、coverage matrix、escalated、halt/resume 状态 |
+| `agent_teams_resume` | 显式恢复 halted 团队，必须带非空 reason；不重建已取消任务 |
 | `agent_teams_delete` | 结束团队：打断成员，团队目录**归档保留**（任务与依赖图、邮箱完整留存） |
 
 `agent_teams_add_member` 默认不需要模型参数：成员沿用队长当前 LLM provider/model 时，会一并快照队长当前思考强度。用户明确要求某个角色使用其他模型时，可以同时传入可选的 `provider` + `model`；只覆盖 `model` 时沿用队长当前 LLM provider。provider 或 model 任一改变时，思考强度自动使用目标模型默认档；用户明确要求某个成员使用特定强度时，可以传入可选的 `reasoning_effort`（目标模型支持的档位 id，或 `"default"` 表示强制使用模型自身默认档）。插件不会为每个成员发起二次选择或弹窗。
@@ -111,7 +114,7 @@ profiles:
         dependencies: [requirements]
 ```
 
-通过 `/agent-teams --profile demo-delivery 实现这个功能` 显式点名模板；不要使用首 token 隐式 profile。`agent_teams_create(profile=...)` 会事务式展开成员；seed 模式还会展开任务，captain 模式则只建成员，由 Captain 根据目标创建任务图，不要询问用户如何拆分或是否并行。依赖 output 会传给下游；failed 的审查/测试不会解锁后续，Captain 应创建不依赖 failed 任务的修复任务和新审查任务。`memberProvider` 是 spawn/fork 后端，不是模型 provider。模板默认只准备发布，不自动部署；首次落盘前进程崩溃可能留下 orphan child。
+通过 `/agent-teams --profile demo-delivery 实现这个功能` 显式点名模板；不要使用首 token 隐式 profile。`agent_teams_create(profile=...)` 会事务式展开成员；seed 模式还会展开任务，captain 模式会从用户目标自动落盘 requirements → implementation → verification → review → integration 五段质量图，Captain 只需引导，不得手工重复建图，也不要询问用户如何拆分或是否并行。依赖 output 会传给下游；failed 的审查/测试不会解锁后续，自动 repair/review 不依赖 failed review。`memberProvider` 是 spawn/fork 后端，不是模型 provider。模板默认只准备发布，不自动部署；首次落盘前进程崩溃可能留下 orphan child。
 
 ## Captain 动态规划与停止整队
 
@@ -131,9 +134,9 @@ profiles:
         role: 分析需求和验收标准
 ```
 
-`taskPlanning: captain` 时，`agent_teams_create({ profile })` 只创建配置的成员；Captain 随后根据用户目标动态创建任务。没有真实依赖的任务会成为独立 ready task，由调度器并行派发；汇总、决策、集成任务才设置 dependencies。`taskPlanning: seed` 则保留固定 seed task 工作流。
+`taskPlanning: captain` 时，`agent_teams_create({ profile })` 会把用户目标直接落为固定质量图：requirements → implementation → verification → review → integration，并以 profile 里唯一匹配的角色分别指派；不确定的角色保持未指派，不会派给 Captain。Captain 只增补目标确实需要的工作，不重建默认图。`taskPlanning: seed` 则保留固定 seed task 工作流。
 
-长任务运行期间，Captain 聊天输入框上方会显示“团队进行中”条带。点击“停止团队”会中断全部成员、取消未完成任务并停止后续调度，但不会删除团队；停止后仍可给 Captain 发消息，Captain 创建新任务时团队会自动恢复调度。
+长任务运行期间，Captain 聊天输入框上方会显示“团队进行中”条带。点击“停止团队”会中断全部成员、取消未完成任务并停止后续调度，但不会删除团队。停止后仍可给 Captain 发消息；要继续派工必须显式 `agent_teams_resume`（或 `create_task({ resume, resumeReason })`），普通 `create_task` 不会静默恢复。
 
 ## 已知限制
 

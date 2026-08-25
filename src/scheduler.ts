@@ -70,6 +70,14 @@ export interface DispatchTicket {
   readonly profileSeedId?: string
   readonly dependencyOutputs: readonly DependencyOutput[]
   readonly executionPrompt?: string
+  readonly kind?: string
+  readonly round?: number
+  readonly objective?: string
+  readonly inScope?: readonly string[]
+  readonly outOfScope?: readonly string[]
+  readonly acceptance?: readonly string[]
+  readonly verify?: readonly string[]
+  readonly reviewedTaskId?: string
 }
 
 function taskProfileSeedId(task: TeamTask): string | undefined {
@@ -189,6 +197,16 @@ export function assignmentPrompt(ticket: DispatchTicket, stateDir: string, teamI
   const goal = ticket.teamDescription?.trim() || '(not provided)'
   const protocol = ticket.profileProtocol?.trim() || '(none)'
   const executionPrompt = ticket.executionPrompt?.trim()
+  const kind = ticket.kind?.trim() || 'work'
+  const contract = [
+    `Kind: ${kind}${ticket.round === undefined ? '' : ` (round ${ticket.round})`}`,
+    ticket.objective === undefined || ticket.objective === '' ? '' : `Objective: ${ticket.objective}`,
+    ticket.inScope === undefined || ticket.inScope.length === 0 ? '' : `In scope: ${ticket.inScope.join(', ')}`,
+    ticket.outOfScope === undefined || ticket.outOfScope.length === 0 ? '' : `Out of scope: ${ticket.outOfScope.join(', ')}`,
+    ticket.acceptance === undefined || ticket.acceptance.length === 0 ? '' : `Acceptance: ${ticket.acceptance.join('; ')}`,
+    ticket.verify === undefined || ticket.verify.length === 0 ? '' : `Verify: ${ticket.verify.join('; ')}`,
+    ticket.reviewedTaskId === undefined ? '' : `Reviewed task: ${ticket.reviewedTaskId}`,
+  ].filter((line) => line !== '').join('\n')
   return `AgentTeams automatic task assignment from the shared task list.
 
 You are executing as configured member "${ticket.memberName}".
@@ -207,11 +225,12 @@ Completed dependency results:
 ${formatDependencyOutputs(ticket.dependencyOutputs)}
 
 Task: ${ticket.taskId}${seed} — ${ticket.subject}${description}
+${contract === '' ? '' : `\nContract:\n${contract}\n`}
 Attempt: ${ticket.attempt}
 Attempt id: ${ticket.attemptId}
 
 Call agent_teams_claim_task for ${ticket.taskId}; it will return this same attempt_id. Include attempt_id=${ticket.attemptId} in every agent_teams_update_task call. If it is rejected as stale, stop work because the task was reassigned. claimed cannot jump to completed. Mark in_progress first, then completed or failed. Include attempt_id on every update. Then send_message to captain and become idle.
-When finishing: use status=completed only when the task's success criteria are satisfied; use status=failed when blocking findings or validation failures mean downstream work must not proceed; include a concise output in either case. Treat the dependency results above as source material. Do not ignore them. Work only this task in this turn.
+When finishing: use status=completed only when the task's success criteria are satisfied; use status=failed when blocking findings or validation failures mean downstream work must not proceed; include a concise output in either case. Quality kinds must submit structured fields: review/requirements need verdict=pass to complete (needs_revision/reject must fail with findings); implementation/repair/verification/integration need acceptanceResults, commandsRun, and in-scope changedPaths. Do not approve your own implementation. Mail is not a formal next review. Treat the dependency results above as source material. Do not ignore them. Work only this task and only its in-scope paths in this turn.
 
 State policy: ${stateDir}/${teamId}/ is read-only diagnostics; mutate team state only through agent_teams_* tools.`
 }
@@ -351,6 +370,14 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
             ...fresh.profile?.executionPrompt === undefined && config.executionPrompt === undefined
               ? {}
               : { executionPrompt: fresh.profile?.executionPrompt ?? config.executionPrompt },
+            kind: task.kind ?? 'work',
+            ...task.round === undefined ? {} : { round: task.round },
+            ...task.objective === undefined ? {} : { objective: task.objective },
+            ...task.inScope === undefined ? {} : { inScope: task.inScope },
+            ...task.outOfScope === undefined ? {} : { outOfScope: task.outOfScope },
+            ...task.acceptance === undefined ? {} : { acceptance: task.acceptance },
+            ...task.verify === undefined ? {} : { verify: task.verify },
+            ...task.reviewedTaskId === undefined ? {} : { reviewedTaskId: task.reviewedTaskId },
             dependencyOutputs: collectCompletedDependencyOutputs(
               fresh.tasks,
               task.id,

@@ -2,7 +2,7 @@
 
 import { useCallback, useState, useSyncExternalStore } from 'react'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import { liveCaptainTeam, teamIsActive, teamProgressSummary } from './activity-model.ts'
+import { teamIsActive, teamProgressSummary } from './activity-model.ts'
 import {
   ACTIVITY_HALT_URL,
   getActivitySnapshotsSnapshot,
@@ -24,7 +24,10 @@ function bannerDetail(t: AgentTeamsTranslate, working: number, detail: string, t
 
 export function TeamProgressBanner({ sessionId, t }: TeamProgressBannerProps) {
   const snapshots = useSyncExternalStore(subscribeActivitySnapshots, getActivitySnapshotsSnapshot)
-  const team = liveCaptainTeam(snapshots.teams, sessionId)
+  const owner = sessionId?.trim() ?? ''
+  // A halted snapshot is still needed while the stop request drains live child
+  // activations (and to show a retryable error if that drain fails).
+  const team = owner === '' ? undefined : snapshots.teams.find((candidate) => candidate.captainSessionId === owner)
   const [stopping, setStopping] = useState(false)
   const [failed, setFailed] = useState(false)
   const stopTeam = useCallback(async () => {
@@ -45,7 +48,11 @@ export function TeamProgressBanner({ sessionId, t }: TeamProgressBannerProps) {
       setStopping(false)
     }
   }, [sessionId, stopping, team])
-  if (team === undefined || !teamIsActive(team)) return null
+  // The host marks a team halted before draining its member activations so the
+  // scheduler cannot race in new work. Keep this banner mounted during that
+  // drain: its disappearance therefore means the stop request has completed,
+  // rather than merely that durable task state was cancelled.
+  if (team === undefined || (!teamIsActive(team) && !stopping && !failed)) return null
   const summary = teamProgressSummary(team, t('format.listSeparator'))
   return (
     <div className={css.root} data-agent-teams-banner data-team-id={team.teamId}>

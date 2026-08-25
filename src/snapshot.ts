@@ -19,7 +19,7 @@ import {
 import type { MemberStatus, TeamState, TeamTask } from './types.ts'
 
 /** Visual task state for the activity panel. */
-export type VisualTaskState = 'blocked' | 'open' | 'running' | 'completed'
+export type VisualTaskState = 'blocked' | 'open' | 'running' | 'completed' | 'failed' | 'cancelled'
 
 /** One member row of the activity snapshot. */
 export interface TeamActivityMember {
@@ -47,6 +47,9 @@ export interface TeamActivityTask {
   readonly model: string
   readonly dependencies: readonly string[]
   readonly depth: number
+  readonly kind?: string
+  readonly round?: number
+  readonly verdict?: string
 }
 
 /** One captain-inbox preview row. */
@@ -170,6 +173,9 @@ export async function assembleTeamSnapshot(
       model: memberModelRoute(roster.find((member) => member.name === task.assignee)),
       dependencies: task.dependencies,
       depth: depths.get(task.id) ?? 0,
+      ...task.kind === undefined ? {} : { kind: task.kind },
+      ...task.round === undefined ? {} : { round: task.round },
+      ...task.verdict === undefined ? {} : { verdict: task.verdict },
     })),
     messageCount: captainInbox.length
       + members.reduce((count, member) => count + member.unread, 0),

@@ -1167,24 +1167,43 @@
 .planEditor {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin: 0 10px 10px;
-  padding: 11px;
-  border: 1px solid color-mix(in srgb, var(--dsw-alias-state-business-primary) 34%, var(--dsw-alias-line-normal));
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--dsw-alias-bg-module-platform) 88%, var(--dsw-alias-state-business-primary));
+  gap: 12px;
+  margin: 0 10px 12px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--dsw-alias-state-business-primary) 30%, var(--dsw-alias-line-normal));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--dsw-alias-bg-module-platform) 94%, var(--dsw-alias-state-business-primary));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--dsw-alias-label-primary) 5%, transparent);
 }
 
-.planEditor header > span {
+.planHeader > span {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+}
+
+.planHeader > span > span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.planHeader strong {
   color: var(--dsw-alias-label-primary);
   font-size: 12px;
 }
 
-.planEditor header em {
+.planHeader small {
+  color: var(--dsw-alias-label-secondary);
+  font-size: 9px;
+  font-weight: 500;
+  line-height: 13px;
+}
+
+.planHeader em {
+  flex: none;
   padding: 1px 7px;
   border-radius: 999px;
   background: var(--dsw-alias-bg-fill-business);
@@ -1194,47 +1213,248 @@
   line-height: 16px;
 }
 
-.planEditor header p {
+.planHeader p {
   margin: 5px 0 0;
   color: var(--dsw-alias-label-secondary);
   font-size: 10px;
   line-height: 15px;
 }
 
-.planList {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.planFlow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.planCard {
+.planFlow li {
+  position: relative;
   display: flex;
   min-width: 0;
-  flex-direction: column;
-  gap: 6px;
-  margin: 0;
-  padding: 7px 8px 8px;
+  align-items: center;
+  gap: 5px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 14px;
+}
+
+.planFlow li:not(:last-child)::after {
+  height: 1px;
+  min-width: 8px;
+  flex: 1;
+  margin-right: 5px;
+  background: var(--dsw-alias-line-normal);
+  content: '';
+}
+
+.planFlow li > span {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  flex: none;
+  place-items: center;
   border: 1px solid var(--dsw-alias-line-normal);
-  border-radius: 9px;
+  border-radius: 50%;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9px;
+}
+
+.planFlow li[data-active] {
+  color: var(--dsw-alias-state-business-primary);
+}
+
+.planFlow li[data-active] > span {
+  border-color: var(--dsw-alias-state-business-primary);
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 12%, transparent);
+}
+
+.planSection {
+  overflow: hidden;
+  border: 1px solid var(--dsw-alias-line-normal);
+  border-radius: 8px;
   background: var(--dsw-alias-bg-module-platform);
 }
 
-.planCard legend {
-  padding: 0 4px;
-  color: var(--dsw-alias-state-business-primary);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 10px;
-  font-weight: 700;
+.planSectionToggle,
+.planCardHeader {
+  box-sizing: border-box;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  cursor: pointer;
+  text-align: left;
 }
 
-.planCard label {
+.planSectionToggle {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 9px;
+}
+
+.planSectionToggle:hover,
+.planCardHeader:hover {
+  background: color-mix(in srgb, var(--dsw-alias-bg-fill-neutral) 46%, transparent);
+}
+
+.planSectionToggle > span {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 7px;
+}
+
+.planSectionToggle strong {
+  font-size: 10.5px;
+}
+
+.planSectionToggle small {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 9px;
+}
+
+.planList {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border-top: 1px solid var(--dsw-alias-line-normal);
+}
+
+.planEmpty {
+  margin: 0;
+  padding: 12px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 10px;
+  text-align: center;
+}
+
+.planCard {
+  position: relative;
+  display: block;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.planCard + .planCard {
+  border-top: 1px solid var(--dsw-alias-line-normal);
+}
+
+.planCard[data-open='true'] {
+  background: color-mix(in srgb, var(--dsw-alias-bg-base) 62%, transparent);
+}
+
+.planCardHeader {
+  display: grid;
+  min-height: 40px;
+  grid-template-columns: minmax(80px, 0.9fr) minmax(72px, 1.15fr) auto 12px;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 9px;
+}
+
+.planCardIdentity {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.planCardIdentity strong,
+.planTaskSummary {
+  overflow: hidden;
+  color: var(--dsw-alias-label-primary);
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.planCardIdentity > span,
+.planCardMeta {
+  overflow: hidden;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 8.5px;
+  line-height: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.planTaskId {
+  width: max-content;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--dsw-alias-bg-fill-neutral);
+  color: var(--dsw-alias-label-secondary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 8.5px;
+  font-weight: 700;
+  line-height: 14px;
+}
+
+.planDirty {
+  justify-self: end;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--dsw-alias-state-warning) 13%, transparent);
+  color: var(--dsw-alias-state-warning);
+  font-size: 8px;
+  font-style: normal;
+  font-weight: 650;
+  line-height: 14px;
+}
+
+.planChevron {
+  flex: none;
+  color: var(--dsw-alias-label-tertiary);
+  transition: transform 180ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.planChevron[data-open='true'] {
+  transform: rotate(90deg);
+}
+
+.planCardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 9px 9px;
+}
+
+.planCardBody fieldset {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.planCardBody label,
+.planNewTask label {
   display: flex;
   min-width: 0;
   flex: 1;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
   color: var(--dsw-alias-label-tertiary);
   font-size: 9px;
+}
+
+.planCardBody label small {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 8px;
+  line-height: 11px;
 }
 
 .planCard input,
@@ -1250,28 +1470,30 @@
   background: var(--dsw-alias-bg-base);
   color: var(--dsw-alias-label-primary);
   font: inherit;
-  font-size: 10px;
+  font-size: 10.5px;
   line-height: 16px;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
 }
 
 .planCard input,
 .planCard select,
 .planNewTask input {
-  height: 27px;
-  padding: 4px 7px;
+  min-height: 32px;
+  padding: 6px 8px;
 }
 
 .planCard textarea {
-  min-height: 46px;
-  padding: 5px 7px;
+  min-height: 58px;
+  padding: 7px 8px;
   resize: vertical;
 }
 
-.planCard input:focus,
-.planCard textarea:focus,
-.planCard select:focus,
-.planNewTask input:focus {
+.planCard input:focus-visible,
+.planCard textarea:focus-visible,
+.planCard select:focus-visible,
+.planNewTask input:focus-visible {
   border-color: var(--dsw-alias-state-business-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--dsw-alias-state-business-primary) 16%, transparent);
 }
 
 .planGrid {
@@ -1282,52 +1504,182 @@
 
 .planActions,
 .planApproveRow,
-.planNewTask {
+.planNewTask,
+.planConfirm,
+.planApproveActions {
   display: flex;
   align-items: center;
   gap: 7px;
 }
 
+.planActions {
+  justify-content: flex-end;
+}
+
 .planActions button,
 .planNewTask button,
-.planApproveRow button {
+.planApproveRow button,
+.planConfirm button {
   flex: none;
-  min-height: 25px;
-  padding: 3px 9px;
-  border: 0;
+  min-height: 30px;
+  padding: 5px 10px;
+  border: 1px solid var(--dsw-alias-line-normal);
   border-radius: 6px;
   background: var(--dsw-alias-bg-fill-neutral);
   color: var(--dsw-alias-label-primary);
   cursor: pointer;
   font-size: 9.5px;
   font-weight: 600;
+  transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
 }
 
-.planActions button[data-danger] {
+.planActions button:hover:not(:disabled),
+.planNewTask button:hover:not(:disabled),
+.planApproveRow button:hover:not(:disabled),
+.planConfirm button:hover:not(:disabled) {
+  border-color: var(--dsw-alias-label-tertiary);
+}
+
+.planActions button:active:not(:disabled),
+.planNewTask button:active:not(:disabled),
+.planApproveRow button:active:not(:disabled),
+.planConfirm button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.planActions button[data-danger],
+.planConfirm button[data-danger] {
   color: var(--dsw-alias-state-danger);
 }
 
-.planActions span,
-.planApproveRow span {
+.planFeedback {
+  display: inline-flex;
   min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 5px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 9px;
+  line-height: 13px;
+  animation: plan-feedback-in 180ms ease-out;
+}
+
+.planFeedback[data-tone='success'] {
+  color: var(--dsw-alias-state-success);
+}
+
+.planFeedback[data-tone='error'] {
+  color: var(--dsw-alias-state-danger);
+}
+
+.planFeedback > span {
+  display: grid;
+  width: 15px;
+  height: 15px;
+  flex: none;
+  place-items: center;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+}
+
+.planFeedback svg {
+  width: 11px;
+  height: 11px;
+}
+
+@keyframes plan-feedback-in {
+  from { opacity: 0; transform: translateY(-2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.planConfirm {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  padding: 7px;
+  border: 1px solid color-mix(in srgb, var(--dsw-alias-state-danger) 30%, var(--dsw-alias-line-normal));
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--dsw-alias-state-danger) 7%, transparent);
+}
+
+.planConfirm > span {
+  min-width: 140px;
+  flex: 1;
   color: var(--dsw-alias-label-secondary);
   font-size: 9px;
   line-height: 13px;
 }
 
-.planNewTask input {
-  flex: 1;
+.planNewTask {
+  align-items: flex-end;
+}
+
+.planNewTask label {
+  gap: 4px;
+}
+
+.planNewTask label > span {
+  line-height: 13px;
 }
 
 .planApproveRow {
+  position: sticky;
+  z-index: 1;
+  bottom: 0;
+  min-height: 50px;
   justify-content: flex-end;
+  margin: 0 -4px -4px;
+  padding: 8px;
+  border: 1px solid var(--dsw-alias-line-normal);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--dsw-alias-bg-module-platform) 94%, transparent);
+  box-shadow: 0 -5px 16px color-mix(in srgb, var(--dsw-alias-bg-base) 35%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.planApproveRow[data-armed='true'] {
+  border-color: color-mix(in srgb, var(--dsw-alias-state-business-primary) 45%, var(--dsw-alias-line-normal));
+}
+
+.planApproveCopy {
+  display: flex;
+  min-width: 120px;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.planApproveCopy strong {
+  color: var(--dsw-alias-label-primary);
+  font-size: 9.5px;
+  line-height: 13px;
+}
+
+.planApproveCopy small {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 8.5px;
+  line-height: 12px;
 }
 
 .planApproveRow button {
-  min-height: 30px;
+  min-height: 32px;
   padding-inline: 13px;
   background: var(--dsw-alias-state-business-primary);
   color: var(--dsw-alias-label-on-fill);
+}
+
+.planApproveActions > button:first-child {
+  background: var(--dsw-alias-bg-fill-neutral);
+  color: var(--dsw-alias-label-primary);
+}
+
+.planSectionToggle:focus-visible,
+.planCardHeader:focus-visible,
+.planActions button:focus-visible,
+.planNewTask button:focus-visible,
+.planApproveRow button:focus-visible,
+.planConfirm button:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: -2px;
 }
 
 .planActions button:disabled,
@@ -1379,6 +1731,20 @@
     animation: none;
     transition: none;
   }
+
+  .planChevron,
+  .planFeedback,
+  .planActions button,
+  .planNewTask button,
+  .planApproveRow button,
+  .planConfirm button,
+  .planCard input,
+  .planCard textarea,
+  .planCard select,
+  .planNewTask input {
+    animation: none;
+    transition: none;
+  }
 }
 
 @media (max-width: 960px) {
@@ -1416,5 +1782,42 @@
 
   .assignmentLine {
     padding-left: 53px;
+  }
+
+  .planFlow li {
+    gap: 4px;
+    font-size: 8px;
+  }
+
+  .planFlow li:not(:last-child)::after {
+    margin-right: 3px;
+  }
+
+  .planCardHeader {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .planCardHeader .planCardMeta {
+    display: none;
+  }
+
+  .planGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .planNewTask,
+  .planApproveRow {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .planNewTask button,
+  .planApproveRow > button,
+  .planApproveActions {
+    width: 100%;
+  }
+
+  .planApproveActions button {
+    flex: 1;
   }
 }

@@ -186,6 +186,7 @@ check(
 )
 const activityPanelCss = await readFile(new URL('../src/client/ActivityPanel.module.css', import.meta.url), 'utf8')
 const activityPanelSource = await readFile(new URL('../src/client/ActivityPanel.tsx', import.meta.url), 'utf8')
+const stagingPlanSource = await readFile(new URL('../src/client/StagingPlanEditor.tsx', import.meta.url), 'utf8')
 const teamProgressBannerCss = await readFile(new URL('../src/client/TeamProgressBanner.module.css', import.meta.url), 'utf8')
 const clientIndexSource = await readFile(new URL('../src/client/index.tsx', import.meta.url), 'utf8')
 const agentTeamsCardCss = await readFile(new URL('../src/client/AgentTeamsCard.module.css', import.meta.url), 'utf8')
@@ -324,6 +325,22 @@ check(
     && activityPanelCss.includes('scrollbar-width: thin')
     && !activityPanelCss.includes('scrollbar-width: none'),
   'interactive panel controls must stay visible to browser verification',
+)
+check(
+  'staged plan editor keeps long plans compact and guards consequential actions',
+  stagingPlanSource.includes('aria-expanded={open}')
+    && stagingPlanSource.includes('aria-live=')
+    && stagingPlanSource.includes('confirmingRemove')
+    && stagingPlanSource.includes('approvalArmed')
+    && stagingPlanSource.includes('data-plan-approve')
+    && stagingPlanSource.includes('data-confirming')
+    && activityPanelCss.includes('.planCardHeader')
+    && activityPanelCss.includes('.planFeedback')
+    && activityPanelCss.includes('.planApproveRow')
+    && activityPanelCss.includes('position: sticky')
+    && activityPanelCss.includes('@media (max-width: 640px)')
+    && activityPanelCss.includes('.planSectionToggle:focus-visible'),
+  'plan review must expose disclosure, feedback, confirmation, focus, sticky action, and narrow-layout contracts',
 )
 check(
   'running DAG tasks reuse the animated work glyph without losing focus context',

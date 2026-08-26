@@ -52,6 +52,7 @@ import {
 } from './activity-monitor.ts'
 import { ACTION_ART, LEAD_ART, memberArtUrl } from './artwork.ts'
 import { OPEN_PANEL_EVENT } from './AgentTeamsCard.tsx'
+import { StagingPlanEditor } from './StagingPlanEditor.tsx'
 import type { AgentTeamsCardData } from './agent-teams-card-definition.ts'
 import type { AgentTeamsLocaleKey, AgentTeamsTranslate } from './locales.ts'
 import {
@@ -459,196 +460,6 @@ function DependencyMap({ tasks, members, t }: {
   )
 }
 
-const PLAN_URL = '/plugins/dsh-agent-teams/plan'
-
-async function mutatePlan(payload: Record<string, unknown>): Promise<void> {
-  const response = await fetch(PLAN_URL, {
-    method: 'POST',
-    cache: 'no-store',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(payload),
-  })
-  if (response.ok) return
-  let message = `HTTP ${response.status}`
-  try {
-    const body = await response.json() as { error?: unknown }
-    if (typeof body.error === 'string' && body.error.trim() !== '') message = body.error
-  } catch {}
-  throw new Error(message)
-}
-
-function StagedMemberEditor({ team, member, t }: {
-  readonly team: ActivityTeam
-  readonly member: ActivityMember
-  readonly t: AgentTeamsTranslate
-}) {
-  const [role, setRole] = useState(member.role)
-  const [provider, setProvider] = useState(member.provider ?? '')
-  const [model, setModel] = useState(member.model ?? '')
-  const [reasoningEffort, setReasoningEffort] = useState(member.reasoningEffort ?? '')
-  const [executionPrompt, setExecutionPrompt] = useState(member.executionPrompt ?? '')
-  const [busy, setBusy] = useState(false)
-  const [feedback, setFeedback] = useState('')
-  useEffect(() => {
-    setRole(member.role)
-    setProvider(member.provider ?? '')
-    setModel(member.model ?? '')
-    setReasoningEffort(member.reasoningEffort ?? '')
-    setExecutionPrompt(member.executionPrompt ?? '')
-  }, [member.role, member.provider, member.model, member.reasoningEffort, member.executionPrompt])
-  const save = async (): Promise<void> => {
-    setBusy(true)
-    setFeedback('')
-    try {
-      await mutatePlan({
-        sessionId: team.captainSessionId,
-        teamId: team.teamId,
-        action: 'update_member',
-        memberName: member.name,
-        role,
-        provider,
-        model,
-        reasoningEffort,
-        executionPrompt,
-      })
-      setFeedback(t('plan.saved'))
-    } catch (error: unknown) {
-      setFeedback(t('plan.failed', { message: error instanceof Error ? error.message : String(error) }))
-    } finally {
-      setBusy(false)
-    }
-  }
-  return (
-    <fieldset className={css.planCard} data-plan-member={member.name} disabled={busy}>
-      <legend>{member.name}</legend>
-      <label>{t('plan.member.role')}<input value={role} onChange={(event) => { setRole(event.currentTarget.value) }} /></label>
-      <span className={css.planGrid}>
-        <label>{t('plan.member.provider')}<input value={provider} onChange={(event) => { setProvider(event.currentTarget.value) }} /></label>
-        <label>{t('plan.member.model')}<input value={model} onChange={(event) => { setModel(event.currentTarget.value) }} /></label>
-      </span>
-      <label>{t('plan.member.reasoning')}<input value={reasoningEffort} onChange={(event) => { setReasoningEffort(event.currentTarget.value) }} placeholder="default" /></label>
-      <label>{t('plan.member.prompt')}<textarea value={executionPrompt} onChange={(event) => { setExecutionPrompt(event.currentTarget.value) }} rows={2} /></label>
-      <span className={css.planActions}>
-        <button type="button" onClick={() => { void save() }}>{t('plan.save')}</button>
-        {feedback !== '' && <span>{feedback}</span>}
-      </span>
-    </fieldset>
-  )
-}
-
-function StagedTaskEditor({ team, task, t }: {
-  readonly team: ActivityTeam
-  readonly task: ActivityTask
-  readonly t: AgentTeamsTranslate
-}) {
-  const taskDependencies = task.dependencies.join(', ')
-  const [subject, setSubject] = useState(task.subject)
-  const [description, setDescription] = useState(task.description ?? '')
-  const [assignee, setAssignee] = useState(task.assignee)
-  const [dependencies, setDependencies] = useState(taskDependencies)
-  const [busy, setBusy] = useState(false)
-  const [feedback, setFeedback] = useState('')
-  useEffect(() => {
-    setSubject(task.subject)
-    setDescription(task.description ?? '')
-    setAssignee(task.assignee)
-    setDependencies(taskDependencies)
-  }, [task.subject, task.description, task.assignee, taskDependencies])
-  const send = async (action: 'update_task' | 'remove_task'): Promise<void> => {
-    setBusy(true)
-    setFeedback('')
-    try {
-      await mutatePlan({
-        sessionId: team.captainSessionId,
-        teamId: team.teamId,
-        action,
-        taskId: task.id,
-        subject,
-        description,
-        assignee,
-        dependencies: dependencies.split(',').map((item) => item.trim()).filter(Boolean),
-      })
-      setFeedback(t('plan.saved'))
-    } catch (error: unknown) {
-      setFeedback(t('plan.failed', { message: error instanceof Error ? error.message : String(error) }))
-    } finally {
-      setBusy(false)
-    }
-  }
-  return (
-    <fieldset className={css.planCard} data-plan-task={task.id} disabled={busy}>
-      <legend>{task.id}</legend>
-      <label>{t('plan.task.subject')}<input value={subject} onChange={(event) => { setSubject(event.currentTarget.value) }} /></label>
-      <label>{t('plan.task.description')}<textarea value={description} onChange={(event) => { setDescription(event.currentTarget.value) }} rows={2} /></label>
-      <span className={css.planGrid}>
-        <label>{t('plan.task.assignee')}
-          <select value={assignee} onChange={(event) => { setAssignee(event.currentTarget.value) }}>
-            <option value="">{t('plan.task.unassigned')}</option>
-            {team.members.map((member) => <option key={member.name} value={member.name}>{member.name}</option>)}
-          </select>
-        </label>
-        <label>{t('plan.task.dependencies')}<input value={dependencies} onChange={(event) => { setDependencies(event.currentTarget.value) }} /></label>
-      </span>
-      <span className={css.planActions}>
-        <button type="button" onClick={() => { void send('update_task') }}>{t('plan.save')}</button>
-        <button type="button" data-danger onClick={() => { void send('remove_task') }}>{t('plan.remove')}</button>
-        {feedback !== '' && <span>{feedback}</span>}
-      </span>
-    </fieldset>
-  )
-}
-
-function StagingEditor({ team, t }: { readonly team: ActivityTeam; readonly t: AgentTeamsTranslate }) {
-  const [newTask, setNewTask] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [feedback, setFeedback] = useState('')
-  const act = async (action: 'add_task' | 'approve'): Promise<void> => {
-    setBusy(true)
-    setFeedback('')
-    let approved = false
-    try {
-      await mutatePlan({
-        sessionId: team.captainSessionId,
-        teamId: team.teamId,
-        action,
-        ...action === 'add_task' ? { subject: newTask, dependencies: [] } : {},
-      })
-      if (action === 'add_task') {
-        setNewTask('')
-        setFeedback(t('plan.saved'))
-      } else {
-        approved = true
-      }
-    } catch (error: unknown) {
-      setFeedback(t('plan.failed', { message: error instanceof Error ? error.message : String(error) }))
-    } finally {
-      if (!approved) setBusy(false)
-    }
-  }
-  return (
-    <section className={css.planEditor} data-staging-editor>
-      <header>
-        <span><strong>{t('plan.title')}</strong><em>{t('plan.badge')}</em></span>
-        <p>{t('plan.description')}</p>
-      </header>
-      <div className={css.planList}>
-        {team.members.map((member) => <StagedMemberEditor key={member.name} team={team} member={member} t={t} />)}
-        {team.tasks.map((task) => <StagedTaskEditor key={task.id} team={team} task={task} t={t} />)}
-      </div>
-      <div className={css.planNewTask}>
-        <input value={newTask} onChange={(event) => { setNewTask(event.currentTarget.value) }} placeholder={t('plan.newTask')} disabled={busy} />
-        <button type="button" disabled={busy || newTask.trim() === ''} onClick={() => { void act('add_task') }}>{t('plan.addTask')}</button>
-      </div>
-      <div className={css.planApproveRow}>
-        {feedback !== '' && <span>{feedback}</span>}
-        <button type="button" data-plan-approve disabled={busy} onClick={() => { void act('approve') }}>
-          {busy ? t('plan.approving') : t('plan.approve')}
-        </button>
-      </div>
-    </section>
-  )
-}
-
 function TeamSection({ team, onNavigate, t, historic = false }: {
   readonly team: ActivityTeam
   /** Navigate to a member transcript (floater hides immediately). */
@@ -680,7 +491,7 @@ function TeamSection({ team, onNavigate, t, historic = false }: {
         </span>
       </header>
 
-      {team.phase === 'staged' && !historic && <StagingEditor team={team} t={t} />}
+      {team.phase === 'staged' && !historic && <StagingPlanEditor team={team} t={t} />}
 
       <section className={css.delegationSection} aria-label={t('delegation.aria')} data-delegation-map>
         <div className={css.captainNode}>

@@ -83,6 +83,7 @@ const PANEL_OPEN_ATTRIBUTE = 'data-agent-teams-panel-open'
 const PANEL_SHIFT_PROPERTY = '--agent-teams-panel-shift'
 const PANEL_CONVERSATION_GAP = 14
 const MOVE_THRESHOLD = 4
+const CAPTAIN_ASSIGNEE = 'captain'
 
 type PanelGesture = {
   readonly kind: 'move' | 'resize'
@@ -419,7 +420,11 @@ function TeamSection({ team, onNavigate, t, historic = false }: {
 }) {
   const [membersOpen, setMembersOpen] = useState(true)
   const busyCount = team.members.filter((member) => member.activity === 'working').length
-  const assignedCount = team.tasks.filter((task) => task.assignee !== '').length
+  const assignedCount = team.tasks.filter((task) => task.assignee !== '' && task.assignee !== CAPTAIN_ASSIGNEE).length
+  const captainOwned = team.tasks.filter((task) => task.assignee === CAPTAIN_ASSIGNEE
+    && task.status !== 'completed' && task.status !== 'failed' && task.status !== 'cancelled')
+  const captainBusy = captainOwned.length > 0
+  const captainTaskIds = formatTaskIds(captainOwned.map((task) => task.id), t)
   const completedCount = team.tasks.filter((task) => task.status === 'completed').length
   const allCompleted = team.tasks.length > 0 && completedCount === team.tasks.length
   return (
@@ -444,16 +449,17 @@ function TeamSection({ team, onNavigate, t, historic = false }: {
               <span className={css.captainName}>{t('captain.name')}</span>
               <span className={css.captainRole}>{t('captain.role')}</span>
             </span>
-            <span className={css.captainSummary}>{t('captain.summary', {
-              tasks: assignedCount,
-              members: team.members.length,
-            })}</span>
+            <span className={css.captainSummary}>{captainBusy
+              ? t('captain.summary.withTakeover', { tasks: assignedCount, captainTasks: captainTaskIds })
+              : t('captain.summary', { tasks: assignedCount, members: team.members.length })}</span>
           </span>
-          <span className={css.captainState} data-busy={busyCount > 0}>
-            <WorkGlyph active={busyCount > 0} />
-            {busyCount > 0
-              ? t('captain.state.working', { count: busyCount })
-              : t(allCompleted ? 'captain.state.collected' : 'captain.state.waiting')}
+          <span className={css.captainState} data-busy={captainBusy || busyCount > 0}>
+            <WorkGlyph active={captainBusy || busyCount > 0} />
+            {captainBusy
+              ? t('captain.state.takeover', { tasks: captainTaskIds })
+              : busyCount > 0
+                ? t('captain.state.working', { count: busyCount })
+                : t(allCompleted ? 'captain.state.collected' : 'captain.state.waiting')}
           </span>
         </div>
 

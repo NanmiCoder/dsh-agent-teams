@@ -178,6 +178,13 @@ function memberOpenTask(team: TeamState, memberName: string, exceptTaskId?: stri
     && (task.status === 'claimed' || task.status === 'in_progress'))
 }
 
+/** Captain work is immediate, not a durable scheduler lane: allow one unfinished takeover at a time. */
+function captainOpenTask(team: TeamState, exceptTaskId?: string): TeamTask | undefined {
+  return team.tasks.find(task => task.id !== exceptTaskId
+    && task.assignee === CAPTAIN_KEY
+    && !TERMINAL_TASK_STATUSES.includes(task.status))
+}
+
 async function waitForMemberIdle(ctx: Context, member: TeamMember, signal: AbortSignal): Promise<void> {
   if (member.id === '') return
   const live = ctx.agents.get(member.id as SessionId)
@@ -534,7 +541,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
 
   ctx.tools.register(defineTool({
     name: 'agent_teams_reassign_task',
-    description: 'Atomically retry, reassign, or let the captain take over any unfinished/failed task. The old attempt is revoked before its member is interrupted, so late updates cannot overwrite the new owner. Use assignee="captain" for captain takeover.',
+    description: 'Atomically retry, reassign, or let the captain take over one ready unfinished/failed task. The old attempt is revoked before its member is interrupted, so late updates cannot overwrite the new owner. Use assignee="captain" only when you will finish that task in this turn; a captain can own only one unfinished takeover at a time, and an unfinished takeover returns to the member pool when the captain becomes idle.',
     parameters: {
       task_id: { type: 'string', required: true, description: 'Task to retry/reassign.' },
       assignee: { type: 'string', required: true, description: 'Active member name, or "captain" for captain takeover.' },
@@ -572,7 +579,16 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
         if (task.status === 'completed') throw new Error(`completed task ${task.id} is immutable and cannot be reassigned`)
         if (task.reassigning === true) throw new Error(`task ${task.id} is already being reassigned`)
         const targetMember = target === CAPTAIN_KEY ? undefined : requireMember(fresh, target)
-        if (targetMember !== undefined) {
+        if (target === CAPTAIN_KEY) {
+          const busy = captainOpenTask(fresh, task.id)
+          if (busy !== undefined) {
+            throw new Error(`captain is busy with ${busy.id}; complete or reassign it before taking over ${task.id}`)
+          }
+          const pending = unsatisfiedDependencies(fresh.tasks, task.dependencies)
+          if (pending.length > 0) {
+            throw new Error(`task ${task.id} is blocked by unfinished dependencies: ${pending.join(', ')} — complete them before captain takeover`)
+          }
+        } else if (targetMember !== undefined) {
           const busy = memberOpenTask(fresh, targetMember.name, task.id)
           if (busy !== undefined) {
             throw new Error(`member "${targetMember.name}" is busy with ${busy.id}; finish or reassign it first`)
@@ -609,7 +625,13 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
           throw new Error(`task ${task.id} changed during reassignment; refusing to overwrite the newer state`)
         }
         task.reassigning = false
-        if (quiescenceError === undefined && target === CAPTAIN_KEY) beginTaskAttempt(task, CAPTAIN_KEY)
+        if (quiescenceError === undefined && target === CAPTAIN_KEY) {
+          beginTaskAttempt(task, CAPTAIN_KEY)
+          // The captain is already in the turn that requested takeover; there
+          // is no later member claim handshake to move claimed -> in_progress.
+          task.status = 'in_progress'
+          task.updatedAt = Date.now()
+        }
         await writeTeam(stateRoot, fresh)
         appendTeamEvent(ctx, captain.session, 'agent-teams/task-updated', {
           teamId: fresh.id,

@@ -20,8 +20,10 @@ import { deliverToMember } from './members.ts'
 import {
   acknowledgeMailbox,
   beginTaskAttempt,
+  CAPTAIN_KEY,
   claimMailboxDelivery,
   findTeamByParticipant,
+  invalidateTaskAttempt,
   readTeam,
   readUnreadMailbox,
   releaseMailboxDelivery,
@@ -270,7 +272,32 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
       parkedAttempts.delete(agent.id)
       return
     }
-    if (located.captainSessionId === agent.id) return
+    if (located.captainSessionId === agent.id) {
+      // Captain takeover is scoped to the captain's current turn. Unlike a
+      // durable member, the captain has no scheduler lane that can resume an
+      // abandoned attempt later. Returning unfinished captain-owned work to
+      // the shared pool on the idle edge prevents it from becoming a
+      // permanently parked `claimed` task after the captain answers, is
+      // interrupted, or the user switches conversations.
+      if (status === 'running') return
+      let requeued = false
+      await withTeamLock(teamLockKey(stateRoot, located.id), async () => {
+        const fresh = await readTeam(stateRoot, located.id)
+        if (fresh === undefined || fresh.captainSessionId !== agent.id) return
+        for (const task of fresh.tasks) {
+          if (task.assignee !== CAPTAIN_KEY
+            || task.status === 'completed'
+            || task.status === 'failed'
+            || task.status === 'cancelled') continue
+          invalidateTaskAttempt(task)
+          task.reassigning = false
+          requeued = true
+        }
+        if (requeued) await writeTeam(stateRoot, fresh)
+      })
+      if (requeued) await runtime.kickTeam(workspace, located.id, agent)
+      return
+    }
     const member = located.members.find(candidate => candidate.id === agent.id && candidate.status !== 'removed')
     if (member === undefined) {
       parkedAttempts.delete(agent.id)

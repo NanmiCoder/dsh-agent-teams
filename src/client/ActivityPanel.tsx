@@ -29,6 +29,7 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { ObservableSnapshot, SessionListState } from '@deepseek-ai/dsh-client-runtime/client'
 import {
   activityPanelExpandedForSession,
+  activityPanelShouldAutoExpand,
   compactDagLayout,
   compactModelLabel,
   COMPACT_DAG_NODE_HEIGHT,
@@ -85,6 +86,7 @@ const PANEL_OPEN_ATTRIBUTE = 'data-agent-teams-panel-open'
 const PANEL_SHIFT_PROPERTY = '--agent-teams-panel-shift'
 const PANEL_CONVERSATION_GAP = 14
 const MOVE_THRESHOLD = 4
+const CAPTAIN_ASSIGNEE = 'captain'
 
 type PanelGesture = {
   readonly kind: 'move' | 'resize'
@@ -454,7 +456,11 @@ function TeamSection({ team, onNavigate, t, historic = false }: {
 }) {
   const [membersOpen, setMembersOpen] = useState(true)
   const busyCount = team.members.filter((member) => member.activity === 'working').length
-  const assignedCount = team.tasks.filter((task) => task.assignee !== '').length
+  const assignedCount = team.tasks.filter((task) => task.assignee !== '' && task.assignee !== CAPTAIN_ASSIGNEE).length
+  const captainOwned = team.tasks.filter((task) => task.assignee === CAPTAIN_ASSIGNEE
+    && task.status !== 'completed' && task.status !== 'failed' && task.status !== 'cancelled')
+  const captainBusy = captainOwned.length > 0
+  const captainTaskIds = formatTaskIds(captainOwned.map((task) => task.id), t)
   const completedCount = team.tasks.filter((task) => task.status === 'completed').length
   const allCompleted = team.tasks.length > 0 && completedCount === team.tasks.length
   return (
@@ -479,16 +485,17 @@ function TeamSection({ team, onNavigate, t, historic = false }: {
               <span className={css.captainName}>{t('captain.name')}</span>
               <span className={css.captainRole}>{t('captain.role')}</span>
             </span>
-            <span className={css.captainSummary}>{t('captain.summary', {
-              tasks: assignedCount,
-              members: team.members.length,
-            })}</span>
+            <span className={css.captainSummary}>{captainBusy
+              ? t('captain.summary.withTakeover', { tasks: assignedCount, captainTasks: captainTaskIds })
+              : t('captain.summary', { tasks: assignedCount, members: team.members.length })}</span>
           </span>
-          <span className={css.captainState} data-busy={busyCount > 0}>
-            <WorkGlyph active={busyCount > 0} />
-            {busyCount > 0
-              ? t('captain.state.working', { count: busyCount })
-              : t(allCompleted ? 'captain.state.collected' : 'captain.state.waiting')}
+          <span className={css.captainState} data-busy={captainBusy || busyCount > 0}>
+            <WorkGlyph active={captainBusy || busyCount > 0} />
+            {captainBusy
+              ? t('captain.state.takeover', { tasks: captainTaskIds })
+              : busyCount > 0
+                ? t('captain.state.working', { count: busyCount })
+                : t(allCompleted ? 'captain.state.collected' : 'captain.state.waiting')}
           </span>
         </div>
 
@@ -634,6 +641,11 @@ export function ActivityPanel({ sessionsList, openMember, t }: ActivityPanelProp
     sessionsList.subscribe,
     sessionsList.getSnapshot,
   ).current
+  const autoOpenTrackerRef = useRef<{
+    sessionId: SessionId | undefined
+    restoreComplete: boolean
+    liveTeamIds: ReadonlySet<string>
+  }>({ sessionId: current, restoreComplete: false, liveTeamIds: new Set() })
   const monitorTargets = useSyncExternalStore(
     subscribeActivityMonitorTargets,
     getActivityMonitorTargetsSnapshot,
@@ -708,11 +720,17 @@ export function ActivityPanel({ sessionsList, openMember, t }: ActivityPanelProp
   // removes the old panel immediately instead of waiting for the no-team
   // autoclose grace period on the destination page.
   useLayoutEffect(() => {
+    const tracker = autoOpenTrackerRef.current
+    if (tracker.sessionId !== current) {
+      tracker.sessionId = current
+      tracker.restoreComplete = false
+      tracker.liveTeamIds = new Set()
+      setWasActive(false)
+      setAutoOpened(false)
+    }
     if (openOwner === undefined || openOwner === current) return
     setOpen(false)
     setOpenOwner(undefined)
-    setWasActive(false)
-    setAutoOpened(false)
   }, [current, openOwner])
 
   // Only the wide docked mode asks the conversation column to yield. Floating
@@ -740,7 +758,22 @@ export function ActivityPanel({ sessionsList, openMember, t }: ActivityPanelProp
     // also performs one cold-start discovery pass so archived/cardless teams
     // survive a browser or `dsh web` restart.
     const controller = startActivityPolling(currentTargets, { discoverySessionId: current })
-    return () => { controller.stop() }
+    let active = true
+    const tracker = autoOpenTrackerRef.current
+    if (tracker.sessionId === current && !tracker.restoreComplete) {
+      void controller.firstTick.then(() => {
+        const latest = autoOpenTrackerRef.current
+        if (!active || latest.sessionId !== current || latest.restoreComplete) return
+        latest.liveTeamIds = new Set(getActivitySnapshotsSnapshot().teams
+          .filter((team) => team.captainSessionId === current)
+          .map((team) => team.teamId))
+        latest.restoreComplete = true
+      })
+    }
+    return () => {
+      active = false
+      controller.stop()
+    }
   }, [current, currentTargets])
 
   useEffect(() => {
@@ -795,14 +828,30 @@ export function ActivityPanel({ sessionsList, openMember, t }: ActivityPanelProp
     [archivedTeams, current, teams],
   )
   const visibleCount = visibleTeams.length + visibleArchived.length + visibleHistoric.length
+  const visibleLiveTeamIds = useMemo(
+    () => visibleTeams.map((team) => team.teamId).sort(),
+    [visibleTeams],
+  )
+  const visibleLiveTeamKey = visibleLiveTeamIds.join('\u0000')
 
   useEffect(() => {
+    const tracker = autoOpenTrackerRef.current
+    const settled = performance.now() - mountedAtRef.current >= AUTO_OPEN_SETTLE_MS
+    const shouldAutoExpand = tracker.sessionId === current && activityPanelShouldAutoExpand({
+      alreadyAutoOpened: autoOpened,
+      pageSettled: settled,
+      restoreComplete: tracker.restoreComplete,
+      previousLiveTeamIds: tracker.liveTeamIds,
+      currentLiveTeamIds: visibleLiveTeamIds,
+    })
+    if (tracker.sessionId === current && tracker.restoreComplete) {
+      tracker.liveTeamIds = new Set(visibleLiveTeamIds)
+    }
     if (visibleCount > 0) {
       setWasActive(true)
-      // Auto-expand only after the page-settle window: opening (and its
-      // main-column yield) right after load reads as a whole-page flicker.
-      const settled = performance.now() - mountedAtRef.current >= AUTO_OPEN_SETTLE_MS
-      if (!autoOpened && settled) {
+      // Existing state restored for a reopened conversation stays collapsed.
+      // Only a live team that appears after the restore pass may auto-expand.
+      if (shouldAutoExpand) {
         setOpenOwner(current)
         setOpen(true)
         setAutoOpened(true)
@@ -819,7 +868,7 @@ export function ActivityPanel({ sessionsList, openMember, t }: ActivityPanelProp
       setAutoOpened(false)
     }, AUTOCLOSE_GRACE_MS)
     return () => { clearTimeout(timer) }
-  }, [visibleCount, autoOpened, wasActive])
+  }, [visibleCount, visibleLiveTeamKey, autoOpened, wasActive, current])
 
   const busy = useMemo(
     () => visibleTeams.some((team) => team.members.some((member) => member.activity === 'working')),

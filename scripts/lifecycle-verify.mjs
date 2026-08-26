@@ -807,8 +807,65 @@ try {
   }
   check('captain takeover owns a fresh attempt and rejects the old member',
     captainAttempt.assignee === 'captain' && captainAttempt.attempt_id !== betaTakeoverClaim.attempt_id
+      && captainAttempt.status === 'in_progress'
       && captainAttempt.attempt === betaTakeoverClaim.attempt + 1
       && lateTakeoverRejected && (await task(t7.task_id))?.output === 'captain result')
+
+  // A captain is one execution lane, not an unlimited pseudo-member. Two
+  // parallel takeovers previously produced the issue #77 state: both member
+  // rows lost their tasks while two captain-owned attempts stayed parked.
+  beta.status = 'idle'
+  gamma.status = 'idle'
+  const t8 = await call('agent_teams_create_task', { subject: 'parallel captain takeover A', assignee: 'beta' })
+  const t9 = await call('agent_teams_create_task', { subject: 'parallel captain takeover B', assignee: 'gamma' })
+  const betaParallelClaim = await call('agent_teams_claim_task', { task_id: t8.task_id }, beta)
+  const gammaParallelClaim = await call('agent_teams_claim_task', { task_id: t9.task_id }, gamma)
+  await call('agent_teams_update_task', {
+    task_id: t8.task_id, status: 'in_progress', attempt_id: betaParallelClaim.attempt_id,
+  }, beta)
+  await call('agent_teams_update_task', {
+    task_id: t9.task_id, status: 'in_progress', attempt_id: gammaParallelClaim.attempt_id,
+  }, gamma)
+  const captainTakeoverRace = await Promise.allSettled([
+    call('agent_teams_reassign_task', {
+      task_id: t8.task_id, assignee: 'captain', reason: 'parallel takeover guard A',
+    }),
+    call('agent_teams_reassign_task', {
+      task_id: t9.task_id, assignee: 'captain', reason: 'parallel takeover guard B',
+    }),
+  ])
+  const raceState = await state()
+  check('parallel captain takeovers allow exactly one active captain task',
+    captainTakeoverRace.filter(result => result.status === 'fulfilled').length === 1
+      && captainTakeoverRace.filter(result => result.status === 'rejected'
+        && /captain is busy with/.test(String(result.reason))).length === 1
+      && raceState?.tasks.filter(candidate => candidate.assignee === 'captain'
+        && (candidate.status === 'claimed' || candidate.status === 'in_progress')).length === 1)
+
+  // If the captain ends the turn without completing that one takeover, it
+  // must return to the ordinary member scheduler instead of staying white and
+  // ownerless forever in the activity panel.
+  publishStatus(captain, 'idle')
+  await new Promise(resolve => setTimeout(resolve, 20))
+  const afterCaptainIdle = await state()
+  const recoveredParallel = afterCaptainIdle?.tasks.filter(candidate => (
+    candidate.id === t8.task_id || candidate.id === t9.task_id
+  )) ?? []
+  check('unfinished captain takeover returns to a member when the captain becomes idle',
+    recoveredParallel.length === 2
+      && recoveredParallel.every(candidate => candidate.assignee !== 'captain')
+      && recoveredParallel.every(candidate => candidate.status === 'claimed' || candidate.status === 'in_progress'))
+  for (const recoveredTask of recoveredParallel) {
+    const owner = recoveredTask.assignee === 'beta' ? beta : gamma
+    owner.status = 'running'
+    const claim = await call('agent_teams_claim_task', { task_id: recoveredTask.id }, owner)
+    await call('agent_teams_update_task', {
+      task_id: recoveredTask.id, status: 'in_progress', attempt_id: claim.attempt_id,
+    }, owner)
+    await call('agent_teams_update_task', {
+      task_id: recoveredTask.id, status: 'completed', output: 'member recovered captain work', attempt_id: claim.attempt_id,
+    }, owner)
+  }
 
   beta.status = 'running'
   gamma.status = 'idle'

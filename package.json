@@ -67,13 +67,14 @@
         "@deepseek-ai/dsh-client-locale",
         "@deepseek-ai/dsh-client-runtime",
         "@deepseek-ai/dsh-client-ui-conversation",
-        "@deepseek-ai/dsh-client-ui-layout"
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-model-selection"
       ],
       "platform": "web"
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json && tsc -p tsconfig.client.json && tsdown",
+    "build": "node scripts/clean-build.mjs && tsc -p tsconfig.json && tsc -p tsconfig.client.json && tsdown",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit",
     "sync:skill": "node scripts/sync-skill.mjs",
     "verify:skill": "node scripts/sync-skill.mjs --check",
@@ -87,6 +88,7 @@
     "@deepseek-ai/dsh-client-runtime": "^0.1.0-rc.6",
     "@deepseek-ai/dsh-client-ui-conversation": "^0.1.0-rc.6",
     "@deepseek-ai/dsh-client-ui-layout": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-ui-model-selection": "^0.1.0-rc.8",
     "@deepseek-ai/dsh-client-ui-primitives": "^0.1.0-rc.6",
     "@deepseek-ai/dsh-client-ui-slots": "^0.1.0-rc.6",
     "@deepseek-ai/dsh-commands": "^0.1.0-rc.6",
@@ -115,6 +117,9 @@
       "optional": true
     },
     "@deepseek-ai/dsh-client-ui-layout": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-client-ui-model-selection": {
       "optional": true
     },
     "@deepseek-ai/dsh-client-ui-primitives": {
@@ -155,6 +160,7 @@
     "@deepseek-ai/dsh-client-runtime": "0.1.0-rc.8",
     "@deepseek-ai/dsh-client-ui-conversation": "0.1.0-rc.8",
     "@deepseek-ai/dsh-client-ui-layout": "0.1.0-rc.8",
+    "@deepseek-ai/dsh-client-ui-model-selection": "0.1.0-rc.8",
     "@deepseek-ai/dsh-client-ui-primitives": "0.1.0-rc.8",
     "@deepseek-ai/dsh-client-ui-slots": "0.1.0-rc.8",
     "@deepseek-ai/dsh-commands": "0.1.0-rc.8",

@@ -23,7 +23,9 @@ import {
 } from 'react'
 import {
   IconBranchOutline16, IconChevronDownOutline14, IconPanelLeftOutline16,
+  IconStopFill16, IconWarningOutline16, Modal,
 } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { ModelDirectory, ModelDirectoryResolver } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { ObservableSnapshot, SessionListState } from '@deepseek-ai/dsh-client-runtime/client'
@@ -38,9 +40,11 @@ import {
   memberRouteLabel,
   relatedTaskIds,
   taskModelLabel,
+  teamIsActive,
   usesParallelTaskGrid,
 } from './activity-model.ts'
 import {
+  ACTIVITY_HALT_URL,
   getActivityMonitorTargetsSnapshot,
   getActivitySnapshotsSnapshot,
   startActivityPolling,
@@ -256,13 +260,14 @@ function compactTaskLabel(subject: string): string {
   return head.length > 18 ? `${head.slice(0, 17)}…` : head
 }
 
-function taskSummary(team: ActivityTeam, t: AgentTeamsTranslate): string {
+function taskSummary(team: ActivityTeam, t: AgentTeamsTranslate, discarded = false): string {
   const completed = team.tasks.filter((task) => task.status === 'completed')
   const cancelled = team.tasks.filter((task) => task.status === 'cancelled')
   const running = team.tasks.filter((task) => task.state === 'running')
   const blocked = team.tasks.filter((task) => task.state === 'blocked')
   const ready = team.tasks.filter((task) => task.state === 'open' && task.status !== 'completed' && task.status !== 'failed' && task.status !== 'cancelled')
   const failed = team.tasks.filter((task) => task.status === 'failed')
+  if (discarded) return t('task.summary.discarded', { count: team.tasks.length })
   if (team.tasks.length === 0) return t('task.summary.waitingBreakdown')
   if (team.phase === 'staged') return t('task.summary.staged', { count: team.tasks.length })
   if (completed.length === team.tasks.length) return t('task.summary.allDelivered', { count: completed.length })
@@ -288,20 +293,20 @@ function taskSummary(team: ActivityTeam, t: AgentTeamsTranslate): string {
   return t('task.summary.waitingSchedule')
 }
 
-function ProgressOverview({ team, t }: { readonly team: ActivityTeam; readonly t: AgentTeamsTranslate }) {
-  const running = team.tasks.filter((task) => task.state === 'running').length
-  const blocked = team.tasks.filter((task) => task.state === 'blocked').length
-  const completed = team.tasks.filter((task) => task.status === 'completed').length
-  const settled = team.tasks.length > 0 && team.tasks.every((task) => (
+function ProgressOverview({ team, t, discarded = false }: { readonly team: ActivityTeam; readonly t: AgentTeamsTranslate; readonly discarded?: boolean }) {
+  const running = discarded ? 0 : team.tasks.filter((task) => task.state === 'running').length
+  const blocked = discarded ? 0 : team.tasks.filter((task) => task.state === 'blocked').length
+  const completed = discarded ? 0 : team.tasks.filter((task) => task.status === 'completed').length
+  const settled = !discarded && team.tasks.length > 0 && team.tasks.every((task) => (
     task.status === 'completed' || task.status === 'failed' || task.status === 'cancelled'
   ))
-  const summaryTone = blocked > 0 ? 'warning' : settled ? 'completed' : 'running'
+  const summaryTone = discarded ? 'discarded' : blocked > 0 ? 'warning' : settled ? 'completed' : 'running'
   return (
     <section className={css.progressOverview} aria-label={t('progress.aria')} data-progress-summary>
       <span className={css.progressTitle}>{t('progress.title')}</span>
       {team.tasks.length > 0 ? (
         <span className={css.progressSegments} aria-hidden>
-          {team.tasks.map((task) => <span key={task.id} data-state={taskTone(task.state, task.status)} />)}
+          {team.tasks.map((task) => <span key={task.id} data-state={discarded ? 'cancelled' : taskTone(task.state, task.status)} />)}
         </span>
       ) : <span className={css.progressEmpty} />}
       <span className={css.progressLegend}>
@@ -311,16 +316,17 @@ function ProgressOverview({ team, t }: { readonly team: ActivityTeam; readonly t
       </span>
       <span className={css.progressSummary} data-state={summaryTone}>
         <span className={css.progressSummaryDot} />
-        <span>{taskSummary(team, t)}</span>
+        <span>{taskSummary(team, t, discarded)}</span>
       </span>
     </section>
   )
 }
 
-function DependencyMap({ tasks, members, t }: {
+function DependencyMap({ tasks, members, t, discarded = false }: {
   readonly tasks: readonly ActivityTask[]
   readonly members: readonly ActivityMember[]
   readonly t: AgentTeamsTranslate
+  readonly discarded?: boolean
 }) {
   const [open, setOpen] = useState(true)
   const [hoverTaskId, setHoverTaskId] = useState<string | null>(null)
@@ -404,7 +410,7 @@ function DependencyMap({ tasks, members, t }: {
                       ? { height: COMPACT_DAG_NODE_HEIGHT }
                       : { left: x, top: y, width: COMPACT_DAG_NODE_WIDTH, height: COMPACT_DAG_NODE_HEIGHT }}
                     data-task-id={task.id}
-                    data-state={taskTone(task.state, task.status)}
+                    data-state={discarded ? 'cancelled' : taskTone(task.state, task.status)}
                     data-task-model={model || undefined}
                     data-focused={related?.has(task.id) ?? false}
                     data-dimmed={related !== null && !related.has(task.id)}
@@ -434,10 +440,14 @@ function DependencyMap({ tasks, members, t }: {
             <span className={css.taskDetailHead}>
               <span className={css.taskDetailId}>{detailTask.id}</span>
               <span className={css.taskDetailSubject} title={detailTask.subject}>{detailTask.subject.replace(/^开发\s*/u, '')}</span>
-              <span className={css.taskDetailBadge} data-state={taskTone(detailTask.state, detailTask.status)}>{taskStatusLabel(detailTask.status, t)}</span>
+              <span className={css.taskDetailBadge} data-state={discarded ? 'cancelled' : taskTone(detailTask.state, detailTask.status)}>
+                {discarded ? t('task.status.notRun') : taskStatusLabel(detailTask.status, t)}
+              </span>
             </span>
             <span className={css.taskDetailLine}>
-              {detailTask.assignee || t('task.assignee.unclaimed')} · {detailTask.status === 'completed'
+              {detailTask.assignee || t('task.assignee.unclaimed')} · {discarded
+                ? t('task.detail.notRun')
+                : detailTask.status === 'completed'
                 ? t('task.detail.completed')
                 : detailTask.dependencies.length === 0
                 ? t('task.detail.noPrerequisite')
@@ -460,14 +470,22 @@ function DependencyMap({ tasks, members, t }: {
   )
 }
 
-function TeamSection({ team, onNavigate, t, historic = false }: {
+function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscarded, onNavigate, t, historic = false }: {
   readonly team: ActivityTeam
+  readonly modelDirectory?: ModelDirectory
+  readonly onContinuePlanning?: () => void
+  readonly onDiscarded?: () => void
   /** Navigate to a member transcript (floater hides immediately). */
   readonly onNavigate: (parentId: SessionId, childId: SessionId) => void
   readonly t: AgentTeamsTranslate
   readonly historic?: boolean
 }) {
   const [membersOpen, setMembersOpen] = useState(true)
+  const [stopOpen, setStopOpen] = useState(false)
+  const [stopping, setStopping] = useState(false)
+  const [stopError, setStopError] = useState('')
+  const discarded = historic && team.phase === 'staged'
+  const stopped = !historic && team.halted === true
   const busyCount = team.members.filter((member) => member.activity === 'working').length
   const assignedCount = team.tasks.filter((task) => task.assignee !== '' && task.assignee !== CAPTAIN_ASSIGNEE).length
   const captainOwned = team.tasks.filter((task) => task.assignee === CAPTAIN_ASSIGNEE
@@ -479,19 +497,70 @@ function TeamSection({ team, onNavigate, t, historic = false }: {
   const allSettled = team.tasks.length > 0 && team.tasks.every((task) => (
     task.status === 'completed' || task.status === 'failed' || task.status === 'cancelled'
   ))
+  const unfinishedCount = team.tasks.filter((task) => (
+    task.status !== 'completed' && task.status !== 'failed' && task.status !== 'cancelled'
+  )).length
+  const canStop = !historic && team.phase === 'running' && team.halted !== true && teamIsActive(team)
+  const stopTeam = async (): Promise<void> => {
+    if (stopping) return
+    setStopping(true)
+    setStopError('')
+    try {
+      const response = await fetch(ACTIVITY_HALT_URL, {
+        method: 'POST',
+        cache: 'no-store',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionId: team.captainSessionId, teamId: team.teamId }),
+      })
+      if (!response.ok) {
+        let message = t('team.stopRequestFailed')
+        try {
+          const body = await response.json() as { error?: unknown }
+          if (typeof body.error === 'string' && body.error.trim() !== '') message = body.error
+        } catch {}
+        throw new Error(message)
+      }
+      setStopOpen(false)
+    } catch (error: unknown) {
+      setStopError(t('team.stopFailed', { message: error instanceof Error ? error.message : String(error) }))
+    } finally {
+      setStopping(false)
+    }
+  }
   return (
-    <section className={css.team} data-team-id={team.teamId}>
-      <header className={css.teamHead}>
-        <span className={css.teamName} title={team.name}>{team.name}</span>
-        {historic && <span className={css.historicPill}>{t('team.ended')}</span>}
-        <span className={css.teamStats}>
-          <span data-stat="members">{t('team.stats.members', { count: team.members.length })}</span>
-          <span data-stat="tasks">{t('team.stats.completed', { completed: completedCount, total: team.tasks.length })}</span>
-          <span data-stat="messages">{t('team.stats.messages', { count: team.messageCount })}</span>
-        </span>
-      </header>
+    <>
+      <section className={css.team} data-team-id={team.teamId}>
+        <header className={css.teamHead}>
+          <span className={css.teamName} title={team.name}>{team.name}</span>
+          {historic && <span className={css.historicPill}>{t(discarded ? 'team.discarded' : 'team.ended')}</span>}
+          {stopped && <span className={css.historicPill}>{t('team.stopped')}</span>}
+          <span className={css.teamStats}>
+            <span data-stat="members">{t('team.stats.members', { count: team.members.length })}</span>
+            <span data-stat="tasks">{t('team.stats.completed', { completed: completedCount, total: team.tasks.length })}</span>
+            <span data-stat="messages">{t('team.stats.messages', { count: team.messageCount })}</span>
+          </span>
+          {canStop && (
+            <button
+              type="button"
+              className={css.teamStopButton}
+              aria-label={t('team.stop')}
+              title={t('team.stop')}
+              onClick={() => { setStopError(''); setStopOpen(true) }}
+            >
+              <IconStopFill16 />
+            </button>
+          )}
+        </header>
 
-      {team.phase === 'staged' && !historic && <StagingPlanEditor team={team} t={t} />}
+        {team.phase === 'staged' && !historic && modelDirectory !== undefined && onContinuePlanning !== undefined && onDiscarded !== undefined && (
+          <StagingPlanEditor
+            team={team}
+            modelDirectory={modelDirectory}
+            onContinuePlanning={onContinuePlanning}
+            onDiscarded={onDiscarded}
+            t={t}
+          />
+        )}
 
       <section className={css.delegationSection} aria-label={t('delegation.aria')} data-delegation-map>
         <div className={css.captainNode}>
@@ -503,16 +572,20 @@ function TeamSection({ team, onNavigate, t, historic = false }: {
               <span className={css.captainName}>{t('captain.name')}</span>
               <span className={css.captainRole}>{t('captain.role')}</span>
             </span>
-            <span className={css.captainSummary}>{captainBusy
-              ? t('captain.summary.withTakeover', { tasks: assignedCount, captainTasks: captainTaskIds })
+            <span className={css.captainSummary}>{discarded
+              ? t('captain.summary.discarded', { tasks: team.tasks.length, members: team.members.length })
+              : captainBusy
+                ? t('captain.summary.withTakeover', { tasks: assignedCount, captainTasks: captainTaskIds })
               : team.phase === 'staged'
                 ? t('captain.summary.staged', { tasks: team.tasks.length, members: team.members.length })
                 : t('captain.summary', { tasks: assignedCount, members: team.members.length })}</span>
           </span>
           <span className={css.captainState} data-busy={captainBusy || busyCount > 0}>
             <WorkGlyph active={captainBusy || busyCount > 0} />
-            {captainBusy
-              ? t('captain.state.takeover', { tasks: captainTaskIds })
+            {discarded
+              ? t('captain.state.discarded')
+              : captainBusy
+                ? t('captain.state.takeover', { tasks: captainTaskIds })
               : team.phase === 'staged'
                 ? t('captain.state.staged')
               : busyCount > 0
@@ -525,7 +598,7 @@ function TeamSection({ team, onNavigate, t, historic = false }: {
           </span>
         </div>
 
-        <ProgressOverview team={team} t={t} />
+        <ProgressOverview team={team} t={t} discarded={discarded} />
 
         <button type="button" className={css.membersToggle} onClick={() => { setMembersOpen((current) => !current) }} aria-expanded={membersOpen} data-members-toggle>
           <span><Chevron open={membersOpen} />{t('members.toggle', { count: team.members.length })}</span>
@@ -564,11 +637,21 @@ function TeamSection({ team, onNavigate, t, historic = false }: {
                       {member.role !== '' && <span className={css.memberRole}>{member.role}</span>}
                       <span className={css.memberState} data-activity={member.activity}>
                         <WorkGlyph active={member.activity === 'working'} />
-                        {team.phase === 'staged' ? t('member.state.staged') : memberStateLabel(member, team.tasks, historic, t)}
+                        {discarded
+                          ? t('member.state.notCreated')
+                          : stopped
+                            ? t('member.state.stopped')
+                            : team.phase === 'staged'
+                              ? t('member.state.staged')
+                              : memberStateLabel(member, team.tasks, historic, t)}
                       </span>
                     </span>
-                    <span className={css.memberStatusLine}>{team.phase === 'staged'
-                      ? t('member.status.staged')
+                    <span className={css.memberStatusLine}>{discarded
+                      ? t('member.status.discarded')
+                      : stopped
+                        ? t('member.status.stopped')
+                        : team.phase === 'staged'
+                          ? t('member.status.staged')
                       : historic && owned.length > 0 && owned.every((task) => (
                         task.status === 'completed' || task.status === 'failed' || task.status === 'cancelled'
                       ))
@@ -583,7 +666,11 @@ function TeamSection({ team, onNavigate, t, historic = false }: {
                   <span className={css.memberCount}>{member.done}/{member.total}</span>
                 </button>
                 <div className={css.assignmentLine}>
-                  <span className={css.assignmentLabel}>{t(team.phase === 'staged' ? 'assignment.staged' : 'assignment.label')}</span>
+                  <span className={css.assignmentLabel}>{t(discarded
+                    ? 'assignment.discarded'
+                    : team.phase === 'staged'
+                      ? 'assignment.staged'
+                      : 'assignment.label')}</span>
                   <span className={css.assignmentTasks}>
                     {owned.length === 0
                       ? <span className={css.taskEmpty}>{t('assignment.empty')}</span>
@@ -594,7 +681,7 @@ function TeamSection({ team, onNavigate, t, historic = false }: {
                             <span
                               key={task.id}
                               className={css.assignmentChip}
-                              data-state={taskTone(task.state, task.status)}
+                              data-state={discarded ? 'cancelled' : taskTone(task.state, task.status)}
                               data-task-model={model || undefined}
                               title={taskTitle(task, model)}
                             >
@@ -610,8 +697,27 @@ function TeamSection({ team, onNavigate, t, historic = false }: {
         </div>}
       </section>
 
-      <DependencyMap tasks={team.tasks} members={team.members} t={t} />
-    </section>
+      <DependencyMap tasks={team.tasks} members={team.members} t={t} discarded={discarded} />
+      </section>
+      <Modal
+        open={stopOpen}
+        onClose={() => { if (!stopping) setStopOpen(false) }}
+        title={t('team.stopTitle', { team: team.name })}
+        closeLabel={t('plan.cancel')}
+        description={t('team.stopDescription', { tasks: unfinishedCount, members: busyCount })}
+        footer={(
+          <span className={css.stopModalActions}>
+            <button type="button" disabled={stopping} onClick={() => { setStopOpen(false) }}>{t('team.stopCancel')}</button>
+            <button type="button" data-danger disabled={stopping} onClick={() => { void stopTeam() }}>
+              <IconStopFill16 />
+              {stopping ? t('team.stopping') : t('team.stopConfirm')}
+            </button>
+          </span>
+        )}
+      >
+        {stopError !== '' && <p className={css.stopModalError} role="alert"><IconWarningOutline16 />{stopError}</p>}
+      </Modal>
+    </>
   )
 }
 
@@ -645,10 +751,11 @@ function historicCardTeam(data: AgentTeamsCardData, owner: string): ActivityTeam
  * session is the one currently open. */
 export type ActivityPanelProps = {
   readonly sessionsList: ObservableSnapshot<SessionListState>
+  readonly modelDirectories: ModelDirectoryResolver
   readonly openMember: (parentId: SessionId, childId: SessionId) => void
 } & PropsLocale<'agentTeams'>
 
-export function ActivityPanel({ sessionsList, openMember, t }: ActivityPanelProps) {
+export function ActivityPanel({ sessionsList, modelDirectories, openMember, t }: ActivityPanelProps) {
   // Navigating to a member's subagent transcript is an explicit departure:
   // hide the floater immediately instead of waiting out the autocollapse
   // grace, so the panel never lingers over the member session.
@@ -683,6 +790,13 @@ export function ActivityPanel({ sessionsList, openMember, t }: ActivityPanelProp
     subscribeActivityMonitorTargets,
     getActivityMonitorTargetsSnapshot,
   )
+  const returnToComposer = (): void => {
+    setOpen(false)
+    setOpenOwner(undefined)
+    window.requestAnimationFrame(() => {
+      document.querySelector<HTMLTextAreaElement>('[data-composer-card] textarea')?.focus()
+    })
+  }
   const { teams, archivedTeams } = useSyncExternalStore(
     subscribeActivitySnapshots,
     getActivitySnapshotsSnapshot,
@@ -1110,11 +1224,21 @@ export function ActivityPanel({ sessionsList, openMember, t }: ActivityPanelProp
               : (
                 <>
                   {visibleTeams.map((team) => (
-                    <TeamSection key={team.teamId} team={team} onNavigate={navigateToSession} t={t} />
+                    <TeamSection
+                      key={team.teamId}
+                      team={team}
+                      modelDirectory={team.phase === 'staged'
+                        ? modelDirectories.directoryFor(team.captainSessionId as SessionId)
+                        : undefined}
+                      onContinuePlanning={returnToComposer}
+                      onDiscarded={returnToComposer}
+                      onNavigate={navigateToSession}
+                      t={t}
+                    />
                   ))}
                   {visibleArchived.map((team) => (
                     <div key={`${team.captainSessionId}:${team.teamId}`} data-team-id={team.teamId} data-historic className={css.archivedWrap}>
-                      <span className={css.archiveLabel}>{t('archive.label')}</span>
+                      <span className={css.archiveLabel}>{t(team.phase === 'staged' ? 'archive.discardedLabel' : 'archive.label')}</span>
                       <TeamSection team={team} onNavigate={navigateToSession} t={t} historic />
                     </div>
                   ))}

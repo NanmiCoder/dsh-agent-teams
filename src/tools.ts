@@ -113,11 +113,14 @@ export type StagedPlanMutation =
       dependencies: string[]
     }
   | { action: 'remove_task'; taskId: string }
+  | { action: 'remove_member'; memberName: string }
 
 /** Runtime bridge shared by model-facing tools and the Web staging surface. */
 export interface AgentTeamsRuntime {
   updateStagedPlan(captain: Agent, teamId: string, mutation: StagedPlanMutation, signal?: AbortSignal): Promise<TeamState>
+  updateStagedPlanBatch(captain: Agent, teamId: string, mutations: readonly StagedPlanMutation[], signal?: AbortSignal): Promise<TeamState>
   approveStagedTeam(captain: Agent, teamId: string, signal?: AbortSignal): Promise<{ teamId: string; members: number; tasks: number }>
+  discardStagedTeam(captain: Agent, teamId: string): Promise<{ teamId: string }>
 }
 
 /** The caller agent, or a loud failure for non-agent callers. */
@@ -425,68 +428,83 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
   const memberSelections = installMemberSelectionRuntime(ctx, config.stateDir)
   const scheduler = installTeamScheduler(ctx, { stateDir: config.stateDir, executionPrompt: config.executionPrompt })
 
-  const updateStagedPlan: AgentTeamsRuntime['updateStagedPlan'] = async (captain, teamId, mutation, signal) => {
+  const updateStagedPlanBatch: AgentTeamsRuntime['updateStagedPlanBatch'] = async (captain, teamId, mutations, signal) => {
+    if (mutations.length === 0) throw new Error('at least one staged plan operation is required')
     const workspace = workspaceOf(captain)
     const stateRoot = stateRootOf(workspace, config)
     return withTeamLock(teamLockKey(stateRoot, teamId), async () => {
       const fresh = await requireFreshCaptainTeam(stateRoot, teamId, captain.id)
       requireStagedTeam(fresh)
-      if (mutation.action === 'update_member') {
-        const member = requireMember(fresh, mutation.memberName)
-        if (member.id !== '') throw new Error(`staged member "${member.name}" was already spawned`)
-        const selection = await resolveMemberLlmSelection(ctx, captain, {
-          provider: mutation.provider,
-          model: mutation.model,
-          reasoningEffort: trimmedOptional(mutation.reasoningEffort),
-          fallback: member.fallback,
-        }, signal)
-        member.role = trimmedOptional(mutation.role)
-        member.provider = selection.provider
-        member.model = selection.model
-        member.reasoningEffort = selection.reasoningEffort
-        member.executionPrompt = trimmedOptional(mutation.executionPrompt)
-      } else if (mutation.action === 'update_task') {
-        const task = requireTask(fresh, mutation.taskId)
-        if (task.status !== 'pending' || (task.attempt ?? 0) !== 0) {
-          throw new Error(`task "${task.id}" has already started and cannot be edited`)
+      for (const mutation of mutations) {
+        if (mutation.action === 'update_member') {
+          const member = requireMember(fresh, mutation.memberName)
+          if (member.id !== '') throw new Error(`staged member "${member.name}" was already spawned`)
+          const selection = await resolveMemberLlmSelection(ctx, captain, {
+            provider: mutation.provider,
+            model: mutation.model,
+            reasoningEffort: trimmedOptional(mutation.reasoningEffort),
+            fallback: member.fallback,
+          }, signal)
+          member.role = trimmedOptional(mutation.role)
+          member.provider = selection.provider
+          member.model = selection.model
+          member.reasoningEffort = selection.reasoningEffort
+          member.executionPrompt = trimmedOptional(mutation.executionPrompt)
+        } else if (mutation.action === 'update_task') {
+          const task = requireTask(fresh, mutation.taskId)
+          if (task.status !== 'pending' || (task.attempt ?? 0) !== 0) {
+            throw new Error(`task "${task.id}" has already started and cannot be edited`)
+          }
+          const subject = mutation.subject.trim()
+          if (subject === '') throw new Error('task subject must not be empty')
+          task.subject = subject
+          task.description = trimmedOptional(mutation.description)
+          task.assignee = trimmedOptional(mutation.assignee)
+          task.dependencies = [...new Set(mutation.dependencies.map((item) => item.trim()).filter(Boolean))]
+          task.updatedAt = Date.now()
+        } else if (mutation.action === 'add_task') {
+          const subject = mutation.subject.trim()
+          if (subject === '') throw new Error('task subject must not be empty')
+          fresh.taskSeq += 1
+          const now = Date.now()
+          fresh.tasks.push({
+            id: `t${fresh.taskSeq}`,
+            subject,
+            description: trimmedOptional(mutation.description),
+            status: 'pending',
+            assignee: trimmedOptional(mutation.assignee),
+            dependencies: [...new Set(mutation.dependencies.map((item) => item.trim()).filter(Boolean))],
+            attempt: 0,
+            kind: 'work',
+            createdAt: now,
+            updatedAt: now,
+          })
+        } else if (mutation.action === 'remove_task') {
+          const task = requireTask(fresh, mutation.taskId)
+          const dependent = fresh.tasks.find((candidate) => candidate.dependencies.includes(task.id))
+          if (dependent !== undefined) {
+            throw new Error(`task "${task.id}" is still required by "${dependent.id}"; update that dependency before removing the task`)
+          }
+          fresh.tasks = fresh.tasks.filter((candidate) => candidate.id !== task.id)
+        } else {
+          const member = requireMember(fresh, mutation.memberName)
+          if (member.id !== '') throw new Error(`staged member "${member.name}" was already spawned`)
+          const owned = fresh.tasks.filter((task) => task.assignee === member.name)
+          if (owned.length > 0) {
+            throw new Error(`member "${member.name}" still owns planned tasks: ${owned.map((task) => task.id).join(', ')}; update or remove those tasks first`)
+          }
+          fresh.members = fresh.members.filter((candidate) => candidate !== member)
         }
-        const subject = mutation.subject.trim()
-        if (subject === '') throw new Error('task subject must not be empty')
-        task.subject = subject
-        task.description = trimmedOptional(mutation.description)
-        task.assignee = trimmedOptional(mutation.assignee)
-        task.dependencies = [...new Set(mutation.dependencies.map((item) => item.trim()).filter(Boolean))]
-        task.updatedAt = Date.now()
-      } else if (mutation.action === 'add_task') {
-        const subject = mutation.subject.trim()
-        if (subject === '') throw new Error('task subject must not be empty')
-        fresh.taskSeq += 1
-        const now = Date.now()
-        fresh.tasks.push({
-          id: `t${fresh.taskSeq}`,
-          subject,
-          description: trimmedOptional(mutation.description),
-          status: 'pending',
-          assignee: trimmedOptional(mutation.assignee),
-          dependencies: [...new Set(mutation.dependencies.map((item) => item.trim()).filter(Boolean))],
-          attempt: 0,
-          kind: 'work',
-          createdAt: now,
-          updatedAt: now,
-        })
-      } else {
-        const task = requireTask(fresh, mutation.taskId)
-        const dependent = fresh.tasks.find((candidate) => candidate.dependencies.includes(task.id))
-        if (dependent !== undefined) {
-          throw new Error(`task "${task.id}" is still required by "${dependent.id}"; remove that dependency first`)
-        }
-        fresh.tasks = fresh.tasks.filter((candidate) => candidate.id !== task.id)
       }
       validateStagedGraph(fresh, false)
       await writeTeam(stateRoot, fresh)
       return fresh
     })
   }
+
+  const updateStagedPlan: AgentTeamsRuntime['updateStagedPlan'] = async (captain, teamId, mutation, signal) => (
+    updateStagedPlanBatch(captain, teamId, [mutation], signal)
+  )
 
   const approveStagedTeam: AgentTeamsRuntime['approveStagedTeam'] = async (captain, teamId, signal) => {
     const workspace = workspaceOf(captain)
@@ -558,7 +576,23 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
     return approved
   }
 
-  const runtime: AgentTeamsRuntime = { updateStagedPlan, approveStagedTeam }
+  const discardStagedTeam: AgentTeamsRuntime['discardStagedTeam'] = async (captain, teamId) => {
+    const workspace = workspaceOf(captain)
+    const stateRoot = stateRootOf(workspace, config)
+    return withTeamLock(teamLockKey(stateRoot, teamId), async () => {
+      const fresh = await requireFreshCaptainTeam(stateRoot, teamId, captain.id)
+      requireStagedTeam(fresh)
+      appendTeamEvent(ctx, captainSessionOf(ctx, fresh.captainSessionId, captain.session), 'agent-teams/plan-discarded', {
+        teamId: fresh.id,
+      })
+      // A staged plan owns no child sessions. Archiving releases the captain
+      // immediately while retaining the rejected graph for later inspection.
+      await archiveTeamDir(stateRoot, fresh.id)
+      return { teamId: fresh.id }
+    })
+  }
+
+  const runtime: AgentTeamsRuntime = { updateStagedPlan, updateStagedPlanBatch, approveStagedTeam, discardStagedTeam }
 
   ctx.tools.register(defineTool({
     name: 'agent_teams_create',
@@ -717,6 +751,126 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
           ...task.assignee === undefined ? {} : { assignee: task.assignee },
           dependencies: task.dependencies,
         })),
+      }
+    },
+  }))
+
+  ctx.tools.register(defineTool({
+    name: 'agent_teams_edit_plan',
+    description: 'Atomically revise the current staged AgentTeams plan without spawning members or scheduling tasks. Use this when the user continues chatting to change a plan that is waiting for approval. Submit dependent edits in order (update downstream dependencies or assignees, then remove tasks, then remove unused members). Never inspect or edit .agent-teams state files or plugin source code to revise a plan.',
+    parameters: {
+      operations: {
+        type: 'array',
+        required: true,
+        description: 'One atomic, ordered batch of staged-plan edits. If any operation is invalid, none of the edits are saved.',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            action: {
+              type: 'string',
+              required: true,
+              enum: ['update_member', 'update_task', 'add_task', 'remove_task', 'remove_member'],
+            },
+            member_name: { type: 'string', description: 'Member name for update_member or remove_member.' },
+            task_id: { type: 'string', description: 'Task id for update_task or remove_task.' },
+            subject: { type: 'string', description: 'Required for add_task; optional replacement for update_task.' },
+            description: { type: 'string', description: 'Optional task description.' },
+            assignee: { type: 'string', description: 'Optional task assignee; an empty string moves it to the shared pool.' },
+            dependencies: { type: 'array', items: { type: 'string' }, description: 'Complete replacement dependency list for a task.' },
+            role: { type: 'string', description: 'Optional member role.' },
+            provider: { type: 'string', description: 'Optional member provider; defaults to the current staged route.' },
+            model: { type: 'string', description: 'Optional member model; defaults to the current staged route.' },
+            reasoning_effort: { type: 'string', description: 'Optional member reasoning effort.' },
+            execution_prompt: { type: 'string', description: 'Optional member-specific execution prompt.' },
+          },
+        },
+      },
+    },
+    output: {
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          status: { type: 'string', required: true },
+          team_id: { type: 'string', required: true },
+          members: { type: 'number', required: true },
+          tasks: { type: 'number', required: true },
+          dependencies: { type: 'number', required: true },
+          roster: { type: 'array', items: { type: 'string' }, required: true },
+          graph: { type: 'array', items: { type: 'string' }, required: true },
+        },
+      },
+      render: (_args, value) => [{
+        type: 'text',
+        text: `Staged plan updated atomically (${value.members} members, ${value.tasks} tasks, ${value.dependencies} dependencies). No members were spawned and no tasks were scheduled.\n${value.graph.join('\n')}`,
+      }],
+    },
+    async execute(args, exec) {
+      const captain = requireCaptain(exec)
+      const workspace = workspaceOf(captain)
+      const team = await requireCaptainTeam(workspace, config, captain)
+      requireStagedTeam(team)
+      if (args.operations.length === 0) throw new Error('at least one staged plan operation is required')
+
+      const mutations: StagedPlanMutation[] = args.operations.map((operation, index) => {
+        const label = `operation ${index + 1} (${operation.action})`
+        if (operation.action === 'update_member') {
+          const memberName = operation.member_name?.trim() ?? ''
+          if (memberName === '') throw new Error(`${label} requires member_name`)
+          const member = requireMember(team, memberName)
+          return {
+            action: 'update_member',
+            memberName,
+            role: operation.role ?? member.role,
+            provider: operation.provider?.trim() || member.provider || '',
+            model: operation.model?.trim() || member.model || '',
+            reasoningEffort: operation.reasoning_effort ?? member.reasoningEffort,
+            executionPrompt: operation.execution_prompt ?? member.executionPrompt,
+          }
+        }
+        if (operation.action === 'update_task') {
+          const taskId = operation.task_id?.trim() ?? ''
+          if (taskId === '') throw new Error(`${label} requires task_id`)
+          const task = requireTask(team, taskId)
+          return {
+            action: 'update_task',
+            taskId,
+            subject: operation.subject ?? task.subject,
+            description: operation.description ?? task.description,
+            assignee: operation.assignee ?? task.assignee,
+            dependencies: operation.dependencies ?? task.dependencies,
+          }
+        }
+        if (operation.action === 'add_task') {
+          const subject = operation.subject?.trim() ?? ''
+          if (subject === '') throw new Error(`${label} requires a non-empty subject`)
+          return {
+            action: 'add_task',
+            subject,
+            description: operation.description,
+            assignee: operation.assignee,
+            dependencies: operation.dependencies ?? [],
+          }
+        }
+        if (operation.action === 'remove_task') {
+          const taskId = operation.task_id?.trim() ?? ''
+          if (taskId === '') throw new Error(`${label} requires task_id`)
+          return { action: 'remove_task', taskId }
+        }
+        const memberName = operation.member_name?.trim() ?? ''
+        if (memberName === '') throw new Error(`${label} requires member_name`)
+        return { action: 'remove_member', memberName }
+      })
+      const updated = await updateStagedPlanBatch(captain, team.id, mutations, exec.signal)
+      return {
+        status: 'staged',
+        team_id: updated.id,
+        members: updated.members.length,
+        tasks: updated.tasks.length,
+        dependencies: updated.tasks.reduce((sum, task) => sum + task.dependencies.length, 0),
+        roster: updated.members.map((member) => `${member.name} (${member.role || 'member'}; ${member.provider ?? ''}/${member.model ?? ''})`),
+        graph: updated.tasks.map((task) => `${task.id}: ${task.subject} -> ${task.assignee || 'shared'}${task.dependencies.length === 0 ? '' : `; depends on ${task.dependencies.join(', ')}`}`),
       }
     },
   }))
@@ -931,9 +1085,9 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
 
   ctx.tools.register(defineTool({
     name: 'agent_teams_create_task',
-    description: 'Create a task in your team\'s task list. Tasks can depend on other tasks (dependencies): a task is only claimable once every dependency is completed. Optionally assign it to a member, who still claims it before working.',
+    description: 'Create a task in your team\'s task list. Every call must include a non-empty subject, including verification and review tasks. Tasks can depend on other tasks (dependencies): a task is only claimable once every dependency is completed. Optionally assign it to a member, who still claims it before working.',
     parameters: {
-      subject: { type: 'string', required: true, description: 'Brief title for the task.' },
+      subject: { type: 'string', required: true, description: 'Required non-empty title for this task. Never omit it, including for verification or review tasks.' },
       description: { type: 'string', description: 'What needs to be done, in detail.' },
       dependencies: {
         type: 'array',

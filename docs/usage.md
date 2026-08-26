@@ -136,7 +136,9 @@ profiles:
 
 `taskPlanning: captain` 时 profile 不再假设项目目录、包管理器或固定质量图；Captain 根据真实目标和 workspace 设计 DAG。若用户明确要求质量门禁，再创建带合同的 requirements → implementation → verification → review → integration 任务，并从真实项目推导 `inScope` 与 `verify`。`taskPlanning: seed` 保留固定 seed task 工作流。
 
-长任务运行期间，Captain 聊天输入框上方会显示“团队进行中”条带。点击“停止团队”会取消 Captain 当前回合、中断全部成员、取消未完成任务并停止后续调度，但不会删除团队。之后的新用户消息可显式要求 `agent_teams_resume`；停止前正在运行的 Captain 无法自行恢复团队。取消/失败任务在归档中保持原终态。
+执行前计划审查直接读取 Harness 的模型目录：成员模型和推理等级使用与主输入区一致的 Provider/模型元数据，不再要求手写路由。审查可选择「继续规划」返回输入框让 Captain 重做方案，也可二次确认「放弃本次计划」并归档 staged 团队；仅「确认并启动团队」会创建成员和调度任务。
+
+长任务运行期间，具体团队标题右侧会显示停止按钮。点击后需在确认框中再次确认，才会取消 Captain 当前回合、中断全部成员、取消未完成任务并停止后续调度；入口不再占用聊天输入区域。停止不会删除团队，之后的新用户消息可显式要求 `agent_teams_resume`。取消/失败任务在归档中保持原终态。
 
 ## 已知限制
 
@@ -145,7 +147,7 @@ profiles:
 - 成员 persona 替换部署默认 persona；成员仍拥有完整工具集（bash/fs/web 等）。
 - 团队状态为文件级持久化，多进程同时操作同一团队不保证一致（同一 dsh 进程内已用锁串行化）。
 - 活动面板读磁盘真相，与会话日志事件流相互独立：切换/重启后先对当前会话做一次冷发现；仅在发现活动团队或存在对话流卡片需求时保持 1s 轮询，普通会话不会常驻扫描。
-- 主聊天窗的官方 Stop 只取消队长当前轮次；AgentTeams 自己的「停止团队」会同时取消 Captain 当前回合和全部 continuable 成员，并冻结后续调度。输入框仍可在停止完成后发送新的恢复指令。
+- 主聊天窗的官方 Stop 只取消队长当前轮次；活动面板中具体团队的「停止团队」会在二次确认后同时取消 Captain 当前回合和全部 continuable 成员，并冻结后续调度。输入框仍可在停止完成后发送新的恢复指令。
 - 右上角浮层挂载到 DeepSeek Harness `0.1.0-rc.8` 的 `shell.overlay`；宽屏停靠态让主对话列按面板实际宽度礼让空间，浮动态保持非模态覆盖，窄屏退回安全内边距 overlay 并关闭拖拽/缩放，左侧导航保持不动。
 - `/agent-teams` 在 slash 菜单中的描述和输入 hint 来自 Host `CommandDefinition`；当前官方命令协议没有 locale namespace 字段，因此仍保留稳定的英文元数据。插件不会用 DOM 替换去伪造这一层翻译；待 Host 提供正式接口后再接入。
 - 成员（模型）不总是严格走工具"仪式"（如完成时不调 `agent_teams_update_task`）——面板如实反映磁盘真相，队长以 `agent_teams_status`/文件为准汇总。

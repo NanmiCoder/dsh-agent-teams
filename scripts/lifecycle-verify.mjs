@@ -412,6 +412,24 @@ try {
       && profileStatus.tasks.some(item => item.seed_id === 'implement'))
   await call('agent_teams_delete', {})
 
+  const deliveriesBeforeDiscard = deliveries.length
+  await call('agent_teams_create', {
+    name: 'Rejected Demo',
+    description: 'plan the user will reject',
+    profile: 'dynamic-delivery',
+    approval: 'required',
+  })
+  await call('agent_teams_create_task', { subject: 'should never run', assignee: 'analyst' })
+  const discardedPlan = await agentTeamsRuntime.discardStagedTeam(captain, 'rejected-demo')
+  const discardedArchive = await readArchivedTeam(stateRoot, 'rejected-demo')
+  check('discarding a staged plan archives it without spawning or dispatching',
+    discardedPlan.teamId === 'rejected-demo'
+      && await readTeam(stateRoot, 'rejected-demo') === undefined
+      && discardedArchive?.phase === 'staged'
+      && discardedArchive.members.every(member => member.id === '')
+      && discardedArchive.tasks.every(task => task.status === 'pending')
+      && deliveries.length === deliveriesBeforeDiscard)
+
   const createdDynamic = await call('agent_teams_create', {
     name: 'Dynamic Demo',
     description: 'goal only',
@@ -461,6 +479,55 @@ try {
       && editedDynamic.tasks[1]?.subject === 'implement approved result'
       && editedDynamic.tasks[1]?.dependencies.join(',') === dynamicFirst.task_id
       && editedDynamic.tasks.every(item => item.status === 'pending')
+      && deliveries.length === deliveriesBeforePlan)
+  const obsoleteReview = await call('agent_teams_create_task', {
+    subject: 'obsolete review',
+    assignee: 'reviewer',
+    dependencies: [dynamicFirst.task_id],
+  })
+  await agentTeamsRuntime.updateStagedPlan(captain, 'dynamic-demo', {
+    action: 'update_task',
+    taskId: dynamicSecond.task_id,
+    subject: 'implement approved result',
+    description: 'Use the analyst output.',
+    assignee: 'implementer',
+    dependencies: [obsoleteReview.task_id],
+  })
+  let rejectedAtomicEdit = false
+  try {
+    await call('agent_teams_edit_plan', {
+      operations: [
+        { action: 'remove_task', task_id: obsoleteReview.task_id },
+        { action: 'update_task', task_id: dynamicSecond.task_id, dependencies: [dynamicFirst.task_id] },
+        { action: 'remove_member', member_name: 'reviewer' },
+      ],
+    })
+  } catch {
+    rejectedAtomicEdit = true
+  }
+  const unchangedAfterRejectedEdit = await readTeam(stateRoot, 'dynamic-demo')
+  check('invalid staged plan batches fail atomically without a partial write',
+    rejectedAtomicEdit
+      && unchangedAfterRejectedEdit?.tasks.some(item => item.id === obsoleteReview.task_id)
+      && unchangedAfterRejectedEdit.tasks.find(item => item.id === dynamicSecond.task_id)?.dependencies.join(',') === obsoleteReview.task_id
+      && unchangedAfterRejectedEdit.members.some(member => member.name === 'reviewer'))
+  const modelEditedPlan = await call('agent_teams_edit_plan', {
+    operations: [
+      { action: 'update_task', task_id: dynamicSecond.task_id, dependencies: [dynamicFirst.task_id] },
+      { action: 'remove_task', task_id: obsoleteReview.task_id },
+      { action: 'remove_member', member_name: 'reviewer' },
+    ],
+  })
+  const modelEditedDynamic = await readTeam(stateRoot, 'dynamic-demo')
+  check('captain can revise the staged DAG and roster through one model-facing atomic tool',
+    modelEditedPlan.status === 'staged'
+      && modelEditedPlan.tasks === 2
+      && modelEditedPlan.members === 4
+      && modelEditedDynamic?.tasks.every(item => item.id !== obsoleteReview.task_id)
+      && modelEditedDynamic.tasks.find(item => item.id === dynamicSecond.task_id)?.dependencies.join(',') === dynamicFirst.task_id
+      && modelEditedDynamic.members.every(member => member.name !== 'reviewer')
+      && modelEditedDynamic.members.every(member => member.id === '')
+      && modelEditedDynamic.tasks.every(item => item.status === 'pending')
       && deliveries.length === deliveriesBeforePlan)
   const approvedDynamic = await call('agent_teams_approve', { confirmation: 'user clicked Approve & Run' })
   const dynamicTeam = await readTeam(stateRoot, 'dynamic-demo')

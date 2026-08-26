@@ -322,6 +322,84 @@
   white-space: nowrap;
 }
 
+.teamStopButton {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--dsw-alias-line-normal);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  cursor: pointer;
+  transition: border-color 150ms ease, background 150ms ease, color 150ms ease;
+}
+
+.teamStopButton:hover {
+  border-color: color-mix(in srgb, var(--dsw-alias-state-danger) 42%, var(--dsw-alias-line-normal));
+  background: color-mix(in srgb, var(--dsw-alias-state-danger) 7%, transparent);
+  color: var(--dsw-alias-state-danger);
+}
+
+.teamStopButton:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 2px;
+}
+
+.stopModalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.stopModalActions button {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 13px;
+  border: 1px solid var(--dsw-alias-line-normal, #e7e9ee);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-fill-neutral, #eef0f4);
+  color: var(--dsw-alias-label-primary, #1c1c1e);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.stopModalActions button[data-danger] {
+  border-color: var(--dsw-alias-state-danger, #e5484d);
+  background: var(--dsw-alias-state-danger, #e5484d);
+  color: var(--dsw-alias-label-on-fill, #fff);
+}
+
+.stopModalActions button:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}
+
+.stopModalError {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin: 0;
+  padding: 9px 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--dsw-alias-state-danger, #e5484d) 8%, transparent);
+  color: var(--dsw-alias-state-danger, #e5484d);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.stopModalError svg {
+  flex: none;
+  margin-top: 1px;
+}
+
 .sectionHead {
   display: flex;
   align-items: center;
@@ -585,6 +663,10 @@
   background: color-mix(in srgb, var(--dsw-alias-state-success) 8%, var(--dsw-alias-bg-module));
 }
 
+.progressSummary[data-state='discarded'] {
+  background: var(--dsw-alias-bg-fill-neutral);
+}
+
 .progressSummary > span:last-child {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -605,6 +687,10 @@
 
 .progressSummary[data-state='completed'] .progressSummaryDot {
   background: var(--dsw-alias-state-success);
+}
+
+.progressSummary[data-state='discarded'] .progressSummaryDot {
+  background: var(--dsw-alias-label-tertiary);
 }
 
 .membersToggle {
@@ -1502,6 +1588,164 @@
   gap: 6px;
 }
 
+.planModelPicker {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 5px;
+}
+
+.planModelMenu {
+  display: flex;
+  width: 100%;
+}
+
+.planModelTrigger {
+  display: flex;
+  width: 100%;
+  min-height: 38px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 9px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 7px;
+  background: var(--dsw-alias-bg-base);
+  color: var(--dsw-alias-label-primary);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 160ms ease, background-color 160ms ease, transform 120ms ease;
+}
+
+.planModelTrigger:hover:not(:disabled) {
+  border-color: var(--dsw-alias-border-l3);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.planModelTrigger:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.planModelTrigger:focus-visible {
+  border-color: var(--dsw-alias-state-business-primary);
+  outline: 2px solid color-mix(in srgb, var(--dsw-alias-state-business-primary) 16%, transparent);
+  outline-offset: 1px;
+}
+
+.planModelTrigger:disabled {
+  cursor: wait;
+  opacity: 0.64;
+}
+
+.planModelTriggerCopy {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.planModelTriggerCopy strong,
+.planModelTriggerCopy span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.planModelTriggerCopy strong {
+  color: var(--dsw-alias-label-primary);
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 15px;
+}
+
+.planModelTriggerCopy span {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 9px;
+  line-height: 14px;
+}
+
+.planModelMenuRow {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.planModelMenuRow > span:first-child {
+  color: var(--dsw-alias-label-primary);
+}
+
+.planModelMenuRow strong {
+  overflow: hidden;
+  color: var(--dsw-alias-label-tertiary);
+  font-weight: 450;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.planModelMenuBack {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.planModelMenuBack svg {
+  transform: rotate(180deg);
+}
+
+.planModelEffortRow {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.planModelEffortRow small {
+  overflow: hidden;
+  width: 100%;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 10px;
+  line-height: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.planModelHint {
+  overflow: hidden;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 8.5px;
+  line-height: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.planModelNotice {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 7px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--dsw-alias-state-warning) 9%, transparent);
+  color: var(--dsw-alias-label-secondary);
+  font-size: 8.5px;
+  line-height: 12px;
+}
+
+.planModelNotice button {
+  flex: none;
+  padding: 2px 6px;
+  border: 0;
+  background: transparent;
+  color: var(--dsw-alias-state-business-primary);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 650;
+}
+
 .planActions,
 .planApproveRow,
 .planNewTask,
@@ -1510,6 +1754,13 @@
   display: flex;
   align-items: center;
   gap: 7px;
+}
+
+.planReviewActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
 }
 
 .planActions {
@@ -1640,6 +1891,10 @@
   border-color: color-mix(in srgb, var(--dsw-alias-state-business-primary) 45%, var(--dsw-alias-line-normal));
 }
 
+.planApproveRow[data-discard='true'] {
+  border-color: color-mix(in srgb, var(--dsw-alias-state-danger) 45%, var(--dsw-alias-line-normal));
+}
+
 .planApproveCopy {
   display: flex;
   min-width: 120px;
@@ -1670,6 +1925,18 @@
 .planApproveActions > button:first-child {
   background: var(--dsw-alias-bg-fill-neutral);
   color: var(--dsw-alias-label-primary);
+}
+
+.planReviewActions > button:not([data-plan-approve]),
+.planApproveActions > button[data-danger] {
+  border-color: var(--dsw-alias-line-normal);
+  background: var(--dsw-alias-bg-fill-neutral);
+  color: var(--dsw-alias-label-primary);
+}
+
+.planReviewActions > button[data-danger],
+.planApproveActions > button[data-danger] {
+  color: var(--dsw-alias-state-danger);
 }
 
 .planSectionToggle:focus-visible,
@@ -1805,6 +2072,10 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .planModelPicker {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .planNewTask,
   .planApproveRow {
     align-items: stretch;
@@ -1813,11 +2084,13 @@
 
   .planNewTask button,
   .planApproveRow > button,
-  .planApproveActions {
+  .planApproveActions,
+  .planReviewActions {
     width: 100%;
   }
 
-  .planApproveActions button {
+  .planApproveActions button,
+  .planReviewActions button {
     flex: 1;
   }
 }

@@ -10,9 +10,11 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 // The frame-level overlay is declared by ui-layout. This import is type-only;
 // ctx.slots.inject below owns the runtime wait for the declaration.
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
+// Official model catalog/directory service. The staged roster reads its
+// provider/model/effort metadata without mutating the captain's own selection.
+import type {} from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import { ActivityPanel } from './ActivityPanel.tsx'
 import { AgentTeamsCard, type AgentTeamsCardInjected } from './AgentTeamsCard.tsx'
-import { TeamProgressBanner } from './TeamProgressBanner.tsx'
 import { agentTeamsCardDefinition } from './agent-teams-card-definition.ts'
 import {
   AGENT_TEAMS_LOCALE_NAMESPACE, en, zh, type AgentTeamsLocaleKey,
@@ -27,7 +29,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 }
 
 /** Required services: conversation nodes, slots, sessions navigation, and locale. */
-export const inject = ['conversationEvents', 'slots', 'sessions', 'locale']
+export const inject = ['conversationEvents', 'slots', 'sessions', 'locale', 'modelDirectories']
 
 /** The replayed user message is the canonical transcript entry. */
 function HiddenAgentTeamsCommand(): null {
@@ -52,6 +54,7 @@ export function apply(ctx: ClientContext): void {
   const Panel = ({ t }: PropsLocale<'agentTeams'>) => (
     <ActivityPanel
       sessionsList={ctx.sessions.list}
+      modelDirectories={ctx.modelDirectories}
       openMember={openMember}
       t={t}
     />
@@ -71,13 +74,6 @@ export function apply(ctx: ClientContext): void {
     name: 'conversation.chat.commandview',
     key: 'agent-teams',
   }, HiddenAgentTeamsCommand))
-
-  ctx.slots.inject('conversation.input.dock', () => ctx.slots.register({
-    name: 'conversation.input.dock',
-    id: 'agent-teams-progress',
-    order: 40,
-    locale: AGENT_TEAMS_LOCALE_NAMESPACE,
-  }, TeamProgressBanner))
 
   ctx.conversationEvents.register(agentTeamsCardDefinition)
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register({

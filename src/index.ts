@@ -149,7 +149,7 @@ export function usageSectionText(toolNames: string, profilesText = ''): string {
   return `When the user asks to run something with AgentTeams (e.g. "use AgentTeams to do X"), or an activation message from the /agent-teams slash command arrives, you are the captain of a multi-agent team. Follow this protocol:
 1. Call agent_teams_create with a team name, the goal as description, and approval="required". This creates a staged plan and must not spawn members or schedule work. Use approval="automatic" only when the user explicitly asks to skip review and run immediately.
 2. Call agent_teams_add_member once per role the goal needs (researcher, engineer, reviewer, ...). In staging these are editable roster entries, not running subagents. By default a member snapshots your current provider/model/reasoning route; use a different route only when the goal or user requires it.
-3. Analyze the goal and create the smallest useful task DAG while staged. Independent work should be parallel; dependencies are only genuine prerequisites. Finish the complete roster and DAG, tell the user the Web plan is ready, then end this turn. Never call agent_teams_approve during the planning turn. The user may click Approve & Run, or explicitly approve in a later user turn; only then may agent_teams_approve be called.
+3. Analyze the goal and create the smallest useful task DAG while staged. Every agent_teams_create_task call must include a non-empty subject, including verification and review tasks. Independent work should be parallel; dependencies are only genuine prerequisites. Finish the complete roster and DAG, tell the user the Web plan is ready, then end this turn. Never call agent_teams_approve during the planning turn. The user may click Approve & Run, explicitly approve in a later user turn, continue chatting to request changes, or discard the plan. For requested changes, call agent_teams_edit_plan with one ordered atomic batch; update downstream dependencies/assignees before removing tasks, then remove unused members. Never inspect or edit .agent-teams state files or plugin source code to revise a plan. Only explicit approval may call agent_teams_approve.
 4. After approval, the final member configuration is spawned atomically and the scheduler starts ready work. Lead by delegation: monitor with agent_teams_status, send guidance with agent_teams_send_message, and let idle teammates execute ready work. Do not duplicate a teammate's work merely because its turn is slow. If the user requires every member to contribute or report, create one task per required contribution (or message each member directly); never wait for an unassigned member to produce work it was never given.
 5. If the user explicitly asks to pause a running member, its open attempt remains parked after interruption; after answering the user, send that same member guidance with agent_teams_send_message so it continues the same attempt. Do not interrupt members for an ordinary user question that did not request a pause. If work must change owner, restart from scratch, or be taken over, call agent_teams_reassign_task first. Prefer another idle member or a retry with the same member. Use assignee=captain only for one ready task that you will personally drive to a terminal status in this same turn; never start a second captain takeover while one is unfinished, and never end your turn with captain-owned work open. Reassignment revokes the old attempt and waits for that member to quiesce, preventing late results from overwriting the new attempt.
 6. Tasks carry attempt_id capabilities. Members must use the current attempt_id for updates; stale-attempt errors mean ownership changed. Check status after progress notifications until every required task is terminal and every member is idle/ready; do not busy-poll or require reports from members with no assigned work.
@@ -182,6 +182,7 @@ export function apply(ctx: Context, config: Config): void {
   const toolNames = [
     'agent_teams_create',
     'agent_teams_approve',
+    'agent_teams_edit_plan',
     'agent_teams_add_member',
     'agent_teams_remove_member',
     'agent_teams_create_task',
@@ -387,6 +388,12 @@ export function apply(ctx: Context, config: Config): void {
             const approved = await agentTeamsRuntime.approveStagedTeam(captain, teamId)
             res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
             res.end(JSON.stringify({ ok: true, phase: 'running', ...approved }))
+            return
+          }
+          if (action === 'discard') {
+            const discarded = await agentTeamsRuntime.discardStagedTeam(captain, teamId)
+            res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
+            res.end(JSON.stringify({ ok: true, phase: 'archived', ...discarded }))
             return
           }
           const dependencies = Array.isArray(payload['dependencies'])

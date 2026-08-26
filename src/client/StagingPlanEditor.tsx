@@ -6,7 +6,9 @@
  * @module dsh-agent-teams/client/staging-plan
  */
 
-import { useEffect, useId, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useId, useState, useSyncExternalStore, type FormEvent } from 'react'
+import type { ModelDirectory } from '@deepseek-ai/dsh-client-ui-model-selection/client'
+import { Menu, type MenuEntry } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ActivityMember, ActivityTask, ActivityTeam } from './activity-monitor.ts'
 import type { AgentTeamsTranslate } from './locales.ts'
 import css from './ActivityPanel.module.css'
@@ -17,6 +19,14 @@ type PlanFeedback = {
   readonly tone: 'success' | 'error'
   readonly message: string
 }
+
+type PlanModelSelection = {
+  readonly provider: string
+  readonly model: string
+  readonly reasoningEffort: string
+}
+
+type EditorPendingChange = (key: string, pending: boolean) => void
 
 function useDismissSuccess(
   feedback: PlanFeedback | undefined,
@@ -76,9 +86,273 @@ function Feedback({ value }: { readonly value: PlanFeedback | undefined }) {
   )
 }
 
-function StagedMemberEditor({ team, member, t }: {
+function routeKey(provider: string, model: string): string {
+  return JSON.stringify([provider, model])
+}
+
+type ModelMenuPane = 'root' | 'models' | 'effort'
+
+const MODEL_MENU_OPEN_MODELS = 'open:models'
+const MODEL_MENU_OPEN_EFFORT = 'open:effort'
+const MODEL_MENU_BACK = 'navigate:back'
+const MODEL_MENU_RETRY = 'action:retry'
+const MODEL_MENU_DEFAULT_EFFORT = 'effort:default'
+
+function modelMenuId(provider: string, model: string): string {
+  return `model:${routeKey(provider, model)}`
+}
+
+function effortMenuId(effort: string): string {
+  return `effort:${effort}`
+}
+
+/**
+ * Thin staged-plan adapter over the official model directory. It deliberately
+ * reads only catalog metadata: choosing a member route must not change the
+ * captain session's composer model.
+ */
+function StagedModelPicker({
+  directory,
+  provider,
+  model,
+  reasoningEffort,
+  busy,
+  onChange,
+  t,
+}: {
+  readonly directory: ModelDirectory
+  readonly provider: string
+  readonly model: string
+  readonly reasoningEffort: string
+  readonly busy: boolean
+  readonly onChange: (selection: PlanModelSelection) => void
+  readonly t: AgentTeamsTranslate
+}) {
+  const state = useSyncExternalStore(directory.store.subscribe, directory.store.getSnapshot)
+  const [open, setOpen] = useState(false)
+  const [pane, setPane] = useState<ModelMenuPane>('root')
+  const catalogRoutes = state.groups.flatMap((group) => group.models.map((candidate) => ({
+    key: routeKey(group.id, candidate.id),
+    provider: group.id,
+    providerName: group.name,
+    model: candidate,
+  })))
+  const selectedKey = routeKey(provider, model)
+  const selected = catalogRoutes.find((candidate) => candidate.key === selectedKey)
+  const efforts = selected?.model.reasoning?.efforts ?? []
+  const currentMissing = provider !== '' && model !== '' && selected === undefined
+  const defaultEffort = selected?.model.reasoning?.defaultEffort
+  const effectiveEffort = reasoningEffort === '' || reasoningEffort === 'default'
+    ? defaultEffort
+    : reasoningEffort
+  const selectedEffort = efforts.find((effort) => effort.id === effectiveEffort)
+  const modelLabel = selected?.model.name
+    ?? (model === '' ? t('plan.model.choose') : model)
+  const effortLabel = selectedEffort?.name
+    ?? (effectiveEffort === undefined ? t('plan.model.providerDefault') : effectiveEffort)
+  const unavailable = state.status === 'error' || state.failures.length > 0
+
+  const close = (): void => {
+    setOpen(false)
+    setPane('root')
+  }
+
+  const rootItems: readonly MenuEntry[] = [
+    {
+      id: MODEL_MENU_OPEN_MODELS,
+      label: (
+        <span className={css.planModelMenuRow}>
+          <span>{t('plan.member.model')}</span>
+          <strong>{modelLabel}</strong>
+          <DisclosureChevron open={false} />
+        </span>
+      ),
+      disabled: state.status === 'loading' && catalogRoutes.length === 0,
+    },
+    {
+      id: MODEL_MENU_OPEN_EFFORT,
+      label: (
+        <span className={css.planModelMenuRow}>
+          <span>{t('plan.member.reasoning')}</span>
+          <strong>{effortLabel}</strong>
+          <DisclosureChevron open={false} />
+        </span>
+      ),
+      disabled: selected?.model.reasoning === undefined,
+    },
+  ]
+
+  const modelItems: MenuEntry[] = [
+    {
+      id: MODEL_MENU_BACK,
+      label: (
+        <span className={css.planModelMenuBack}>
+          <DisclosureChevron open={false} />
+          {t('plan.model.back')}
+        </span>
+      ),
+    },
+    { type: 'separator', id: 'models:separator' },
+  ]
+  if (catalogRoutes.length === 0) {
+    modelItems.push({
+      id: 'models:empty',
+      label: state.status === 'loading' ? t('plan.model.loading') : t('plan.model.empty'),
+      disabled: true,
+    })
+  } else {
+    for (const group of state.groups) {
+      modelItems.push({ type: 'label', id: `provider:${group.id}`, text: group.name })
+      for (const candidate of group.models) {
+        modelItems.push({
+          id: modelMenuId(group.id, candidate.id),
+          label: candidate.name,
+        })
+      }
+    }
+  }
+
+  const effortItems: MenuEntry[] = [
+    {
+      id: MODEL_MENU_BACK,
+      label: (
+        <span className={css.planModelMenuBack}>
+          <DisclosureChevron open={false} />
+          {t('plan.model.back')}
+        </span>
+      ),
+    },
+    { type: 'separator', id: 'effort:separator' },
+    {
+      id: MODEL_MENU_DEFAULT_EFFORT,
+      label: defaultEffort === undefined
+        ? t('plan.model.providerDefault')
+        : t('plan.model.modelDefault', {
+          effort: efforts.find((effort) => effort.id === defaultEffort)?.name ?? defaultEffort,
+        }),
+    },
+    ...efforts.map((effort): MenuEntry => ({
+      id: effortMenuId(effort.id),
+      label: (
+        <span className={css.planModelEffortRow}>
+          <span>{effort.name}</span>
+          {effort.description !== undefined && <small>{effort.description}</small>}
+        </span>
+      ),
+    })),
+  ]
+
+  const items = pane === 'models' ? modelItems : pane === 'effort' ? effortItems : rootItems
+  const selectedId = pane === 'models'
+    ? modelMenuId(provider, model)
+    : pane === 'effort'
+      ? reasoningEffort === '' || reasoningEffort === 'default'
+        ? MODEL_MENU_DEFAULT_EFFORT
+        : effortMenuId(reasoningEffort)
+      : undefined
+
+  const choose = (id: string): void => {
+    if (id === MODEL_MENU_OPEN_MODELS) {
+      setPane('models')
+      return
+    }
+    if (id === MODEL_MENU_OPEN_EFFORT) {
+      setPane('effort')
+      return
+    }
+    if (id === MODEL_MENU_BACK) {
+      setPane('root')
+      return
+    }
+    if (id === MODEL_MENU_RETRY) {
+      void directory.load().catch(() => undefined)
+      return
+    }
+    const nextModel = catalogRoutes.find((candidate) => modelMenuId(candidate.provider, candidate.model.id) === id)
+    if (nextModel !== undefined) {
+      close()
+      if (nextModel.provider === provider && nextModel.model.id === model) return
+      onChange({
+        provider: nextModel.provider,
+        model: nextModel.model.id,
+        reasoningEffort: 'default',
+      })
+      return
+    }
+    if (id === MODEL_MENU_DEFAULT_EFFORT) {
+      close()
+      if (effectiveEffort === defaultEffort) return
+      onChange({ provider, model, reasoningEffort: 'default' })
+      return
+    }
+    const nextEffort = efforts.find((effort) => effortMenuId(effort.id) === id)
+    if (nextEffort === undefined) return
+    close()
+    if (nextEffort.id === reasoningEffort) return
+    onChange({ provider, model, reasoningEffort: nextEffort.id })
+  }
+
+  return (
+    <div className={css.planModelPicker} data-model-directory-status={state.status}>
+      <Menu
+        open={open}
+        portal
+        align="end"
+        compact
+        className={css.planModelMenu}
+        items={items}
+        footer={unavailable ? [{ id: MODEL_MENU_RETRY, label: t('plan.model.retry') }] : undefined}
+        selectedId={selectedId}
+        onSelect={choose}
+        onClose={close}
+        anchor={(
+          <button
+            type="button"
+            className={css.planModelTrigger}
+            data-plan-model-trigger
+            aria-label={t('plan.model.triggerAria', { model: modelLabel, effort: effortLabel })}
+            aria-haspopup="menu"
+            aria-expanded={open}
+            disabled={busy}
+            onClick={() => {
+              if (open) close()
+              else {
+                setPane('root')
+                setOpen(true)
+                void directory.load().catch(() => undefined)
+              }
+            }}
+          >
+            <span className={css.planModelTriggerCopy}>
+              <strong>{state.status === 'loading' && catalogRoutes.length === 0 ? t('plan.model.loading') : modelLabel}</strong>
+              <span>{effortLabel}</span>
+            </span>
+            <DisclosureChevron open={open} />
+          </button>
+        )}
+      />
+      <small className={css.planModelHint}>
+        {currentMissing
+          ? t('plan.model.currentUnavailable', { provider, model })
+          : selected?.model.description ?? t('plan.model.route', { provider, model })}
+      </small>
+      {unavailable && (
+        <span className={css.planModelNotice} role={state.status === 'error' ? 'alert' : 'status'}>
+          <span>{state.error ?? t('plan.model.partialFailure', { count: state.failures.length })}</span>
+          <button type="button" disabled={busy || state.status === 'loading'} onClick={() => { void directory.load().catch(() => undefined) }}>
+            {t('plan.model.retry')}
+          </button>
+        </span>
+      )}
+    </div>
+  )
+}
+
+function StagedMemberEditor({ team, member, modelDirectory, onPendingChange, t }: {
   readonly team: ActivityTeam
   readonly member: ActivityMember
+  readonly modelDirectory: ModelDirectory
+  readonly onPendingChange: EditorPendingChange
   readonly t: AgentTeamsTranslate
 }) {
   const bodyId = useId()
@@ -103,6 +377,11 @@ function StagedMemberEditor({ team, member, t }: {
   const dirty = signature !== savedSignature
 
   useEffect(() => {
+    onPendingChange(`member:${member.name}`, dirty || busy)
+    return () => { onPendingChange(`member:${member.name}`, false) }
+  }, [busy, dirty, member.name, onPendingChange])
+
+  useEffect(() => {
     setRole(member.role)
     setProvider(member.provider ?? '')
     setModel(member.model ?? '')
@@ -112,8 +391,17 @@ function StagedMemberEditor({ team, member, t }: {
   }, [member.role, member.provider, member.model, member.reasoningEffort, member.executionPrompt, remoteSignature])
 
   const markEdited = (): void => { setFeedback(undefined) }
-  const save = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
-    event.preventDefault()
+  const persist = async (selection: PlanModelSelection = { provider, model, reasoningEffort }): Promise<void> => {
+    const nextSignature = JSON.stringify([
+      role,
+      selection.provider,
+      selection.model,
+      selection.reasoningEffort,
+      executionPrompt,
+    ])
+    setProvider(selection.provider)
+    setModel(selection.model)
+    setReasoningEffort(selection.reasoningEffort)
     setBusy(true)
     setFeedback(undefined)
     try {
@@ -123,12 +411,12 @@ function StagedMemberEditor({ team, member, t }: {
         action: 'update_member',
         memberName: member.name,
         role,
-        provider,
-        model,
-        reasoningEffort,
+        provider: selection.provider,
+        model: selection.model,
+        reasoningEffort: selection.reasoningEffort,
         executionPrompt,
       })
-      setSavedSignature(signature)
+      setSavedSignature(nextSignature)
       setFeedback({ tone: 'success', message: t('plan.saved') })
     } catch (error: unknown) {
       setFeedback({ tone: 'error', message: t('plan.failed', { message: errorMessage(error) }) })
@@ -136,8 +424,12 @@ function StagedMemberEditor({ team, member, t }: {
       setBusy(false)
     }
   }
+  const save = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
+    event.preventDefault()
+    await persist()
+  }
 
-  const route = `${member.provider ?? ''}/${member.model ?? ''}`.replace(/^\//u, '')
+  const route = `${provider}/${model}`.replace(/^\//u, '')
   return (
     <article className={css.planCard} data-plan-member={member.name} data-open={open}>
       <button
@@ -159,15 +451,15 @@ function StagedMemberEditor({ team, member, t }: {
         <form id={bodyId} className={css.planCardBody} onSubmit={(event) => { void save(event) }}>
           <fieldset disabled={busy}>
             <label>{t('plan.member.role')}<input name="role" value={role} onChange={(event) => { setRole(event.currentTarget.value); markEdited() }} /></label>
-            <span className={css.planGrid}>
-              <label>{t('plan.member.provider')}<input name="provider" required value={provider} onChange={(event) => { setProvider(event.currentTarget.value); markEdited() }} /></label>
-              <label>{t('plan.member.model')}<input name="model" required value={model} onChange={(event) => { setModel(event.currentTarget.value); markEdited() }} /></label>
-            </span>
-            <label>
-              {t('plan.member.reasoning')}
-              <input name="reasoningEffort" value={reasoningEffort} onChange={(event) => { setReasoningEffort(event.currentTarget.value); markEdited() }} placeholder="default" />
-              <small>{t('plan.member.reasoningHint')}</small>
-            </label>
+            <StagedModelPicker
+              directory={modelDirectory}
+              provider={provider}
+              model={model}
+              reasoningEffort={reasoningEffort}
+              busy={busy}
+              onChange={(selection) => { void persist(selection) }}
+              t={t}
+            />
             <label>{t('plan.member.prompt')}<textarea name="executionPrompt" value={executionPrompt} onChange={(event) => { setExecutionPrompt(event.currentTarget.value); markEdited() }} rows={3} /></label>
           </fieldset>
           <span className={css.planActions}>
@@ -182,9 +474,10 @@ function StagedMemberEditor({ team, member, t }: {
   )
 }
 
-function StagedTaskEditor({ team, task, t }: {
+function StagedTaskEditor({ team, task, onPendingChange, t }: {
   readonly team: ActivityTeam
   readonly task: ActivityTask
+  readonly onPendingChange: EditorPendingChange
   readonly t: AgentTeamsTranslate
 }) {
   const bodyId = useId()
@@ -202,6 +495,11 @@ function StagedTaskEditor({ team, task, t }: {
   useDismissSuccess(feedback, setFeedback)
   const signature = JSON.stringify([subject, description, assignee, dependencies])
   const dirty = signature !== savedSignature
+
+  useEffect(() => {
+    onPendingChange(`task:${task.id}`, dirty || busy)
+    return () => { onPendingChange(`task:${task.id}`, false) }
+  }, [busy, dirty, onPendingChange, task.id])
 
   useEffect(() => {
     setSubject(task.subject)
@@ -310,8 +608,11 @@ function StagedTaskEditor({ team, task, t }: {
   )
 }
 
-export function StagingPlanEditor({ team, t }: {
+export function StagingPlanEditor({ team, modelDirectory, onContinuePlanning, onDiscarded, t }: {
   readonly team: ActivityTeam
+  readonly modelDirectory: ModelDirectory
+  readonly onContinuePlanning: () => void
+  readonly onDiscarded: () => void
   readonly t: AgentTeamsTranslate
 }) {
   const membersId = useId()
@@ -321,10 +622,27 @@ export function StagingPlanEditor({ team, t }: {
   const [newTask, setNewTask] = useState('')
   const [busy, setBusy] = useState(false)
   const [approvalArmed, setApprovalArmed] = useState(false)
+  const [discardArmed, setDiscardArmed] = useState(false)
+  const [pendingEditors, setPendingEditors] = useState<ReadonlySet<string>>(new Set())
   const [feedback, setFeedback] = useState<PlanFeedback>()
   useDismissSuccess(feedback, setFeedback)
   const dependencyLinks = team.tasks.reduce((total, task) => total + task.dependencies.length, 0)
   const runnable = team.members.length > 0 && team.tasks.length > 0
+  const hasPendingEdits = pendingEditors.size > 0 || newTask.trim() !== ''
+
+  useEffect(() => {
+    void modelDirectory.load().catch(() => undefined)
+  }, [modelDirectory])
+
+  const onPendingChange = useCallback<EditorPendingChange>((key, pending) => {
+    setPendingEditors((current) => {
+      if (pending === current.has(key)) return current
+      const next = new Set(current)
+      if (pending) next.add(key)
+      else next.delete(key)
+      return next
+    })
+  }, [])
 
   const addTask = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault()
@@ -364,6 +682,23 @@ export function StagingPlanEditor({ team, t }: {
     }
   }
 
+  const discard = async (): Promise<void> => {
+    setBusy(true)
+    setFeedback(undefined)
+    try {
+      await mutatePlan({
+        sessionId: team.captainSessionId,
+        teamId: team.teamId,
+        action: 'discard',
+      })
+      onDiscarded()
+    } catch (error: unknown) {
+      setFeedback({ tone: 'error', message: t('plan.failed', { message: errorMessage(error) }) })
+      setBusy(false)
+      setDiscardArmed(false)
+    }
+  }
+
   return (
     <section className={css.planEditor} data-staging-editor>
       <header className={css.planHeader}>
@@ -392,7 +727,16 @@ export function StagingPlanEditor({ team, t }: {
           <div id={membersId} className={css.planList}>
             {team.members.length === 0
               ? <p className={css.planEmpty}>{t('plan.members.empty')}</p>
-              : team.members.map((member) => <StagedMemberEditor key={member.name} team={team} member={member} t={t} />)}
+              : team.members.map((member) => (
+                <StagedMemberEditor
+                  key={member.name}
+                  team={team}
+                  member={member}
+                  modelDirectory={modelDirectory}
+                  onPendingChange={onPendingChange}
+                  t={t}
+                />
+              ))}
           </div>
         )}
       </section>
@@ -406,7 +750,7 @@ export function StagingPlanEditor({ team, t }: {
           <div id={tasksId} className={css.planList}>
             {team.tasks.length === 0
               ? <p className={css.planEmpty}>{t('plan.tasks.empty')}</p>
-              : team.tasks.map((task) => <StagedTaskEditor key={task.id} team={team} task={task} t={t} />)}
+              : team.tasks.map((task) => <StagedTaskEditor key={task.id} team={team} task={task} onPendingChange={onPendingChange} t={t} />)}
           </div>
         )}
       </section>
@@ -419,25 +763,44 @@ export function StagingPlanEditor({ team, t }: {
         <button type="submit" disabled={busy || newTask.trim() === ''}>{busy ? t('plan.adding') : t('plan.addTask')}</button>
       </form>
 
-      <div className={css.planApproveRow} data-armed={approvalArmed}>
+      <div className={css.planApproveRow} data-armed={approvalArmed || discardArmed} data-discard={discardArmed || undefined}>
         <span className={css.planApproveCopy}>
-          <strong>{approvalArmed ? t('plan.approveConfirmTitle') : t('plan.approveTitle')}</strong>
-          <small>{approvalArmed
-            ? t('plan.approveWarning')
-            : t('plan.approveHint', { members: team.members.length, tasks: team.tasks.length })}</small>
+          <strong>{discardArmed
+            ? t('plan.discardConfirmTitle')
+            : approvalArmed
+              ? t('plan.approveConfirmTitle')
+              : t('plan.approveTitle')}</strong>
+          <small>{discardArmed
+            ? t('plan.discardWarning')
+            : approvalArmed
+              ? t('plan.approveWarning')
+              : hasPendingEdits
+                ? t('plan.pendingEdits')
+                : t('plan.approveHint', { members: team.members.length, tasks: team.tasks.length })}</small>
         </span>
         <Feedback value={feedback} />
-        {approvalArmed ? (
+        {discardArmed ? (
+          <span className={css.planApproveActions}>
+            <button type="button" disabled={busy} onClick={() => { setDiscardArmed(false) }}>{t('plan.cancel')}</button>
+            <button type="button" data-plan-discard data-danger data-confirming disabled={busy} onClick={() => { void discard() }}>
+              {busy ? t('plan.discarding') : t('plan.discardConfirm')}
+            </button>
+          </span>
+        ) : approvalArmed ? (
           <span className={css.planApproveActions}>
             <button type="button" disabled={busy} onClick={() => { setApprovalArmed(false) }}>{t('plan.cancel')}</button>
-            <button type="button" data-plan-approve data-confirming disabled={busy || !runnable} onClick={() => { void approve() }}>
+            <button type="button" data-plan-approve data-confirming disabled={busy || !runnable || hasPendingEdits} onClick={() => { void approve() }}>
               {busy ? t('plan.approving') : t('plan.approveConfirm')}
             </button>
           </span>
         ) : (
-          <button type="button" data-plan-approve disabled={busy || !runnable} onClick={() => { setApprovalArmed(true); setFeedback(undefined) }}>
-            {t('plan.approve')}
-          </button>
+          <span className={css.planReviewActions}>
+            <button type="button" data-plan-continue disabled={busy} onClick={onContinuePlanning}>{t('plan.continue')}</button>
+            <button type="button" data-plan-discard data-danger disabled={busy} onClick={() => { setDiscardArmed(true); setFeedback(undefined) }}>{t('plan.discard')}</button>
+            <button type="button" data-plan-approve disabled={busy || !runnable || hasPendingEdits} onClick={() => { setApprovalArmed(true); setFeedback(undefined) }}>
+              {t('plan.approve')}
+            </button>
+          </span>
         )}
       </div>
     </section>

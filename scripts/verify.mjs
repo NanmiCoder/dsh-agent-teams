@@ -11,6 +11,7 @@
  */
 
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
@@ -188,12 +189,13 @@ check(
 const activityPanelCss = await readFile(new URL('../src/client/ActivityPanel.module.css', import.meta.url), 'utf8')
 const activityPanelSource = await readFile(new URL('../src/client/ActivityPanel.tsx', import.meta.url), 'utf8')
 const stagingPlanSource = await readFile(new URL('../src/client/StagingPlanEditor.tsx', import.meta.url), 'utf8')
-const teamProgressBannerCss = await readFile(new URL('../src/client/TeamProgressBanner.module.css', import.meta.url), 'utf8')
 const clientIndexSource = await readFile(new URL('../src/client/index.tsx', import.meta.url), 'utf8')
 const agentTeamsCardCss = await readFile(new URL('../src/client/AgentTeamsCard.module.css', import.meta.url), 'utf8')
 const agentTeamsCardSource = await readFile(new URL('../src/client/AgentTeamsCard.tsx', import.meta.url), 'utf8')
 const artworkSource = await readFile(new URL('../src/client/artwork.ts', import.meta.url), 'utf8')
 const hostSource = await readFile(new URL('../src/index.ts', import.meta.url), 'utf8')
+const toolsSource = await readFile(new URL('../src/tools.ts', import.meta.url), 'utf8')
+const localesSource = await readFile(new URL('../src/client/locales.ts', import.meta.url), 'utf8')
 const localeKeys = Object.keys(agentTeamsZh).sort()
 const englishLocaleKeys = Object.keys(agentTeamsEn).sort()
 const placeholders = value => [...value.matchAll(/\{(\w+)\}/gu)].map(match => match[1]).sort()
@@ -207,9 +209,9 @@ check(
 check(
   'client registers the official locale namespace on both visible slots',
   AGENT_TEAMS_LOCALE_NAMESPACE === 'agentTeams'
-    && clientIndexSource.includes("'conversationEvents', 'slots', 'sessions', 'locale'")
+    && clientIndexSource.includes("'conversationEvents', 'slots', 'sessions', 'locale', 'modelDirectories'")
     && clientIndexSource.includes('ctx.locale.register(AGENT_TEAMS_LOCALE_NAMESPACE, { zh, en })')
-    && clientIndexSource.match(/locale:\s*AGENT_TEAMS_LOCALE_NAMESPACE/gu)?.length === 3,
+    && clientIndexSource.match(/locale:\s*AGENT_TEAMS_LOCALE_NAMESPACE/gu)?.length === 2,
 )
 check(
   'slash command transcript hides the duplicate pre-message result row',
@@ -217,9 +219,53 @@ check(
     && /name:\s*'conversation\.chat\.commandview',\s*key:\s*'agent-teams'/u.test(clientIndexSource),
 )
 check(
-  'captain progress banner follows the official composer width tokens',
-  teamProgressBannerCss.includes('max-width: var(--dsh-composer-card-max-width)')
-    && teamProgressBannerCss.includes('margin: 0 auto 8px'),
+  'stop-team control lives in the team panel and requires confirmation',
+  !clientIndexSource.includes("conversation.input.dock")
+    && activityPanelSource.includes('className={css.teamStopButton}')
+    && activityPanelSource.includes('<Modal')
+    && activityPanelSource.includes('ACTIVITY_HALT_URL'),
+)
+check(
+  'clean builds do not package the removed composer stop banner',
+  !existsSync(new URL('../lib/client/TeamProgressBanner.js', import.meta.url))
+    && !existsSync(new URL('../lib/types/client/TeamProgressBanner.d.ts', import.meta.url)),
+)
+check(
+  'staged member routes use the official directory and primitive Menu instead of native route selects',
+  clientIndexSource.includes('@deepseek-ai/dsh-client-ui-model-selection/client')
+    && stagingPlanSource.includes('directory.store.subscribe')
+    && stagingPlanSource.includes("from '@deepseek-ai/dsh-client-ui-primitives'")
+    && stagingPlanSource.includes('<Menu')
+    && stagingPlanSource.includes('data-plan-model-trigger')
+    && !stagingPlanSource.includes('name="provider"')
+    && !stagingPlanSource.includes('name="model"')
+    && !stagingPlanSource.includes('name="modelRoute"')
+    && !stagingPlanSource.includes('name="reasoningEffort"'),
+)
+check(
+  'staged plan review offers continue, discard, and approve outcomes',
+  stagingPlanSource.includes('data-plan-continue')
+    && stagingPlanSource.includes('data-plan-discard')
+    && stagingPlanSource.includes("action: 'discard'")
+    && hostSource.includes("if (action === 'discard')"),
+)
+check(
+  'continued planning uses a model-facing atomic staged-plan tool instead of state-file edits',
+  toolsSource.includes("name: 'agent_teams_edit_plan'")
+    && toolsSource.includes('updateStagedPlanBatch')
+    && toolsSource.includes("action: 'remove_member'")
+    && toolsSource.includes('none of the edits are saved')
+    && hostSource.includes('agent_teams_edit_plan')
+    && hostSource.includes('Never inspect or edit .agent-teams state files or plugin source code'),
+)
+check(
+  'discarded and stopped teams render terminal semantics instead of pending execution copy',
+  activityPanelSource.includes("const discarded = historic && team.phase === 'staged'")
+    && activityPanelSource.includes("t('member.status.discarded')")
+    && activityPanelSource.includes("t('member.status.stopped')")
+    && activityPanelSource.includes("'archive.discardedLabel'")
+    && localesSource.includes("'task.status.notRun': '未执行'")
+    && localesSource.includes("'member.state.notCreated': '未创建'"),
 )
 const expectedArtwork = [
   'team-lead-v2.png',

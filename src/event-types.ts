@@ -75,6 +75,11 @@ export interface AgentTeamsTeamDeletedData {
   readonly teamId: string
 }
 
+/** Records a staged plan that the user rejected before any member was spawned. */
+export interface AgentTeamsPlanDiscardedData {
+  readonly teamId: string
+}
+
 /** Records one mailbox message sent between team agents. */
 export interface AgentTeamsMessageSentData {
   readonly teamId: string
@@ -134,6 +139,11 @@ declare module '@deepseek-ai/dsh-session/types' {
      * @param data - stable team identity.
      */
     'agent-teams/team-deleted': AgentTeamsTeamDeletedData
+    /**
+     * Closes a staged plan rejected during pre-run review.
+     * @param data - stable team identity.
+     */
+    'agent-teams/plan-discarded': AgentTeamsPlanDiscardedData
   }
 }
 
@@ -148,3 +158,4 @@ export type AgentTeamsEventType =
   | 'agent-teams/team-halted'
   | 'agent-teams/team-resumed'
   | 'agent-teams/team-deleted'
+  | 'agent-teams/plan-discarded'

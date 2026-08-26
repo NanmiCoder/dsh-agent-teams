@@ -17,7 +17,28 @@ import { createHash, randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import type { TaskStatus, TeamMember, TeamMessage, TeamState, TeamTask } from './types.ts'
+import { TERMINAL_TASK_STATUSES, type TaskStatus, type TeamMember, type TeamMessage, type TeamProfileSnapshot, type TeamState, type TeamTask } from './types.ts'
+import { hasValidQualityTaskFields, isReviewPolicy } from './quality-gates.ts'
+
+export {
+  buildCoverageMatrix,
+  canDeclareDelivery,
+  classifyChangedPath,
+  collectChangedPaths,
+  defaultQualityDeliveryGraph,
+  describeQualityLoop,
+  evaluateQualityCompletion,
+  hasValidQualityTaskFields,
+  isQualityKind,
+  pathMatchesScope,
+  planQualityFollowUp,
+  qualityPlanningPrompt,
+  resumeTeamState,
+  sanitizeReviewAcceptance,
+  sanitizeReviewObjective,
+  taskKindOf,
+  validateCreateTask,
+} from './quality-gates.ts'
 
 /** Mailbox key of the captain. */
 export const CAPTAIN_KEY = 'captain'
@@ -148,6 +169,17 @@ export function beginTaskAttempt(task: TeamTask, assignee: string): string {
  * Revoke the current worker immediately. Clearing its capability makes old
  * updates stale; a separate handoff generation serializes async quiescence.
  */
+/** Cancel one unfinished task without returning it to the ready pool. */
+export function cancelUnfinishedTask(task: TeamTask, output?: string): void {
+  if (TERMINAL_TASK_STATUSES.includes(task.status)) return
+  task.status = 'cancelled'
+  task.attemptId = undefined
+  task.handoffId = undefined
+  task.reassigning = false
+  if (output !== undefined) task.output = output
+  task.updatedAt = Date.now()
+}
+
 export function invalidateTaskAttempt(
   task: TeamTask,
   nextAssignee?: string,
@@ -182,10 +214,11 @@ export async function readTeam(stateRoot: string, teamId: string): Promise<TeamS
   try {
     const raw = await readFile(join(stateRoot, teamId, 'team.json'), 'utf8')
     const value: unknown = JSON.parse(stripLeadingBom(raw))
-    if (!isTeamState(value, teamId)) {
+    const team = coerceTeamState(value, teamId)
+    if (team === undefined) {
       throw new Error(`invalid AgentTeams state in team "${teamId}"`)
     }
-    return value
+    return team
   } catch (error: unknown) {
     if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
       return undefined
@@ -207,10 +240,11 @@ export function readTeamSync(stateRoot: string, teamId: string): TeamState | und
   try {
     const raw = readFileSync(join(stateRoot, teamId, 'team.json'), 'utf8')
     const value: unknown = JSON.parse(stripLeadingBom(raw))
-    if (!isTeamState(value, teamId)) {
+    const team = coerceTeamState(value, teamId)
+    if (team === undefined) {
       throw new Error(`invalid AgentTeams state in team "${teamId}"`)
     }
-    return value
+    return team
   } catch (error: unknown) {
     if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
       return undefined
@@ -638,14 +672,80 @@ function isTeamMember(value: unknown): value is TeamMember {
     && isOptionalString(value['provider'])
     && isOptionalString(value['model'])
     && isOptionalString(value['reasoningEffort'])
+    && isOptionalString(value['activeProvider'])
+    && isOptionalString(value['activeModel'])
+    && (value['executionPrompt'] === undefined || typeof value['executionPrompt'] === 'string')
+    && (value['fallback'] === undefined || (isRecord(value['fallback']) && typeof value['fallback']['provider'] === 'string' && typeof value['fallback']['model'] === 'string'))
+    && (value['fallbackActive'] === undefined || typeof value['fallbackActive'] === 'boolean')
     && isFiniteNumber(value['joinedAt'])
     && (value['status'] === 'idle' || value['status'] === 'working' || value['status'] === 'removed')
 }
 
 /** Validate one task record at the durable JSON boundary. */
-function isTeamTask(value: unknown): value is TeamTask {
+function isTeamProfileSnapshot(value: unknown): value is TeamProfileSnapshot {
+  return isRecord(value)
+    && typeof value['name'] === 'string'
+    && value['name'].trim() !== ''
+    && isOptionalString(value['description'])
+    && isOptionalString(value['protocol'])
+    && (value['executionPrompt'] === undefined || typeof value['executionPrompt'] === 'string')
+    && (value['fallback'] === undefined || (isRecord(value['fallback']) && typeof value['fallback']['provider'] === 'string' && typeof value['fallback']['model'] === 'string'))
+    && (value['taskPlanning'] === undefined || value['taskPlanning'] === 'captain' || value['taskPlanning'] === 'seed')
+    && (value['reviewPolicy'] === undefined || isReviewPolicy(value['reviewPolicy']))
+}
+
+function coerceProfileSnapshot(value: unknown): TeamProfileSnapshot | undefined {
+  if (typeof value === 'string') {
+    const name = value.trim()
+    return name === '' ? undefined : { name }
+  }
+  if (!isRecord(value)) return undefined
+  if (!isTeamProfileSnapshot(value)) return undefined
+  return {
+    name: value.name.trim(),
+    ...value.description === undefined ? {} : { description: value.description },
+    ...value.protocol === undefined ? {} : { protocol: value.protocol },
+    ...value.taskPlanning === undefined ? {} : { taskPlanning: value.taskPlanning },
+  }
+}
+
+function coerceTeamState(value: unknown, expectedId: string): TeamState | undefined {
+  if (!isRecord(value)) return undefined
+  if (value['profile'] !== undefined && !isTeamProfileSnapshot(value['profile']) && typeof value['profile'] !== 'string') {
+    const next = { ...value }
+    delete next['profile']
+    value = next
+  } else if (typeof value['profile'] === 'string') {
+    const upgraded = coerceProfileSnapshot(value['profile'])
+    value = upgraded === undefined
+      ? (() => {
+        const next = { ...value as Record<string, unknown> }
+        delete next['profile']
+        return next
+      })()
+      : { ...value, profile: upgraded }
+  }
+  if (!isRecord(value) || !Array.isArray(value['tasks'])) {
+    return isTeamState(value, expectedId) ? value : undefined
+  }
+  const tasks = (value['tasks'] as unknown[]).map((task) => {
+    if (!isRecord(task)) return task
+    if (task['profileSeedId'] !== undefined && (typeof task['profileSeedId'] !== 'string' || task['profileSeedId'].trim() === '')) {
+      const next = { ...task }
+      delete next['profileSeedId']
+      return next
+    }
+    return task
+  })
+  const coerced = { ...value, tasks }
+  return isTeamState(coerced, expectedId) ? coerced : undefined
+}
+
+export function isTeamTask(value: unknown): value is TeamTask {
   if (!isRecord(value)) return false
   return typeof value['id'] === 'string'
+    && isOptionalString(value['profileSeedId'])
+    && (value['profileSeedId'] === undefined || value['profileSeedId'].trim() !== '')
     && typeof value['subject'] === 'string'
     && isOptionalString(value['description'])
     && (value['status'] === 'pending'
@@ -665,6 +765,7 @@ function isTeamTask(value: unknown): value is TeamTask {
     && (value['reassigning'] === undefined || typeof value['reassigning'] === 'boolean')
     && isFiniteNumber(value['createdAt'])
     && isFiniteNumber(value['updatedAt'])
+    && hasValidQualityTaskFields(value)
 }
 
 /** Validate the full team record before it can participate in authorization. */
@@ -674,6 +775,7 @@ function isTeamState(value: unknown, expectedId: string): value is TeamState {
     && typeof value['name'] === 'string'
     && value['name'].trim() !== ''
     && isOptionalString(value['description'])
+    && (value['profile'] === undefined || isTeamProfileSnapshot(value['profile']))
     && typeof value['captainSessionId'] === 'string'
     && value['captainSessionId'] !== ''
     && isFiniteNumber(value['createdAt'])
@@ -683,16 +785,26 @@ function isTeamState(value: unknown, expectedId: string): value is TeamState {
     && value['tasks'].every(isTeamTask)
     && Number.isSafeInteger(value['taskSeq'])
     && (value['taskSeq'] as number) >= 0
+    && (value['phase'] === undefined || value['phase'] === 'staged' || value['phase'] === 'running')
+    && (value['approvedAt'] === undefined || isFiniteNumber(value['approvedAt']))
+    && (value['halted'] === undefined || typeof value['halted'] === 'boolean')
+    && (value['haltedAt'] === undefined || isFiniteNumber(value['haltedAt']))
+    && (value['reviewPolicy'] === undefined || isReviewPolicy(value['reviewPolicy']))
+    && (value['escalated'] === undefined || typeof value['escalated'] === 'boolean')
   if (!validShape) return false
 
   const members = value['members'] as TeamMember[]
   const tasks = value['tasks'] as TeamTask[]
   const memberIds = new Set<string>()
   const memberKeys = new Set<string>()
+  const staged = value['phase'] === 'staged'
   for (const member of members) {
     const key = sanitizeKey(member.name)
-    if (member.id === '' || key === CAPTAIN_KEY || memberIds.has(member.id) || memberKeys.has(key)) return false
-    memberIds.add(member.id)
+    if ((!staged && member.id === '') || key === CAPTAIN_KEY || memberKeys.has(key)) return false
+    if (member.id !== '') {
+      if (memberIds.has(member.id)) return false
+      memberIds.add(member.id)
+    }
     memberKeys.add(key)
   }
   const taskIds = new Set<string>()
@@ -832,11 +944,12 @@ export async function listArchivedTeamIds(stateRoot: string): Promise<string[]> 
 // ── activity snapshot (server-side, like the Claude Code desktop watcher) ──
 
 /** Visual task state for the activity panel. */
-export type VisualTaskState = 'blocked' | 'open' | 'running' | 'completed'
+export type VisualTaskState = 'blocked' | 'open' | 'running' | 'completed' | 'failed' | 'cancelled'
 
 /**
  * The visual state of one task: `running` while in_progress, `completed`
- * when done, `blocked` while any dependency is unfinished, else `open`.
+ * when done, `failed`/`cancelled` when terminal without success, `blocked`
+ * while any dependency is unfinished, else `open`.
  */
 export function taskVisualState(
   status: string,
@@ -844,6 +957,8 @@ export function taskVisualState(
   tasks: readonly TeamTask[],
 ): VisualTaskState {
   if (status === 'completed') return 'completed'
+  if (status === 'failed') return 'failed'
+  if (status === 'cancelled') return 'cancelled'
   if (status === 'in_progress') return 'running'
   const byId = new Map(tasks.map((task) => [task.id, task]))
   const openDependency = dependencies.some((dependencyId) => {

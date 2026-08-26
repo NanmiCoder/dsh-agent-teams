@@ -31,10 +31,13 @@ import {
   activityPanelExpandedForSession,
   activityPanelShouldAutoExpand,
   compactDagLayout,
+  compactModelLabel,
   COMPACT_DAG_NODE_HEIGHT,
   COMPACT_DAG_NODE_WIDTH,
   dependencyFocusTaskId,
+  memberRouteLabel,
   relatedTaskIds,
+  taskModelLabel,
   usesParallelTaskGrid,
 } from './activity-model.ts'
 import {
@@ -150,6 +153,16 @@ function formatTaskIds(ids: readonly string[], t: AgentTeamsTranslate): string {
   return ids.join(t('format.listSeparator'))
 }
 
+function taskTitle(task: ActivityTask, model: string): string {
+  const extras = [
+    task.kind,
+    task.round === undefined ? undefined : `r${task.round}`,
+    task.verdict,
+    model === '' ? undefined : model,
+  ].filter((item): item is string => item !== undefined)
+  return extras.length === 0 ? `${task.id} · ${task.subject}` : `${task.id} · ${task.subject} · ${extras.join(' · ')}`
+}
+
 /** Badge/bar coloring key: visual state, widened for terminal statuses. */
 function taskTone(state: ActivityTask['state'], status: string): string {
   if (status === 'failed') return 'failed'
@@ -214,7 +227,12 @@ function memberStatusText(
   const owned = tasks.filter((task) => task.assignee === member.name)
   const current = owned.find((task) => task.id === member.currentTask)
   const blocked = owned.find((task) => task.state === 'blocked')
-  if (member.activity === 'working' && current !== undefined) return t('member.status.executing', { taskId: current.id })
+  if (member.activity === 'working' && current !== undefined) {
+    const model = taskModelLabel(current, [member])
+    return model === ''
+      ? t('member.status.executing', { taskId: current.id })
+      : t('member.status.executingModel', { taskId: current.id, model })
+  }
   if (member.activity === 'working') return t('member.status.working')
   if (blocked !== undefined) {
     const dependency = tasks.find((task) => blocked.dependencies.includes(task.id) && task.state !== 'completed')
@@ -239,11 +257,24 @@ function compactTaskLabel(subject: string): string {
 
 function taskSummary(team: ActivityTeam, t: AgentTeamsTranslate): string {
   const completed = team.tasks.filter((task) => task.status === 'completed')
+  const cancelled = team.tasks.filter((task) => task.status === 'cancelled')
   const running = team.tasks.filter((task) => task.state === 'running')
   const blocked = team.tasks.filter((task) => task.state === 'blocked')
-  const ready = team.tasks.filter((task) => task.state === 'open' && task.status !== 'completed')
+  const ready = team.tasks.filter((task) => task.state === 'open' && task.status !== 'completed' && task.status !== 'failed' && task.status !== 'cancelled')
+  const failed = team.tasks.filter((task) => task.status === 'failed')
   if (team.tasks.length === 0) return t('task.summary.waitingBreakdown')
+  if (team.phase === 'staged') return t('task.summary.staged', { count: team.tasks.length })
   if (completed.length === team.tasks.length) return t('task.summary.allDelivered', { count: completed.length })
+  if (completed.length + cancelled.length + failed.length === team.tasks.length) {
+    return t('task.summary.ended', {
+      completed: completed.length,
+      cancelled: cancelled.length,
+      failed: failed.length,
+    })
+  }
+  if (failed.length > 0 && running.length === 0 && ready.length === 0 && blocked.length === 0) {
+    return t('task.summary.failedSettled', { count: failed.length })
+  }
   if (blocked.length > 0 && running.length > 0) {
     return t('task.summary.blockedAndRunning', {
       tasks: formatTaskIds(blocked.slice(0, 3).map((task) => task.id), t),
@@ -260,7 +291,10 @@ function ProgressOverview({ team, t }: { readonly team: ActivityTeam; readonly t
   const running = team.tasks.filter((task) => task.state === 'running').length
   const blocked = team.tasks.filter((task) => task.state === 'blocked').length
   const completed = team.tasks.filter((task) => task.status === 'completed').length
-  const summaryTone = blocked > 0 ? 'warning' : completed === team.tasks.length && team.tasks.length > 0 ? 'completed' : 'running'
+  const settled = team.tasks.length > 0 && team.tasks.every((task) => (
+    task.status === 'completed' || task.status === 'failed' || task.status === 'cancelled'
+  ))
+  const summaryTone = blocked > 0 ? 'warning' : settled ? 'completed' : 'running'
   return (
     <section className={css.progressOverview} aria-label={t('progress.aria')} data-progress-summary>
       <span className={css.progressTitle}>{t('progress.title')}</span>
@@ -282,8 +316,9 @@ function ProgressOverview({ team, t }: { readonly team: ActivityTeam; readonly t
   )
 }
 
-function DependencyMap({ tasks, t }: {
+function DependencyMap({ tasks, members, t }: {
   readonly tasks: readonly ActivityTask[]
+  readonly members: readonly ActivityMember[]
   readonly t: AgentTeamsTranslate
 }) {
   const [open, setOpen] = useState(true)
@@ -327,6 +362,7 @@ function DependencyMap({ tasks, t }: {
     ?? tasks.find((task) => task.state === 'running')
     ?? tasks[0]!
   const detailTask = tasks.find((task) => task.id === focusedTaskId) ?? fallbackTask
+  const detailModel = taskModelLabel(detailTask, members)
   const waitingOn = detailTask.dependencies.filter((dependency) => (
     tasks.find((task) => task.id === dependency)?.status !== 'completed'
   ))
@@ -355,35 +391,42 @@ function DependencyMap({ tasks, t }: {
                   return <path key={`${edge.from}:${edge.to}`} d={edge.path} data-active={active} data-dimmed={related !== null && !active} />
                 })}
               </svg>}
-              {layout.nodes.map(({ task, x, y }) => (
-                <button
-                  key={task.id}
-                  type="button"
-                  className={css.dagNode}
-                  style={parallel
-                    ? { height: COMPACT_DAG_NODE_HEIGHT }
-                    : { left: x, top: y, width: COMPACT_DAG_NODE_WIDTH, height: COMPACT_DAG_NODE_HEIGHT }}
-                  data-task-id={task.id}
-                  data-state={taskTone(task.state, task.status)}
-                  data-focused={related?.has(task.id) ?? false}
-                  data-dimmed={related !== null && !related.has(task.id)}
-                  aria-pressed={pinnedTaskId === task.id}
-                  title={`${task.id} · ${task.subject}`}
-                  onClick={() => { setPinnedTaskId((current) => current === task.id ? null : task.id) }}
-                  onMouseEnter={() => { scheduleHover(task.id) }}
-                  onMouseLeave={() => { scheduleHover(null) }}
-                  onFocus={() => { setKeyboardTaskId(task.id) }}
-                  onBlur={() => { setKeyboardTaskId(null) }}
-                >
-                  <span className={css.dagNodeHead}><span className={css.dagNodeDot} />{task.id}</span>
-                  <span className={css.dagNodeLabel}>{compactTaskLabel(task.subject)}</span>
-                  {task.state === 'running' && (
-                    <span className={css.dagRunningState} aria-label={t('task.runningAria')}>
-                      <WorkGlyph active />
+              {layout.nodes.map(({ task, x, y }) => {
+                const model = taskModelLabel(task, members)
+                const shortModel = compactModelLabel(model)
+                return (
+                  <button
+                    key={task.id}
+                    type="button"
+                    className={css.dagNode}
+                    style={parallel
+                      ? { height: COMPACT_DAG_NODE_HEIGHT }
+                      : { left: x, top: y, width: COMPACT_DAG_NODE_WIDTH, height: COMPACT_DAG_NODE_HEIGHT }}
+                    data-task-id={task.id}
+                    data-state={taskTone(task.state, task.status)}
+                    data-task-model={model || undefined}
+                    data-focused={related?.has(task.id) ?? false}
+                    data-dimmed={related !== null && !related.has(task.id)}
+                    aria-pressed={pinnedTaskId === task.id}
+                    title={taskTitle(task, model)}
+                    onClick={() => { setPinnedTaskId((current) => current === task.id ? null : task.id) }}
+                    onMouseEnter={() => { scheduleHover(task.id) }}
+                    onMouseLeave={() => { scheduleHover(null) }}
+                    onFocus={() => { setKeyboardTaskId(task.id) }}
+                    onBlur={() => { setKeyboardTaskId(null) }}
+                  >
+                    <span className={css.dagNodeHead}><span className={css.dagNodeDot} />{task.id}</span>
+                    <span className={css.dagNodeLabel}>
+                      {task.state === 'running' && shortModel !== '' ? shortModel : compactTaskLabel(task.subject)}
                     </span>
-                  )}
-                </button>
-              ))}
+                    {task.state === 'running' && (
+                      <span className={css.dagRunningState} aria-label={t('task.runningAria')}>
+                        <WorkGlyph active />
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
             </div>
           </div>
           <section className={css.taskDetail} data-task-detail={detailTask.id}>
@@ -401,12 +444,207 @@ function DependencyMap({ tasks, t }: {
                   ? t('task.detail.ready')
                   : t('task.detail.waitingOn', { tasks: formatTaskIds(waitingOn, t) })}
             </span>
+            {detailModel !== '' && (
+              <span className={css.taskDetailModel} data-task-model={detailModel}>
+                {t('task.model', { model: detailModel })}
+              </span>
+            )}
             <span className={css.taskDetailMeta}>{dependents.length === 0
               ? t('task.detail.noDownstream')
               : t('task.detail.unlocks', { tasks: formatTaskIds(dependents.map((task) => task.id), t) })}</span>
           </section>
         </>
       )}
+    </section>
+  )
+}
+
+const PLAN_URL = '/plugins/dsh-agent-teams/plan'
+
+async function mutatePlan(payload: Record<string, unknown>): Promise<void> {
+  const response = await fetch(PLAN_URL, {
+    method: 'POST',
+    cache: 'no-store',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  if (response.ok) return
+  let message = `HTTP ${response.status}`
+  try {
+    const body = await response.json() as { error?: unknown }
+    if (typeof body.error === 'string' && body.error.trim() !== '') message = body.error
+  } catch {}
+  throw new Error(message)
+}
+
+function StagedMemberEditor({ team, member, t }: {
+  readonly team: ActivityTeam
+  readonly member: ActivityMember
+  readonly t: AgentTeamsTranslate
+}) {
+  const [role, setRole] = useState(member.role)
+  const [provider, setProvider] = useState(member.provider ?? '')
+  const [model, setModel] = useState(member.model ?? '')
+  const [reasoningEffort, setReasoningEffort] = useState(member.reasoningEffort ?? '')
+  const [executionPrompt, setExecutionPrompt] = useState(member.executionPrompt ?? '')
+  const [busy, setBusy] = useState(false)
+  const [feedback, setFeedback] = useState('')
+  useEffect(() => {
+    setRole(member.role)
+    setProvider(member.provider ?? '')
+    setModel(member.model ?? '')
+    setReasoningEffort(member.reasoningEffort ?? '')
+    setExecutionPrompt(member.executionPrompt ?? '')
+  }, [member.role, member.provider, member.model, member.reasoningEffort, member.executionPrompt])
+  const save = async (): Promise<void> => {
+    setBusy(true)
+    setFeedback('')
+    try {
+      await mutatePlan({
+        sessionId: team.captainSessionId,
+        teamId: team.teamId,
+        action: 'update_member',
+        memberName: member.name,
+        role,
+        provider,
+        model,
+        reasoningEffort,
+        executionPrompt,
+      })
+      setFeedback(t('plan.saved'))
+    } catch (error: unknown) {
+      setFeedback(t('plan.failed', { message: error instanceof Error ? error.message : String(error) }))
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <fieldset className={css.planCard} data-plan-member={member.name} disabled={busy}>
+      <legend>{member.name}</legend>
+      <label>{t('plan.member.role')}<input value={role} onChange={(event) => { setRole(event.currentTarget.value) }} /></label>
+      <span className={css.planGrid}>
+        <label>{t('plan.member.provider')}<input value={provider} onChange={(event) => { setProvider(event.currentTarget.value) }} /></label>
+        <label>{t('plan.member.model')}<input value={model} onChange={(event) => { setModel(event.currentTarget.value) }} /></label>
+      </span>
+      <label>{t('plan.member.reasoning')}<input value={reasoningEffort} onChange={(event) => { setReasoningEffort(event.currentTarget.value) }} placeholder="default" /></label>
+      <label>{t('plan.member.prompt')}<textarea value={executionPrompt} onChange={(event) => { setExecutionPrompt(event.currentTarget.value) }} rows={2} /></label>
+      <span className={css.planActions}>
+        <button type="button" onClick={() => { void save() }}>{t('plan.save')}</button>
+        {feedback !== '' && <span>{feedback}</span>}
+      </span>
+    </fieldset>
+  )
+}
+
+function StagedTaskEditor({ team, task, t }: {
+  readonly team: ActivityTeam
+  readonly task: ActivityTask
+  readonly t: AgentTeamsTranslate
+}) {
+  const taskDependencies = task.dependencies.join(', ')
+  const [subject, setSubject] = useState(task.subject)
+  const [description, setDescription] = useState(task.description ?? '')
+  const [assignee, setAssignee] = useState(task.assignee)
+  const [dependencies, setDependencies] = useState(taskDependencies)
+  const [busy, setBusy] = useState(false)
+  const [feedback, setFeedback] = useState('')
+  useEffect(() => {
+    setSubject(task.subject)
+    setDescription(task.description ?? '')
+    setAssignee(task.assignee)
+    setDependencies(taskDependencies)
+  }, [task.subject, task.description, task.assignee, taskDependencies])
+  const send = async (action: 'update_task' | 'remove_task'): Promise<void> => {
+    setBusy(true)
+    setFeedback('')
+    try {
+      await mutatePlan({
+        sessionId: team.captainSessionId,
+        teamId: team.teamId,
+        action,
+        taskId: task.id,
+        subject,
+        description,
+        assignee,
+        dependencies: dependencies.split(',').map((item) => item.trim()).filter(Boolean),
+      })
+      setFeedback(t('plan.saved'))
+    } catch (error: unknown) {
+      setFeedback(t('plan.failed', { message: error instanceof Error ? error.message : String(error) }))
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <fieldset className={css.planCard} data-plan-task={task.id} disabled={busy}>
+      <legend>{task.id}</legend>
+      <label>{t('plan.task.subject')}<input value={subject} onChange={(event) => { setSubject(event.currentTarget.value) }} /></label>
+      <label>{t('plan.task.description')}<textarea value={description} onChange={(event) => { setDescription(event.currentTarget.value) }} rows={2} /></label>
+      <span className={css.planGrid}>
+        <label>{t('plan.task.assignee')}
+          <select value={assignee} onChange={(event) => { setAssignee(event.currentTarget.value) }}>
+            <option value="">{t('plan.task.unassigned')}</option>
+            {team.members.map((member) => <option key={member.name} value={member.name}>{member.name}</option>)}
+          </select>
+        </label>
+        <label>{t('plan.task.dependencies')}<input value={dependencies} onChange={(event) => { setDependencies(event.currentTarget.value) }} /></label>
+      </span>
+      <span className={css.planActions}>
+        <button type="button" onClick={() => { void send('update_task') }}>{t('plan.save')}</button>
+        <button type="button" data-danger onClick={() => { void send('remove_task') }}>{t('plan.remove')}</button>
+        {feedback !== '' && <span>{feedback}</span>}
+      </span>
+    </fieldset>
+  )
+}
+
+function StagingEditor({ team, t }: { readonly team: ActivityTeam; readonly t: AgentTeamsTranslate }) {
+  const [newTask, setNewTask] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [feedback, setFeedback] = useState('')
+  const act = async (action: 'add_task' | 'approve'): Promise<void> => {
+    setBusy(true)
+    setFeedback('')
+    let approved = false
+    try {
+      await mutatePlan({
+        sessionId: team.captainSessionId,
+        teamId: team.teamId,
+        action,
+        ...action === 'add_task' ? { subject: newTask, dependencies: [] } : {},
+      })
+      if (action === 'add_task') {
+        setNewTask('')
+        setFeedback(t('plan.saved'))
+      } else {
+        approved = true
+      }
+    } catch (error: unknown) {
+      setFeedback(t('plan.failed', { message: error instanceof Error ? error.message : String(error) }))
+    } finally {
+      if (!approved) setBusy(false)
+    }
+  }
+  return (
+    <section className={css.planEditor} data-staging-editor>
+      <header>
+        <span><strong>{t('plan.title')}</strong><em>{t('plan.badge')}</em></span>
+        <p>{t('plan.description')}</p>
+      </header>
+      <div className={css.planList}>
+        {team.members.map((member) => <StagedMemberEditor key={member.name} team={team} member={member} t={t} />)}
+        {team.tasks.map((task) => <StagedTaskEditor key={task.id} team={team} task={task} t={t} />)}
+      </div>
+      <div className={css.planNewTask}>
+        <input value={newTask} onChange={(event) => { setNewTask(event.currentTarget.value) }} placeholder={t('plan.newTask')} disabled={busy} />
+        <button type="button" disabled={busy || newTask.trim() === ''} onClick={() => { void act('add_task') }}>{t('plan.addTask')}</button>
+      </div>
+      <div className={css.planApproveRow}>
+        {feedback !== '' && <span>{feedback}</span>}
+        <button type="button" data-plan-approve disabled={busy} onClick={() => { void act('approve') }}>
+          {busy ? t('plan.approving') : t('plan.approve')}
+        </button>
+      </div>
     </section>
   )
 }
@@ -427,6 +665,9 @@ function TeamSection({ team, onNavigate, t, historic = false }: {
   const captainTaskIds = formatTaskIds(captainOwned.map((task) => task.id), t)
   const completedCount = team.tasks.filter((task) => task.status === 'completed').length
   const allCompleted = team.tasks.length > 0 && completedCount === team.tasks.length
+  const allSettled = team.tasks.length > 0 && team.tasks.every((task) => (
+    task.status === 'completed' || task.status === 'failed' || task.status === 'cancelled'
+  ))
   return (
     <section className={css.team} data-team-id={team.teamId}>
       <header className={css.teamHead}>
@@ -438,6 +679,8 @@ function TeamSection({ team, onNavigate, t, historic = false }: {
           <span data-stat="messages">{t('team.stats.messages', { count: team.messageCount })}</span>
         </span>
       </header>
+
+      {team.phase === 'staged' && !historic && <StagingEditor team={team} t={t} />}
 
       <section className={css.delegationSection} aria-label={t('delegation.aria')} data-delegation-map>
         <div className={css.captainNode}>
@@ -451,15 +694,23 @@ function TeamSection({ team, onNavigate, t, historic = false }: {
             </span>
             <span className={css.captainSummary}>{captainBusy
               ? t('captain.summary.withTakeover', { tasks: assignedCount, captainTasks: captainTaskIds })
-              : t('captain.summary', { tasks: assignedCount, members: team.members.length })}</span>
+              : team.phase === 'staged'
+                ? t('captain.summary.staged', { tasks: team.tasks.length, members: team.members.length })
+                : t('captain.summary', { tasks: assignedCount, members: team.members.length })}</span>
           </span>
           <span className={css.captainState} data-busy={captainBusy || busyCount > 0}>
             <WorkGlyph active={captainBusy || busyCount > 0} />
             {captainBusy
               ? t('captain.state.takeover', { tasks: captainTaskIds })
+              : team.phase === 'staged'
+                ? t('captain.state.staged')
               : busyCount > 0
                 ? t('captain.state.working', { count: busyCount })
-                : t(allCompleted ? 'captain.state.collected' : 'captain.state.waiting')}
+                : t(allCompleted
+                  ? 'captain.state.collected'
+                  : allSettled
+                    ? 'captain.state.settled'
+                    : 'captain.state.waiting')}
           </span>
         </div>
 
@@ -474,8 +725,9 @@ function TeamSection({ team, onNavigate, t, historic = false }: {
           {team.members.length === 0 && <span className={css.emptyHint}>{t('members.empty')}</span>}
           {team.members.map((member) => {
             const owned = team.tasks.filter((task) => task.assignee === member.name)
+            const memberModel = memberRouteLabel(member)
             return (
-              <div key={member.id} className={css.memberBlock} data-activity={member.activity}>
+              <div key={member.id || member.name} className={css.memberBlock} data-activity={member.activity}>
                 <span className={css.memberBranch} aria-hidden><span /></span>
                 <button
                   type="button"
@@ -501,23 +753,44 @@ function TeamSection({ team, onNavigate, t, historic = false }: {
                       {member.role !== '' && <span className={css.memberRole}>{member.role}</span>}
                       <span className={css.memberState} data-activity={member.activity}>
                         <WorkGlyph active={member.activity === 'working'} />
-                        {memberStateLabel(member, team.tasks, historic, t)}
+                        {team.phase === 'staged' ? t('member.state.staged') : memberStateLabel(member, team.tasks, historic, t)}
                       </span>
                     </span>
-                    <span className={css.memberStatusLine}>{memberStatusText(member, team.tasks, t)}</span>
+                    <span className={css.memberStatusLine}>{team.phase === 'staged'
+                      ? t('member.status.staged')
+                      : historic && owned.length > 0 && owned.every((task) => (
+                        task.status === 'completed' || task.status === 'failed' || task.status === 'cancelled'
+                      ))
+                        ? t('member.status.settled')
+                      : memberStatusText(member, team.tasks, t)}</span>
+                    {memberModel !== '' && (
+                      <span className={css.memberModel} data-member-model={memberModel}>
+                        {t('member.model', { model: memberModel })}
+                      </span>
+                    )}
                   </span>
                   <span className={css.memberCount}>{member.done}/{member.total}</span>
                 </button>
                 <div className={css.assignmentLine}>
-                  <span className={css.assignmentLabel}>{t('assignment.label')}</span>
+                  <span className={css.assignmentLabel}>{t(team.phase === 'staged' ? 'assignment.staged' : 'assignment.label')}</span>
                   <span className={css.assignmentTasks}>
                     {owned.length === 0
                       ? <span className={css.taskEmpty}>{t('assignment.empty')}</span>
-                      : owned.map((task) => (
-                        <span key={task.id} className={css.assignmentChip} data-state={taskTone(task.state, task.status)} title={task.subject}>
-                          {task.id}
-                        </span>
-                      ))}
+                      : owned.map((task) => {
+                          const model = taskModelLabel(task, team.members)
+                          const shortModel = compactModelLabel(model)
+                          return (
+                            <span
+                              key={task.id}
+                              className={css.assignmentChip}
+                              data-state={taskTone(task.state, task.status)}
+                              data-task-model={model || undefined}
+                              title={taskTitle(task, model)}
+                            >
+                              {task.state === 'running' && shortModel !== '' ? `${task.id} · ${shortModel}` : task.id}
+                            </span>
+                          )
+                        })}
                   </span>
                 </div>
               </div>
@@ -526,7 +799,7 @@ function TeamSection({ team, onNavigate, t, historic = false }: {
         </div>}
       </section>
 
-      <DependencyMap tasks={team.tasks} t={t} />
+      <DependencyMap tasks={team.tasks} members={team.members} t={t} />
     </section>
   )
 }
@@ -539,6 +812,7 @@ function historicCardTeam(data: AgentTeamsCardData, owner: string): ActivityTeam
     teamId: data.teamId,
     name: data.teamName,
     captainSessionId: data.captainSessionId || owner,
+    phase: 'running',
     members: data.members.map((member) => ({
       ...member,
       status: 'removed',

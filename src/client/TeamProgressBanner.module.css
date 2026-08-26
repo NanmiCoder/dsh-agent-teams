@@ -1,0 +1,68 @@
+.root {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  box-sizing: border-box;
+  /* InputBar owns the same composer max width but applies 16px side
+     clearance as parent padding. Mirror its content width here so this
+     standalone input-dock row is exactly aligned with the input card. */
+  width: calc(100% - var(--dsh-composer-side-clearance) - var(--dsh-composer-side-clearance));
+  max-width: var(--dsh-composer-card-max-width);
+  min-width: 0;
+  margin: 0 auto 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--dsw-alias-line-normal, #e7e9ee);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary, #4d6bfe) 8%, var(--dsw-alias-bg-layer-1, #ffffff));
+}
+
+.copy {
+  display: flex;
+  flex: 1 1 180px;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+
+.title {
+  color: var(--dsw-alias-label-primary, #1c1c1e);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 18px;
+}
+
+.detail {
+  overflow: hidden;
+  color: var(--dsw-alias-label-secondary, #5c5c66);
+  font-size: 12px;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stop {
+  flex: none;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--dsw-alias-state-error-primary, #e5484d) 35%, transparent);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-1, #ffffff);
+  color: var(--dsw-alias-state-error-primary, #e5484d);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  cursor: pointer;
+}
+
+.stop:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.error {
+  flex: 1 1 100%;
+  color: var(--dsw-alias-state-error-primary, #e5484d);
+  font-size: 12px;
+  line-height: 18px;
+}

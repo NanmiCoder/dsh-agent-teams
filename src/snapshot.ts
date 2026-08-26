@@ -19,13 +19,17 @@ import {
 import type { MemberStatus, TeamState, TeamTask } from './types.ts'
 
 /** Visual task state for the activity panel. */
-export type VisualTaskState = 'blocked' | 'open' | 'running' | 'completed'
+export type VisualTaskState = 'blocked' | 'open' | 'running' | 'completed' | 'failed' | 'cancelled'
 
 /** One member row of the activity snapshot. */
 export interface TeamActivityMember {
   readonly id: string
   readonly name: string
   readonly role: string
+  readonly provider: string
+  readonly model: string
+  readonly reasoningEffort: string
+  readonly executionPrompt: string
   readonly status: MemberStatus
   readonly activity: 'working' | 'idle' | 'unknown'
   readonly progress: number
@@ -39,11 +43,16 @@ export interface TeamActivityMember {
 export interface TeamActivityTask {
   readonly id: string
   readonly subject: string
+  readonly description: string
   readonly status: string
   readonly state: VisualTaskState
   readonly assignee: string
+  readonly model: string
   readonly dependencies: readonly string[]
   readonly depth: number
+  readonly kind?: string
+  readonly round?: number
+  readonly verdict?: string
 }
 
 /** One captain-inbox preview row. */
@@ -59,6 +68,8 @@ export interface TeamActivitySnapshot {
   readonly name: string
   readonly description?: string
   readonly captainSessionId: string
+  readonly phase: 'staged' | 'running'
+  readonly halted?: boolean
   readonly members: readonly TeamActivityMember[]
   readonly tasks: readonly TeamActivityTask[]
   readonly messageCount: number
@@ -79,6 +90,15 @@ function currentTaskOf(memberName: string, tasks: readonly TeamTask[]): string {
     if (task.status === 'in_progress' && task.assignee === memberName) return task.id
   }
   return ''
+}
+
+/** Compact `provider/model` route for the activity panel, or just the model. */
+export function memberModelRoute(member: { provider?: string; model?: string } | undefined): string {
+  if (member === undefined) return ''
+  const provider = member.provider?.trim() ?? ''
+  const model = member.model?.trim() ?? ''
+  if (provider !== '' && model !== '') return `${provider}/${model}`
+  return model
 }
 
 /**
@@ -120,6 +140,10 @@ export async function assembleTeamSnapshot(
       id: member.id,
       name: member.name,
       role: member.role ?? '',
+      provider: member.provider?.trim() ?? '',
+      model: member.model?.trim() ?? '',
+      reasoningEffort: member.reasoningEffort?.trim() ?? '',
+      executionPrompt: member.executionPrompt ?? '',
       status: member.status,
       activity: options.historic === true
         ? 'idle'
@@ -129,7 +153,7 @@ export async function assembleTeamSnapshot(
               : activity.get(member.id) === 'idle' || activity.get(member.id) === 'ready'
                 ? 'idle'
                 : 'unknown')
-          : 'unknown',
+          : state.phase === 'staged' ? 'idle' : 'unknown',
       progress: owned.length === 0 ? 0 : Math.round((done / owned.length) * 100),
       done,
       total: owned.length,
@@ -144,15 +168,22 @@ export async function assembleTeamSnapshot(
     name: state.name,
     ...state.description !== undefined ? { description: state.description } : {},
     captainSessionId: state.captainSessionId,
+    phase: state.phase ?? 'running',
+    ...state.halted === true ? { halted: true } : {},
     members,
     tasks: tasks.map((task) => ({
       id: task.id,
       subject: task.subject,
+      description: task.description ?? '',
       status: task.status,
       state: taskVisualState(task.status, task.dependencies, tasks),
       assignee: task.assignee ?? '',
+      model: memberModelRoute(roster.find((member) => member.name === task.assignee)),
       dependencies: task.dependencies,
       depth: depths.get(task.id) ?? 0,
+      ...task.kind === undefined ? {} : { kind: task.kind },
+      ...task.round === undefined ? {} : { round: task.round },
+      ...task.verdict === undefined ? {} : { verdict: task.verdict },
     })),
     messageCount: captainInbox.length
       + members.reduce((count, member) => count + member.unread, 0),

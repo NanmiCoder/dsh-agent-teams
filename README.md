@@ -22,7 +22,7 @@
 
 `dsh-agent-teams` turns the current DeepSeek Harness session into a captain that can assemble durable sub-agents, split a goal into dependency-aware tasks, and coordinate work through direct messages.
 
-Ask in natural language. The plugin provides the team protocol, ten coordination tools, persistent state, an automatic shared-task scheduler, and a live Web UI—without requiring a separate workflow engine.
+Ask in natural language. The plugin provides the team protocol, eleven coordination tools, persistent state, an automatic shared-task scheduler, and a live Web UI—without requiring a separate workflow engine.
 
 <p align="center">
   <img src="./assets/ui.png" width="100%" alt="DeepSeek Harness conversation with the AgentTeams live activity panel, members, tasks, dependencies, and reports">
@@ -41,7 +41,9 @@ Read the [latest release notes](https://github.com/NanmiCoder/dsh-agent-teams/re
 | **Dependency-aware tasks** | Tasks move through explicit states and cannot be claimed before their dependencies finish. |
 | **Automatic reuse and safe takeover** | Idle members claim the next ready task; reassignment revokes stale attempts before new work starts, and cold recovery retries stranded open attempts. |
 | **Direct messaging** | Members send durable mailbox messages directly to teammates or the captain—no relay required. |
-| **Live activity panel** | The Web UI combines segmented progress, a collapsible roster, and an interactive task DAG; completed archives retain their full member and task history. |
+| **Live activity panel** | The Web UI combines segmented progress, a collapsible roster, and an interactive task DAG; running tasks show the member's model, and completed archives retain their full member and task history. |
+| **Plan before execution** | Normal `/agent-teams` runs stage an unspawned roster and DAG first. The Web panel can edit member routes/prompts and task assignments/dependencies; only **Approve & Run** creates members and starts scheduling. |
+| **Quality gates** | Opt-in quality tasks support requirements → implementation → verification → review → integration contracts, automatic repair/re-review, and explicit resume. Scope control is a completion-time audit, not host write interception. See [docs/quality-gates.md](./docs/quality-gates.md). |
 
 The conversation card and activity panel use Harness's official locale service. They follow live language changes between English and Simplified Chinese—including status labels, dynamic summaries, controls, archive markers, and accessibility text—without a page reload or a separate plugin setting.
 
@@ -165,6 +167,34 @@ pnpm install
 pnpm build
 pnpm verify
 ```
+
+## Named multi-role profiles
+
+Configure one or more complete team profiles in `cordis.patch.yml`. A profile always supplies the roster (independent provider/model/role/reasoning effort). Set `taskPlanning: captain` when the Captain should derive the DAG from the user's goal; omit it or set `taskPlanning: seed` to keep a fixed template workflow:
+
+```yaml
+profiles:
+  demo-delivery:
+    description: Ship a small feature
+    protocol: Discuss requirements, review, test, then prepare release; do not deploy automatically.
+    members:
+      - name: analyst
+        model: gpt-5.6-sol
+        role: Analyze requirements
+      - name: implementer
+        model: gpt-5.6-terra
+        role: Implement the approved solution
+    tasks:
+      - id: requirements
+        subject: Requirements discussion
+        assignee: analyst
+      - id: implementation
+        subject: Implement solution
+        assignee: implementer
+        dependencies: [requirements]
+```
+
+Use an explicit profile flag: `/agent-teams --profile demo-delivery implement the feature`. The first ordinary token is never treated as an implicit profile. Normal command runs call `agent_teams_create({ profile, approval: "required" })`: the roster and seed/Captain-designed DAG remain staged, no child session is created, and no task is claimed. Edit the plan in the activity panel, then click **Approve & Run**. Approval resolves the final provider/model/reasoning choices, atomically spawns the roster, and starts only ready tasks. Direct tool clients may pass `approval: "automatic"` for the legacy immediate path. Failed review/test tasks do not unlock downstream work; automatic repair/review tasks do not depend on the failed review.
 
 ## License
 

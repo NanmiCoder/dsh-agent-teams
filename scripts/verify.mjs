@@ -82,6 +82,7 @@ import {
   installMemberSelectionRuntime,
   resolveMemberLlmSelection,
   spawnMember,
+  validateMemberLlmSelections,
 } from '../lib/members.js'
 
 let failures = 0
@@ -1106,6 +1107,33 @@ try {
   emptyEffortRejected = true
 }
 check('empty explicit reasoning effort is rejected', emptyEffortRejected)
+
+let catalogCalls = 0
+await validateMemberLlmSelections({
+  llm: {
+    async listModels(provider) {
+      catalogCalls += 1
+      return [{ provider, id: 'known-model', name: 'Known model' }]
+    },
+  },
+}, [
+  { provider: 'known-provider', model: 'known-model' },
+  { provider: 'known-provider', model: 'known-model' },
+])
+check('approval model preflight caches one catalog lookup per provider', catalogCalls === 1)
+let unknownCatalogModelRejected = false
+try {
+  await validateMemberLlmSelections({
+    llm: {
+      async listModels(provider) {
+        return [{ provider, id: 'known-model', name: 'Known model' }]
+      },
+    },
+  }, [{ provider: 'known-provider', model: 'typo-model' }])
+} catch (error) {
+  unknownCatalogModelRejected = /unknown member model.*typo-model/i.test(String(error?.message ?? error))
+}
+check('approval model preflight rejects an unlisted typo before spawn', unknownCatalogModelRejected)
 
 let startSpec
 const spawnMemberRecord = {

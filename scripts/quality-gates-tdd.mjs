@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createRequire } from 'node:module'
 import { assignmentPrompt } from '../lib/scheduler.js'
-import { haltTeamWork, registerAgentTeamsTools } from '../lib/tools.js'
+import { applyQualityFollowUp, haltTeamWork, registerAgentTeamsTools } from '../lib/tools.js'
 import { createTeamDir, readTeam } from '../lib/state.js'
 
 const require = createRequire(import.meta.url)
@@ -77,6 +77,7 @@ function loadStateApi() {
     isTeamTask: state.isTeamTask,
     validateCreateTask: state.validateCreateTask,
     defaultQualityDeliveryGraph: state.defaultQualityDeliveryGraph,
+    qualityPlanningPrompt: state.qualityPlanningPrompt,
     sanitizeReviewAcceptance: state.sanitizeReviewAcceptance,
     sanitizeReviewObjective: state.sanitizeReviewObjective,
     describeQualityLoop: state.describeQualityLoop,
@@ -279,6 +280,41 @@ rejectCreate('tdd.create.implementation-blocked-until-requirements-pass', team({
   ...implContract(),
 })
 
+{
+  const requirements = task({
+    id: 't1',
+    kind: 'requirements',
+    status: 'pending',
+    objective: 'Converge requirements',
+    acceptance: ['no open questions'],
+  })
+  const result = api.validateCreateTask?.(team({
+    phase: 'staged',
+    tasks: [requirements],
+    taskSeq: 1,
+  }), {
+    subject: 'planned implementation',
+    ...implContract(),
+    dependencies: ['t1'],
+  })
+  check('tdd.create.staged-implementation-can-follow-pending-requirements', result?.ok === true)
+}
+
+rejectCreate('tdd.create.staged-implementation-must-depend-on-requirements', team({
+  phase: 'staged',
+  tasks: [task({
+    id: 't1',
+    kind: 'requirements',
+    status: 'pending',
+    objective: 'Converge requirements',
+    acceptance: ['no open questions'],
+  })],
+  taskSeq: 1,
+}), {
+  subject: 'unsequenced implementation',
+  ...implContract(),
+})
+
 console.log('quality-gates TDD — B. completion gates')
 
 function rejectComplete(label, currentTask, update, extraOk) {
@@ -352,6 +388,19 @@ rejectComplete('tdd.complete.claimed-still-cannot-jump-to-completed', task({ kin
     { status: 'completed', output: 'free-text result is enough' },
   )
   check('tdd.complete.work-kind-keeps-legacy-output-only-complete', result?.ok === true)
+}
+
+{
+  const result = api.evaluateQualityCompletion?.(task(implContract({
+    acceptance: ['文档确实不含“回滚/rollback”相关章节或说明（故意遗漏）'],
+    verify: ['! grep -qiE "回滚|rollback" file.md'],
+  })), {
+    status: 'completed',
+    changedPaths: ['src/parser.ts'],
+    acceptanceResults: [{ criterion: '文档确实不含回滚或 rollback 说明', status: 'passed' }],
+    commandsRun: [{ command: 'grep reverse check', status: 'passed' }],
+  })
+  check('tdd.complete.ordered-evidence-tolerates-model-paraphrase', result?.ok === true)
 }
 
 console.log('quality-gates TDD — C. path rules')
@@ -585,6 +634,38 @@ console.log('quality-gates TDD — D. auto loop')
     Array.isArray(graph)
       && graph.map((item) => item.kind).join('>') === 'requirements>implementation>verification>review>integration'
       && graph[3]?.acceptance?.every((item) => !/needs_revision/i.test(item)) === true,
+  )
+  const prompt = api.qualityPlanningPrompt?.() ?? ''
+  check(
+    'tdd.plan.prompt-explains-staged-full-dag-and-review-rewire',
+    /entire DAG while.*staged/i.test(prompt)
+      && /automatically rewires.*downstream/i.test(prompt),
+  )
+}
+
+{
+  const source = task({ id: 't1', kind: 'implementation', status: 'completed', assignee: 'implementer', ...implContract() })
+  const review = task({
+    id: 't2',
+    kind: 'review',
+    status: 'failed',
+    assignee: 'reviewer',
+    dependencies: ['t1'],
+    reviewedTaskId: 't1',
+    round: 1,
+    verdict: 'needs_revision',
+    findings: [{ id: 'DOC-001', severity: 'medium', problem: 'missing rollback', requiredFix: 'add rollback', file: 'src/parser.ts' }],
+    ...reviewContract(),
+  })
+  const integration = task({ id: 't3', kind: 'integration', status: 'pending', dependencies: ['t2'] })
+  const current = team({ tasks: [source, review, integration], taskSeq: 3 })
+  const followUp = applyQualityFollowUp(current, review)
+  const replacement = followUp.created.at(-1)
+  check(
+    'tdd.loop.pending-downstream-rewired-to-new-review-gate',
+    followUp.created.map((item) => item.kind).join('>') === 'repair>review'
+      && replacement?.kind === 'review'
+      && integration.dependencies.join(',') === replacement.id,
   )
 }
 
@@ -866,7 +947,10 @@ console.log('quality-gates TDD — tool-level closed loop')
       return () => listeners.set(name, current.filter((item) => item !== listener))
     },
     agents: { get(id) { return liveAgents.get(id) } },
-    llm: { async resolveCallConfig(config) { return config } },
+    llm: {
+      async resolveCallConfig(config) { return config },
+      async listModels() { return [] },
+    },
     subagents: {
       registerContinuableSetup() { return () => {} },
       getProvider(name) {

@@ -95,6 +95,34 @@ export interface MemberSelectionRuntime {
   ): Promise<T>
 }
 
+/**
+ * Validate a resolved roster against every provider catalog before any child
+ * session is created. Catalogs are advisory when empty (some adapters accept
+ * dynamic model ids), but a non-empty catalog is authoritative enough to
+ * catch a typo that would otherwise boot a child and fail on its first turn.
+ */
+export async function validateMemberLlmSelections(
+  ctx: Context,
+  selections: readonly MemberLlmSelection[],
+  signal?: AbortSignal,
+): Promise<void> {
+  const catalogs = new Map<string, Awaited<ReturnType<typeof ctx.llm.listModels>>>()
+  for (const selection of selections) {
+    if (signal?.aborted === true) throw signal.reason ?? new Error('member model validation was cancelled')
+    let catalog = catalogs.get(selection.provider)
+    if (catalog === undefined) {
+      catalog = await ctx.llm.listModels(selection.provider)
+      catalogs.set(selection.provider, catalog)
+    }
+    if (catalog.length === 0 || catalog.some((model) => model.id === selection.model)) continue
+    const available = catalog.slice(0, 8).map((model) => model.id).join(', ')
+    throw new Error(
+      `unknown member model "${selection.model}" for provider "${selection.provider}"`
+      + `${available === '' ? '' : ` (available: ${available}${catalog.length > 8 ? ', …' : ''})`}`,
+    )
+  }
+}
+
 const MEMBER_LABEL_PREFIX = 'agent-teams:'
 const FALLBACK_FAILURE_CODES = new Set(['QUOTA', 'RATE_LIMIT', 'AUTH', 'MISSING_CREDENTIAL', 'NO_ADAPTER'])
 

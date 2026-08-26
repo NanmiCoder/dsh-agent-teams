@@ -76,6 +76,7 @@ function publishStatus(subject, status) {
 
 const captain = makeAgent('captain-session')
 liveAgents.set(captain.id, captain)
+let advertisedModels = []
 // A non-AgentTeams continuable sibling must survive every team lifecycle
 // operation untouched.
 children.push({ id: 'foreign-session', label: 'unrelated continuable', mode: 'continuable' })
@@ -101,6 +102,9 @@ const ctx = {
   llm: {
     async resolveCallConfig(config) {
       return config
+    },
+    async listModels(provider) {
+      return advertisedModels.map(model => ({ provider, id: model, name: model }))
     },
   },
   subagents: {
@@ -974,6 +978,32 @@ try {
   check('team shutdown leaves unrelated continuable followup untouched',
     typeof foreignFollowup === 'string'
       && deliveries.some(delivery => delivery.childId === 'foreign-session'))
+
+  await call('agent_teams_create', {
+    name: 'Atomic Approval',
+    description: 'invalid route must not partially start',
+    approval: 'required',
+  })
+  await call('agent_teams_add_member', { name: 'valid', role: 'writer', provider: 'fake', model: 'fake-model' })
+  await call('agent_teams_add_member', { name: 'invalid', role: 'reviewer', provider: 'fake', model: 'typo-model' })
+  await call('agent_teams_create_task', { subject: 'must remain staged', assignee: 'valid' })
+  const childrenBeforeRejectedApproval = children.length
+  advertisedModels = ['fake-model']
+  let invalidApprovalRejected = false
+  try {
+    await call('agent_teams_approve', { confirmation: 'user clicked Approve & Run' })
+  } catch (error) {
+    invalidApprovalRejected = /unknown member model.*typo-model/i.test(String(error?.message ?? error))
+  }
+  const rejectedApprovalTeam = await readTeam(stateRoot, 'atomic-approval')
+  check('invalid roster approval rejects before any member session is created',
+    invalidApprovalRejected
+      && children.length === childrenBeforeRejectedApproval
+      && rejectedApprovalTeam?.phase === 'staged'
+      && rejectedApprovalTeam.members.every(member => member.id === '')
+      && rejectedApprovalTeam.tasks.every(item => item.status === 'pending'))
+  advertisedModels = []
+  await call('agent_teams_delete', {})
 
   await call('agent_teams_create', { name: 'Lifecycle', description: 'second generation' })
   await call('agent_teams_delete', {})

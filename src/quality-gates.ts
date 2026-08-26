@@ -306,6 +306,24 @@ function nonemptyStringList(value: unknown): value is string[] {
   return Array.isArray(value) && value.length > 0 && value.every(nonemptyString)
 }
 
+function dependencyClosureContains(
+  tasks: readonly TeamTask[],
+  dependencies: readonly string[],
+  targetId: string,
+): boolean {
+  const byId = new Map(tasks.map((task) => [task.id, task]))
+  const pending = [...dependencies]
+  const visited = new Set<string>()
+  while (pending.length > 0) {
+    const id = pending.pop()
+    if (id === undefined || visited.has(id)) continue
+    if (id === targetId) return true
+    visited.add(id)
+    pending.push(...(byId.get(id)?.dependencies ?? []))
+  }
+  return false
+}
+
 export function validateCreateTask(team: TeamState, input: CreateTaskInput): ValidateCreateTaskResult {
   const kind = input.kind ?? 'work'
   if (!(TASK_KINDS as readonly string[]).includes(kind)) {
@@ -381,8 +399,17 @@ export function validateCreateTask(team: TeamState, input: CreateTaskInput): Val
 
   if (kind === 'implementation') {
     const requirements = team.tasks.filter((item) => taskKindOf(item) === 'requirements')
-    if (requirements.length > 0 && !requirements.some((item) => item.status === 'completed' && item.verdict === 'pass')) {
-      return { ok: false, error: 'implementation is blocked until a requirements task completes with verdict=pass' }
+    const passed = requirements.some((item) => item.status === 'completed' && item.verdict === 'pass')
+    const stagedBehindRequirements = team.phase === 'staged' && requirements.some((item) => (
+      dependencyClosureContains(team.tasks, dependencies, item.id)
+    ))
+    if (requirements.length > 0 && !passed && !stagedBehindRequirements) {
+      return {
+        ok: false,
+        error: team.phase === 'staged'
+          ? 'implementation must depend on the staged requirements task; it will run only after requirements passes'
+          : 'implementation is blocked until a requirements task completes with verdict=pass',
+      }
     }
   }
 
@@ -433,19 +460,19 @@ function openHighFindings(findings: readonly ReviewFinding[] | undefined): Revie
 function acceptanceCovered(required: readonly string[] | undefined, results: readonly AcceptanceResult[] | undefined): boolean {
   if (results === undefined) return false
   const byCriterion = new Map(results.map((item) => [item.criterion, item]))
-  for (const criterion of required ?? []) {
-    if (byCriterion.get(criterion)?.status !== 'passed') return false
-  }
-  return true
+  if ((required ?? []).every((criterion) => byCriterion.get(criterion)?.status === 'passed')) return true
+  // Structured result arrays naturally preserve the contract order. Accept a
+  // same-length all-pass report even when a model paraphrases punctuation or
+  // whitespace in `criterion`; verification evidence remains independently
+  // required below. This avoids turning display text into an opaque id.
+  return results.length === (required ?? []).length && results.every((item) => item.status === 'passed')
 }
 
 function verifyCovered(required: readonly string[] | undefined, results: readonly CommandResult[] | undefined): boolean {
   if (results === undefined) return false
   const byCommand = new Map(results.map((item) => [item.command, item]))
-  for (const command of required ?? []) {
-    if (byCommand.get(command)?.status !== 'passed') return false
-  }
-  return true
+  if ((required ?? []).every((command) => byCommand.get(command)?.status === 'passed')) return true
+  return results.length === (required ?? []).length && results.every((item) => item.status === 'passed')
 }
 
 export function evaluateQualityCompletion(
@@ -863,6 +890,8 @@ export function defaultQualityDeliveryGraph(input: {
 export function qualityPlanningPrompt(): string {
   return [
     'When the user explicitly requests full quality-mode planning, use this order unless a constraint forbids a stage: requirements → implementation → verification → review → integration.',
+    'Build that entire DAG while the team is staged: an implementation may be created before requirements finishes when its dependency chain includes that requirements task. This is supported; do not wait for requirements to run and do not inspect plugin source to confirm it.',
+    'A staged integration task may depend on review round 1. If that review later returns needs_revision, the system automatically rewires still-pending downstream dependencies to the generated repair + next-review gate, so keep integration in the original plan instead of omitting or manually recreating it.',
     'Derive inScope and verification commands from the actual workspace or explicit profile; never assume src/ or pnpm test.',
     'Give every quality task a contract. Review acceptance must judge the latest implementation, not whether the gate rejects needs_revision.',
     'Do not write smoke-test scripts into tasks. Do not ask reviewers to submit needs_revision on purpose.',

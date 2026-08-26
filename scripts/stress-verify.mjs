@@ -97,6 +97,9 @@ function mountRuntime() {
       async resolveCallConfig(config) {
         return config
       },
+      async listModels() {
+        return []
+      },
     },
     subagents: {
       registerContinuableSetup() {

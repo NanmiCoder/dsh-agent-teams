@@ -59,6 +59,7 @@ import {
   memberActivity,
   resolveMemberLlmSelection,
   spawnMember,
+  validateMemberLlmSelections,
   type MemberRuntimeConfig,
 } from './members.ts'
 import { TERMINAL_TASK_STATUSES, type TeamMember, type TeamState, type TeamTask } from './types.ts'
@@ -500,6 +501,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
       validateStagedGraph(fresh, true)
       const spawned: TeamMember[] = []
       try {
+        const selections = new Map<TeamMember, Awaited<ReturnType<typeof resolveMemberLlmSelection>>>()
         for (const member of fresh.members) {
           if (member.id !== '') continue
           const selection = await resolveMemberLlmSelection(ctx, captain, {
@@ -508,9 +510,15 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
             reasoningEffort: member.reasoningEffort,
             fallback: member.fallback,
           }, runSignal)
+          selections.set(member, selection)
           member.provider = selection.provider
           member.model = selection.model
           member.reasoningEffort = selection.reasoningEffort
+        }
+        // This is the approval commit barrier: resolve and validate the whole
+        // final roster before spawning even the first durable child.
+        await validateMemberLlmSelections(ctx, [...selections.values()], runSignal)
+        for (const [member, selection] of selections) {
           await spawnMember(
             ctx,
             memberRuntime(config),
@@ -1305,8 +1313,20 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
       },
       findings: {
         type: 'array',
-        items: { type: 'object', additionalProperties: true, properties: {} },
-        description: 'Structured review findings. Required when verdict is needs_revision or reject.',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            id: { type: 'string', required: true },
+            severity: { type: 'string', enum: ['low', 'medium', 'high', 'blocker'], required: true },
+            problem: { type: 'string', required: true },
+            requiredFix: { type: 'string', required: true },
+            file: { type: 'string' },
+            line: { type: 'number' },
+            resolved: { type: 'boolean' },
+          },
+        },
+        description: 'Structured review findings. Required when verdict is needs_revision or reject; each item needs id, severity, problem, and requiredFix.',
       },
       changedPaths: {
         type: 'array',
@@ -1315,13 +1335,30 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
       },
       acceptanceResults: {
         type: 'array',
-        items: { type: 'object', additionalProperties: true, properties: {} },
-        description: 'Acceptance evidence. Quality kinds require a passed result for every acceptance item.',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            criterion: { type: 'string', required: true },
+            status: { type: 'string', enum: ['passed', 'failed'], required: true },
+            evidence: { type: 'string' },
+          },
+        },
+        description: 'Acceptance evidence in contract order: {criterion, status:"passed"|"failed", evidence?}. Supply one item per acceptance criterion.',
       },
       commandsRun: {
         type: 'array',
-        items: { type: 'object', additionalProperties: true, properties: {} },
-        description: 'Verification command evidence. Must cover every verify command.',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            command: { type: 'string', required: true },
+            status: { type: 'string', enum: ['passed', 'failed'], required: true },
+            exitCode: { type: 'number' },
+            evidence: { type: 'string' },
+          },
+        },
+        description: 'Verification evidence in contract order: {command, status:"passed"|"failed", exitCode?, evidence?}. Supply one item per verify command.',
       },
     },
     output: {
@@ -1834,6 +1871,7 @@ async function initializeProfileTeam(input: {
       fallback: template.fallback ?? profile.fallback ?? input.config.fallback,
     }, input.exec.signal))
   }
+  await validateMemberLlmSelections(input.ctx, selections, input.exec.signal)
   const now = Date.now()
   const seedToActual = new Map(profile.tasks.map((template, index) => [template.id, `t${index + 1}`] as const))
   const draft: TeamState = {
@@ -2005,10 +2043,11 @@ function parseCommandResults(value: unknown): CommandResult[] | undefined {
   })
 }
 
-function applyQualityFollowUp(team: TeamState, closed: TeamTask): { created: TeamTask[]; escalated: boolean } {
+export function applyQualityFollowUp(team: TeamState, closed: TeamTask): { created: TeamTask[]; escalated: boolean } {
   const planned = planQualityFollowUp(team, closed)
   if (planned.escalated === true) team.escalated = true
   const created: TeamTask[] = []
+  const existing = [...team.tasks]
   const now = Date.now()
   const idBySubject = new Map<string, string>()
   for (const draft of planned.created) {
@@ -2042,6 +2081,21 @@ function applyQualityFollowUp(team: TeamState, closed: TeamTask): { created: Tea
     }
     team.tasks.push(next)
     created.push(next)
+  }
+  // A staged full delivery plan may already contain downstream integration
+  // work that points at the first requirements/review gate. When that gate
+  // opens an automatic revision loop, move only still-pending downstream
+  // edges to the new terminal gate so the approved plan can continue after
+  // the repair instead of waiting forever on an intentionally failed task.
+  const replacement = created.at(-1)
+  if (replacement !== undefined) {
+    for (const task of existing) {
+      if (task.status !== 'pending' || !task.dependencies.includes(closed.id)) continue
+      task.dependencies = task.dependencies.map((dependency) => (
+        dependency === closed.id ? replacement.id : dependency
+      ))
+      task.updatedAt = now
+    }
   }
   return { created, escalated: planned.escalated === true }
 }

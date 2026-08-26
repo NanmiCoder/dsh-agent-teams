@@ -86,7 +86,7 @@
 
 ## 使用协议
 
-插件提示段会指导模型按协议执行：建团队 → 按角色拉成员 → 拆任务并声明依赖 → 共享调度器自动领取并唤醒空闲成员 → 队长监控/引导 → 阻塞时先安全转派或接管 → 汇报后 `agent_teams_delete`。成员之间可以直接互发消息，无需队长中转。驻留成员在中断或正常结束一轮后若仍持有 `claimed/in_progress` 任务，该 attempt 会停驻；队长通过 `agent_teams_send_message` 可让原成员沿用同一 capability 继续，只有显式重试/转派/接管才会撤销它。进程冷重启后，调度器仍会为无法确认驻留状态的开放任务生成新 attempt 并恢复。若用户要求每名成员都产出或上报，队长必须为每人创建任务或发送明确指令，不能等待未分配工作的成员凭空完成职责。
+插件提示段会指导模型按两阶段协议执行：创建 staged 团队 → 写入可编辑成员占位 → 拆任务并声明依赖 → 等待用户审查 → **Approve & Run** 后原子创建成员并启动调度 → 队长监控/引导 → 汇报后 `agent_teams_delete`。staged 阶段没有子会话、不会领取任务。只有用户明确要求跳过审查时才使用 `approval: automatic`。成员之间可以直接互发消息，无需队长中转。驻留成员在中断或正常结束一轮后若仍持有 `claimed/in_progress` 任务，该 attempt 会停驻；只有显式重试/转派/接管才会撤销它。
 
 ## 命名多角色 profiles
 
@@ -114,7 +114,7 @@ profiles:
         dependencies: [requirements]
 ```
 
-通过 `/agent-teams --profile demo-delivery 实现这个功能` 显式点名模板；不要使用首 token 隐式 profile。`agent_teams_create(profile=...)` 会事务式展开成员；seed 模式还会展开任务，captain 模式会从用户目标自动落盘 requirements → implementation → verification → review → integration 五段质量图，Captain 只需引导，不得手工重复建图，也不要询问用户如何拆分或是否并行。依赖 output 会传给下游；failed 的审查/测试不会解锁后续，自动 repair/review 不依赖 failed review。`memberProvider` 是 spawn/fork 后端，不是模型 provider。模板默认只准备发布，不自动部署；首次落盘前进程崩溃可能留下 orphan child。
+通过 `/agent-teams --profile demo-delivery 实现这个功能` 显式点名模板；不要使用首 token 隐式 profile。seed 模式提供模板任务，captain 模式只提供阵容与约束，由 Captain 在 staged 阶段设计 DAG。面板允许编辑成员 provider/model/reasoning/角色提示词和任务负责人/依赖，批准前不会创建成员或派工。依赖 output 会传给下游；failed 的审查/测试不会解锁后续，自动 repair/review 不依赖 failed review。`memberProvider` 是 spawn/fork 后端，不是模型 provider。
 
 ## Captain 动态规划与停止整队
 
@@ -134,9 +134,9 @@ profiles:
         role: 分析需求和验收标准
 ```
 
-`taskPlanning: captain` 时，`agent_teams_create({ profile })` 会把用户目标直接落为固定质量图：requirements → implementation → verification → review → integration，并以 profile 里唯一匹配的角色分别指派；不确定的角色保持未指派，不会派给 Captain。Captain 只增补目标确实需要的工作，不重建默认图。`taskPlanning: seed` 则保留固定 seed task 工作流。
+`taskPlanning: captain` 时 profile 不再假设项目目录、包管理器或固定质量图；Captain 根据真实目标和 workspace 设计 DAG。若用户明确要求质量门禁，再创建带合同的 requirements → implementation → verification → review → integration 任务，并从真实项目推导 `inScope` 与 `verify`。`taskPlanning: seed` 保留固定 seed task 工作流。
 
-长任务运行期间，Captain 聊天输入框上方会显示“团队进行中”条带。点击“停止团队”会中断全部成员、取消未完成任务并停止后续调度，但不会删除团队。停止后仍可给 Captain 发消息；要继续派工必须显式 `agent_teams_resume`（或 `create_task({ resume, resumeReason })`），普通 `create_task` 不会静默恢复。
+长任务运行期间，Captain 聊天输入框上方会显示“团队进行中”条带。点击“停止团队”会取消 Captain 当前回合、中断全部成员、取消未完成任务并停止后续调度，但不会删除团队。之后的新用户消息可显式要求 `agent_teams_resume`；停止前正在运行的 Captain 无法自行恢复团队。取消/失败任务在归档中保持原终态。
 
 ## 已知限制
 
@@ -145,7 +145,7 @@ profiles:
 - 成员 persona 替换部署默认 persona；成员仍拥有完整工具集（bash/fs/web 等）。
 - 团队状态为文件级持久化，多进程同时操作同一团队不保证一致（同一 dsh 进程内已用锁串行化）。
 - 活动面板读磁盘真相，与会话日志事件流相互独立：切换/重启后先对当前会话做一次冷发现；仅在发现活动团队或存在对话流卡片需求时保持 1s 轮询，普通会话不会常驻扫描。
-- 主聊天窗的官方 Stop 只取消队长当前轮次，不会级联停止 continuable 成员。队长空闲而成员仍在工作时，输入框上方会显示「团队进行中」条带；点「停止团队」会中断全部成员、取消未完成任务，但不解散团队。输入框仍可给队长发消息。
+- 主聊天窗的官方 Stop 只取消队长当前轮次；AgentTeams 自己的「停止团队」会同时取消 Captain 当前回合和全部 continuable 成员，并冻结后续调度。输入框仍可在停止完成后发送新的恢复指令。
 - 右上角浮层挂载到 DeepSeek Harness `0.1.0-rc.8` 的 `shell.overlay`；宽屏停靠态让主对话列按面板实际宽度礼让空间，浮动态保持非模态覆盖，窄屏退回安全内边距 overlay 并关闭拖拽/缩放，左侧导航保持不动。
 - `/agent-teams` 在 slash 菜单中的描述和输入 hint 来自 Host `CommandDefinition`；当前官方命令协议没有 locale namespace 字段，因此仍保留稳定的英文元数据。插件不会用 DOM 替换去伪造这一层翻译；待 Host 提供正式接口后再接入。
 - 成员（模型）不总是严格走工具"仪式"（如完成时不调 `agent_teams_update_task`）——面板如实反映磁盘真相，队长以 `agent_teams_status`/文件为准汇总。

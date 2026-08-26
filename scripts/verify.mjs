@@ -600,6 +600,7 @@ check('planning roster with no tasks still shows the banner', teamIsActive({
   tasks: [],
 }) === true)
 check('halted team is not active', teamIsActive({ ...liveTeam, halted: true }) === false)
+check('staged team is not presented as actively executing', teamIsActive({ ...liveTeam, phase: 'staged' }) === false)
 check('settled failed/completed team is not waiting to be scheduled', teamIsActive({
   members: [{ name: 'analyst', status: 'idle', activity: 'idle' }],
   tasks: [

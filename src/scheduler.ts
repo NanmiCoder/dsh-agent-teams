@@ -278,7 +278,7 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
     async kickTeam(workspace, teamId, suppliedCaptain) {
       const stateRoot = stateRootOf(workspace, config)
       const team = await readTeam(stateRoot, teamId)
-      if (team === undefined || team.halted === true) return
+      if (team === undefined || team.halted === true || team.phase === 'staged') return
       const captain = liveCaptain(ctx, team.captainSessionId, suppliedCaptain)
       if (captain === undefined) return
       for (const member of team.members) {
@@ -292,7 +292,7 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
       const queueKey = memberQueueKey(stateRoot, teamId, memberName)
       await serializeMember(queueKey, async () => {
         let team = await readTeam(stateRoot, teamId)
-        if (team === undefined || team.halted === true) return
+        if (team === undefined || team.halted === true || team.phase === 'staged') return
         const captain = liveCaptain(ctx, team.captainSessionId, suppliedCaptain)
         if (captain === undefined) return
         let member = team.members.find(candidate => candidate.name === memberName && candidate.status !== 'removed')
@@ -326,7 +326,7 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
 
         const ticket = await withTeamLock(teamLockKey(stateRoot, team.id), async (): Promise<DispatchTicket | undefined> => {
           const fresh = await readTeam(stateRoot, team!.id)
-          if (fresh === undefined || fresh.halted === true) return undefined
+          if (fresh === undefined || fresh.halted === true || fresh.phase === 'staged') return undefined
           const currentMember = fresh.members.find(candidate => candidate.name === memberName && candidate.status !== 'removed')
           if (currentMember === undefined || currentMember.id === '' || !isMemberAvailable(ctx, currentMember)) return undefined
           const owned = ownedOpenTask(fresh.tasks, currentMember.name)

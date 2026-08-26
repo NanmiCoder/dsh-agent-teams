@@ -153,9 +153,9 @@ pnpm verify
 
 ## 命名多角色团队配置
 
-在 `cordis.patch.yml` 的 `profiles` 中配置完整团队模板。每个 profile 都提供成员阵容，可独立指定 provider、model、role、reasoning_effort。`taskPlanning: captain` 表示程序按用户目标自动生成 requirements → implementation → verification → review → integration 质量图，Captain 负责引导而不重复手工建图；省略该字段或设为 `seed` 时，仍会展开模板中的固定任务图。使用 `/agent-teams --profile <名称> <目标>` 显式激活；不会把首个普通 token 隐式识别为 profile。
+在 `cordis.patch.yml` 的 `profiles` 中配置完整团队模板。每个 profile 都提供成员阵容，可独立指定 provider、model、role、reasoning_effort。`taskPlanning: captain` 表示只提供阵容和约束，由 Captain 根据用户目标设计 DAG；省略该字段或设为 `seed` 时，展开模板中的固定任务图。使用 `/agent-teams --profile <名称> <目标>` 显式激活；不会把首个普通 token 隐式识别为 profile。
 
-`agent_teams_create({ profile })` 会在同一进程内事务式展开成员；seed 模式还会展开种子任务，captain 模式会自动落盘 requirements → implementation → verification → review → integration 五段质量图。Captain 引导该图，不重复手工创建；角色不唯一时任务保持未指派，绝不派给 Captain。审查或测试失败不会解锁下游；自动 repair/review 不依赖 failed review。`memberProvider` 仍表示 spawn/fork 后端，不是 LLM provider。模板只负责发布准备，真实部署必须等待用户明确确认。首次落盘前进程崩溃可能留下无法恢复的 orphan child，这是已知限制。
+普通 `/agent-teams` 流程会调用 `agent_teams_create({ profile, approval: "required" })`：只落盘可编辑的成员占位和 DAG，不创建子会话、不领取任务。用户可在活动面板修改成员 provider/model/reasoning/角色提示词，以及任务负责人和依赖，再点击「确认并启动团队」。批准后才会按最终配置原子创建成员并启动就绪任务。直接工具调用方可显式传 `approval: "automatic"` 保留旧的立即执行路径。审查或测试失败不会解锁下游；自动 repair/review 不依赖 failed review。
 
 ## 许可证
 

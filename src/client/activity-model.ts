@@ -83,11 +83,12 @@ export function liveCaptainTeam<T extends { readonly captainSessionId: string; r
 
 /** Whether the captain chat should keep showing the in-progress banner. */
 export function teamIsActive(team: {
+  readonly phase?: string
   readonly halted?: boolean
   readonly members: readonly { readonly status?: string; readonly activity?: string }[]
   readonly tasks: readonly { readonly status: string }[]
 }): boolean {
-  if (team.halted === true) return false
+  if (team.halted === true || team.phase === 'staged') return false
   if (team.members.some((member) => member.activity === 'working' || member.status === 'working')) return true
   if (team.tasks.some((task) => task.status === 'pending' || task.status === 'claimed' || task.status === 'in_progress')) return true
   return team.members.length > 0 && team.tasks.length === 0

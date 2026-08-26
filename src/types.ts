@@ -222,6 +222,13 @@ export interface TeamState {
   /** Monotonic task id counter. */
   taskSeq: number
   /**
+   * Two-phase execution lifecycle. Missing means `running` for durable
+   * compatibility with teams created before staging existed.
+   */
+  phase?: 'staged' | 'running'
+  /** Timestamp written only after a staged plan is explicitly approved. */
+  approvedAt?: number
+  /**
    * Human halt from the captain chat. The team remains on disk, members stay
    * available, and unfinished work is cancelled until the captain resumes.
    */

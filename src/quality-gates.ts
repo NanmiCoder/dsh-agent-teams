@@ -862,8 +862,8 @@ export function defaultQualityDeliveryGraph(input: {
 
 export function qualityPlanningPrompt(): string {
   return [
-    'Quality-mode planning: the user supplies only the goal and constraints.',
-    'Create the default graph in this order unless a constraint forbids a stage: requirements → implementation → verification → review → integration.',
+    'When the user explicitly requests full quality-mode planning, use this order unless a constraint forbids a stage: requirements → implementation → verification → review → integration.',
+    'Derive inScope and verification commands from the actual workspace or explicit profile; never assume src/ or pnpm test.',
     'Give every quality task a contract. Review acceptance must judge the latest implementation, not whether the gate rejects needs_revision.',
     'Do not write smoke-test scripts into tasks. Do not ask reviewers to submit needs_revision on purpose.',
     'Do not claim implementation or review yourself unless the user asked the captain to take over.',

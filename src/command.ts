@@ -3,7 +3,6 @@ import type { PreStepDecision } from '@deepseek-ai/dsh-agent'
 import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-commands'
 import { createUserMessage, type UserMessage } from '@deepseek-ai/dsh-llm'
 import { parseProfileInvocation, resolveProfileTaskPlanning, type TeamProfileConfig, type AgentTeamsInvocation } from './profiles.ts'
-import { qualityPlanningPrompt } from './quality-gates.ts'
 
 export const AGENT_TEAMS_COMMAND = 'agent-teams'
 const PROFILE_COMMAND_PREFIX = `${AGENT_TEAMS_COMMAND}-`
@@ -64,15 +63,17 @@ export function invokedAgentTeamsGoal(messages: readonly UserMessage[]): string 
 }
 
 export function buildActivationDirective(goal: string, profile?: string, taskPlanning: 'captain' | 'seed' = 'seed'): string {
-  const lines = ['The user invoked an AgentTeams slash command. Activate the AgentTeams protocol from your instructions now: you are the captain of a multi-agent team.']
+  const lines = [
+    'The user invoked an AgentTeams slash command. Activate the AgentTeams protocol from your instructions now: you are the captain of a multi-agent team.',
+    'Call agent_teams_create with approval="required". Build the complete staged roster and DAG, then stop and ask the user to review the Web plan. Do not approve or start it in this same turn.',
+  ]
   if (profile !== undefined) {
     lines.push(`Use configured AgentTeams profile "${profile}" when calling agent_teams_create.`)
     if (taskPlanning === 'captain') {
       lines.push(
-        'This profile supplies the roster and guardrails. After create, do not recreate members or the default quality graph.',
-        'The program creates requirements → implementation → verification → review → integration from the goal. Guide that graph and add work only when the goal requires it; do not ask the user whether to split, merge, serialize, or parallelize.',
+        'This profile supplies the roster and guardrails. After create, do not recreate members.',
+        'Derive the smallest useful task graph from the goal while the team is staged; do not ask the user whether to split, merge, serialize, or parallelize.',
         'Independent supplemental work must become separate ready tasks so idle members can run in parallel. Add dependencies only for genuine prerequisites and later synthesis.',
-        qualityPlanningPrompt(),
       )
     } else {
       lines.push('Do not recreate the same members or seed tasks manually.')

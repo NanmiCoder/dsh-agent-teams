@@ -46,8 +46,6 @@ import {
   buildCoverageMatrix,
   canDeclareDelivery,
   describeQualityLoop,
-  defaultQualityDeliveryGraph,
-  hasValidQualityTaskFields,
   sanitizeReviewAcceptance,
   sanitizeReviewObjective,
   taskKindOf,
@@ -85,6 +83,40 @@ export interface ToolsConfig {
   maxMembers: number
   /** Named team profiles from the active DSH profile. */
   profiles: Record<string, import('./profiles.ts').TeamProfileConfig>
+}
+
+/** Browser/UI mutations allowed while a plan is waiting for approval. */
+export type StagedPlanMutation =
+  | {
+      action: 'update_member'
+      memberName: string
+      role?: string | null
+      provider: string
+      model: string
+      reasoningEffort?: string | null
+      executionPrompt?: string | null
+    }
+  | {
+      action: 'update_task'
+      taskId: string
+      subject: string
+      description?: string | null
+      assignee?: string | null
+      dependencies: string[]
+    }
+  | {
+      action: 'add_task'
+      subject: string
+      description?: string | null
+      assignee?: string | null
+      dependencies: string[]
+    }
+  | { action: 'remove_task'; taskId: string }
+
+/** Runtime bridge shared by model-facing tools and the Web staging surface. */
+export interface AgentTeamsRuntime {
+  updateStagedPlan(captain: Agent, teamId: string, mutation: StagedPlanMutation, signal?: AbortSignal): Promise<TeamState>
+  approveStagedTeam(captain: Agent, teamId: string, signal?: AbortSignal): Promise<{ teamId: string; members: number; tasks: number }>
 }
 
 /** The caller agent, or a loud failure for non-agent callers. */
@@ -192,6 +224,49 @@ function requireTask(team: TeamState, taskId: string): TeamTask {
     throw new Error(`no task "${taskId}" in team "${team.name}" — use agent_teams_status to list tasks`)
   }
   return task
+}
+
+function requireStagedTeam(team: TeamState): void {
+  if (team.phase !== 'staged') {
+    throw new Error(`team "${team.name}" is already running; its plan can no longer be edited`)
+  }
+  if (team.halted === true) throw new Error(`team "${team.name}" is halted, not awaiting plan approval`)
+}
+
+function trimmedOptional(value: string | null | undefined): string | undefined {
+  const trimmed = value?.trim()
+  return trimmed === undefined || trimmed === '' ? undefined : trimmed
+}
+
+/** Validate references and cycles before a staged graph can be saved or run. */
+function validateStagedGraph(team: TeamState, requireRunnable: boolean): void {
+  const members = team.members.filter((member) => member.status !== 'removed')
+  if (requireRunnable && members.length === 0) throw new Error('add at least one member before approving the plan')
+  if (requireRunnable && team.tasks.length === 0) throw new Error('add at least one task before approving the plan')
+  const memberNames = new Set(members.map((member) => member.name))
+  const taskIds = new Set(team.tasks.map((task) => task.id))
+  for (const task of team.tasks) {
+    if (task.subject.trim() === '') throw new Error(`task "${task.id}" must have a subject`)
+    if (task.assignee !== undefined && task.assignee !== CAPTAIN_KEY && !memberNames.has(task.assignee)) {
+      throw new Error(`task "${task.id}" assignee "${task.assignee}" is not an active member`)
+    }
+    for (const dependency of task.dependencies) {
+      if (dependency === task.id) throw new Error(`task "${task.id}" cannot depend on itself`)
+      if (!taskIds.has(dependency)) throw new Error(`task "${task.id}" depends on unknown task "${dependency}"`)
+    }
+  }
+  const visiting = new Set<string>()
+  const visited = new Set<string>()
+  const byId = new Map(team.tasks.map((task) => [task.id, task]))
+  const visit = (taskId: string): void => {
+    if (visiting.has(taskId)) throw new Error(`task dependency graph contains a cycle at "${taskId}"`)
+    if (visited.has(taskId)) return
+    visiting.add(taskId)
+    for (const dependency of byId.get(taskId)?.dependencies ?? []) visit(dependency)
+    visiting.delete(taskId)
+    visited.add(taskId)
+  }
+  for (const task of team.tasks) visit(task.id)
 }
 
 function memberOpenTask(team: TeamState, memberName: string, exceptTaskId?: string): TeamTask | undefined {
@@ -308,7 +383,17 @@ export async function haltTeamWork(input: {
       members: fresh.members.filter((member) => member.id !== '' && member.status !== 'removed').map((member) => ({ ...member })),
     }
   })
+  // Persist the stop boundary first, then abort the Captain before draining
+  // children. Otherwise its current model turn can observe `halted`, call
+  // resume, and race the still-running HTTP stop request.
+  input.captain.cancel({ kind: 'user' }, { keepInbox: true })
   await stopTeamMemberActivations(input.ctx, input.captain, halted.members, input.signal)
+  // Interrupting a child emits a trailing subagent-settled notification. That
+  // notification can start a fresh Captain turn after the first cancellation,
+  // so close the stop boundary again once every child activation has drained.
+  // Queued user input is preserved both times; only runtime-generated work is
+  // prevented from silently resuming the halted team.
+  input.captain.cancel({ kind: 'user' }, { keepInbox: true })
   return {
     teamName: halted.teamName,
     cancelledTasks: halted.cancelledTasks,
@@ -334,18 +419,151 @@ export function steerCaptainReport(captain: Pick<Agent, 'steer'>, from: string, 
  * @param ctx - the plugin context (injects `tools`).
  * @param config - resolved tool config.
  */
-export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void {
+export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): AgentTeamsRuntime {
   installRetiredMemberGuard(ctx, config.stateDir)
   const memberSelections = installMemberSelectionRuntime(ctx, config.stateDir)
   const scheduler = installTeamScheduler(ctx, { stateDir: config.stateDir, executionPrompt: config.executionPrompt })
 
+  const updateStagedPlan: AgentTeamsRuntime['updateStagedPlan'] = async (captain, teamId, mutation, signal) => {
+    const workspace = workspaceOf(captain)
+    const stateRoot = stateRootOf(workspace, config)
+    return withTeamLock(teamLockKey(stateRoot, teamId), async () => {
+      const fresh = await requireFreshCaptainTeam(stateRoot, teamId, captain.id)
+      requireStagedTeam(fresh)
+      if (mutation.action === 'update_member') {
+        const member = requireMember(fresh, mutation.memberName)
+        if (member.id !== '') throw new Error(`staged member "${member.name}" was already spawned`)
+        const selection = await resolveMemberLlmSelection(ctx, captain, {
+          provider: mutation.provider,
+          model: mutation.model,
+          reasoningEffort: trimmedOptional(mutation.reasoningEffort),
+          fallback: member.fallback,
+        }, signal)
+        member.role = trimmedOptional(mutation.role)
+        member.provider = selection.provider
+        member.model = selection.model
+        member.reasoningEffort = selection.reasoningEffort
+        member.executionPrompt = trimmedOptional(mutation.executionPrompt)
+      } else if (mutation.action === 'update_task') {
+        const task = requireTask(fresh, mutation.taskId)
+        if (task.status !== 'pending' || (task.attempt ?? 0) !== 0) {
+          throw new Error(`task "${task.id}" has already started and cannot be edited`)
+        }
+        const subject = mutation.subject.trim()
+        if (subject === '') throw new Error('task subject must not be empty')
+        task.subject = subject
+        task.description = trimmedOptional(mutation.description)
+        task.assignee = trimmedOptional(mutation.assignee)
+        task.dependencies = [...new Set(mutation.dependencies.map((item) => item.trim()).filter(Boolean))]
+        task.updatedAt = Date.now()
+      } else if (mutation.action === 'add_task') {
+        const subject = mutation.subject.trim()
+        if (subject === '') throw new Error('task subject must not be empty')
+        fresh.taskSeq += 1
+        const now = Date.now()
+        fresh.tasks.push({
+          id: `t${fresh.taskSeq}`,
+          subject,
+          description: trimmedOptional(mutation.description),
+          status: 'pending',
+          assignee: trimmedOptional(mutation.assignee),
+          dependencies: [...new Set(mutation.dependencies.map((item) => item.trim()).filter(Boolean))],
+          attempt: 0,
+          kind: 'work',
+          createdAt: now,
+          updatedAt: now,
+        })
+      } else {
+        const task = requireTask(fresh, mutation.taskId)
+        const dependent = fresh.tasks.find((candidate) => candidate.dependencies.includes(task.id))
+        if (dependent !== undefined) {
+          throw new Error(`task "${task.id}" is still required by "${dependent.id}"; remove that dependency first`)
+        }
+        fresh.tasks = fresh.tasks.filter((candidate) => candidate.id !== task.id)
+      }
+      validateStagedGraph(fresh, false)
+      await writeTeam(stateRoot, fresh)
+      return fresh
+    })
+  }
+
+  const approveStagedTeam: AgentTeamsRuntime['approveStagedTeam'] = async (captain, teamId, signal) => {
+    const workspace = workspaceOf(captain)
+    const stateRoot = stateRootOf(workspace, config)
+    const runSignal = signal ?? new AbortController().signal
+    const approved = await withTeamLock(teamLockKey(stateRoot, teamId), async () => {
+      const fresh = await requireFreshCaptainTeam(stateRoot, teamId, captain.id)
+      requireStagedTeam(fresh)
+      // A staged removal has no child session to retain in history. Drop those
+      // placeholders before transitioning to the stricter running shape.
+      fresh.members = fresh.members.filter((member) => member.status !== 'removed')
+      validateStagedGraph(fresh, true)
+      const spawned: TeamMember[] = []
+      try {
+        for (const member of fresh.members) {
+          if (member.id !== '') continue
+          const selection = await resolveMemberLlmSelection(ctx, captain, {
+            provider: member.provider,
+            model: member.model,
+            reasoningEffort: member.reasoningEffort,
+            fallback: member.fallback,
+          }, runSignal)
+          member.provider = selection.provider
+          member.model = selection.model
+          member.reasoningEffort = selection.reasoningEffort
+          await spawnMember(
+            ctx,
+            memberRuntime(config),
+            memberSelections,
+            selection,
+            captain,
+            fresh,
+            member,
+            config.stateDir,
+            runSignal,
+          )
+          spawned.push(member)
+        }
+        if (fresh.members.some((member) => member.id === '')) {
+          throw new Error('one or more staged members could not be spawned')
+        }
+        fresh.phase = 'running'
+        fresh.approvedAt = Date.now()
+        await writeTeam(stateRoot, fresh)
+        return { teamId: fresh.id, members: fresh.members.length, tasks: fresh.tasks.length }
+      } catch (error: unknown) {
+        await recordRetiredMemberIds(stateRoot, spawned.map((member) => member.id)).catch(() => undefined)
+        for (const member of spawned) {
+          if (member.id !== '') interruptMember(ctx, captain, member.id)
+        }
+        throw error
+      }
+    })
+    try {
+      await scheduler.kickTeam(workspace, teamId, captain)
+    } catch (error: unknown) {
+      // Approval is already durably committed. A transient wake-up failure is
+      // recoverable by the next status/member lifecycle kick and must not make
+      // the UI report that an already-running team failed to approve.
+      ctx.logger.warn(`agent-teams: post-approval kick failed for "${teamId}": ${String(error)}`)
+    }
+    return approved
+  }
+
+  const runtime: AgentTeamsRuntime = { updateStagedPlan, approveStagedTeam }
+
   ctx.tools.register(defineTool({
     name: 'agent_teams_create',
-    description: 'Create a team. Optional profile expands the configured roster in one in-process transactional create. Seed-planning profiles expand their template tasks; captain-planning profiles instantiate the fixed quality graph requirements → implementation → verification → review → integration from the goal. If profile is omitted, create an empty team and add members/tasks afterwards. If profile is set, do not recreate the same members. A successful create means the team now exists on disk; do not retry create for the same captain.',
+    description: 'Create a team. Use approval=required for a two-phase plan: members and tasks remain unspawned/unclaimed until the user reviews the Web plan and explicitly approves it. Optional profiles expand their configured roster; seed profiles also expand template tasks, while captain profiles leave the graph for the Captain to design. approval=automatic preserves the legacy immediate-execution path.',
     parameters: {
       name: { type: 'string', required: true, description: 'Name for the new team (used as its stable id).' },
       description: { type: 'string', description: 'Team purpose / the goal the team will work on.' },
       profile: { type: 'string', description: 'Optional configured profile name.' },
+      approval: {
+        type: 'string',
+        enum: ['required', 'automatic'],
+        description: 'required stages the plan for explicit user review; automatic starts immediately. Defaults to automatic for API compatibility.',
+      },
     },
     output: {
       schema: {
@@ -355,6 +573,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
           team_id: { type: 'string', required: true },
           team_name: { type: 'string', required: true },
           state_dir: { type: 'string', required: true },
+          phase: { type: 'string', required: true },
           profile: { type: 'string' },
           task_planning: { type: 'string' },
           members: { type: 'array', items: { type: 'object', additionalProperties: false, properties: { member_name: { type: 'string', required: true }, member_id: { type: 'string', required: true }, provider: { type: 'string', required: true }, model: { type: 'string', required: true }, reasoning_effort: { type: 'string' }, status: { type: 'string', required: true } } } },
@@ -363,7 +582,9 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
       },
       render: (args, value) => [{
         type: 'text',
-        text: `Team "${value.team_name}" created (id ${value.team_id}) under ${value.state_dir}. You are the captain${value.task_planning === 'captain' ? '. This profile instantiated the default quality graph; guide it, do not recreate it manually.' : ''}.`,
+        text: value.phase === 'staged'
+          ? `Team "${value.team_name}" plan created under ${value.state_dir}. It is staged: finish the roster and DAG, then wait for the user to edit and approve it. Do not start or approve it yourself.`
+          : `Team "${value.team_name}" created (id ${value.team_id}) under ${value.state_dir}. You are the captain.`,
       }],
     },
     async execute(args, exec) {
@@ -373,6 +594,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
       const teamName = args.name.trim()
       if (teamName === '') throw new Error('team name must not be empty')
       const teamId = sanitizeKey(teamName)
+      const staged = args.approval === 'required'
       const profileName = args.profile?.trim()
       if (args.profile !== undefined && profileName === '') {
         throw new Error('AgentTeams profile name must not be empty')
@@ -398,6 +620,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
               members: [],
               tasks: [],
               taskSeq: 0,
+              ...staged ? { phase: 'staged' as const } : {},
             }
             await createTeamDir(stateRoot, state)
             return { committed: true as const, state }
@@ -413,6 +636,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
             teamId,
             profileName,
             description: args.description,
+            staged,
           })
         })
       })
@@ -458,12 +682,14 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
           team_id: snapshot.id,
           team_name: snapshot.name,
           state_dir: join(stateRoot, snapshot.id),
+          phase: snapshot.phase ?? 'running',
         }
       }
       return {
         team_id: snapshot.id,
         team_name: snapshot.name,
         state_dir: join(stateRoot, snapshot.id),
+        phase: snapshot.phase ?? 'running',
         profile: snapshot.profile.name,
         task_planning: snapshot.profile.taskPlanning ?? 'seed',
         members: snapshot.members.map((member) => ({
@@ -488,14 +714,47 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
   }))
 
   ctx.tools.register(defineTool({
+    name: 'agent_teams_approve',
+    description: 'Approve and start a staged team plan. Call this only in response to an explicit user approval in a new user turn; never call it during the turn that created or edited the plan. The Web Approve & Run button uses the same runtime directly.',
+    parameters: {
+      confirmation: { type: 'string', required: true, description: 'The user\'s explicit approval statement.' },
+    },
+    output: {
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          status: { type: 'string', required: true },
+          team_id: { type: 'string', required: true },
+          members: { type: 'number', required: true },
+          tasks: { type: 'number', required: true },
+        },
+      },
+      render: (_args, value) => [{
+        type: 'text',
+        text: `Team ${value.team_id} approved and running (${value.members} members, ${value.tasks} tasks).`,
+      }],
+    },
+    async execute(args, exec) {
+      if (args.confirmation.trim() === '') throw new Error('explicit user approval text is required')
+      const captain = requireCaptain(exec)
+      const workspace = workspaceOf(captain)
+      const team = await requireCaptainTeam(workspace, config, captain)
+      const approved = await approveStagedTeam(captain, team.id, exec.signal)
+      return { status: 'running', team_id: approved.teamId, members: approved.members, tasks: approved.tasks }
+    },
+  }))
+
+  ctx.tools.register(defineTool({
     name: 'agent_teams_add_member',
-    description: 'Add a durable continuable member. By default it snapshots the captain\'s current LLM route and effort. Supply provider/model only for an explicitly requested role-specific route; a changed provider or model automatically uses the target model\'s default effort. Set reasoning_effort only to request one of the target model\'s supported ids explicitly (or "default" to force its default). The member waits for messages, works on assigned tasks, and can message the team.',
+    description: 'Add a member to the team roster. In a staged team this only adds an editable plan row and does not spawn a child; approval spawns the final configuration. In a running team it creates the durable continuable member immediately.',
     parameters: {
       name: { type: 'string', required: true, description: 'Unique member name inside the team.' },
       role: { type: 'string', description: 'Role of the member (e.g. researcher, engineer, reviewer).' },
       provider: { type: 'string', description: 'Optional LLM provider route. Use only when the user explicitly requests a different provider; requires model.' },
       model: { type: 'string', description: 'Optional model override. Omit for the captain\'s current model (or the configured memberModel default).' },
       reasoning_effort: { type: 'string', description: 'Optional reasoning effort override: one of the target model\'s supported effort ids, or "default" to force its default. When omitted, the captain\'s effort is inherited only for the same provider/model; a changed route uses the target default.' },
+      executionPrompt: { type: 'string', description: 'Optional member-specific execution prompt. It remains editable while staged.' },
     },
     output: {
       schema: {
@@ -508,11 +767,14 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
           model: { type: 'string', required: true },
           reasoning_effort: { type: 'string' },
           status: { type: 'string', required: true },
+          phase: { type: 'string', required: true },
         },
       },
       render: (args, value) => [{
         type: 'text',
-        text: `Member "${value.member_name}" added (subagent id ${value.member_id}, ${value.provider}/${value.model}${value.reasoning_effort === undefined ? '' : `, reasoning ${value.reasoning_effort}`}, status ${value.status}).`,
+        text: value.phase === 'staged'
+          ? `Member "${value.member_name}" added to the staged roster (${value.provider}/${value.model}); no child was spawned.`
+          : `Member "${value.member_name}" added (subagent id ${value.member_id}, ${value.provider}/${value.model}${value.reasoning_effort === undefined ? '' : `, reasoning ${value.reasoning_effort}`}, status ${value.status}).`,
       }],
     },
     async execute(args, exec) {
@@ -548,20 +810,23 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
           provider: selection.provider,
           model: selection.model,
           reasoningEffort: selection.reasoningEffort,
+          executionPrompt: trimmedOptional(args.executionPrompt),
           joinedAt: Date.now(),
           status: 'idle',
         }
-        await spawnMember(
-          ctx,
-          memberRuntime(config),
-          memberSelections,
-          selection,
-          captain,
-          fresh,
-          member,
-          config.stateDir,
-          exec.signal,
-        )
+        if (fresh.phase !== 'staged') {
+          await spawnMember(
+            ctx,
+            memberRuntime(config),
+            memberSelections,
+            selection,
+            captain,
+            fresh,
+            member,
+            config.stateDir,
+            exec.signal,
+          )
+        }
         fresh.members.push(member)
         try {
           await writeTeam(stateRoot, fresh)
@@ -590,6 +855,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
             ? {}
             : { reasoning_effort: selection.reasoningEffort },
           status: member.status,
+          phase: fresh.phase ?? 'running',
         }
       })
       await scheduler.kickMember(workspace, team.id, created.member_name, captain)
@@ -1387,6 +1653,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
         team_id: team.id,
         team_name: team.name,
         description: team.description ?? '',
+        phase: team.phase ?? 'running',
         halted: loop.halted,
         escalated: loop.escalated,
         loop_state: loop.state,
@@ -1511,7 +1778,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
           if (member.status === 'removed') continue
           member.status = 'removed'
           for (const task of fresh.tasks) {
-            if (task.assignee === member.name && task.status !== 'completed') invalidateTaskAttempt(task)
+            if (task.assignee === member.name && !TERMINAL_TASK_STATUSES.includes(task.status)) invalidateTaskAttempt(task)
           }
         }
         await writeTeam(stateRoot, fresh)
@@ -1540,72 +1807,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): void
       return { deleted: true, team_name: team.name }
     },
   }))
-}
-
-function normalizedRoleTerms(member: Pick<TeamMember, 'name' | 'role'>): string[] {
-  return `${member.name} ${member.role ?? ''}`
-    .toLowerCase()
-    .split(/[^a-z0-9]+/u)
-    .filter(Boolean)
-}
-
-function uniqueRoleAssignee(members: readonly Pick<TeamMember, 'name' | 'role'>[], aliases: readonly string[]): string | undefined {
-  for (const alias of aliases) {
-    const matched = members.filter((member) => normalizedRoleTerms(member).includes(alias))
-    if (matched.length === 1) return matched[0]?.name
-    // A higher-priority role term that names several members is ambiguous;
-    // do not quietly pick a lower-priority, less-specific match.
-    if (matched.length > 1) return undefined
-  }
-  return undefined
-}
-
-/** Instantiate the fixed quality graph that captain-planning profiles deliver. */
-function instantiateCaptainQualityTasks(
-  goal: string,
-  members: readonly Pick<TeamMember, 'name' | 'role'>[],
-  now: number,
-): TeamTask[] {
-  const graph = defaultQualityDeliveryGraph({
-    goal,
-    analyst: uniqueRoleAssignee(members, ['analyst', 'requirements', 'researcher']),
-    implementer: uniqueRoleAssignee(members, ['implementer', 'developer']),
-    tester: uniqueRoleAssignee(members, ['tester', 'test', 'verification']),
-    reviewer: uniqueRoleAssignee(members, ['reviewer', 'review', 'auditor']),
-    integrator: uniqueRoleAssignee(members, ['integrator', 'integration', 'release', 'lead']),
-  })
-  const idBySubject = new Map(graph.map((item, index) => [item.subject, `t${index + 1}`] as const))
-  const tasks = graph.map((item, index): TeamTask => {
-    const id = `t${index + 1}`
-    const task: TeamTask = {
-      id,
-      profileSeedId: item.subject,
-      subject: item.subject,
-      description: item.objective,
-      status: 'pending',
-      ...item.assignee === undefined ? {} : { assignee: item.assignee },
-      dependencies: item.dependencies.map((dependency) => idBySubject.get(dependency) ?? dependency),
-      attempt: 0,
-      kind: item.kind,
-      round: 1,
-      objective: item.objective,
-      acceptance: [...item.acceptance],
-      ...item.inScope === undefined ? {} : { inScope: [...item.inScope] },
-      ...item.verify === undefined ? {} : { verify: [...item.verify] },
-      ...item.coverageOf === undefined ? {} : { coverageOf: [...item.coverageOf] },
-      ...item.kind === 'review' ? { reviewedTaskId: idBySubject.get('implementation')! } : {},
-      createdAt: now,
-      updatedAt: now,
-    }
-    if (!hasValidQualityTaskFields({ ...task })) throw new Error(`default quality graph emitted invalid task "${item.subject}"`)
-    return task
-  })
-  const implementation = tasks.find((task) => task.kind === 'implementation')
-  const review = tasks.find((task) => task.kind === 'review')
-  if (implementation === undefined || review?.reviewedTaskId !== implementation.id) {
-    throw new Error('default quality graph failed to link its review to implementation')
-  }
-  return tasks
+  return runtime
 }
 
 async function initializeProfileTeam(input: {
@@ -1619,6 +1821,7 @@ async function initializeProfileTeam(input: {
   teamId: string
   profileName: string
   description?: string
+  staged: boolean
 }): Promise<{ committed: true; state: TeamState }> {
   const profile = resolveTeamProfile(input.config.profiles, input.profileName, input.config.maxMembers)
   const selections: Awaited<ReturnType<typeof resolveMemberLlmSelection>>[] = []
@@ -1632,9 +1835,6 @@ async function initializeProfileTeam(input: {
     }, input.exec.signal))
   }
   const now = Date.now()
-  const generatedTasks = profile.taskPlanning === 'captain'
-    ? instantiateCaptainQualityTasks(input.description ?? input.teamName, profile.members, now)
-    : undefined
   const seedToActual = new Map(profile.tasks.map((template, index) => [template.id, `t${index + 1}`] as const))
   const draft: TeamState = {
     name: input.teamName,
@@ -1652,6 +1852,7 @@ async function initializeProfileTeam(input: {
     ...profile.reviewPolicy === undefined ? {} : { reviewPolicy: profile.reviewPolicy },
     captainSessionId: input.captain.id,
     createdAt: now,
+    ...input.staged ? { phase: 'staged' as const } : {},
     members: profile.members.map((template, index) => {
       const selection = selections[index]!
       return {
@@ -1667,7 +1868,7 @@ async function initializeProfileTeam(input: {
         status: 'idle' as const,
       }
     }),
-    tasks: generatedTasks ?? profile.tasks.map((template, index) => ({
+    tasks: profile.tasks.map((template, index) => ({
       id: `t${index + 1}`,
       profileSeedId: template.id,
       subject: template.subject,
@@ -1679,7 +1880,11 @@ async function initializeProfileTeam(input: {
       createdAt: now,
       updatedAt: now,
     })),
-    taskSeq: generatedTasks?.length ?? profile.tasks.length,
+    taskSeq: profile.tasks.length,
+  }
+  if (input.staged) {
+    await createTeamDir(input.stateRoot, draft)
+    return { committed: true, state: draft }
   }
   const spawned: TeamMember[] = []
   try {

@@ -785,6 +785,8 @@ function isTeamState(value: unknown, expectedId: string): value is TeamState {
     && value['tasks'].every(isTeamTask)
     && Number.isSafeInteger(value['taskSeq'])
     && (value['taskSeq'] as number) >= 0
+    && (value['phase'] === undefined || value['phase'] === 'staged' || value['phase'] === 'running')
+    && (value['approvedAt'] === undefined || isFiniteNumber(value['approvedAt']))
     && (value['halted'] === undefined || typeof value['halted'] === 'boolean')
     && (value['haltedAt'] === undefined || isFiniteNumber(value['haltedAt']))
     && (value['reviewPolicy'] === undefined || isReviewPolicy(value['reviewPolicy']))
@@ -795,10 +797,14 @@ function isTeamState(value: unknown, expectedId: string): value is TeamState {
   const tasks = value['tasks'] as TeamTask[]
   const memberIds = new Set<string>()
   const memberKeys = new Set<string>()
+  const staged = value['phase'] === 'staged'
   for (const member of members) {
     const key = sanitizeKey(member.name)
-    if (member.id === '' || key === CAPTAIN_KEY || memberIds.has(member.id) || memberKeys.has(key)) return false
-    memberIds.add(member.id)
+    if ((!staged && member.id === '') || key === CAPTAIN_KEY || memberKeys.has(key)) return false
+    if (member.id !== '') {
+      if (memberIds.has(member.id)) return false
+      memberIds.add(member.id)
+    }
     memberKeys.add(key)
   }
   const taskIds = new Set<string>()

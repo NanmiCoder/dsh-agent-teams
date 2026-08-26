@@ -55,7 +55,10 @@ function makeAgent(id, parentSession) {
       this.followups.push(message)
     },
     steer() {},
-    cancel() {},
+    cancel(cause, options) {
+      this.cancelCount = (this.cancelCount ?? 0) + 1
+      this.lastCancel = { cause, options }
+    },
     whenIdle() {
       return this.status === 'idle' ? Promise.resolve() : new Promise(resolve => { this._idle = resolve })
     },
@@ -160,7 +163,7 @@ const ctx = {
   logger: { debug() {}, warn() {} },
 }
 
-registerAgentTeamsTools(ctx, {
+const agentTeamsRuntime = registerAgentTeamsTools(ctx, {
   stateDir: '.agent-teams',
   memberProvider: 'spawn',
   memberMaxDepth: 1,
@@ -302,8 +305,9 @@ check('slash --profile without a goal still activates',
 check('profile-only activation asks for the goal',
   buildActivationDirective('', 'demo-delivery').includes('The goal was not given')
     && buildActivationDirective('', 'demo-delivery').includes('Use configured AgentTeams profile "demo-delivery"'))
-check('captain-planning activation tells the captain to guide the automatic graph',
-  buildActivationDirective('ship it', 'dynamic-delivery', 'captain').includes('program creates requirements')
+check('captain-planning activation requires a staged user-reviewed graph',
+  buildActivationDirective('ship it', 'dynamic-delivery', 'captain').includes('approval="required"')
+    && buildActivationDirective('ship it', 'dynamic-delivery', 'captain').includes('review the Web plan')
     && buildActivationDirective('ship it', 'dynamic-delivery', 'captain').includes('run in parallel')
     && !buildActivationDirective('ship it', 'dynamic-delivery', 'captain').includes('seed tasks'))
 const unknownProfile = command.handler({
@@ -408,31 +412,71 @@ try {
     name: 'Dynamic Demo',
     description: 'goal only',
     profile: 'dynamic-delivery',
+    approval: 'required',
   })
-  const dynamicTeam = await readTeam(stateRoot, 'dynamic-demo')
-  check('captain-planning create instantiates the fixed quality graph',
+  const stagedDynamic = await readTeam(stateRoot, 'dynamic-demo')
+  check('captain-planning create stages only the configured roster',
     createdDynamic.profile === 'dynamic-delivery'
       && createdDynamic.task_planning === 'captain'
+      && createdDynamic.phase === 'staged'
       && createdDynamic.members?.length === 5
-      && createdDynamic.tasks?.map(item => item.kind).join('>') === 'requirements>implementation>verification>review>integration'
-      && dynamicTeam?.profile?.taskPlanning === 'captain'
-      && dynamicTeam.tasks.length === 5
-      && dynamicTeam.tasks[1]?.dependencies.join(',') === 't1'
-      && dynamicTeam.tasks[2]?.dependencies.join(',') === 't2'
-      && dynamicTeam.tasks[3]?.dependencies.join(',') === 't3'
-      && dynamicTeam.tasks[3]?.reviewedTaskId === 't2'
-      && dynamicTeam.tasks[1]?.inScope?.length > 0
-      && dynamicTeam.tasks[1]?.verify?.length > 0)
-  check('captain quality graph maps unique roles without assigning captain',
-    dynamicTeam?.tasks[0]?.assignee === 'analyst'
-      && dynamicTeam.tasks[1]?.assignee === 'implementer'
-      && dynamicTeam.tasks[2]?.assignee === 'tester'
-      && dynamicTeam.tasks[3]?.assignee === 'reviewer'
-      && dynamicTeam.tasks[4]?.assignee === 'release'
-      && dynamicTeam.tasks.every(item => item.assignee !== 'captain'))
-  const dynamicAnalyst = liveAgents.get(createdDynamic.members.find(member => member.member_name === 'analyst')?.member_id)
-  const dynamicImplementer = liveAgents.get(createdDynamic.members.find(member => member.member_name === 'implementer')?.member_id)
+      && createdDynamic.members.every(member => member.member_id === '')
+      && createdDynamic.tasks?.length === 0
+      && stagedDynamic?.profile?.taskPlanning === 'captain'
+      && stagedDynamic.phase === 'staged'
+      && stagedDynamic.members.every(member => member.id === '')
+      && stagedDynamic.tasks.length === 0)
+  const deliveriesBeforePlan = deliveries.length
+  const dynamicFirst = await call('agent_teams_create_task', { subject: 'analyze goal', assignee: 'analyst' })
+  const dynamicSecond = await call('agent_teams_create_task', {
+    subject: 'implement result',
+    assignee: 'implementer',
+    dependencies: [dynamicFirst.task_id],
+  })
+  await agentTeamsRuntime.updateStagedPlan(captain, 'dynamic-demo', {
+    action: 'update_member',
+    memberName: 'reviewer',
+    role: 'security reviewer',
+    provider: 'fake-provider',
+    model: 'fake-reviewer-updated',
+    reasoningEffort: 'high',
+    executionPrompt: 'Review security-sensitive changes only.',
+  })
+  await agentTeamsRuntime.updateStagedPlan(captain, 'dynamic-demo', {
+    action: 'update_task',
+    taskId: dynamicSecond.task_id,
+    subject: 'implement approved result',
+    description: 'Use the analyst output.',
+    assignee: 'implementer',
+    dependencies: [dynamicFirst.task_id],
+  })
+  const editedDynamic = await readTeam(stateRoot, 'dynamic-demo')
+  check('staged roster and DAG are editable without spawning or dispatching',
+    editedDynamic?.members.find(member => member.name === 'reviewer')?.model === 'fake-reviewer-updated'
+      && editedDynamic.members.find(member => member.name === 'reviewer')?.executionPrompt === 'Review security-sensitive changes only.'
+      && editedDynamic.tasks[1]?.subject === 'implement approved result'
+      && editedDynamic.tasks[1]?.dependencies.join(',') === dynamicFirst.task_id
+      && editedDynamic.tasks.every(item => item.status === 'pending')
+      && deliveries.length === deliveriesBeforePlan)
+  const approvedDynamic = await call('agent_teams_approve', { confirmation: 'user clicked Approve & Run' })
+  const dynamicTeam = await readTeam(stateRoot, 'dynamic-demo')
+  check('approval atomically spawns the final roster before dispatch',
+    approvedDynamic.status === 'running'
+      && dynamicTeam?.phase === 'running'
+      && typeof dynamicTeam.approvedAt === 'number'
+      && dynamicTeam.members.every(member => member.id !== '')
+      && dynamicTeam.tasks[0]?.status === 'pending'
+      && dynamicTeam.tasks[1]?.status === 'pending')
+  for (const member of dynamicTeam.members) publishStatus(liveAgents.get(member.id), 'idle')
+  await call('agent_teams_status', {})
+  const dispatchedDynamic = await readTeam(stateRoot, 'dynamic-demo')
+  check('approved plan dispatches only after a spawned member becomes idle',
+    dispatchedDynamic?.tasks[0]?.status === 'claimed'
+      && dispatchedDynamic.tasks[1]?.status === 'pending')
+  const dynamicAnalyst = liveAgents.get(dynamicTeam.members.find(member => member.name === 'analyst')?.id)
+  const dynamicImplementer = liveAgents.get(dynamicTeam.members.find(member => member.name === 'implementer')?.id)
   const interruptedBeforeHalt = dynamicAnalyst.interruptCount ?? 0
+  const captainCancelsBeforeHalt = captain.cancelCount ?? 0
   const halt = await haltTeamWork({
     ctx,
     stateRoot,
@@ -441,11 +485,15 @@ try {
     signal: new AbortController().signal,
   })
   const haltedTeam = await readTeam(stateRoot, 'dynamic-demo')
-  check('captain halt cancels default graph and keeps the team',
+  check('captain halt cancels the approved graph and keeps the team',
     halt.alreadyHalted === false
-      && halt.cancelledTasks === 5
+      && halt.cancelledTasks === 2
       && haltedTeam?.halted === true
       && haltedTeam.tasks.every(item => item.status === 'cancelled'))
+  check('team halt cancels the captain turn while preserving queued user input',
+    captain.cancelCount === captainCancelsBeforeHalt + 2
+      && captain.lastCancel?.cause?.kind === 'user'
+      && captain.lastCancel?.options?.keepInbox === true)
   check('captain halt interrupts and drains graph members',
     (dynamicAnalyst.interruptCount ?? 0) > interruptedBeforeHalt
       && (dynamicImplementer.interruptCount ?? 0) > 0
@@ -473,6 +521,10 @@ try {
       && (await readTeam(stateRoot, 'dynamic-demo'))?.halted !== true
       && (await readTeam(stateRoot, 'dynamic-demo'))?.tasks.every(item => item.status === 'cancelled'))
   await call('agent_teams_delete', {})
+  const haltedArchive = await readArchivedTeam(stateRoot, 'dynamic-demo')
+  check('shutdown preserves cancelled task history in the archive',
+    haltedArchive?.tasks.length === 2
+      && haltedArchive.tasks.every(item => item.status === 'cancelled'))
 
   await call('agent_teams_create', { name: 'Quality Loop', description: 'review loop' })
   await call('agent_teams_add_member', { name: 'builder', role: 'implementer' })

@@ -7,6 +7,8 @@ export interface ActivityMember {
   readonly role: string
   readonly provider?: string
   readonly model?: string
+  readonly reasoningEffort?: string
+  readonly executionPrompt?: string
   readonly status?: 'idle' | 'working' | 'removed'
   readonly activity: 'working' | 'idle' | 'unknown'
   readonly progress: number
@@ -20,6 +22,7 @@ export interface ActivityMember {
 export interface ActivityTask {
   readonly id: string
   readonly subject: string
+  readonly description?: string
   readonly status: string
   readonly state: 'blocked' | 'open' | 'running' | 'completed' | 'failed' | 'cancelled'
   readonly assignee: string
@@ -44,6 +47,7 @@ export interface ActivityTeam {
   readonly name: string
   readonly description?: string
   readonly captainSessionId: string
+  readonly phase: 'staged' | 'running'
   readonly halted?: boolean
   readonly members: readonly ActivityMember[]
   readonly tasks: readonly ActivityTask[]

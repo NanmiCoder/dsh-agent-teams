@@ -1164,6 +1164,179 @@
   line-height: 16px;
 }
 
+.planEditor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0 10px 10px;
+  padding: 11px;
+  border: 1px solid color-mix(in srgb, var(--dsw-alias-state-business-primary) 34%, var(--dsw-alias-line-normal));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--dsw-alias-bg-module-platform) 88%, var(--dsw-alias-state-business-primary));
+}
+
+.planEditor header > span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--dsw-alias-label-primary);
+  font-size: 12px;
+}
+
+.planEditor header em {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--dsw-alias-bg-fill-business);
+  color: var(--dsw-alias-label-on-fill);
+  font-size: 9px;
+  font-style: normal;
+  line-height: 16px;
+}
+
+.planEditor header p {
+  margin: 5px 0 0;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 10px;
+  line-height: 15px;
+}
+
+.planList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.planCard {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 7px 8px 8px;
+  border: 1px solid var(--dsw-alias-line-normal);
+  border-radius: 9px;
+  background: var(--dsw-alias-bg-module-platform);
+}
+
+.planCard legend {
+  padding: 0 4px;
+  color: var(--dsw-alias-state-business-primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.planCard label {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 9px;
+}
+
+.planCard input,
+.planCard textarea,
+.planCard select,
+.planNewTask input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--dsw-alias-line-normal);
+  border-radius: 6px;
+  outline: none;
+  background: var(--dsw-alias-bg-base);
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 10px;
+  line-height: 16px;
+}
+
+.planCard input,
+.planCard select,
+.planNewTask input {
+  height: 27px;
+  padding: 4px 7px;
+}
+
+.planCard textarea {
+  min-height: 46px;
+  padding: 5px 7px;
+  resize: vertical;
+}
+
+.planCard input:focus,
+.planCard textarea:focus,
+.planCard select:focus,
+.planNewTask input:focus {
+  border-color: var(--dsw-alias-state-business-primary);
+}
+
+.planGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 6px;
+}
+
+.planActions,
+.planApproveRow,
+.planNewTask {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.planActions button,
+.planNewTask button,
+.planApproveRow button {
+  flex: none;
+  min-height: 25px;
+  padding: 3px 9px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--dsw-alias-bg-fill-neutral);
+  color: var(--dsw-alias-label-primary);
+  cursor: pointer;
+  font-size: 9.5px;
+  font-weight: 600;
+}
+
+.planActions button[data-danger] {
+  color: var(--dsw-alias-state-danger);
+}
+
+.planActions span,
+.planApproveRow span {
+  min-width: 0;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 9px;
+  line-height: 13px;
+}
+
+.planNewTask input {
+  flex: 1;
+}
+
+.planApproveRow {
+  justify-content: flex-end;
+}
+
+.planApproveRow button {
+  min-height: 30px;
+  padding-inline: 13px;
+  background: var(--dsw-alias-state-business-primary);
+  color: var(--dsw-alias-label-on-fill);
+}
+
+.planActions button:disabled,
+.planNewTask button:disabled,
+.planApproveRow button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
 /* Historic teams retain the exact same visual hierarchy as live teams. The
    explicit label carries the ended state; fading the entire subtree made the
    reference colors and DAG borders look missing. */

@@ -28,6 +28,8 @@ export interface TeamActivityMember {
   readonly role: string
   readonly provider: string
   readonly model: string
+  readonly reasoningEffort: string
+  readonly executionPrompt: string
   readonly status: MemberStatus
   readonly activity: 'working' | 'idle' | 'unknown'
   readonly progress: number
@@ -41,6 +43,7 @@ export interface TeamActivityMember {
 export interface TeamActivityTask {
   readonly id: string
   readonly subject: string
+  readonly description: string
   readonly status: string
   readonly state: VisualTaskState
   readonly assignee: string
@@ -65,6 +68,7 @@ export interface TeamActivitySnapshot {
   readonly name: string
   readonly description?: string
   readonly captainSessionId: string
+  readonly phase: 'staged' | 'running'
   readonly halted?: boolean
   readonly members: readonly TeamActivityMember[]
   readonly tasks: readonly TeamActivityTask[]
@@ -138,6 +142,8 @@ export async function assembleTeamSnapshot(
       role: member.role ?? '',
       provider: member.provider?.trim() ?? '',
       model: member.model?.trim() ?? '',
+      reasoningEffort: member.reasoningEffort?.trim() ?? '',
+      executionPrompt: member.executionPrompt ?? '',
       status: member.status,
       activity: options.historic === true
         ? 'idle'
@@ -147,7 +153,7 @@ export async function assembleTeamSnapshot(
               : activity.get(member.id) === 'idle' || activity.get(member.id) === 'ready'
                 ? 'idle'
                 : 'unknown')
-          : 'unknown',
+          : state.phase === 'staged' ? 'idle' : 'unknown',
       progress: owned.length === 0 ? 0 : Math.round((done / owned.length) * 100),
       done,
       total: owned.length,
@@ -162,11 +168,13 @@ export async function assembleTeamSnapshot(
     name: state.name,
     ...state.description !== undefined ? { description: state.description } : {},
     captainSessionId: state.captainSessionId,
+    phase: state.phase ?? 'running',
     ...state.halted === true ? { halted: true } : {},
     members,
     tasks: tasks.map((task) => ({
       id: task.id,
       subject: task.subject,
+      description: task.description ?? '',
       status: task.status,
       state: taskVisualState(task.status, task.dependencies, tasks),
       assignee: task.assignee ?? '',

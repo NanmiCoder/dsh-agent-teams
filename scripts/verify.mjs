@@ -30,6 +30,7 @@ import {
 } from '../lib/state.js'
 import {
   activityPanelExpandedForSession,
+  activityPanelShouldAutoExpand,
   compactDagLayout,
   COMPACT_DAG_NODE_HEIGHT,
   COMPACT_DAG_NODE_WIDTH,
@@ -569,6 +570,42 @@ check(
   activityPanelExpandedForSession(true, 'session-a', 'session-a')
     && !activityPanelExpandedForSession(true, 'session-a', 'session-b')
     && !activityPanelExpandedForSession(true, 'session-a', undefined),
+)
+check(
+  'restored live activity stays collapsed when a conversation is reopened',
+  !activityPanelShouldAutoExpand({
+    alreadyAutoOpened: false,
+    pageSettled: true,
+    restoreComplete: true,
+    previousLiveTeamIds: new Set(['restored-team']),
+    currentLiveTeamIds: ['restored-team'],
+  }),
+)
+check(
+  'archived-only conversation restore never auto-expands the activity panel',
+  !activityPanelShouldAutoExpand({
+    alreadyAutoOpened: false,
+    pageSettled: true,
+    restoreComplete: true,
+    previousLiveTeamIds: new Set(),
+    currentLiveTeamIds: [],
+  }),
+)
+check(
+  'a new live team appearing after restore still auto-expands once',
+  activityPanelShouldAutoExpand({
+    alreadyAutoOpened: false,
+    pageSettled: true,
+    restoreComplete: true,
+    previousLiveTeamIds: new Set(),
+    currentLiveTeamIds: ['new-team'],
+  }) && !activityPanelShouldAutoExpand({
+    alreadyAutoOpened: true,
+    pageSettled: true,
+    restoreComplete: true,
+    previousLiveTeamIds: new Set(),
+    currentLiveTeamIds: ['new-team'],
+  }),
 )
 let monitorNotifications = 0
 const unsubscribeMonitor = subscribeActivityMonitorTargets(() => { monitorNotifications += 1 })

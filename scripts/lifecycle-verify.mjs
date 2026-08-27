@@ -51,10 +51,14 @@ function makeAgent(id, parentSession) {
     options: { provider: 'fake', model: 'fake-model' },
     session: session(parentSession),
     followups: [],
+    injections: [],
     followup(message) {
       this.followups.push(message)
     },
     steer() {},
+    inject(message) {
+      this.injections.push(message)
+    },
     cancel(cause, options) {
       this.cancelCount = (this.cancelCount ?? 0) + 1
       this.lastCancel = { cause, options }
@@ -413,6 +417,8 @@ try {
   await call('agent_teams_delete', {})
 
   const deliveriesBeforeDiscard = deliveries.length
+  const captainCancelsBeforeDiscard = captain.cancelCount ?? 0
+  const captainInjectionsBeforeDiscard = captain.injections.length
   await call('agent_teams_create', {
     name: 'Rejected Demo',
     description: 'plan the user will reject',
@@ -429,6 +435,13 @@ try {
       && discardedArchive.members.every(member => member.id === '')
       && discardedArchive.tasks.every(task => task.status === 'pending')
       && deliveries.length === deliveriesBeforeDiscard)
+  const discardControlText = captain.injections.at(-1)?.content?.map(block => block.text ?? '').join('\n') ?? ''
+  check('discard aborts the active Captain turn and parks an authoritative no-recreate context',
+    (captain.cancelCount ?? 0) === captainCancelsBeforeDiscard + 1
+      && captain.injections.length === captainInjectionsBeforeDiscard + 1
+      && /Do not call agent_teams_create/.test(discardControlText)
+      && /Wait for a later explicit user request/.test(discardControlText)
+      && captain.lastCancel?.options?.keepInbox === true)
 
   const createdDynamic = await call('agent_teams_create', {
     name: 'Dynamic Demo',
@@ -511,6 +524,23 @@ try {
       && unchangedAfterRejectedEdit?.tasks.some(item => item.id === obsoleteReview.task_id)
       && unchangedAfterRejectedEdit.tasks.find(item => item.id === dynamicSecond.task_id)?.dependencies.join(',') === obsoleteReview.task_id
       && unchangedAfterRejectedEdit.members.some(member => member.name === 'reviewer'))
+  const captainCancelsBeforeContinue = captain.cancelCount ?? 0
+  const captainFollowupsBeforeContinue = captain.followups.length
+  const continuedPlan = await agentTeamsRuntime.continueStagedPlanning(captain, 'dynamic-demo')
+  const waitingPlan = await readTeam(stateRoot, 'dynamic-demo')
+  const feedbackControlText = captain.followups.at(-1)?.content?.map(block => block.text ?? '').join('\n') ?? ''
+  check('return-to-chat cancels the planning turn and asks one question without recreating the team',
+    continuedPlan.alreadyWaiting === false
+      && waitingPlan?.planReviewState === 'awaiting_feedback'
+      && (captain.cancelCount ?? 0) === captainCancelsBeforeContinue + 1
+      && captain.followups.length === captainFollowupsBeforeContinue + 1
+      && /Ask the user one concise, concrete question/.test(feedbackControlText)
+      && /Do not create a replacement team/.test(feedbackControlText))
+  const repeatedContinue = await agentTeamsRuntime.continueStagedPlanning(captain, 'dynamic-demo')
+  check('return-to-chat is idempotent while feedback is already pending',
+    repeatedContinue.alreadyWaiting === true
+      && (captain.cancelCount ?? 0) === captainCancelsBeforeContinue + 1
+      && captain.followups.length === captainFollowupsBeforeContinue + 1)
   const modelEditedPlan = await call('agent_teams_edit_plan', {
     operations: [
       { action: 'update_task', task_id: dynamicSecond.task_id, dependencies: [dynamicFirst.task_id] },
@@ -528,6 +558,7 @@ try {
       && modelEditedDynamic.members.every(member => member.name !== 'reviewer')
       && modelEditedDynamic.members.every(member => member.id === '')
       && modelEditedDynamic.tasks.every(item => item.status === 'pending')
+      && modelEditedDynamic.planReviewState === 'awaiting_review'
       && deliveries.length === deliveriesBeforePlan)
   const approvedDynamic = await call('agent_teams_approve', { confirmation: 'user clicked Approve & Run' })
   const dynamicTeam = await readTeam(stateRoot, 'dynamic-demo')

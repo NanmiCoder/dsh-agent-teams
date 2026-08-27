@@ -282,6 +282,8 @@
 
 /* team */
 .team {
+  container-name: agent-team;
+  container-type: inline-size;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -1750,17 +1752,23 @@
 .planApproveRow,
 .planNewTask,
 .planConfirm,
-.planApproveActions {
+.planApproveActions,
+.planSecondaryActions {
   display: flex;
   align-items: center;
   gap: 7px;
 }
 
 .planReviewActions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
+  display: grid;
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr);
   gap: 6px;
+}
+
+.planSecondaryActions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
 }
 
 .planActions {
@@ -1877,6 +1885,8 @@
   z-index: 1;
   bottom: 0;
   min-height: 50px;
+  align-items: stretch;
+  flex-direction: column;
   justify-content: flex-end;
   margin: 0 -4px -4px;
   padding: 8px;
@@ -1897,7 +1907,7 @@
 
 .planApproveCopy {
   display: flex;
-  min-width: 120px;
+  min-width: 0;
   flex: 1;
   flex-direction: column;
   gap: 2px;
@@ -1922,19 +1932,23 @@
   color: var(--dsw-alias-label-on-fill);
 }
 
+.planReviewActions > button[data-plan-approve] {
+  width: 100%;
+}
+
 .planApproveActions > button:first-child {
   background: var(--dsw-alias-bg-fill-neutral);
   color: var(--dsw-alias-label-primary);
 }
 
-.planReviewActions > button:not([data-plan-approve]),
+.planSecondaryActions > button,
 .planApproveActions > button[data-danger] {
   border-color: var(--dsw-alias-line-normal);
   background: var(--dsw-alias-bg-fill-neutral);
   color: var(--dsw-alias-label-primary);
 }
 
-.planReviewActions > button[data-danger],
+.planSecondaryActions > button[data-danger],
 .planApproveActions > button[data-danger] {
   color: var(--dsw-alias-state-danger);
 }
@@ -2090,7 +2104,41 @@
   }
 
   .planApproveActions button,
-  .planReviewActions button {
+  .planReviewActions button,
+  .planSecondaryActions button {
     flex: 1;
+  }
+}
+
+@container agent-team (max-width: 360px) {
+  .planEditor {
+    margin-inline: 0;
+    padding-inline: 10px;
+  }
+
+  .planHeader > span {
+    align-items: flex-start;
+  }
+
+  .planFlow li {
+    gap: 3px;
+    font-size: 7.5px;
+  }
+
+  .planFlow li:not(:last-child)::after {
+    min-width: 4px;
+    margin-right: 2px;
+  }
+
+  .planSecondaryActions,
+  .planApproveActions {
+    display: grid;
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .planSecondaryActions button,
+  .planApproveActions button {
+    width: 100%;
   }
 }

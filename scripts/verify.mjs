@@ -246,8 +246,21 @@ check(
   'staged plan review offers continue, discard, and approve outcomes',
   stagingPlanSource.includes('data-plan-continue')
     && stagingPlanSource.includes('data-plan-discard')
+    && stagingPlanSource.includes("action: 'continue'")
     && stagingPlanSource.includes("action: 'discard'")
+    && hostSource.includes("if (action === 'continue')")
     && hostSource.includes("if (action === 'discard')"),
+)
+check(
+  'review decisions control the Captain turn instead of relying on front-end state alone',
+  toolsSource.includes('stagedPlanFeedbackContext')
+    && toolsSource.includes('stagedPlanDiscardContext')
+    && toolsSource.includes("fresh.planReviewState = 'awaiting_feedback'")
+    && toolsSource.includes("captain.cancel({ kind: 'user' }, { keepInbox: true })")
+    && toolsSource.includes('captain.followup(createUserMessage')
+    && toolsSource.includes('captain.inject(createUserMessage')
+    && toolsSource.includes('Do not create a replacement team')
+    && toolsSource.includes('Do not call agent_teams_create'),
 )
 check(
   'continued planning uses a model-facing atomic staged-plan tool instead of state-file edits',
@@ -378,16 +391,17 @@ check(
   stagingPlanSource.includes('aria-expanded={open}')
     && stagingPlanSource.includes('aria-live=')
     && stagingPlanSource.includes('confirmingRemove')
-    && stagingPlanSource.includes('approvalArmed')
+    && !stagingPlanSource.includes('approvalArmed')
     && stagingPlanSource.includes('data-plan-approve')
     && stagingPlanSource.includes('data-confirming')
     && activityPanelCss.includes('.planCardHeader')
     && activityPanelCss.includes('.planFeedback')
     && activityPanelCss.includes('.planApproveRow')
     && activityPanelCss.includes('position: sticky')
-    && activityPanelCss.includes('@media (max-width: 640px)')
+    && activityPanelCss.includes('container-type: inline-size')
+    && activityPanelCss.includes('@container agent-team')
     && activityPanelCss.includes('.planSectionToggle:focus-visible'),
-  'plan review must expose disclosure, feedback, confirmation, focus, sticky action, and narrow-layout contracts',
+  'plan review must expose disclosure, feedback, destructive confirmation, focus, sticky action, and container-based narrow-layout contracts',
 )
 check(
   'running DAG tasks reuse the animated work glyph without losing focus context',

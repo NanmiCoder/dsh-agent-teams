@@ -136,7 +136,7 @@ profiles:
 
 `taskPlanning: captain` 时 profile 不再假设项目目录、包管理器或固定质量图；Captain 根据真实目标和 workspace 设计 DAG。若用户明确要求质量门禁，再创建带合同的 requirements → implementation → verification → review → integration 任务，并从真实项目推导 `inScope` 与 `verify`。`taskPlanning: seed` 保留固定 seed task 工作流。
 
-执行前计划审查直接读取 Harness 的模型目录：成员模型和推理等级使用与主输入区一致的 Provider/模型元数据，不再要求手写路由。审查可选择「继续规划」返回输入框让 Captain 重做方案，也可二次确认「放弃本次计划」并归档 staged 团队；仅「确认并启动团队」会创建成员和调度任务。
+执行前计划审查直接读取 Harness 的模型目录：成员模型和推理等级使用与主输入区一致的 Provider/模型元数据，不再要求手写路由。「返回对话修改」会把 staged 草案标记为等待反馈，取消尚未结束的规划轮次，并由插件上下文要求 Captain 只追问一次修改方向；用户回复后，Captain 必须通过一次 `agent_teams_edit_plan` 原子更新同一份草案，不能另建团队。「放弃本次计划」需要二次确认，随后归档草案、取消当前轮次，并保留禁止自动重建的模型上下文；仅「确认并启动团队」会创建成员和调度任务，且不再增加一次无意义的启动确认。
 
 长任务运行期间，具体团队标题右侧会显示停止按钮。点击后需在确认框中再次确认，才会取消 Captain 当前回合、中断全部成员、取消未完成任务并停止后续调度；入口不再占用聊天输入区域。停止不会删除团队，之后的新用户消息可显式要求 `agent_teams_resume`。取消/失败任务在归档中保持原终态。
 

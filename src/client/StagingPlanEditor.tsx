@@ -621,7 +621,6 @@ export function StagingPlanEditor({ team, modelDirectory, onContinuePlanning, on
   const [tasksOpen, setTasksOpen] = useState(true)
   const [newTask, setNewTask] = useState('')
   const [busy, setBusy] = useState(false)
-  const [approvalArmed, setApprovalArmed] = useState(false)
   const [discardArmed, setDiscardArmed] = useState(false)
   const [pendingEditors, setPendingEditors] = useState<ReadonlySet<string>>(new Set())
   const [feedback, setFeedback] = useState<PlanFeedback>()
@@ -629,6 +628,7 @@ export function StagingPlanEditor({ team, modelDirectory, onContinuePlanning, on
   const dependencyLinks = team.tasks.reduce((total, task) => total + task.dependencies.length, 0)
   const runnable = team.members.length > 0 && team.tasks.length > 0
   const hasPendingEdits = pendingEditors.size > 0 || newTask.trim() !== ''
+  const waitingForFeedback = team.planReviewState === 'awaiting_feedback'
 
   useEffect(() => {
     void modelDirectory.load().catch(() => undefined)
@@ -678,7 +678,26 @@ export function StagingPlanEditor({ team, modelDirectory, onContinuePlanning, on
     } catch (error: unknown) {
       setFeedback({ tone: 'error', message: t('plan.failed', { message: errorMessage(error) }) })
       setBusy(false)
-      setApprovalArmed(false)
+    }
+  }
+
+  const continueInChat = async (): Promise<void> => {
+    if (waitingForFeedback) {
+      onContinuePlanning()
+      return
+    }
+    setBusy(true)
+    setFeedback(undefined)
+    try {
+      await mutatePlan({
+        sessionId: team.captainSessionId,
+        teamId: team.teamId,
+        action: 'continue',
+      })
+      onContinuePlanning()
+    } catch (error: unknown) {
+      setFeedback({ tone: 'error', message: t('plan.failed', { message: errorMessage(error) }) })
+      setBusy(false)
     }
   }
 
@@ -763,17 +782,22 @@ export function StagingPlanEditor({ team, modelDirectory, onContinuePlanning, on
         <button type="submit" disabled={busy || newTask.trim() === ''}>{busy ? t('plan.adding') : t('plan.addTask')}</button>
       </form>
 
-      <div className={css.planApproveRow} data-armed={approvalArmed || discardArmed} data-discard={discardArmed || undefined}>
+      <div
+        className={css.planApproveRow}
+        data-armed={discardArmed || undefined}
+        data-discard={discardArmed || undefined}
+        data-review-state={waitingForFeedback ? 'awaiting-feedback' : 'awaiting-review'}
+      >
         <span className={css.planApproveCopy}>
           <strong>{discardArmed
             ? t('plan.discardConfirmTitle')
-            : approvalArmed
-              ? t('plan.approveConfirmTitle')
+            : waitingForFeedback
+              ? t('plan.feedbackTitle')
               : t('plan.approveTitle')}</strong>
           <small>{discardArmed
             ? t('plan.discardWarning')
-            : approvalArmed
-              ? t('plan.approveWarning')
+            : waitingForFeedback
+              ? t('plan.feedbackHint')
               : hasPendingEdits
                 ? t('plan.pendingEdits')
                 : t('plan.approveHint', { members: team.members.length, tasks: team.tasks.length })}</small>
@@ -786,20 +810,17 @@ export function StagingPlanEditor({ team, modelDirectory, onContinuePlanning, on
               {busy ? t('plan.discarding') : t('plan.discardConfirm')}
             </button>
           </span>
-        ) : approvalArmed ? (
-          <span className={css.planApproveActions}>
-            <button type="button" disabled={busy} onClick={() => { setApprovalArmed(false) }}>{t('plan.cancel')}</button>
-            <button type="button" data-plan-approve data-confirming disabled={busy || !runnable || hasPendingEdits} onClick={() => { void approve() }}>
-              {busy ? t('plan.approving') : t('plan.approveConfirm')}
-            </button>
-          </span>
         ) : (
           <span className={css.planReviewActions}>
-            <button type="button" data-plan-continue disabled={busy} onClick={onContinuePlanning}>{t('plan.continue')}</button>
-            <button type="button" data-plan-discard data-danger disabled={busy} onClick={() => { setDiscardArmed(true); setFeedback(undefined) }}>{t('plan.discard')}</button>
-            <button type="button" data-plan-approve disabled={busy || !runnable || hasPendingEdits} onClick={() => { setApprovalArmed(true); setFeedback(undefined) }}>
+            <button type="button" data-plan-approve disabled={busy || !runnable || hasPendingEdits} onClick={() => { void approve() }}>
               {t('plan.approve')}
             </button>
+            <span className={css.planSecondaryActions}>
+              <button type="button" data-plan-continue disabled={busy} onClick={() => { void continueInChat() }}>
+                {t(waitingForFeedback ? 'plan.returnToChat' : 'plan.continue')}
+              </button>
+              <button type="button" data-plan-discard data-danger disabled={busy} onClick={() => { setDiscardArmed(true); setFeedback(undefined) }}>{t('plan.discard')}</button>
+            </span>
           </span>
         )}
       </div>

@@ -226,6 +226,13 @@ export interface TeamState {
    * compatibility with teams created before staging existed.
    */
   phase?: 'staged' | 'running'
+  /**
+   * Human-facing review sub-state while `phase` is `staged`. Missing staged
+   * records are treated as `awaiting_review` for backward compatibility.
+   * `awaiting_feedback` means the user returned to chat and the Captain must
+   * ask what should change before editing this same draft.
+   */
+  planReviewState?: 'awaiting_review' | 'awaiting_feedback'
   /** Timestamp written only after a staged plan is explicitly approved. */
   approvedAt?: number
   /**

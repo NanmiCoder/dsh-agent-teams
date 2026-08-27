@@ -120,6 +120,7 @@ export interface AgentTeamsRuntime {
   updateStagedPlan(captain: Agent, teamId: string, mutation: StagedPlanMutation, signal?: AbortSignal): Promise<TeamState>
   updateStagedPlanBatch(captain: Agent, teamId: string, mutations: readonly StagedPlanMutation[], signal?: AbortSignal): Promise<TeamState>
   approveStagedTeam(captain: Agent, teamId: string, signal?: AbortSignal): Promise<{ teamId: string; members: number; tasks: number }>
+  continueStagedPlanning(captain: Agent, teamId: string): Promise<{ teamId: string; alreadyWaiting: boolean }>
   discardStagedTeam(captain: Agent, teamId: string): Promise<{ teamId: string }>
 }
 
@@ -418,6 +419,26 @@ export function steerCaptainReport(captain: Pick<Agent, 'steer'>, from: string, 
   }
 }
 
+/** Context queued after the human rejects a staged plan. */
+export function stagedPlanDiscardContext(teamName: string): string {
+  return [
+    `The user discarded the staged AgentTeams plan "${teamName}" from the pre-run review UI.`,
+    'That decision is final for this draft: it has been archived, no members were created, and no tasks may run.',
+    'Do not call agent_teams_create, agent_teams_approve, or recreate a replacement team merely because the old team is no longer active.',
+    'Wait for a later explicit user request. If the next user message is unrelated to AgentTeams, answer it normally and do not start a team.',
+  ].join('\n')
+}
+
+/** Model-facing continuation that turns the review UI back into a conversation. */
+export function stagedPlanFeedbackContext(teamName: string): string {
+  return [
+    `The user selected "Return to chat and revise" for the staged AgentTeams plan "${teamName}".`,
+    'The existing staged plan is still the only draft. Do not create a replacement team, approve it, spawn members, edit the plan, or start work in this turn.',
+    'Ask the user one concise, concrete question about what they want changed, then stop and wait for their answer.',
+    'After the user answers, revise this same staged roster and DAG with one atomic agent_teams_edit_plan call, summarize the changes, and ask the user to review the updated plan again.',
+  ].join('\n')
+}
+
 /**
  * Register every `agent_teams_*` tool into the shared tools registry.
  * @param ctx - the plugin context (injects `tools`).
@@ -497,6 +518,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         }
       }
       validateStagedGraph(fresh, false)
+      fresh.planReviewState = 'awaiting_review'
       await writeTeam(stateRoot, fresh)
       return fresh
     })
@@ -554,6 +576,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
           throw new Error('one or more staged members could not be spawned')
         }
         fresh.phase = 'running'
+        delete fresh.planReviewState
         fresh.approvedAt = Date.now()
         await writeTeam(stateRoot, fresh)
         return { teamId: fresh.id, members: fresh.members.length, tasks: fresh.tasks.length }
@@ -576,10 +599,50 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
     return approved
   }
 
+  const continueStagedPlanning: AgentTeamsRuntime['continueStagedPlanning'] = async (captain, teamId) => {
+    const workspace = workspaceOf(captain)
+    const stateRoot = stateRootOf(workspace, config)
+    const prepared = await withTeamLock(teamLockKey(stateRoot, teamId), async () => {
+      const fresh = await requireFreshCaptainTeam(stateRoot, teamId, captain.id)
+      requireStagedTeam(fresh)
+      if (fresh.planReviewState === 'awaiting_feedback') {
+        return { teamName: fresh.name, alreadyWaiting: true }
+      }
+      fresh.planReviewState = 'awaiting_feedback'
+      await writeTeam(stateRoot, fresh)
+      return { teamName: fresh.name, alreadyWaiting: false }
+    })
+    if (prepared.alreadyWaiting) return { teamId, alreadyWaiting: true }
+
+    // End any planning turn that is still producing tool calls. A plugin
+    // follow-up submitted after cancellation is queued as the next turn by the
+    // Harness Agent contract, so it cannot race ahead and recreate the team.
+    captain.cancel({ kind: 'user' }, { keepInbox: true })
+    try {
+      captain.followup(createUserMessage({
+        content: [{ type: 'text', text: stagedPlanFeedbackContext(prepared.teamName) }],
+        source: { kind: 'plugin', plugin: 'dsh-agent-teams' },
+      }))
+    } catch (error: unknown) {
+      // Do not leave the durable UI in a false waiting state when the live
+      // Captain disappeared between lookup and delivery.
+      await withTeamLock(teamLockKey(stateRoot, teamId), async () => {
+        const fresh = await requireFreshCaptainTeam(stateRoot, teamId, captain.id)
+        requireStagedTeam(fresh)
+        if (fresh.planReviewState === 'awaiting_feedback') {
+          fresh.planReviewState = 'awaiting_review'
+          await writeTeam(stateRoot, fresh)
+        }
+      })
+      throw error
+    }
+    return { teamId, alreadyWaiting: false }
+  }
+
   const discardStagedTeam: AgentTeamsRuntime['discardStagedTeam'] = async (captain, teamId) => {
     const workspace = workspaceOf(captain)
     const stateRoot = stateRootOf(workspace, config)
-    return withTeamLock(teamLockKey(stateRoot, teamId), async () => {
+    const discarded = await withTeamLock(teamLockKey(stateRoot, teamId), async () => {
       const fresh = await requireFreshCaptainTeam(stateRoot, teamId, captain.id)
       requireStagedTeam(fresh)
       appendTeamEvent(ctx, captainSessionOf(ctx, fresh.captainSessionId, captain.session), 'agent-teams/plan-discarded', {
@@ -588,11 +651,33 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
       // A staged plan owns no child sessions. Archiving releases the captain
       // immediately while retaining the rejected graph for later inspection.
       await archiveTeamDir(stateRoot, fresh.id)
-      return { teamId: fresh.id }
+      return { teamId: fresh.id, teamName: fresh.name }
     })
+    // Preserve this control fact for the next genuine user turn, then abort the
+    // still-running Captain turn. Without both operations a late model step can
+    // observe the missing active team and incorrectly create it again.
+    try {
+      captain.inject(createUserMessage({
+        content: [{ type: 'text', text: stagedPlanDiscardContext(discarded.teamName) }],
+        source: { kind: 'plugin', plugin: 'dsh-agent-teams' },
+      }))
+    } catch (error: unknown) {
+      // The archive is already authoritative. Cancellation still prevents a
+      // late step from recreating work; failure to park extra context is only a
+      // live-delivery warning and must not turn a successful discard into 409.
+      ctx.logger.warn(`agent-teams: failed to inject discard context for "${discarded.teamId}": ${String(error)}`)
+    }
+    captain.cancel({ kind: 'user' }, { keepInbox: true })
+    return { teamId: discarded.teamId }
   }
 
-  const runtime: AgentTeamsRuntime = { updateStagedPlan, updateStagedPlanBatch, approveStagedTeam, discardStagedTeam }
+  const runtime: AgentTeamsRuntime = {
+    updateStagedPlan,
+    updateStagedPlanBatch,
+    approveStagedTeam,
+    continueStagedPlanning,
+    discardStagedTeam,
+  }
 
   ctx.tools.register(defineTool({
     name: 'agent_teams_create',
@@ -662,7 +747,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
               members: [],
               tasks: [],
               taskSeq: 0,
-              ...staged ? { phase: 'staged' as const } : {},
+              ...staged ? { phase: 'staged' as const, planReviewState: 'awaiting_review' as const } : {},
             }
             await createTeamDir(stateRoot, state)
             return { committed: true as const, state }
@@ -2044,7 +2129,7 @@ async function initializeProfileTeam(input: {
     ...profile.reviewPolicy === undefined ? {} : { reviewPolicy: profile.reviewPolicy },
     captainSessionId: input.captain.id,
     createdAt: now,
-    ...input.staged ? { phase: 'staged' as const } : {},
+    ...input.staged ? { phase: 'staged' as const, planReviewState: 'awaiting_review' as const } : {},
     members: profile.members.map((template, index) => {
       const selection = selections[index]!
       return {

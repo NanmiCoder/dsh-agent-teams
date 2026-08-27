@@ -577,7 +577,9 @@ function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscarded, on
               : captainBusy
                 ? t('captain.summary.withTakeover', { tasks: assignedCount, captainTasks: captainTaskIds })
               : team.phase === 'staged'
-                ? t('captain.summary.staged', { tasks: team.tasks.length, members: team.members.length })
+                ? t(team.planReviewState === 'awaiting_feedback'
+                  ? 'captain.summary.awaitingFeedback'
+                  : 'captain.summary.staged', { tasks: team.tasks.length, members: team.members.length })
                 : t('captain.summary', { tasks: assignedCount, members: team.members.length })}</span>
           </span>
           <span className={css.captainState} data-busy={captainBusy || busyCount > 0}>
@@ -587,7 +589,9 @@ function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscarded, on
               : captainBusy
                 ? t('captain.state.takeover', { tasks: captainTaskIds })
               : team.phase === 'staged'
-                ? t('captain.state.staged')
+                ? t(team.planReviewState === 'awaiting_feedback'
+                  ? 'captain.state.awaitingFeedback'
+                  : 'captain.state.staged')
               : busyCount > 0
                 ? t('captain.state.working', { count: busyCount })
                 : t(allCompleted

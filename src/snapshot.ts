@@ -69,6 +69,7 @@ export interface TeamActivitySnapshot {
   readonly description?: string
   readonly captainSessionId: string
   readonly phase: 'staged' | 'running'
+  readonly planReviewState?: 'awaiting_review' | 'awaiting_feedback'
   readonly halted?: boolean
   readonly members: readonly TeamActivityMember[]
   readonly tasks: readonly TeamActivityTask[]
@@ -169,6 +170,9 @@ export async function assembleTeamSnapshot(
     ...state.description !== undefined ? { description: state.description } : {},
     captainSessionId: state.captainSessionId,
     phase: state.phase ?? 'running',
+    ...state.phase === 'staged'
+      ? { planReviewState: state.planReviewState ?? 'awaiting_review' as const }
+      : {},
     ...state.halted === true ? { halted: true } : {},
     members,
     tasks: tasks.map((task) => ({

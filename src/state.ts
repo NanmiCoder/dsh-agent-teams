@@ -786,6 +786,9 @@ function isTeamState(value: unknown, expectedId: string): value is TeamState {
     && Number.isSafeInteger(value['taskSeq'])
     && (value['taskSeq'] as number) >= 0
     && (value['phase'] === undefined || value['phase'] === 'staged' || value['phase'] === 'running')
+    && (value['planReviewState'] === undefined
+      || value['planReviewState'] === 'awaiting_review'
+      || value['planReviewState'] === 'awaiting_feedback')
     && (value['approvedAt'] === undefined || isFiniteNumber(value['approvedAt']))
     && (value['halted'] === undefined || typeof value['halted'] === 'boolean')
     && (value['haltedAt'] === undefined || isFiniteNumber(value['haltedAt']))

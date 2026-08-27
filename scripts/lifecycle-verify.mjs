@@ -752,10 +752,8 @@ try {
   // must be idempotent until the captain performs an explicit reassignment.
   publishStatus(alpha, 'idle')
   await new Promise(resolve => setTimeout(resolve, 20))
-  // Normal continuable settlement disposes its live AgentHandle between
-  // turns. The process-local idle observation must still distinguish this
-  // parked attempt from a cold process restart.
-  liveAgents.delete(alpha.id)
+  // The idle member remains resident, so repeated status kicks must keep
+  // its current attempt parked rather than spuriously waking it again.
   const deliveriesBeforeParkedKicks = deliveries.length
   await Promise.all([
     call('agent_teams_status', {}),
@@ -769,6 +767,22 @@ try {
       && parkedAlpha.attempt === alphaClaim.attempt
       && parkedAlpha.attemptId === alphaClaim.attempt_id
       && deliveries.length === deliveriesBeforeParkedKicks)
+  liveAgents.set(alpha.id, alpha)
+
+  // A later cold-loss differs from the intentionally parked resident case:
+  // the owner has no live AgentHandle, so a captain status kick must start a
+  // fresh attempt rather than leaving the task claimed forever.
+  liveAgents.delete(alpha.id)
+  const deliveriesBeforeColdRecovery = deliveries.length
+  await call('agent_teams_status', {})
+  await new Promise(resolve => setTimeout(resolve, 20))
+  const coldRecoveredAlpha = await task(t1.task_id)
+  check('missing parked owner is redispatched with a fresh attempt',
+    coldRecoveredAlpha?.status === 'claimed'
+      && coldRecoveredAlpha.assignee === 'alpha'
+      && coldRecoveredAlpha.attempt === alphaClaim.attempt + 1
+      && coldRecoveredAlpha.attemptId !== alphaClaim.attempt_id
+      && deliveries.length === deliveriesBeforeColdRecovery + 1)
   liveAgents.set(alpha.id, alpha)
 
   publishStatus(beta, 'idle')
@@ -798,10 +812,10 @@ try {
     task_id: t1.task_id, assignee: 'gamma', reason: 'alpha is stuck',
   })
   const reassigned = await task(t1.task_id)
-  check('reassignment quiesces old owner and creates a new attempt',
+  check('reassignment quiesces recovered owner and creates a new attempt',
     takeover.assignee === 'gamma' && reassigned?.status === 'claimed'
-      && reassigned.attemptId !== alphaClaim.attempt_id
-      && takeover.attempt === alphaClaim.attempt + 1)
+      && reassigned.attemptId !== coldRecoveredAlpha?.attemptId
+      && takeover.attempt === (coldRecoveredAlpha?.attempt ?? 0) + 1)
   let staleRejected = false
   try {
     await call('agent_teams_update_task', {

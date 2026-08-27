@@ -341,13 +341,17 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
           // A resident idle member can intentionally leave an attempt open
           // while waiting for guidance, or because the user paused its turn.
           // Re-dispatching here would revoke still-valid work on every idle
-          // edge and every status kick. The idle observer remembers that exact
-          // capability across normal continuable disposal; only an unobserved
-          // durable capability (cold process recovery) or a legacy open task
-          // with no capability is retried.
+          // edge and every status kick. A parked attempt is therefore kept
+          // only while its owner remains resident in the live Agent registry.
+          // Once that member has disappeared, the prior turn cannot receive a
+          // follow-up, so retaining the process-local parking marker would
+          // make the durable claimed/in-progress task permanently ownerless.
           const parkedAttemptId = parkedAttempts.get(currentMember.id)
+          const ownerIsResident = liveMember(ctx, currentMember) !== undefined
           const recoverOwned = owned !== undefined
-            && (owned.attemptId === undefined || owned.attemptId !== parkedAttemptId)
+            && (owned.attemptId === undefined
+              || owned.attemptId !== parkedAttemptId
+              || !ownerIsResident)
           const task = recoverOwned ? owned : owned === undefined
             ? nextReadyTask(fresh.tasks, currentMember.name)
             : undefined

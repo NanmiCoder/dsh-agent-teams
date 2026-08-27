@@ -441,14 +441,16 @@ check(
     && memberBadgeSection.includes('data-member-model={memberModel}')
     && memberBadgeSection.includes('title={memberModel}')
     && memberBadgeSection.includes('aria-label={memberModel}')
+    && memberBadgeSection.includes('role="img"')
     && memberBadgeSection.indexOf('css.memberRole') < memberBadgeSection.indexOf('css.memberModel')
     && memberBadgeSection.indexOf('css.memberModel') < memberBadgeSection.indexOf('css.memberState'),
-  'the badge must be a noninteractive span inside memberLine after role and before member state, carrying the full route in title/aria-label/data-member-model',
+  'the badge must be a noninteractive role=img span inside memberLine after role and before member state, carrying the full route in title/aria-label/data-member-model',
 )
 check(
-  'the old separate third-line member model span is removed',
-  !activityPanelSource.includes("t('member.model'"),
-  'the previous standalone model row must not remain',
+  'the old separate third-line member model span and locale key are removed',
+  !activityPanelSource.includes("t('member.model'")
+    && !localesSource.includes("'member.model'"),
+  'the previous standalone model row and its orphaned locale key must not remain',
 )
 const memberModelCssStart = activityPanelCss.indexOf('.memberModel {')
 const memberModelCssBlock = activityPanelCss.slice(
@@ -758,7 +760,7 @@ check(
     && taskModelLabel({ assignee: 'analyst' }, []) === '',
 )
 check(
-  'member route projection covers provider/model, model-only, missing, whitespace, and nested slash routes',
+  'existing member route helpers retain expanded fallback regression coverage',
   memberRouteLabel({ provider: 'openai', model: 'gpt-5.6-sol' }) === 'openai/gpt-5.6-sol'
     && compactModelLabel('openai/gpt-5.6-sol') === 'gpt-5.6-sol'
     && memberRouteLabel({ model: 'grok-4.6' }) === 'grok-4.6'

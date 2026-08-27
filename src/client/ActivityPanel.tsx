@@ -643,7 +643,7 @@ function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscarded, on
                           title/aria-label (accessible tooltip) and the data-member-model
                           DOM probe; noninteractive span, no tab stop. */}
                       {memberModel !== '' && (
-                        <span className={css.memberModel} data-member-model={memberModel} title={memberModel} aria-label={memberModel}>
+                        <span className={css.memberModel} role="img" data-member-model={memberModel} title={memberModel} aria-label={memberModel}>
                           {compactModelLabel(memberModel)}
                         </span>
                       )}

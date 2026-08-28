@@ -134,6 +134,18 @@ Defaults work without extra setup. A trusted profile can override member behavio
 
 `slashCommand: false` disables the deterministic `/agent-teams` activation surfaces (slash command and gesture boundary), leaving the natural-language trigger as the only entry point.
 
+### Optional Hindsight project memory
+
+Set `hindsightBridge.enabled: true` to let assignments recall bounded project memory from the optional structural Cordis service `hindsightProjectMemory`, and to retain privacy-filtered terminal task summaries through a durable idempotent outbox. The bridge is disabled by default, imports no Hindsight runtime package, and fails open when the service is absent or unavailable. Recalled text is explicitly marked untrusted and cannot override task policy. Terminal envelopes exclude sessions, mailboxes, prompts, and model reasoning; archived team directories preserve their outbox state.
+
+```yaml
+    hindsightBridge:
+      enabled: true
+      recallBudget: low
+      recallTimeoutMs: 5000
+      maxRecallChars: 4000
+```
+
 ## Boundaries
 
 - One captain leads one active team at a time.
@@ -199,3 +211,7 @@ Use an explicit profile flag: `/agent-teams --profile demo-delivery implement th
 ## License
 
 [MIT](./LICENSE)
+
+## Optional Hindsight project-memory bridge
+
+Set `hindsightBridge.enabled: true` to recall bounded, untrusted project memory before assignment. Recall and retain I/O run outside the team lock; claims are revalidated, and terminal completed/failed results are atomically queued with team state. Pending records of a live team are retried on later scheduler kicks. Deleting a team performs one final best-effort drain and preserves any still-pending records in its archive; startup recovery scans both live and archived teams and retries those records when the workspace registry and Hindsight service are available. Older team files without the optional outbox remain readable.

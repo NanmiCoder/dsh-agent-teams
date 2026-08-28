@@ -32,6 +32,7 @@ import {
   writeTeam,
 } from './state.ts'
 import type { TeamMember, TeamState, TeamTask } from './types.ts'
+import { drainHindsightOutbox, hindsightRecallFingerprint, normalizeHindsightBridgeConfig, recallHindsightTaskMemory, type HindsightBridgeConfig } from './memory-bridge.ts'
 
 /** Per-dependency output cap in the assignment prompt. */
 export const DEPENDENCY_OUTPUT_MAX_CHARS = 2_000
@@ -41,6 +42,7 @@ export const DEPENDENCY_OUTPUTS_TOTAL_MAX_CHARS = 12_000
 export interface SchedulerConfig {
   readonly stateDir: string
   readonly executionPrompt?: string
+  readonly hindsightBridge?: HindsightBridgeConfig
 }
 
 export interface TeamScheduler {
@@ -62,6 +64,7 @@ export interface DispatchTicket {
   readonly taskId: string
   readonly memberName: string
   readonly memberId: string
+  readonly memoryBrief?: string
   readonly attempt: number
   readonly attemptId: string
   readonly previousAssignee?: string
@@ -232,7 +235,10 @@ ${executionPrompt}
 `}
 Completed dependency results:
 ${formatDependencyOutputs(ticket.dependencyOutputs)}
-
+${ticket.memoryBrief === undefined ? '' : `
+Recalled project memory:
+${ticket.memoryBrief}
+`}
 Task: ${ticket.taskId}${seed} — ${ticket.subject}${description}
 ${contract === '' ? '' : `\nContract:\n${contract}\n`}
 ${structuredCompletion}
@@ -254,7 +260,8 @@ function fallbackMailboxPrompt(messages: Awaited<ReturnType<typeof readUnreadMai
 }
 
 /** Install one scheduler and its member activity observer. */
-export function installTeamScheduler(ctx: Context, config: SchedulerConfig): TeamScheduler {
+export function installTeamScheduler(ctx: Context, configInput: SchedulerConfig): TeamScheduler {
+  const config = { ...configInput, hindsightBridge: normalizeHindsightBridgeConfig(configInput.hindsightBridge) }
   const memberQueues = new Map<string, Promise<unknown>>()
   // An idle edge in this process proves that the resident member ended its
   // turn while the current attempt was still open. Remember that capability
@@ -301,6 +308,9 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
       await serializeMember(queueKey, async () => {
         let team = await readTeam(stateRoot, teamId)
         if (team === undefined || team.halted === true || team.phase === 'staged') return
+        await drainHindsightOutbox(ctx, workspace, stateRoot, teamId, config.hindsightBridge)
+        team = await readTeam(stateRoot, teamId)
+        if (team === undefined || team.halted === true || team.phase === 'staged') return
         const captain = liveCaptain(ctx, team.captainSessionId, suppliedCaptain)
         if (captain === undefined) return
         let member = team.members.find(candidate => candidate.name === memberName && candidate.status !== 'removed')
@@ -331,6 +341,14 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
           }
           return
         }
+
+        // Snapshot the candidate, recall outside the lock, then revalidate inside
+        // the claim mutation. If the candidate changes, its stale brief is dropped.
+        const recallCandidate = ownedOpenTask(team.tasks, member.name) ?? nextReadyTask(team.tasks, member.name)
+        const recallFingerprint = recallCandidate === undefined ? undefined : hindsightRecallFingerprint(team, recallCandidate)
+        const memoryBrief = recallCandidate === undefined
+          ? undefined
+          : await recallHindsightTaskMemory(ctx, workspace, team, recallCandidate, config.hindsightBridge)
 
         const ticket = await withTeamLock(teamLockKey(stateRoot, team.id), async (): Promise<DispatchTicket | undefined> => {
           const fresh = await readTeam(stateRoot, team!.id)
@@ -369,6 +387,7 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
             taskId: task.id,
             memberName: currentMember.name,
             memberId: currentMember.id,
+            ...recallCandidate?.id === task.id && memoryBrief !== undefined && recallFingerprint === hindsightRecallFingerprint(fresh, task) ? { memoryBrief } : {},
             attempt: task.attempt ?? 1,
             attemptId,
             previousAssignee,

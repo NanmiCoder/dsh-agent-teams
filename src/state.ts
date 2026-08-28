@@ -19,6 +19,7 @@ import { mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promise
 import { join } from 'node:path'
 import { TERMINAL_TASK_STATUSES, type TaskStatus, type TeamMember, type TeamMessage, type TeamProfileSnapshot, type TeamState, type TeamTask } from './types.ts'
 import { hasValidQualityTaskFields, isReviewPolicy } from './quality-gates.ts'
+import { coerceHindsightOutboxRecord } from './memory-bridge.ts'
 
 export {
   buildCoverageMatrix,
@@ -737,7 +738,10 @@ function coerceTeamState(value: unknown, expectedId: string): TeamState | undefi
     }
     return task
   })
-  const coerced = { ...value, tasks }
+  const hindsightOutbox = Array.isArray(value['hindsightOutbox'])
+    ? value['hindsightOutbox'].map(coerceHindsightOutboxRecord).filter((record): record is NonNullable<typeof record> => record !== undefined)
+    : undefined
+  const coerced = { ...value, tasks, ...(hindsightOutbox === undefined ? {} : { hindsightOutbox }) }
   return isTeamState(coerced, expectedId) ? coerced : undefined
 }
 
@@ -794,6 +798,7 @@ function isTeamState(value: unknown, expectedId: string): value is TeamState {
     && (value['haltedAt'] === undefined || isFiniteNumber(value['haltedAt']))
     && (value['reviewPolicy'] === undefined || isReviewPolicy(value['reviewPolicy']))
     && (value['escalated'] === undefined || typeof value['escalated'] === 'boolean')
+    && (value['hindsightOutbox'] === undefined || (Array.isArray(value['hindsightOutbox']) && value['hindsightOutbox'].every(item => coerceHindsightOutboxRecord(item) !== undefined)))
   if (!validShape) return false
 
   const members = value['members'] as TeamMember[]

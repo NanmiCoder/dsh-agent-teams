@@ -39,6 +39,7 @@ import { collectArchivedTeamsActivity, collectTeamsActivity } from './snapshot.t
 import { findTeamByCaptain } from './state.ts'
 import { formatProfilesForPrompt, type TeamProfileConfig } from './profiles.ts'
 import { qualityPlanningPrompt } from './quality-gates.ts'
+import { drainAllHindsightOutboxes, type HindsightBridgeConfig } from './memory-bridge.ts'
 
 /**
  * Structural slice of the web server service, compatible with both the
@@ -92,6 +93,8 @@ export interface Config {
    * Disable to keep the natural-language trigger as the only entry point.
    */
   slashCommand?: boolean
+  /** Optional shared project-memory bridge. Disabled by default. */
+  hindsightBridge?: Partial<HindsightBridgeConfig>
 }
 
 // `z.object()` has an implicit `{}` default in Schemastery.  Fallback routes
@@ -142,6 +145,12 @@ export const Config: z<Config> = z.object({
   maxMembers: z.natural().min(1).default(8),
   promptSectionOrder: z.natural().default(117),
   slashCommand: z.boolean().default(true),
+  hindsightBridge: z.object({
+    enabled: z.boolean().default(false),
+    recallTimeoutMs: z.natural().min(100).max(30_000).default(5_000),
+    recallBudget: z.union([z.const('low'), z.const('mid')]).default('low'),
+    maxRecallChars: z.natural().min(500).max(12_000).default(4_000),
+  }),
 })
 
 /** The model-facing usage policy: when and how to drive AgentTeams. */
@@ -162,7 +171,7 @@ Tools: ${toolNames}${profilesText === '' ? '' : `\n\n${profilesText}`}`
 }
 
 export function apply(ctx: Context, config: Config): void {
-  const resolved: ToolsConfig = {
+  const resolved: ToolsConfig & { hindsightBridge: HindsightBridgeConfig } = {
     stateDir: config.stateDir ?? '.agent-teams',
     memberProvider: config.memberProvider ?? 'spawn',
     memberModel: config.memberModel,
@@ -171,6 +180,12 @@ export function apply(ctx: Context, config: Config): void {
     memberMaxDepth: config.memberMaxDepth ?? 1,
     maxMembers: config.maxMembers ?? 8,
     profiles: config.profiles ?? {},
+    hindsightBridge: {
+      enabled: config.hindsightBridge?.enabled ?? false,
+      recallTimeoutMs: config.hindsightBridge?.recallTimeoutMs ?? 5_000,
+      recallBudget: config.hindsightBridge?.recallBudget ?? 'low',
+      maxRecallChars: config.hindsightBridge?.maxRecallChars ?? 4_000,
+    },
   }
 
   // Provider registration is a sibling plugin's effect (`subagent-spawn` /
@@ -516,11 +531,26 @@ export function apply(ctx: Context, config: Config): void {
     }), 'agent-teams: artwork route')
   }
 
+  let hindsightDrain: Promise<void> | undefined
+  const startHindsightDrain = (): void => {
+    if (!resolved.hindsightBridge.enabled || hindsightDrain !== undefined) return
+    const workspaceRegistry = (ctx.get(WORKSPACE_KEYS[0]) ?? ctx.get(WORKSPACE_KEYS[1])) as WorkspaceRegistry | undefined
+    if (workspaceRegistry === undefined || ctx.get('hindsightProjectMemory') === undefined) return
+    const roots = workspaceRegistry.list().map(workspace => ({ workspace: workspace.path, stateRoot: join(workspace.path, resolved.stateDir) }))
+    hindsightDrain = drainAllHindsightOutboxes(ctx, roots, resolved.hindsightBridge)
+      .catch(error => { ctx.logger.warn(`agent-teams: startup Hindsight outbox drain failed: ${String(error)}`) })
+      .finally(() => { hindsightDrain = undefined })
+  }
+
   registerWebSurface()
+  startHindsightDrain()
   ctx.on('internal/service', (name) => {
     if (WEB_SERVER_KEYS.includes(name as (typeof WEB_SERVER_KEYS)[number])
       || WORKSPACE_KEYS.includes(name as (typeof WORKSPACE_KEYS)[number])) {
       registerWebSurface()
+    }
+    if (name === 'hindsightProjectMemory' || WORKSPACE_KEYS.includes(name as (typeof WORKSPACE_KEYS)[number])) {
+      startHindsightDrain()
     }
   })
 }

@@ -65,6 +65,7 @@ import {
 import { TERMINAL_TASK_STATUSES, type TeamMember, type TeamState, type TeamTask } from './types.ts'
 import { installTeamScheduler } from './scheduler.ts'
 import { resolveTeamProfile } from './profiles.ts'
+import { drainHindsightOutbox, enqueueHindsightTaskResult, normalizeHindsightBridgeConfig, type HindsightBridgeConfig } from './memory-bridge.ts'
 
 /** Resolved plugin config consumed by the tools. */
 export interface ToolsConfig {
@@ -84,6 +85,8 @@ export interface ToolsConfig {
   maxMembers: number
   /** Named team profiles from the active DSH profile. */
   profiles: Record<string, import('./profiles.ts').TeamProfileConfig>
+  /** Optional shared project-memory bridge. */
+  hindsightBridge?: HindsightBridgeConfig
 }
 
 /** Browser/UI mutations allowed while a plan is waiting for approval. */
@@ -444,10 +447,11 @@ export function stagedPlanFeedbackContext(teamName: string): string {
  * @param ctx - the plugin context (injects `tools`).
  * @param config - resolved tool config.
  */
-export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): AgentTeamsRuntime {
+export function registerAgentTeamsTools(ctx: Context, configInput: ToolsConfig): AgentTeamsRuntime {
+  const config = { ...configInput, hindsightBridge: normalizeHindsightBridgeConfig(configInput.hindsightBridge) }
   installRetiredMemberGuard(ctx, config.stateDir)
   const memberSelections = installMemberSelectionRuntime(ctx, config.stateDir)
-  const scheduler = installTeamScheduler(ctx, { stateDir: config.stateDir, executionPrompt: config.executionPrompt })
+  const scheduler = installTeamScheduler(ctx, { stateDir: config.stateDir, executionPrompt: config.executionPrompt, hindsightBridge: config.hindsightBridge })
 
   const updateStagedPlanBatch: AgentTeamsRuntime['updateStagedPlanBatch'] = async (captain, teamId, mutations, signal) => {
     if (mutations.length === 0) throw new Error('at least one staged plan operation is required')
@@ -1677,6 +1681,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         if (acceptanceResults !== undefined) task.acceptanceResults = acceptanceResults
         if (commandsRun !== undefined) task.commandsRun = commandsRun
         task.updatedAt = Date.now()
+        if (config.hindsightBridge.enabled) enqueueHindsightTaskResult(fresh, task)
         const followUp = (task.status === 'failed' && (task.verdict === 'needs_revision' || task.verdict === 'reject'))
           ? applyQualityFollowUp(fresh, task)
           : undefined
@@ -1715,6 +1720,9 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
           ...task.attemptId === undefined ? {} : { attempt_id: task.attemptId },
           ...task.output !== undefined ? { output: task.output } : {},
         }
+      })
+      await drainHindsightOutbox(ctx, workspace, stateRoot, team.id, config.hindsightBridge).catch(error => {
+        ctx.logger.warn(`agent-teams: Hindsight outbox drain failed: ${String(error)}`)
       })
       await scheduler.kickTeam(workspace, team.id, team.captainSessionId === caller.id ? caller : undefined)
       return updated
@@ -2071,6 +2079,10 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
           ctx.logger.warn(`agent-teams: member did not quiesce cleanly before team archive: ${String(result.reason)}`)
         }
       }
+      // Best-effort final delivery is outside the lock; pending records remain archived.
+      await drainHindsightOutbox(ctx, workspace, stateRoot, team.id, config.hindsightBridge).catch(error => {
+        ctx.logger.warn(`agent-teams: final Hindsight outbox drain failed: ${String(error)}`)
+      })
       await withTeamLock(teamLockKey(stateRoot, team.id), async () => {
         const fresh = await requireFreshCaptainTeam(stateRoot, team.id, captain.id)
         appendTeamEvent(ctx, captainSessionOf(ctx, fresh.captainSessionId, captain.session), 'agent-teams/team-deleted', {

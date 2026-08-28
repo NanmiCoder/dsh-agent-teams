@@ -8,6 +8,8 @@
  * @module dsh-agent-teams/types
  */
 
+import type { HindsightOutboxRecord } from './memory-bridge.ts'
+
 /** Task lifecycle statuses in progression order. */
 export type TaskStatus =
   | 'pending'
@@ -246,4 +248,6 @@ export interface TeamState {
   reviewPolicy?: ReviewPolicy
   /** Set when an automatic review/repair loop hits its configured ceiling. */
   escalated?: boolean
+  /** Structured terminal task results awaiting or recording Hindsight delivery. */
+  hindsightOutbox?: HindsightOutboxRecord[]
 }

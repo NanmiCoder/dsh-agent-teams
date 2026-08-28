@@ -242,7 +242,7 @@ export function apply(ctx: ClientContext): void {}
 Conversation Node 是“事件折叠 + keyed slot renderer”的组合：
 
 1. 定义共享事件类型，并 merge 到 session event map。
-2. `conversationEvents.register(definition)`：
+2. 将 `uiConversation` 放入 `inject`，并调用 `ctx.get('uiConversation').events.register(definition)`：
    - `match` 选择事件；
    - `start` 创建节点状态；
    - `update` 按 seq 确定性折叠；

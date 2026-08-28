@@ -29,7 +29,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 }
 
 /** Required services: conversation nodes, slots, sessions navigation, and locale. */
-export const inject = ['conversationEvents', 'slots', 'sessions', 'locale', 'modelDirectories']
+export const inject = ['uiConversation', 'slots', 'sessions', 'locale', 'modelDirectories']
 
 /** The replayed user message is the canonical transcript entry. */
 function HiddenAgentTeamsCommand(): null {
@@ -75,7 +75,7 @@ export function apply(ctx: ClientContext): void {
     key: 'agent-teams',
   }, HiddenAgentTeamsCommand))
 
-  ctx.conversationEvents.register(agentTeamsCardDefinition)
+  ctx.get('uiConversation').events.register(agentTeamsCardDefinition)
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register({
     name: 'conversation.chat.node',
     key: 'agent-teams',

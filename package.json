@@ -1,6 +1,6 @@
 {
   "name": "@nanmicoder/dsh-agent-teams",
-  "version": "0.1.14",
+  "version": "0.1.15-alpha.1",
   "description": "AgentTeams for DeepSeek Harness: multi-agent team collaboration (captain, members, tasks with dependencies, messaging) driven by natural language, with a tree monitor in the web GUI",
   "type": "module",
   "main": "lib/index.js",
@@ -56,6 +56,7 @@
   },
   "publishConfig": {
     "access": "public",
+    "tag": "alpha",
     "registry": "https://registry.npmjs.org/"
   },
   "dsh": {
@@ -80,9 +81,10 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit",
     "sync:skill": "node scripts/sync-skill.mjs",
     "verify:skill": "node scripts/sync-skill.mjs --check",
-    "verify": "node scripts/verify.mjs && node scripts/fallback-tdd.mjs && node scripts/quality-gates-tdd.mjs && node scripts/lifecycle-verify.mjs && node scripts/stress-verify.mjs && pnpm verify:web-routes && pnpm verify:skill",
+    "verify": "node scripts/verify.mjs && node scripts/fallback-tdd.mjs && node scripts/quality-gates-tdd.mjs && node scripts/lifecycle-verify.mjs && node scripts/stress-verify.mjs && pnpm verify:web-routes && pnpm verify:release && pnpm verify:skill",
     "prepublishOnly": "pnpm build && pnpm verify",
-    "verify:web-routes": "node scripts/web-routes-verify.mjs"
+    "verify:web-routes": "node scripts/web-routes-verify.mjs",
+    "verify:release": "node --test scripts/release-metadata.test.mjs"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.2",

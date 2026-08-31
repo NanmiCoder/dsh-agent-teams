@@ -30,7 +30,7 @@
 
 ## 版本更新
 
-查看[最新版本说明](https://github.com/NanmiCoder/dsh-agent-teams/releases/latest)，或浏览[完整发布历史](https://github.com/NanmiCoder/dsh-agent-teams/releases)。同一份 Markdown 说明也会随 npm 包发布到 `release-notes/` 目录。
+Harness Alpha.2 用户请查看 [v0.1.15-alpha.1](https://github.com/NanmiCoder/dsh-agent-teams/releases/tag/v0.1.15-alpha.1)。[稳定版](https://github.com/NanmiCoder/dsh-agent-teams/releases/latest)仍保留给旧宿主使用。也可浏览[完整发布历史](https://github.com/NanmiCoder/dsh-agent-teams/releases)；同一份说明随 npm 包发布到 `release-notes/` 目录。
 
 ## 为什么需要 AgentTeams？
 
@@ -48,26 +48,55 @@
 
 ## 安装
 
-> [!NOTE]
-> 当前源码适配 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) **0.1.2-alpha.2**。加载此构建前请先安装该宿主版本；此次迁移不兼容旧 RC 宿主。详见[兼容性验证记录](./docs/alpha2-compatibility.md)。
+> [!IMPORTANT]
+> **插件 0.1.15-alpha.1 对应 DeepSeek Harness 0.1.2-alpha.2。** 升级插件不会自动升级 Harness，本版也没有兼容旧 RC 宿主 API 的适配层。安装前先用 `dsh --version` 核对你实际启动的宿主版本。
 
-### npm
+| Harness 宿主 | 应使用的插件 | 兼容性说明 |
+| --- | --- | --- |
+| **0.1.2-alpha.2** | **0.1.15-alpha.1**（`@alpha`） | 已在 macOS arm64 上通过真实 API 和 Web UI 验收。 |
+| **0.1.0-rc.8** | **0.1.14** | 原有依赖基线；不升级宿主时保留这一组合。 |
+| 其他旧 RC / 未更新的源码宿主 | 保留当前已能正常使用的插件，不要安装 `@alpha` | 不能推断所有旧宿主都兼容 0.1.14。 |
+| Alpha.1、后续 Alpha 或其他源码提交 | 尚未验证 | 请对齐上面明确验证的宿主版本，或单独验证。 |
+
+本次迁移通过 `alpha` 渠道主动选择安装，**`latest` 保持为 0.1.14**，普通更新不会把旧宿主切到 Alpha.2 插件。可选 peer dependencies 并不是运行时版本拦截：装得上，不代表不兼容的宿主能加载成功。
+
+详见[兼容性记录](./docs/alpha2-compatibility.md)和[真实业务 / UI 验收报告](./docs/alpha2-release-acceptance.md)。
+
+### npm：使用 Harness Alpha.2
+
+通过 npm 安装 Harness 的用户，先升级宿主，再安装对应插件：
 
 ```sh
-dsh plugin --profile web add @nanmicoder/dsh-agent-teams@latest
+npm install --global @deepseek-ai/dsh@0.1.2-alpha.2
+dsh --version
+dsh plugin --profile web add @nanmicoder/dsh-agent-teams@0.1.15-alpha.1
 ```
 
-### 从源码构建
+上面固定版本，便于复现；确认发布说明后，也可用 `@nanmicoder/dsh-agent-teams@alpha` 跟随 Alpha 渠道。示例针对 `web` profile，其他 profile 请替换为你实际使用的名称。宿主或插件变更后，停止并重启正在运行的 Harness，再刷新浏览器。
+
+### 不升级宿主 / 回退旧版本
+
+如果仍使用原来的 RC 宿主，**不要把插件升级到本次 Alpha 版**。保留可用的 0.1.14 组合，或重新安装固定版本：
 
 ```sh
-git clone https://github.com/NanmiCoder/dsh-agent-teams.git
+dsh plugin --profile web add @nanmicoder/dsh-agent-teams@0.1.14
+```
+
+重启旧宿主并刷新浏览器即可。如果宿主也已升级，则要恢复匹配的旧宿主后再使用 0.1.14；仅回退插件不是受支持的 Alpha.2 组合。版本不匹配不需要删除凭据或 `.agent-teams` 数据。
+
+**从源码运行 Harness 的用户：** 更新本插件仓库、重新构建插件，或安装全局 CLI，都不会自动升级另一个正在运行的 Harness 源码目录。请先保留本地改动，把实际启动的宿主源码更新到 [dsh-v0.1.2-alpha.2](https://github.com/deepseek-ai/deepseek-harness/tree/dsh-v0.1.2-alpha.2)，按该版本说明安装依赖、构建并重启。如果宿主源码必须保持旧版，插件也应保留旧版；本地链接插件请使用 `v0.1.14` tag 及其对应依赖和构建，不要直接更新到当前 `main`。
+
+### 从源码构建 Alpha.2 插件
+
+```sh
+git clone --branch v0.1.15-alpha.1 https://github.com/NanmiCoder/dsh-agent-teams.git
 cd dsh-agent-teams
-pnpm install
+pnpm install --frozen-lockfile
 pnpm build
 dsh plugin --profile web add .
 ```
 
-修改源码后请重新执行 `pnpm build`。本地安装会继续链接到当前源码目录。
+此构建要求上面的 Alpha.2 宿主。修改源码后请重新执行 `pnpm build`；本地安装会继续链接到当前源码目录，只拉取代码不会重建已经链接的插件。
 
 检查组合配置、重启 DSH，然后刷新 Web UI：
 

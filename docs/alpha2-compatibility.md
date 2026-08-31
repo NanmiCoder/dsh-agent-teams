@@ -3,15 +3,12 @@
 Validated on 2026-08-31 against `@deepseek-ai/dsh@0.1.2-alpha.2`, macOS arm64,
 Node.js 26.7.0 and pnpm 10.33.0. The starting plugin was 0.1.14 at
 `5fe388f1a30da7b1374294b25bd6f8ad74ab6aa5`, built against 0.1.0-rc.8.
-This is an unreleased source migration; it does not upgrade a user's running
-host or publish a new npm package.
-
-The fixed source has been copied back to the project. Its existing local
-`node_modules` and `lib` were preserved because a daily profile links that
-checkout. All validation used a separate dependency install and packaged
-build; `/tmp/dsh-agent-teams-alpha2-verified.tgz` is the verified artifact.
-Reinstall dependencies and rebuild the checkout when moving that linked
-profile to Alpha.2. Do not load the Alpha.2 client into an old RC host.
+The migration ships as **0.1.15-alpha.1**, on the opt-in npm `alpha` channel.
+It does not upgrade a user's running host. Validation used isolated dependency
+installs and packaged builds, with `/tmp` as the business workspace. Existing
+daily profiles and their linked build outputs were preserved. Reinstall
+dependencies and rebuild a source-linked plugin when moving its profile to
+Alpha.2. Do not load the Alpha.2 client into an old RC host.
 
 ## Cause and migration
 
@@ -46,13 +43,14 @@ host-version check. An incompatible host may accept the package installation
 and then fail to activate the client or serve its routes. Successful package
 installation alone is not evidence of compatibility.
 
-Before publishing this migration, use a new prerelease plugin version and a
-separate npm `alpha` dist-tag while preserving the existing `latest` release.
-The current publish workflow does not select that channel, so it must be
-updated before an Alpha release. Neither the version bump nor that release
-workflow change is part of this compatibility commit. Supporting both host
-generations in one build would require an explicit adapter and validation
-against both runtime versions.
+The release uses npm `alpha`, preserving **latest=0.1.14**. Both
+`publishConfig.tag` and the GitHub Actions publish command select the channel;
+the metadata check rejects mismatched version/channel pairs. GitHub marks
+this release as a prerelease and does not replace its stable latest release.
+Supporting both host generations in one build would require an explicit
+adapter and validation against both runtime versions. The
+[README](../README.md#install) includes host upgrade, old-version pinning,
+source-checkout and rollback instructions.
 
 ## Verification
 
@@ -108,6 +106,13 @@ for these results. The provider was `deepseek-official`, model
 These checks cover the compatibility seams above, not every possible task,
 provider, failure mode or production deployment. Existing user profiles and
 project analysis documents were not modified by the verification.
+
+A second release acceptance run used three real members to produce and
+independently review an order-settlement JSON and HTML report. It exercised
+human plan revision, invalid dependency rejection, member continuation,
+interruption, discard, live locales/themes and 390px browser layouts.
+See the [business and UI acceptance record](./alpha2-release-acceptance.md),
+including recovered model mistakes and the limits of the environment.
 
 ## Upstream reference
 

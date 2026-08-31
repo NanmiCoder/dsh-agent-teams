@@ -23,16 +23,12 @@ jobs:
   publish:
     if: github.repository == 'NanmiCoder/dsh-agent-teams'
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.value }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
-
-      - name: Read package version
-        id: version
-        shell: bash
-        run: |
-          package_version="$(node --print "require('./package.json').version")"
-          echo "value=${package_version}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
@@ -40,6 +36,10 @@ jobs:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
           package-manager-cache: false
+
+      - name: Validate version and release channel
+        id: version
+        run: node scripts/release-metadata.mjs >> "$GITHUB_OUTPUT"
 
       - name: Set up package managers
         run: npm install --global npm@11.19.0 pnpm@10.33.0
@@ -67,7 +67,9 @@ jobs:
           npm pack --dry-run --ignore-scripts
 
       - name: Publish to npm
-        run: npm publish --ignore-scripts --access public
+        env:
+          NPM_DIST_TAG: ${{ steps.version.outputs.dist_tag }}
+        run: npm publish --ignore-scripts --access public --tag "$NPM_DIST_TAG"
 
   release:
     if: github.event_name == 'push'
@@ -79,18 +81,12 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v6
 
-      - name: Read package version
-        id: version
-        shell: bash
-        run: |
-          package_version="$(node --print "require('./package.json').version")"
-          echo "value=${package_version}" >> "$GITHUB_OUTPUT"
-
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.version.outputs.value }}
-          name: AgentTeams v${{ steps.version.outputs.value }}
-          body_path: release-notes/v${{ steps.version.outputs.value }}.md
+          tag_name: v${{ needs.publish.outputs.version }}
+          name: AgentTeams v${{ needs.publish.outputs.version }}
+          body_path: release-notes/v${{ needs.publish.outputs.version }}.md
           draft: false
-          prerelease: false
+          prerelease: ${{ needs.publish.outputs.prerelease == 'true' }}
+          make_latest: ${{ needs.publish.outputs.prerelease == 'true' && 'false' || 'true' }}

@@ -1,5 +1,12 @@
 # Alpha.2 发布验收记录
 
+> 发布策略已更新：同一套 Alpha.2 适配代码以 **0.1.15** 发布到 **latest**，旧宿主用户固定安装兼容旧版。
+> 这次调整没有修改运行时代码。下文保留原实测版本、真实 API / UI 过程及其证据，不把历史测试版本改写为新版本。
+
+0.1.15 补充验证：重新完成 frozen lockfile 安装、typecheck、build、完整 `pnpm verify` 和打包，
+并用 Alpha.2 CLI 实际安装。新包的 67 个运行时及资源文件与此前实测的本地 Alpha 包逐字节一致；
+发布元数据为 `dist_tag=latest`、`prerelease=false`。本次没有重复整轮真实 API 业务测试。
+
 日期：2026-08-31。目标插件：**0.1.15-alpha.1**；宿主：
 `@deepseek-ai/dsh@0.1.2-alpha.2`；macOS arm64、Node.js 26.7.0、pnpm 10.33.0。
 兼容修复提交：`bf50b49`。业务验收先使用该提交构建的本地 tarball，

@@ -30,7 +30,7 @@ Ask in natural language. The plugin provides the team protocol, eleven coordinat
 
 ## Releases
 
-For Harness Alpha.2, read [v0.1.15-alpha.1](https://github.com/NanmiCoder/dsh-agent-teams/releases/tag/v0.1.15-alpha.1). The [stable release](https://github.com/NanmiCoder/dsh-agent-teams/releases/latest) remains on the older host line. Browse the [complete release history](https://github.com/NanmiCoder/dsh-agent-teams/releases); the same notes ship in the npm package under `release-notes/`.
+The [latest release](https://github.com/NanmiCoder/dsh-agent-teams/releases/latest), [v0.1.15](https://github.com/NanmiCoder/dsh-agent-teams/releases/tag/v0.1.15), supports Harness **0.1.2-alpha.2**. Older hosts must use a pinned compatible plugin version. Browse the [complete release history](https://github.com/NanmiCoder/dsh-agent-teams/releases); the same notes ship in the npm package under `release-notes/`.
 
 ## Why AgentTeams?
 
@@ -50,16 +50,16 @@ The conversation card and activity panel use Harness's official locale service. 
 ## Install
 
 > [!IMPORTANT]
-> **Plugin 0.1.15-alpha.1 requires DeepSeek Harness 0.1.2-alpha.2.** Updating this plugin does not update Harness. This release has no adapter for the old RC host APIs. Check the version of the instance you actually launch with `dsh --version` before installing.
+> **Plugin 0.1.15 (`@latest`) requires DeepSeek Harness 0.1.2-alpha.2.** Updating this plugin does not update Harness. This release has no adapter for the old RC host APIs. Check the version of the instance you actually launch with `dsh --version` before installing.
 
 | Harness host | Plugin to use | Compatibility status |
 | --- | --- | --- |
-| **0.1.2-alpha.2** | **0.1.15-alpha.1** (`@alpha`) | Real API and Web UI verified on macOS arm64. |
+| **0.1.2-alpha.2** | **0.1.15** (`@latest`) | Recommended current pair; real API and Web UI verified on macOS arm64. |
 | **0.1.0-rc.8** | **0.1.14** | Previous dependency baseline; keep this pair if you are not upgrading Harness. |
-| Other older RC / unchanged source checkout | Keep your working plugin version; do not install `@alpha` | Do not assume every older host works with 0.1.14. |
+| Other older RC / unchanged source checkout | Pin your working plugin version; do not follow `@latest` | Do not assume every older host works with 0.1.14. |
 | Alpha.1, later Alpha versions, or other source revisions | Not verified | Match the documented host version or validate separately. |
 
-`alpha` is the opt-in channel for this migration. **`latest` remains 0.1.14** so ordinary installs do not switch older hosts to the Alpha.2 build. Optional peer dependencies are not a runtime version check: a successful install on an incompatible host does not mean the plugin can activate.
+**The default plugin release follows the current supported Harness developer preview: `latest=0.1.15`, for Harness Alpha.2.** The host's Alpha version does not require a separate Alpha plugin channel. Users staying on an older host must install an explicit compatible plugin version instead of `@latest`. Optional peer dependencies are not a runtime version check: a successful install on an incompatible host does not mean the plugin can activate.
 
 See the [compatibility details](./docs/alpha2-compatibility.md) and [real business / UI acceptance report](./docs/alpha2-release-acceptance.md).
 
@@ -70,14 +70,14 @@ If you install Harness through npm, upgrade the host first, then install the mat
 ```sh
 npm install --global @deepseek-ai/dsh@0.1.2-alpha.2
 dsh --version
-dsh plugin --profile web add @nanmicoder/dsh-agent-teams@0.1.15-alpha.1
+dsh plugin --profile web add @nanmicoder/dsh-agent-teams@latest
 ```
 
-The exact plugin version is reproducible; use `@nanmicoder/dsh-agent-teams@alpha` to follow the Alpha channel after checking its release notes. These examples target the `web` profile; use your actual profile if different. Stop and restart the running Harness process after changing either host or plugin, then refresh the browser.
+To pin this release, replace `@latest` with `@0.1.15`. Check the required host version in the release notes when updating. These examples target the `web` profile; use your actual profile if different. Stop and restart the running Harness process after changing either host or plugin, then refresh the browser.
 
 ### Staying on an older host / rolling back
 
-If you are keeping the previous RC host, **do not upgrade the plugin to this Alpha release**. Keep the working 0.1.14 pair or reinstall its pinned package:
+If you are keeping the previous RC host, **do not install the plugin's `@latest`**. For Harness 0.1.0-rc.8, keep or reinstall the pinned 0.1.14 plugin:
 
 ```sh
 dsh plugin --profile web add @nanmicoder/dsh-agent-teams@0.1.14
@@ -90,7 +90,7 @@ Restart the old host and refresh the browser. If you also upgraded Harness, rest
 ### Build the Alpha.2 plugin from source
 
 ```sh
-git clone --branch v0.1.15-alpha.1 https://github.com/NanmiCoder/dsh-agent-teams.git
+git clone --branch v0.1.15 https://github.com/NanmiCoder/dsh-agent-teams.git
 cd dsh-agent-teams
 pnpm install --frozen-lockfile
 pnpm build

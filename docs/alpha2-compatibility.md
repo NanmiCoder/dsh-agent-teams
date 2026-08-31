@@ -3,7 +3,7 @@
 Validated on 2026-08-31 against `@deepseek-ai/dsh@0.1.2-alpha.2`, macOS arm64,
 Node.js 26.7.0 and pnpm 10.33.0. The starting plugin was 0.1.14 at
 `5fe388f1a30da7b1374294b25bd6f8ad74ab6aa5`, built against 0.1.0-rc.8.
-The migration ships as **0.1.15-alpha.1**, on the opt-in npm `alpha` channel.
+The migration ships as **0.1.15**, on npm's default **latest** channel.
 It does not upgrade a user's running host. Validation used isolated dependency
 installs and packaged builds, with `/tmp` as the business workspace. Existing
 daily profiles and their linked build outputs were preserved. Reinstall
@@ -43,10 +43,15 @@ host-version check. An incompatible host may accept the package installation
 and then fail to activate the client or serve its routes. Successful package
 installation alone is not evidence of compatibility.
 
-The release uses npm `alpha`, preserving **latest=0.1.14**. Both
-`publishConfig.tag` and the GitHub Actions publish command select the channel;
-the metadata check rejects mismatched version/channel pairs. GitHub marks
-this release as a prerelease and does not replace its stable latest release.
+The default plugin release follows the current supported Harness developer
+preview: **latest=0.1.15**, for Harness **0.1.2-alpha.2**. Older hosts must pin
+a compatible historical plugin version, such as 0.1.14 for 0.1.0-rc.8.
+The host's prerelease suffix does not determine the plugin's release channel.
+Both `publishConfig.tag` and GitHub Actions select `latest` for 0.1.15;
+the metadata check rejects mismatched plugin-version/channel pairs. GitHub
+publishes 0.1.15 as a regular release and makes it the latest release.
+This replaces the initial opt-in-only policy used for 0.1.15-alpha.1;
+that historical package remains available without being the recommended install.
 Supporting both host generations in one build would require an explicit
 adapter and validation against both runtime versions. The
 [README](../README.md#install) includes host upgrade, old-version pinning,

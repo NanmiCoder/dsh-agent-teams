@@ -797,7 +797,7 @@ export function normalizeBlankOptionalTaskFields<T extends object>(task: T): T {
   for (const key of BLANK_SENSITIVE_STRING_LIST_FIELDS) {
     const value = next[key]
     if (!Array.isArray(value)) continue
-    const kept = value.filter((item) => typeof item === 'string' && item.trim() !== '')
+    const kept = value.filter((item) => !(typeof item === 'string' && item.trim() === ''))
     if (kept.length === value.length) continue
     if (kept.length === 0) delete next[key]
     else next[key] = kept

@@ -204,6 +204,17 @@ console.log('quality-gates TDD — A2. blank optional normalization (#99/#105)')
     untouched?.reviewedTaskId === 't1'
       && JSON.stringify(untouched?.inScope) === JSON.stringify(['src/b.ts']),
   )
+  for (const invalid of [123, null, { path: 'src/private/' }]) {
+    const malformed = task({ acceptance: ['', invalid, 'real criterion'] })
+    const normalized = api.normalizeBlankOptionalTaskFields?.(malformed)
+    check(
+      `tdd.normalize.retains-invalid-list-item.${JSON.stringify(invalid)}`,
+      normalized?.acceptance?.length === 2
+        && normalized.acceptance[0] === invalid
+        && api.isTeamTask?.(normalized) === false
+        && malformed.acceptance.length === 3,
+    )
+  }
 }
 
 function rejectCreate(label, current, input, extraOk) {

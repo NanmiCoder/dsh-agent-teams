@@ -574,6 +574,26 @@ try {
     recoveredQuality?.tasks.find((item) => item.id === 't1')?.reviewedTaskId === 't2')
   await removeTeamDir(stateRoot, dirtyQuality.id)
 
+  // Recovery only removes blank strings. Other malformed values must still
+  // fail durable validation rather than silently erasing contract/scope data.
+  for (const [field, values] of [
+    ['acceptance', [123, 'real criterion']],
+    ['outOfScope', [{ path: 'src/private/' }]],
+    ['sourceFindingIds', [null]],
+  ]) {
+    const malformed = {
+      ...dirtyQuality,
+      id: `malformed-${field.toLowerCase()}`,
+      tasks: [{ ...dirtyQuality.tasks[1], [field]: values }],
+    }
+    await createTeamDir(stateRoot, malformed)
+    let rejected = false
+    try { await readTeam(stateRoot, malformed.id) }
+    catch (error) { rejected = /invalid AgentTeams state/.test(String(error)) }
+    check(`cold-resume rejects non-string ${field} items`, rejected)
+    await removeTeamDir(stateRoot, malformed.id)
+  }
+
   const found = await findTeamByCaptain(stateRoot, 'sess-captain')
   check('findTeamByCaptain finds the team', found?.id === team.id)
   check('findTeamByCaptain ignores other captains', await findTeamByCaptain(stateRoot, 'sess-other') === undefined)

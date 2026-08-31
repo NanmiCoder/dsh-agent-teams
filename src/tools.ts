@@ -1839,7 +1839,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
 
   ctx.tools.register(defineTool({
     name: 'agent_teams_status',
-    description: 'Team snapshot: members with live activity and tasks with status/assignee/dependencies/output. Captains also see every team mailbox; members see only their own inbox. Poll this to watch progress.',
+    description: 'Team snapshot: members with live activity and tasks with status/assignee/dependencies/output. Captains also see every team mailbox; members see only their own inbox. Members receive work via scheduler wakeups and report through the mailbox. Dispatch, then end your turn — you will be woken by progress deliveries; avoid polling while members are running.',
     parameters: {},
     output: {
       schema: { type: 'object', additionalProperties: true, properties: {} },

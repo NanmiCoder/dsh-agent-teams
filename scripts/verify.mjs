@@ -525,6 +525,55 @@ try {
     recovered?.id === dirty.id && recovered.profile === undefined && recovered.tasks[0]?.profileSeedId === undefined)
   await removeTeamDir(stateRoot, dirty.id)
 
+  // Regression for #105: a task persisted with model-materialized blank
+  // optional fields (e.g. reviewedTaskId:"") used to brick the whole team on
+  // reload. The durable boundary must normalize blanks to omitted instead,
+  // while keeping non-blank optional values intact.
+  const dirtyQuality = {
+    ...team,
+    id: 'dirty-quality-fields',
+    tasks: [
+      {
+        id: 't1',
+        subject: 'Review impl',
+        kind: 'review',
+        status: 'pending',
+        dependencies: [],
+        reviewedTaskId: 't2',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      },
+      {
+        id: 't2',
+        subject: 'Repair with blanks',
+        kind: 'repair',
+        status: 'pending',
+        dependencies: [],
+        sourceTaskId: 't1',
+        sourceFindingIds: [''],
+        reviewedTaskId: '',
+        objective: '',
+        inScope: ['', 'src/repair.ts'],
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      },
+    ],
+    taskSeq: 2,
+  }
+  await mkdir(join(stateRoot, dirtyQuality.id, 'inbox'), { recursive: true })
+  await writeFile(join(stateRoot, dirtyQuality.id, 'team.json'), JSON.stringify(dirtyQuality, null, 2), 'utf8')
+  const recoveredQuality = await readTeam(stateRoot, dirtyQuality.id)
+  const repairedTask = recoveredQuality?.tasks.find((item) => item.id === 't2')
+  check('cold-resume recovers blank optional quality fields (#105)',
+    recoveredQuality?.id === dirtyQuality.id
+      && repairedTask?.reviewedTaskId === undefined
+      && repairedTask?.objective === undefined
+      && repairedTask?.sourceFindingIds === undefined
+      && JSON.stringify(repairedTask?.inScope) === JSON.stringify(['src/repair.ts']))
+  check('cold-resume keeps non-blank optional quality fields (#105)',
+    recoveredQuality?.tasks.find((item) => item.id === 't1')?.reviewedTaskId === 't2')
+  await removeTeamDir(stateRoot, dirtyQuality.id)
+
   const found = await findTeamByCaptain(stateRoot, 'sess-captain')
   check('findTeamByCaptain finds the team', found?.id === team.id)
   check('findTeamByCaptain ignores other captains', await findTeamByCaptain(stateRoot, 'sess-other') === undefined)

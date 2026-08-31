@@ -80,6 +80,7 @@ function loadStateApi() {
     qualityPlanningPrompt: state.qualityPlanningPrompt,
     sanitizeReviewAcceptance: state.sanitizeReviewAcceptance,
     sanitizeReviewObjective: state.sanitizeReviewObjective,
+    normalizeBlankOptionalTaskFields: state.normalizeBlankOptionalTaskFields,
     describeQualityLoop: state.describeQualityLoop,
   }
 }
@@ -168,6 +169,40 @@ console.log('quality-gates TDD — A. create contract')
   check(
     'tdd.create.work-kind-remains-compatible',
     created?.ok === true && (created.task?.kind === 'work' || created.kind === 'work'),
+  )
+}
+
+console.log('quality-gates TDD — A2. blank optional normalization (#99/#105)')
+
+{
+  const normalized = api.normalizeBlankOptionalTaskFields?.({
+    kind: 'repair',
+    subject: 'repair with blanks',
+    objective: '',
+    reviewedTaskId: '',
+    sourceTaskId: 't1',
+    sourceFindingIds: [''],
+    inScope: ['', 'src/repair.ts'],
+    acceptance: ['fixed'],
+  })
+  check(
+    'tdd.normalize.blank-optional-fields-to-omitted',
+    normalized?.reviewedTaskId === undefined
+      && normalized?.objective === undefined
+      && normalized?.sourceFindingIds === undefined
+      && JSON.stringify(normalized?.inScope) === JSON.stringify(['src/repair.ts'])
+      && normalized?.sourceTaskId === 't1'
+      && JSON.stringify(normalized?.acceptance) === JSON.stringify(['fixed']),
+  )
+  const untouched = api.normalizeBlankOptionalTaskFields?.({
+    reviewedTaskId: 't1',
+    inScope: ['src/b.ts'],
+    subject: 's',
+  })
+  check(
+    'tdd.normalize.non-blank-values-untouched',
+    untouched?.reviewedTaskId === 't1'
+      && JSON.stringify(untouched?.inScope) === JSON.stringify(['src/b.ts']),
   )
 }
 
@@ -1005,6 +1040,71 @@ console.log('quality-gates TDD — tool-level closed loop')
     check(
       'tdd.create.work-kind-remains-compatible.tool',
       persistedWork?.kind === 'work' || persistedWork?.kind === undefined,
+    )
+
+    // Regression for #105: a model-materialized reviewedTaskId:"" (plus other
+    // blank optionals) on a repair task must be normalized to omitted instead
+    // of persisted into team.json, where durable-state validation would brick
+    // the whole team on reload.
+    const repair = await call('agent_teams_create_task', {
+      subject: 'repair with blank optional',
+      kind: 'repair',
+      sourceTaskId: work.task_id,
+      sourceFindingIds: ['F-1'],
+      reviewedTaskId: '',
+      objective: 'Close F-1',
+      acceptance: ['F-1 fixed'],
+      inScope: ['', 'src/repair.ts'],
+      verify: ['', 'pnpm verify'],
+    })
+    const persistedRepair = (await readTeam(join(workspace, '.agent-teams'), 'gates'))?.tasks.find((item) => item.id === repair.task_id)
+    check(
+      'tdd.create.blank-optional-fields-normalized.tool',
+      persistedRepair?.reviewedTaskId === undefined
+        && persistedRepair?.objective === 'Close F-1'
+        && JSON.stringify(persistedRepair?.inScope) === JSON.stringify(['src/repair.ts'])
+        && JSON.stringify(persistedRepair?.verify) === JSON.stringify(['pnpm verify']),
+    )
+    check(
+      'tdd.create.team-still-loadable-after-blank-optional.tool',
+      (await readTeam(join(workspace, '.agent-teams'), 'gates'))?.id === 'gates',
+    )
+    await throwsAsync('tdd.create.review-blank-reviewedTaskId-rejected.tool', () => call('agent_teams_create_task', {
+      subject: 'review blank id',
+      kind: 'review',
+      objective: 'Review it',
+      acceptance: ['pass'],
+      reviewedTaskId: '',
+    }))
+
+    // Regression for #99: a blank optional profile must be treated as omitted,
+    // not as a hard create failure.
+    const blankProfileCaptain = {
+      id: 'captain-session-blank-profile',
+      status: 'idle',
+      options: { provider: 'fake', model: 'fake-model' },
+      session: {
+        header: { cwd: workspace, seedLength: 0 },
+        events: [],
+        append() {},
+        requestHeader() {
+          return { config: { provider: 'fake', model: 'fake-model', reasoningEffort: 'high' } }
+        },
+      },
+      followup() {},
+      steer() {},
+      cancel() {},
+      whenIdle() { return Promise.resolve() },
+    }
+    liveAgents.set(blankProfileCaptain.id, blankProfileCaptain)
+    const blankProfileTeam = await call(
+      'agent_teams_create',
+      { name: 'Blank Profile', profile: '' },
+      blankProfileCaptain,
+    )
+    check(
+      'tdd.create.blank-profile-treated-as-omitted.tool',
+      typeof blankProfileTeam?.team_id === 'string' && blankProfileTeam?.profile === undefined,
     )
 
     await throwsAsync('tdd.create.implementation-requires-objective.tool', () => call('agent_teams_create_task', {

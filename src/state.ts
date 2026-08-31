@@ -18,7 +18,7 @@ import { readFileSync } from 'node:fs'
 import { mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { TERMINAL_TASK_STATUSES, type TaskStatus, type TeamMember, type TeamMessage, type TeamProfileSnapshot, type TeamState, type TeamTask } from './types.ts'
-import { hasValidQualityTaskFields, isReviewPolicy } from './quality-gates.ts'
+import { hasValidQualityTaskFields, isReviewPolicy, normalizeBlankOptionalTaskFields } from './quality-gates.ts'
 
 export {
   buildCoverageMatrix,
@@ -30,6 +30,7 @@ export {
   evaluateQualityCompletion,
   hasValidQualityTaskFields,
   isQualityKind,
+  normalizeBlankOptionalTaskFields,
   pathMatchesScope,
   planQualityFollowUp,
   qualityPlanningPrompt,
@@ -730,12 +731,17 @@ function coerceTeamState(value: unknown, expectedId: string): TeamState | undefi
   }
   const tasks = (value['tasks'] as unknown[]).map((task) => {
     if (!isRecord(task)) return task
-    if (task['profileSeedId'] !== undefined && (typeof task['profileSeedId'] !== 'string' || task['profileSeedId'].trim() === '')) {
-      const next = { ...task }
+    // Tolerate legacy dirty records instead of bricking the whole team on
+    // reload: blank optional fields written by older builds (or by models that
+    // materialize optionals as "") are normalized to omitted, matching the
+    // profileSeedId handling below and the tool-input normalization.
+    const cleaned = normalizeBlankOptionalTaskFields(task)
+    if (cleaned['profileSeedId'] !== undefined && (typeof cleaned['profileSeedId'] !== 'string' || cleaned['profileSeedId'].trim() === '')) {
+      const next = { ...cleaned }
       delete next['profileSeedId']
       return next
     }
-    return task
+    return cleaned
   })
   const coerced = { ...value, tasks }
   return isTeamState(coerced, expectedId) ? coerced : undefined

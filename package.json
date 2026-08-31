@@ -81,7 +81,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit",
     "sync:skill": "node scripts/sync-skill.mjs",
     "verify:skill": "node scripts/sync-skill.mjs --check",
-    "verify": "node scripts/verify.mjs && node scripts/fallback-tdd.mjs && node scripts/quality-gates-tdd.mjs && node scripts/lifecycle-verify.mjs && node scripts/stress-verify.mjs && pnpm verify:web-routes && pnpm verify:release && pnpm verify:skill",
+    "verify": "node scripts/verify.mjs && node scripts/fallback-tdd.mjs && node scripts/member-failure-tdd.mjs && node scripts/quality-gates-tdd.mjs && node scripts/lifecycle-verify.mjs && node scripts/stress-verify.mjs && pnpm verify:web-routes && pnpm verify:release && pnpm verify:skill",
     "prepublishOnly": "pnpm build && pnpm verify",
     "verify:web-routes": "node scripts/web-routes-verify.mjs",
     "verify:release": "node --test scripts/release-metadata.test.mjs"
@@ -204,6 +204,7 @@
     "@deepseek-ai/dsh-client-ui-slots": "0.1.2-alpha.2",
     "@deepseek-ai/dsh-commands": "0.1.2-alpha.2",
     "@deepseek-ai/dsh-llm": "0.1.2-alpha.2",
+    "@deepseek-ai/dsh-llm-retry": "0.1.2-alpha.2",
     "@deepseek-ai/dsh-session": "0.1.2-alpha.2",
     "@deepseek-ai/dsh-session-projection": "0.1.2-alpha.2",
     "@deepseek-ai/dsh-subagent": "0.1.2-alpha.2",

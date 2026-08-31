@@ -282,8 +282,8 @@
 
 .resizeHandle:hover::after,
 .panel[data-resizing] .resizeHandle::after {
-  background-color: var(--dsw-alias-state-business-primary);
-  border-color: var(--dsw-alias-state-business-primary);
+  background-color: var(--dsw-alias-bg-fill-business);
+  border-color: var(--dsw-alias-bg-fill-business);
   opacity: 0.95;
 }
 

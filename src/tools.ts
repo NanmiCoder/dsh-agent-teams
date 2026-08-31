@@ -49,6 +49,7 @@ import {
   describeQualityLoop,
   sanitizeReviewAcceptance,
   sanitizeReviewObjective,
+  normalizeBlankOptionalTaskFields,
   taskKindOf,
 } from './state.ts'
 import type { AcceptanceResult, CommandResult, ReviewFinding, ReviewVerdict, TaskKind } from './types.ts'
@@ -723,10 +724,12 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
       if (teamName === '') throw new Error('team name must not be empty')
       const teamId = sanitizeKey(teamName)
       const staged = args.approval === 'required'
-      const profileName = args.profile?.trim()
-      if (args.profile !== undefined && profileName === '') {
-        throw new Error('AgentTeams profile name must not be empty')
-      }
+      // Some models materialize optional parameters as "" instead of omitting
+      // them (issue #99). The profile is optional, so treat a blank value
+      // exactly like an omitted one instead of failing every create call.
+      const profileName = args.profile !== undefined && args.profile.trim() !== ''
+        ? args.profile.trim()
+        : undefined
       const created = await withTeamLock(captainLockKey(stateRoot, captain.id), async () => {
         const current = await findTeamByParticipant(stateRoot, captain.id)
         if (current !== undefined) {
@@ -1222,28 +1225,33 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
       const workspace = workspaceOf(captain)
       const stateRoot = stateRootOf(workspace, config)
       const team = await requireCaptainTeam(workspace, config, captain)
+      // Some models materialize optional parameters as "" instead of omitting
+      // them (issue #105). Normalize blank optional fields to omitted before
+      // validation so a blank value can neither be rejected spuriously nor be
+      // persisted into team.json, where it would brick the team on reload.
+      const input = normalizeBlankOptionalTaskFields(args)
       const created = await withTeamLock(teamLockKey(stateRoot, team.id), async () => {
         const fresh = await requireFreshCaptainTeam(stateRoot, team.id, captain.id)
         const gate = validateCreateTask(fresh, {
-          subject: args.subject,
-          description: args.description,
-          dependencies: args.dependencies,
-          assignee: args.assignee,
-          kind: args.kind as TaskKind | undefined,
-          round: args.round,
-          objective: args.objective,
-          inScope: args.inScope,
-          outOfScope: args.outOfScope,
-          acceptance: args.acceptance,
-          verify: args.verify,
-          deliverables: args.deliverables,
-          nonGoals: args.nonGoals,
-          reviewedTaskId: args.reviewedTaskId,
-          sourceTaskId: args.sourceTaskId,
-          sourceFindingIds: args.sourceFindingIds,
-          coverageOf: args.coverageOf,
-          resume: args.resume,
-          resumeReason: args.resumeReason,
+          subject: input.subject,
+          description: input.description,
+          dependencies: input.dependencies,
+          assignee: input.assignee,
+          kind: input.kind as TaskKind | undefined,
+          round: input.round,
+          objective: input.objective,
+          inScope: input.inScope,
+          outOfScope: input.outOfScope,
+          acceptance: input.acceptance,
+          verify: input.verify,
+          deliverables: input.deliverables,
+          nonGoals: input.nonGoals,
+          reviewedTaskId: input.reviewedTaskId,
+          sourceTaskId: input.sourceTaskId,
+          sourceFindingIds: input.sourceFindingIds,
+          coverageOf: input.coverageOf,
+          resume: input.resume,
+          resumeReason: input.resumeReason,
         })
         if (!gate.ok) throw new Error(gate.error ?? 'create_task rejected by quality gates')
         if (fresh.halted === true) {
@@ -1267,11 +1275,11 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         if (args.assignee !== undefined) requireMember(fresh, args.assignee)
         const kind = gate.kind ?? 'work'
         const objective = kind === 'review' || kind === 'requirements'
-          ? sanitizeReviewObjective(args.objective)
-          : args.objective
+          ? sanitizeReviewObjective(input.objective)
+          : input.objective
         const acceptance = kind === 'review' || kind === 'requirements'
-          ? sanitizeReviewAcceptance(args.acceptance)
-          : args.acceptance
+          ? sanitizeReviewAcceptance(input.acceptance)
+          : input.acceptance
         const task: TeamTask = {
           id: `t${fresh.taskSeq + 1}`,
           subject: args.subject,
@@ -1285,16 +1293,16 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
           kind,
           ...args.round === undefined ? {} : { round: args.round },
           ...objective === undefined ? {} : { objective },
-          ...args.inScope === undefined ? {} : { inScope: args.inScope },
-          ...args.outOfScope === undefined ? {} : { outOfScope: args.outOfScope },
+          ...input.inScope === undefined ? {} : { inScope: input.inScope },
+          ...input.outOfScope === undefined ? {} : { outOfScope: input.outOfScope },
           ...acceptance === undefined ? {} : { acceptance },
-          ...args.verify === undefined ? {} : { verify: args.verify },
-          ...args.deliverables === undefined ? {} : { deliverables: args.deliverables },
-          ...args.nonGoals === undefined ? {} : { nonGoals: args.nonGoals },
-          ...args.reviewedTaskId === undefined ? {} : { reviewedTaskId: args.reviewedTaskId },
-          ...args.sourceTaskId === undefined ? {} : { sourceTaskId: args.sourceTaskId },
-          ...args.sourceFindingIds === undefined ? {} : { sourceFindingIds: args.sourceFindingIds },
-          ...args.coverageOf === undefined ? {} : { coverageOf: args.coverageOf },
+          ...input.verify === undefined ? {} : { verify: input.verify },
+          ...input.deliverables === undefined ? {} : { deliverables: input.deliverables },
+          ...input.nonGoals === undefined ? {} : { nonGoals: input.nonGoals },
+          ...input.reviewedTaskId === undefined ? {} : { reviewedTaskId: input.reviewedTaskId },
+          ...input.sourceTaskId === undefined ? {} : { sourceTaskId: input.sourceTaskId },
+          ...input.sourceFindingIds === undefined ? {} : { sourceFindingIds: input.sourceFindingIds },
+          ...input.coverageOf === undefined ? {} : { coverageOf: input.coverageOf },
         }
         fresh.taskSeq += 1
         fresh.tasks.push(task)
@@ -1653,6 +1661,10 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
             ...task.output !== undefined ? { output: task.output } : {},
           }
         }
+        // Blank optional list entries (e.g. changedPaths:[""]) must not be
+        // persisted: hasValidQualityTaskFields rejects them on reload and
+        // would brick the whole team state (issue #105 class).
+        const input = normalizeBlankOptionalTaskFields(args)
         const findings = parseFindings(args.findings)
         const acceptanceResults = parseAcceptanceResults(args.acceptanceResults)
         const commandsRun = parseCommandResults(args.commandsRun)
@@ -1661,7 +1673,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
           output: args.output,
           verdict: args.verdict as ReviewVerdict | undefined,
           findings,
-          changedPaths: args.changedPaths,
+          changedPaths: input.changedPaths,
           acceptanceResults,
           commandsRun,
         })
@@ -1674,7 +1686,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         if (args.output !== undefined) task.output = args.output
         if (args.verdict !== undefined) task.verdict = args.verdict as ReviewVerdict
         if (findings !== undefined) task.findings = findings
-        if (args.changedPaths !== undefined) task.changedPaths = args.changedPaths
+        if (input.changedPaths !== undefined) task.changedPaths = input.changedPaths
         if (acceptanceResults !== undefined) task.acceptanceResults = acceptanceResults
         if (commandsRun !== undefined) task.commandsRun = commandsRun
         task.updatedAt = Date.now()
@@ -2231,7 +2243,9 @@ function parseFindings(value: unknown): ReviewFinding[] | undefined {
       severity: raw['severity'],
       problem: raw['problem'],
       requiredFix: raw['requiredFix'],
-      ...typeof raw['file'] === 'string' ? { file: raw['file'] } : {},
+      // A blank optional file must be omitted, not persisted: durable-state
+      // validation requires non-empty optional strings (issue #105 class).
+      ...typeof raw['file'] === 'string' && raw['file'].trim() !== '' ? { file: raw['file'] } : {},
       ...typeof raw['line'] === 'number' ? { line: raw['line'] } : {},
       ...typeof raw['resolved'] === 'boolean' ? { resolved: raw['resolved'] } : {},
     }

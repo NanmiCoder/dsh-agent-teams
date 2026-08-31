@@ -17,9 +17,10 @@ import { installModelSelection, type Agent, type ModelSelection } from '@deepsee
 // Declaration merge only: makes ctx.subagents visible.
 import { foldSubagentDescriptor, SubagentError } from '@deepseek-ai/dsh-subagent'
 import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
-import type { SessionId } from '@deepseek-ai/dsh-session'
+import type { Session, SessionId } from '@deepseek-ai/dsh-session'
 import { join } from 'node:path'
-import { readRetiredMemberIds, readTeamSync, readTeam, withTeamLock, writeTeam } from './state.ts'
+import { appendMailbox, CAPTAIN_KEY, createMessage, readRetiredMemberIds, readTeamSync, readTeam, withTeamLock, writeTeam } from './state.ts'
+import { appendTeamEvent, captainSessionOf } from './events.ts'
 import { TERMINAL_TASK_STATUSES, type TeamMember, type TeamState } from './types.ts'
 
 /** Persona snapshot of a profile protocol; the full text lives on team.json. */
@@ -141,6 +142,73 @@ export function selectFallbackRoute(
     return { retry: false, switched: alreadySwitched, selection: current }
   }
   return { retry: true, switched: true, selection: fallback }
+}
+
+/**
+ * Bridge one unrecoverable member turn failure into durable team state
+ * (issue #94).
+ *
+ * A member turn can die mid-request — for example `STREAM_CLOSED` when an
+ * SSE stream ends without `[DONE]` — without the harness ever reporting an
+ * idle edge or disposing the handle. The member then stays `working` and its
+ * open attempt stays `claimed`/`in_progress` forever: the scheduler's
+ * availability gate never reopens, mailbox flushes never reach the member,
+ * and the captain is never told. The `agent/request-error` hook fires before
+ * the failed turn closes, so it is the one reliable observation point.
+ *
+ * Semantics: the owned open attempt is marked `failed` rather than returned
+ * to `pending`. `claimed`/`in_progress` → `failed` are existing legal
+ * transitions, the terminal record keeps the failed generation inspectable,
+ * and requeueing instead would re-dispatch the same work on the next kick and
+ * recreate an unbounded failure/dispatch loop for transport-class errors (the
+ * issue #66 feedback shape) because automatic retry budgeting does not exist.
+ * The captain mailbox notification is the recovery path.
+ *
+ * The write is skipped when the member owns no open attempt and was not
+ * recorded `working`: that failure self-heals on the eventual idle edge and
+ * would only spam the captain's mailbox.
+ *
+ * All mutations run under the team lock through the ordinary durable path.
+ * Errors propagate to the caller, which logs and never rethrows into the
+ * request-error waterfall.
+ */
+export async function failMemberOpenAttempt(
+  ctx: Context,
+  stateRoot: string,
+  teamId: string,
+  memberName: string,
+  failure: { readonly code: string; readonly message: string },
+  fallbackSession: Session,
+): Promise<void> {
+  const summary = `${failure.message} (code ${failure.code})`
+  await withTeamLock(`team:${stateRoot}:${teamId}`, async () => {
+    const team = await readTeam(stateRoot, teamId)
+    if (team === undefined || team.halted === true) return
+    const member = team.members.find(candidate => candidate.name === memberName && candidate.status !== 'removed')
+    if (member === undefined) return
+    const task = team.tasks.find(candidate => candidate.assignee === memberName
+      && (candidate.status === 'claimed' || candidate.status === 'in_progress'))
+    if (task === undefined && member.status !== 'working') return
+    if (task !== undefined) {
+      task.status = 'failed'
+      task.output = summary
+      task.updatedAt = Date.now()
+    }
+    member.status = 'idle'
+    const message = createMessage(memberName, CAPTAIN_KEY, task === undefined
+      ? `Member "${memberName}" hit an unrecoverable turn failure: ${summary}. No open attempt was owned; the member is available again.`
+      : `Member "${memberName}" hit an unrecoverable turn failure: ${summary}. Task ${task.id} ("${task.subject}") was marked failed; reassign it or retry when ready.`)
+    await appendMailbox(stateRoot, team.id, CAPTAIN_KEY, message)
+    appendTeamEvent(ctx, captainSessionOf(ctx, team.captainSessionId, fallbackSession), 'agent-teams/message-sent', {
+      teamId: team.id,
+      messageId: message.id,
+      from: memberName,
+      to: CAPTAIN_KEY,
+      content: message.content,
+      ts: message.ts,
+    })
+    await writeTeam(stateRoot, team)
+  })
 }
 
 async function updateFallbackState(
@@ -311,26 +379,57 @@ export function installMemberSelectionRuntime(ctx: Context, stateDir: string): M
     const selectionRef = { current: modelSelection(selection), assembled: undefined as ModelSelection | undefined }
     const disposeSelection = installModelSelection(childCtx, selectionRef)
     const fallback = selection.fallback
-    if (fallback === undefined) return disposeSelection
     let switched = false
+    // Installed unconditionally: with no fallback configured this handler is
+    // still the only place that observes a member turn dying mid-request, so
+    // it must bridge the failure into team state (issue #94) even though it
+    // has no route to switch to.
     const disposeFallback = childCtx.on('agent/request-error', async (payload) => {
       if (payload.agent.id !== child.id) return undefined
       const transition = selectFallbackRoute(selectionRef.current ?? { provider: selection.provider, model: selection.model }, fallback, payload.failure.code, switched)
-      if (!transition.retry) return undefined
-      switched = transition.switched
-      selectionRef.current = transition.selection
+      // selectFallbackRoute only retries when a fallback route exists; the
+      // explicit guard narrows that fact for the compiler.
+      if (fallback !== undefined && transition.retry) {
+        switched = transition.switched
+        selectionRef.current = transition.selection
+        const workspace = child.session.header.cwd ?? process.cwd()
+        const identity = descriptor.label.slice(MEMBER_LABEL_PREFIX.length)
+        const separator = identity.indexOf(':')
+        if (separator > 0) {
+          const teamId = identity.slice(0, separator)
+          const memberName = identity.slice(separator + 1)
+          void updateFallbackState(join(workspace, stateDir), teamId, memberName, fallback, ctx).catch((error: unknown) => {
+            ctx.logger.warn(`agent-teams: failed to persist fallback route: ${String(error)}`)
+          })
+        }
+        ctx.logger.warn(`agent-teams: member ${child.id} switching to fallback ${fallback.provider}/${fallback.model} after ${payload.failure.code}`)
+        return { kind: 'retry' as const }
+      }
+      // Unrecoverable: no fallback configured, the code is not one a route
+      // switch can fix (transport-class failures like STREAM_CLOSED), or the
+      // fallback route already failed. Leave the failure terminal (no retry —
+      // retrying without a route change would loop) and bridge it into team
+      // state so the scheduler gate reopens and the captain is notified.
       const workspace = child.session.header.cwd ?? process.cwd()
       const identity = descriptor.label.slice(MEMBER_LABEL_PREFIX.length)
       const separator = identity.indexOf(':')
       if (separator > 0) {
         const teamId = identity.slice(0, separator)
         const memberName = identity.slice(separator + 1)
-        void updateFallbackState(join(workspace, stateDir), teamId, memberName, fallback, ctx).catch((error: unknown) => {
-          ctx.logger.warn(`agent-teams: failed to persist fallback route: ${String(error)}`)
-        })
+        try {
+          await failMemberOpenAttempt(
+            ctx,
+            join(workspace, stateDir),
+            teamId,
+            memberName,
+            { code: payload.failure.code, message: payload.failure.message },
+            child.session,
+          )
+        } catch (error: unknown) {
+          ctx.logger.warn(`agent-teams: failed to record member turn failure: ${String(error)}`)
+        }
       }
-      ctx.logger.warn(`agent-teams: member ${child.id} switching to fallback ${fallback.provider}/${fallback.model} after ${payload.failure.code}`)
-      return { kind: 'retry' as const }
+      return undefined
     })
     return () => {
       disposeFallback()

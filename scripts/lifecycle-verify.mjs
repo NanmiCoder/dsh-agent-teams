@@ -13,7 +13,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { haltTeamWork, registerAgentTeamsTools } from '../lib/tools.js'
 import { buildActivationDirective, invokedAgentTeamsGoal, invokedAgentTeamsInvocation, installAgentTeamsGestureBoundary, profileCommandName, registerAgentTeamsCommand } from '../lib/command.js'
-import { readArchivedTeam, readTeam, readUnreadMailbox } from '../lib/state.js'
+import { readArchivedTeam, readMailbox, readTeam, readUnreadMailbox } from '../lib/state.js'
 import { collectArchivedTeamsActivity } from '../lib/snapshot.js'
 
 const workspace = await mkdtemp(join(tmpdir(), 'dsh-agent-teams-lifecycle-'))
@@ -22,6 +22,8 @@ const liveAgents = new Map()
 const children = []
 const deliveries = []
 const listeners = new Map()
+const childListeners = new Map()
+const continuableSetups = []
 const failNextDelivery = new Set()
 const failures = []
 let childSeq = 0
@@ -78,6 +80,43 @@ function publishStatus(subject, status) {
   for (const listener of listeners.get('agent/status') ?? []) listener({ agent: subject, status })
 }
 
+/**
+ * Compose one child's scoped context like the harness does, so the plugin's
+ * continuable setup can install its per-child listeners (model selection and
+ * the `agent/request-error` bridge) against a dispatchable registry.
+ */
+function childContext(child) {
+  const registry = new Map()
+  childListeners.set(child.id, registry)
+  return {
+    agent: child,
+    on(name, listener) {
+      const current = registry.get(name) ?? []
+      current.push(listener)
+      registry.set(name, current)
+      return () => registry.set(name, (registry.get(name) ?? []).filter(candidate => candidate !== listener))
+    },
+  }
+}
+
+/** Dispatch one failed model request to a child's request-error listeners. */
+async function emitRequestError(child, failure) {
+  const handlers = childListeners.get(child.id)?.get('agent/request-error') ?? []
+  let action
+  for (const handler of handlers) {
+    action = await handler({
+      agent: child,
+      turn: 1,
+      step: 0,
+      provider: 'fake',
+      failure,
+      retryPolicy: undefined,
+      signal: new AbortController().signal,
+    })
+  }
+  return action
+}
+
 const captain = makeAgent('captain-session')
 liveAgents.set(captain.id, captain)
 let advertisedModels = []
@@ -112,7 +151,8 @@ const ctx = {
     },
   },
   subagents: {
-    registerContinuableSetup() {
+    registerContinuableSetup(setup) {
+      continuableSetups.push(setup)
       return () => {}
     },
     getProvider(name) {
@@ -128,6 +168,20 @@ const ctx = {
       child.status = 'running'
       liveAgents.set(id, child)
       children.push({ id, label: spec.label, mode: 'continuable' })
+      if (typeof spec.label === 'string' && spec.label.startsWith('agent-teams:')) {
+        child.session.events = [{
+          type: 'subagent/descriptor',
+          data: {
+            version: 3,
+            mode: 'continuable',
+            provider: 'spawn',
+            label: spec.label,
+            agentProvider: spec.request?.agentOptions?.provider ?? 'fake',
+            agentModel: spec.request?.agentOptions?.model ?? 'fake-model',
+          },
+        }]
+      }
+      for (const setup of continuableSetups) setup(childContext(child))
       return { childId: id, messageId: `welcome-${childSeq}` }
     },
     async listChildren(parentId) {
@@ -1000,8 +1054,21 @@ try {
   // must return to the ordinary member scheduler instead of staying white and
   // ownerless forever in the activity panel.
   publishStatus(captain, 'idle')
-  await new Promise(resolve => setTimeout(resolve, 20))
-  const afterCaptainIdle = await state()
+  // The requeue lands only after team.json's atomic write, which on Windows
+  // can stall on transient rename EPERM retries (issue #108), so poll for
+  // settlement instead of guessing a fixed wait.
+  let afterCaptainIdle = await state()
+  for (let waited = 0; waited < 2000; waited += 20) {
+    // A torn read during a degraded non-atomic overwrite must not kill the
+    // run; treat it as "not settled yet" and keep polling.
+    const settled = ((afterCaptainIdle?.tasks.filter(candidate => (
+      candidate.id === t8.task_id || candidate.id === t9.task_id
+    )) ?? []).every(candidate => candidate.assignee !== 'captain'
+      && (candidate.status === 'claimed' || candidate.status === 'in_progress')))
+    if (settled) break
+    await new Promise(resolve => setTimeout(resolve, 20))
+    afterCaptainIdle = await state().catch(() => undefined)
+  }
   const recoveredParallel = afterCaptainIdle?.tasks.filter(candidate => (
     candidate.id === t8.task_id || candidate.id === t9.task_id
   )) ?? []
@@ -1109,6 +1176,88 @@ try {
   check('same-name team can be recreated and archived again',
     await readTeam(stateRoot, teamId) === undefined
       && replacementArchive?.description === 'second generation')
+
+  // ── member turn failure bridging (issue #94) ─────────────────────────
+  // A member turn dies mid-stream with a transport-class failure and the
+  // harness emits no idle edge: the continuable handle survives and the
+  // durable record keeps the member "working". The plugin must bridge the
+  // failure at the request-error boundary (fail the open attempt, release
+  // the member, notify the captain); before the fix the request-error hook
+  // was only installed when a fallback route existed, so no-fallback teams
+  // stalled silently with a parked in_progress task.
+  await call('agent_teams_create', { name: 'Failure Bridge', description: 'turn failures must surface' })
+  await call('agent_teams_add_member', { name: 'flake', role: 'streaming worker' })
+  const flakeTeam = await readTeam(stateRoot, 'failure-bridge')
+  const flake = liveAgents.get(flakeTeam?.members.find(member => member.name === 'flake')?.id)
+  publishStatus(flake, 'idle')
+  const flakeTask = await call('agent_teams_create_task', { subject: 'streaming work', assignee: 'flake' })
+  const flakeClaim = await call('agent_teams_claim_task', { task_id: flakeTask.task_id }, flake)
+  await call('agent_teams_update_task', {
+    task_id: flakeTask.task_id, status: 'in_progress', attempt_id: flakeClaim.attempt_id,
+  }, flake)
+
+  // The captain asks the working member a question while its turn is wedged;
+  // live delivery is unavailable, so the message stays a durable fallback
+  // that only the scheduler mailbox flush can hand over.
+  failNextDelivery.add(flake.id)
+  await call('agent_teams_send_message', { to: 'flake', content: 'status update please' })
+  const deliveriesBeforeFailure = deliveries.length
+  const captainMailBeforeFailure = (await readMailbox(stateRoot, 'failure-bridge', 'captain')).length
+
+  // The turn dies mid-stream with a transport-class failure and no idle edge.
+  const failureAction = await emitRequestError(flake, {
+    code: 'STREAM_CLOSED',
+    message: 'SSE stream ended without [DONE]',
+  })
+  // Degraded non-atomic overwrites can hand a reader torn JSON; retry the
+  // durable reads instead of letting environmental I/O noise fail the checks.
+  const readTeamStable = async (teamId) => {
+    for (let attempt = 0; ; attempt += 1) {
+      try { return await readTeam(stateRoot, teamId) } catch (error) { if (attempt >= 5) throw error }
+    }
+  }
+  const readMailboxStable = async (teamId, agentKey) => {
+    for (let attempt = 0; ; attempt += 1) {
+      try { return await readMailbox(stateRoot, teamId, agentKey) } catch (error) { if (attempt >= 5) throw error }
+    }
+  }
+  const bridgeState = () => readTeamStable('failure-bridge')
+  const bridgeTask = async () => (await bridgeState())?.tasks.find(candidate => candidate.id === flakeTask.task_id)
+  const stalledFlake = (await bridgeState())?.members.find(member => member.name === 'flake')
+  const captainMail = await readMailboxStable('failure-bridge', 'captain')
+  check('turn failure fails the open attempt, releases the member, and owns no retry',
+    failureAction === undefined
+      && (await bridgeTask())?.status === 'failed'
+      && (await bridgeTask())?.output?.includes('STREAM_CLOSED') === true
+      && stalledFlake?.status === 'idle')
+  check('turn failure notifies the captain mailbox with the error code',
+    captainMail.length === captainMailBeforeFailure + 1
+      && captainMail.at(-1)?.from === 'flake'
+      && captainMail.at(-1)?.to === 'captain'
+      && captainMail.at(-1)?.content.includes('STREAM_CLOSED') === true
+      && captainMail.at(-1)?.content.includes(flakeTask.task_id))
+  check('turn failure dispatches nothing and leaves the question queued',
+    deliveries.length === deliveriesBeforeFailure
+      && (await readUnreadMailbox(stateRoot, 'failure-bridge', 'flake')).length === 1)
+
+  // Once the harness settles the dead turn (idle edge or handle disposal),
+  // the released member's gate reopens and the queued question flushes.
+  publishStatus(flake, 'idle')
+  let flushed = false
+  for (let waited = 0; waited < 2000; waited += 20) {
+    // Repeat the status kick: one scheduler pass can be lost to the same
+    // degraded-write noise, and mailbox flush is idempotent.
+    await call('agent_teams_status', {}).catch(() => {})
+    const unread = await readUnreadMailbox(stateRoot, 'failure-bridge', 'flake').catch(() => null)
+    if (unread !== null && deliveries.length > deliveriesBeforeFailure && unread.length === 0) {
+      flushed = true
+      break
+    }
+    await new Promise(resolve => setTimeout(resolve, 20))
+  }
+  check('settled member flushes the queued captain question with the attempt still failed',
+    flushed && (await bridgeTask())?.status === 'failed')
+  await call('agent_teams_delete', {})
 } finally {
   await rm(workspace, { recursive: true, force: true })
 }

@@ -50,7 +50,7 @@ The conversation card and activity panel use Harness's official locale service. 
 ## Install
 
 > [!NOTE]
-> Requires an existing [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) installation.
+> This source targets [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) **0.1.2-alpha.2**. Install that exact host version before loading this build; older RC hosts are not supported by this migration. See the [compatibility verification](./docs/alpha2-compatibility.md).
 
 ### npm
 

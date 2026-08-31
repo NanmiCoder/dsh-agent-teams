@@ -49,7 +49,7 @@
 ## 安装
 
 > [!NOTE]
-> 使用前请确保已安装 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)。
+> 当前源码适配 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) **0.1.2-alpha.2**。加载此构建前请先安装该宿主版本；此次迁移不兼容旧 RC 宿主。详见[兼容性验证记录](./docs/alpha2-compatibility.md)。
 
 ### npm
 

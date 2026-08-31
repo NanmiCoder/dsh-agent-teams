@@ -21,18 +21,19 @@ import { defineConfig, type UserConfig } from 'tsdown'
 /** Platform seed entries the browser module table answers (external). */
 const PLATFORM_MODULES = [
   'react', 'react/jsx-runtime', 'react-dom', 'react-dom/client', '@deepseek-ai/cordis',
+  '@deepseek-ai/dsh-client-store',
   '@deepseek-ai/dsh-client-ui-slots',
   '@deepseek-ai/dsh-client-ui-primitives',
 ]
 
-/** Dynamic rows whose factories the rc.8 shell preloads before boot. */
-const PRELOADED_CLIENT_EXTERNALS = ['@deepseek-ai/dsh-client-runtime/client']
+/** alpha.2 has no parser-preloaded runtime bundle. */
+const PRELOADED_CLIENT_EXTERNALS: string[] = []
 
 /** Externals resolved from the loader module table. */
 const CLIENT_EXTERNALS: readonly string[] = [...PLATFORM_MODULES, ...PRELOADED_CLIENT_EXTERNALS]
 
 /** Wire/type layers a client bundle may inline (no shared runtime identity). */
-const INLINE_SAFE = /^@deepseek-ai\/dsh-(host-apiproxy|session|llm|tools|brand)(\/|$)/
+const INLINE_SAFE = /^@deepseek-ai\/dsh-(session|llm|tools|brand)(\/|$)/
 
 /** Vendored framework libraries (no cross-plugin runtime identity). */
 const VENDORED_LIBRARY = /^@deepseek-ai\/(cosmokit|schemastery)(\/|$)/

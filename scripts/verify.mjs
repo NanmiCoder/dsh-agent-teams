@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { SUBAGENT_DESCRIPTOR_VERSION } from '@deepseek-ai/dsh-subagent'
 /**
  * Offline smoke verification for dsh-agent-teams.
  *
@@ -210,7 +211,7 @@ check(
   'client uses the uiConversation event registry and registers the official locale namespace',
   AGENT_TEAMS_LOCALE_NAMESPACE === 'agentTeams'
     && clientIndexSource.includes("'uiConversation', 'slots', 'sessions', 'locale', 'modelDirectories'")
-    && clientIndexSource.includes("ctx.get('uiConversation').events.register(agentTeamsCardDefinition)")
+    && clientIndexSource.includes('ctx.uiConversation.events.register(agentTeamsCardDefinition)')
     && clientIndexSource.includes('ctx.locale.register(AGENT_TEAMS_LOCALE_NAMESPACE, { zh, en })')
     && clientIndexSource.match(/locale:\s*AGENT_TEAMS_LOCALE_NAMESPACE/gu)?.length === 2,
 )
@@ -524,6 +525,75 @@ try {
   check('cold-resume ignores dirty optional profile and seed id',
     recovered?.id === dirty.id && recovered.profile === undefined && recovered.tasks[0]?.profileSeedId === undefined)
   await removeTeamDir(stateRoot, dirty.id)
+
+  // Regression for #105: a task persisted with model-materialized blank
+  // optional fields (e.g. reviewedTaskId:"") used to brick the whole team on
+  // reload. The durable boundary must normalize blanks to omitted instead,
+  // while keeping non-blank optional values intact.
+  const dirtyQuality = {
+    ...team,
+    id: 'dirty-quality-fields',
+    tasks: [
+      {
+        id: 't1',
+        subject: 'Review impl',
+        kind: 'review',
+        status: 'pending',
+        dependencies: [],
+        reviewedTaskId: 't2',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      },
+      {
+        id: 't2',
+        subject: 'Repair with blanks',
+        kind: 'repair',
+        status: 'pending',
+        dependencies: [],
+        sourceTaskId: 't1',
+        sourceFindingIds: [''],
+        reviewedTaskId: '',
+        objective: '',
+        inScope: ['', 'src/repair.ts'],
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      },
+    ],
+    taskSeq: 2,
+  }
+  await mkdir(join(stateRoot, dirtyQuality.id, 'inbox'), { recursive: true })
+  await writeFile(join(stateRoot, dirtyQuality.id, 'team.json'), JSON.stringify(dirtyQuality, null, 2), 'utf8')
+  const recoveredQuality = await readTeam(stateRoot, dirtyQuality.id)
+  const repairedTask = recoveredQuality?.tasks.find((item) => item.id === 't2')
+  check('cold-resume recovers blank optional quality fields (#105)',
+    recoveredQuality?.id === dirtyQuality.id
+      && repairedTask?.reviewedTaskId === undefined
+      && repairedTask?.objective === undefined
+      && repairedTask?.sourceFindingIds === undefined
+      && JSON.stringify(repairedTask?.inScope) === JSON.stringify(['src/repair.ts']))
+  check('cold-resume keeps non-blank optional quality fields (#105)',
+    recoveredQuality?.tasks.find((item) => item.id === 't1')?.reviewedTaskId === 't2')
+  await removeTeamDir(stateRoot, dirtyQuality.id)
+
+  // Recovery only removes blank strings. Other malformed values must still
+  // fail durable validation rather than silently erasing contract/scope data.
+  for (const [field, values] of [
+    ['acceptance', [123, 'real criterion']],
+    ['outOfScope', [{ path: 'src/private/' }]],
+    ['sourceFindingIds', [null]],
+  ]) {
+    const malformed = {
+      ...dirtyQuality,
+      id: `malformed-${field.toLowerCase()}`,
+      tasks: [{ ...dirtyQuality.tasks[1], [field]: values }],
+    }
+    await createTeamDir(stateRoot, malformed)
+    let rejected = false
+    try { await readTeam(stateRoot, malformed.id) }
+    catch (error) { rejected = /invalid AgentTeams state/.test(String(error)) }
+    check(`cold-resume rejects non-string ${field} items`, rejected)
+    await removeTeamDir(stateRoot, malformed.id)
+  }
 
   const found = await findTeamByCaptain(stateRoot, 'sess-captain')
   check('findTeamByCaptain finds the team', found?.id === team.id)
@@ -1252,7 +1322,7 @@ function descriptorEvent(label, agentProvider = 'descriptor-provider', agentMode
   return {
     type: 'subagent/descriptor',
     data: {
-      version: 2,
+      version: SUBAGENT_DESCRIPTOR_VERSION,
       mode: 'continuable',
       provider: 'spawn',
       label,
@@ -1514,7 +1584,7 @@ try {
           `$f = '${transientJson.replaceAll("'", "''")}';
            $s = [System.IO.File]::Open($f, [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::ReadWrite);
            [Console]::Out.WriteLine('HELD_T'); [Console]::Out.Flush();
-           Start-Sleep -Milliseconds 140; $s.Dispose()`],
+           Start-Sleep -Milliseconds 80; $s.Dispose()`],
         { stdio: ['ignore', 'pipe', 'inherit'] },
       )
       const flashed = await new Promise((resolve, reject) => {
@@ -1537,8 +1607,10 @@ try {
         flasher.on('exit', onExit)
       })
       try {
-        // The flasher releases after ~140 ms; archiveTeamDir retries the
-        // rename across that window, so archiving must still succeed.
+        // The flasher releases after ~80 ms (plus process exit jitter): the
+        // lock must outlive the first rename attempt but land comfortably
+        // inside the 3x50 ms retry budget, including the PowerShell dispose
+        // jitter that previously pushed a 140 ms hold past it (issue #108).
         await archiveTeamDir(atomicStateRoot, transientTeam.id)
         const archived = await readFile(join(atomicStateRoot, 'archive', transientTeam.id, 'team.json'), 'utf8')
         check(

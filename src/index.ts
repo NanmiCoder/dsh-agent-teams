@@ -24,7 +24,6 @@ import type {} from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-subagent'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import type { WorkspaceRegistry } from '@deepseek-ai/dsh-workspace'
-import type { IncomingMessage, ServerResponse } from 'node:http'
 import {
   haltTeamWork,
   registerAgentTeamsTools,
@@ -40,20 +39,7 @@ import { findTeamByCaptain } from './state.ts'
 import { formatProfilesForPrompt, type TeamProfileConfig } from './profiles.ts'
 import { qualityPlanningPrompt } from './quality-gates.ts'
 
-/**
- * Structural slice of the web server service, compatible with both the
- * published `dsh-host-webserver@0.0.1-rc.1` (`ctx.httpServer` /
- * `HttpServerService`) and the renamed `webServer` / `WebServer` in later
- * builds: the beta transition renames the service without changing the route
- * registration shape.
- */
-interface WebRouteHost {
-  register(route: {
-    kind: 'exact' | 'prefix'
-    path: string
-    handler: (req: IncomingMessage, res: ServerResponse) => void | Promise<void>
-  }): () => void
-}
+import { authenticatedWebRoutes, type BrowserRequestGate, type WebRouteHost } from './web-routes.ts'
 
 /** Web-server service key candidates, newest first. */
 const WEB_SERVER_KEYS = ['webServer', 'httpServer'] as const
@@ -229,9 +215,10 @@ export function apply(ctx: Context, config: Config): void {
   let webRegistered = false
   const registerWebSurface = (): void => {
     if (webRegistered) return
-    const webServer = (ctx.get(WEB_SERVER_KEYS[0]) ?? ctx.get(WEB_SERVER_KEYS[1])) as WebRouteHost | undefined
+    const rawWebServer = (ctx.get(WEB_SERVER_KEYS[0]) ?? ctx.get(WEB_SERVER_KEYS[1])) as WebRouteHost | undefined
     const workspaceRegistry = (ctx.get(WORKSPACE_KEYS[0]) ?? ctx.get(WORKSPACE_KEYS[1])) as WorkspaceRegistry | undefined
-    if (webServer === undefined || workspaceRegistry === undefined) return
+    if (rawWebServer === undefined || workspaceRegistry === undefined) return
+    const webServer = authenticatedWebRoutes(rawWebServer, () => ctx.get('connection') as BrowserRequestGate | undefined)
     webRegistered = true
 
     // Activity panel data route: the browser floater polls this for team

@@ -30,7 +30,7 @@ Ask in natural language. The plugin provides the team protocol, eleven coordinat
 
 ## Releases
 
-Read the [latest release notes](https://github.com/NanmiCoder/dsh-agent-teams/releases/latest) or browse the [complete release history](https://github.com/NanmiCoder/dsh-agent-teams/releases). The same Markdown notes are included in the npm package under `release-notes/`.
+The [latest release](https://github.com/NanmiCoder/dsh-agent-teams/releases/latest), [v0.1.15](https://github.com/NanmiCoder/dsh-agent-teams/releases/tag/v0.1.15), supports Harness **0.1.2-alpha.2**. Older hosts must use a pinned compatible plugin version. Browse the [complete release history](https://github.com/NanmiCoder/dsh-agent-teams/releases); the same notes ship in the npm package under `release-notes/`.
 
 ## Why AgentTeams?
 
@@ -49,26 +49,55 @@ The conversation card and activity panel use Harness's official locale service. 
 
 ## Install
 
-> [!NOTE]
-> Requires an existing [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) installation.
+> [!IMPORTANT]
+> **Plugin 0.1.15 (`@latest`) requires DeepSeek Harness 0.1.2-alpha.2.** Updating this plugin does not update Harness. This release has no adapter for the old RC host APIs. Check the version of the instance you actually launch with `dsh --version` before installing.
 
-### npm
+| Harness host | Plugin to use | Compatibility status |
+| --- | --- | --- |
+| **0.1.2-alpha.2** | **0.1.15** (`@latest`) | Recommended current pair; real API and Web UI verified on macOS arm64. |
+| **0.1.0-rc.8** | **0.1.14** | Previous dependency baseline; keep this pair if you are not upgrading Harness. |
+| Other older RC / unchanged source checkout | Pin your working plugin version; do not follow `@latest` | Do not assume every older host works with 0.1.14. |
+| Alpha.1, later Alpha versions, or other source revisions | Not verified | Match the documented host version or validate separately. |
+
+**The default plugin release follows the current supported Harness developer preview: `latest=0.1.15`, for Harness Alpha.2.** The host's Alpha version does not require a separate Alpha plugin channel. Users staying on an older host must install an explicit compatible plugin version instead of `@latest`. Optional peer dependencies are not a runtime version check: a successful install on an incompatible host does not mean the plugin can activate.
+
+See the [compatibility details](./docs/alpha2-compatibility.md) and [real business / UI acceptance report](./docs/alpha2-release-acceptance.md).
+
+### npm: Harness Alpha.2
+
+If you install Harness through npm, upgrade the host first, then install the matching plugin:
 
 ```sh
+npm install --global @deepseek-ai/dsh@0.1.2-alpha.2
+dsh --version
 dsh plugin --profile web add @nanmicoder/dsh-agent-teams@latest
 ```
 
-### Build from source
+To pin this release, replace `@latest` with `@0.1.15`. Check the required host version in the release notes when updating. These examples target the `web` profile; use your actual profile if different. Stop and restart the running Harness process after changing either host or plugin, then refresh the browser.
+
+### Staying on an older host / rolling back
+
+If you are keeping the previous RC host, **do not install the plugin's `@latest`**. For Harness 0.1.0-rc.8, keep or reinstall the pinned 0.1.14 plugin:
 
 ```sh
-git clone https://github.com/NanmiCoder/dsh-agent-teams.git
+dsh plugin --profile web add @nanmicoder/dsh-agent-teams@0.1.14
+```
+
+Restart the old host and refresh the browser. If you also upgraded Harness, restore the matching older host before using 0.1.14; rolling back only the plugin is not a supported Alpha.2 configuration. Do not delete credentials or `.agent-teams` data to fix a version mismatch.
+
+**Harness built from source:** updating this plugin repository, rebuilding it, or installing a global CLI does not upgrade a separately launched Harness checkout. Preserve your local changes, update the actual host checkout to [dsh-v0.1.2-alpha.2](https://github.com/deepseek-ai/deepseek-harness/tree/dsh-v0.1.2-alpha.2), follow its build instructions, and restart that host. If its source must stay old, keep the old plugin too; for a source-linked plugin use tag `v0.1.14` and its matching dependencies/build, not the current `main` branch.
+
+### Build the Alpha.2 plugin from source
+
+```sh
+git clone --branch v0.1.15 https://github.com/NanmiCoder/dsh-agent-teams.git
 cd dsh-agent-teams
-pnpm install
+pnpm install --frozen-lockfile
 pnpm build
 dsh plugin --profile web add .
 ```
 
-Run `pnpm build` again after changing the source. The local plugin install remains linked to this checkout.
+This requires the Alpha.2 host above. Run `pnpm build` again after changing the source. The local plugin install remains linked to this checkout; pulling source alone does not rebuild that linked plugin.
 
 Validate the composed profile, restart DSH, and refresh the Web UI:
 

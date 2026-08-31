@@ -1,11 +1,16 @@
 /** Browser plugin for the AgentTeams activity floater and conversation card. */
 
-import type { ClientContext, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import type {} from '@deepseek-ai/dsh-api-session-controller/client'
+import type {} from '@deepseek-ai/dsh-client-ui-session/client'
+import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 // Type-only: pulls the official browser locale service into ClientContext.
 import type {} from '@deepseek-ai/dsh-client-locale/client'
-// Module-loading import: the card registers into the conversation chat-node
-// slot, whose keyed renderer map lives in the ui-conversation contract.
+// Conversation folding is target-neutral; keyed Chat rendering is owned by
+// ui-chat, whose declaration is loaded above.
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 // The frame-level overlay is declared by ui-layout. This import is type-only;
 // ctx.slots.inject below owns the runtime wait for the declaration.
@@ -75,7 +80,7 @@ export function apply(ctx: ClientContext): void {
     key: 'agent-teams',
   }, HiddenAgentTeamsCommand))
 
-  ctx.get('uiConversation').events.register(agentTeamsCardDefinition)
+  ctx.uiConversation.events.register(agentTeamsCardDefinition)
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register({
     name: 'conversation.chat.node',
     key: 'agent-teams',

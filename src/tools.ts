@@ -60,12 +60,15 @@ import {
   memberActivity,
   resolveMemberLlmSelection,
   spawnMember,
+  steerCaptainReport,
   validateMemberLlmSelections,
   type MemberRuntimeConfig,
 } from './members.ts'
 import { TERMINAL_TASK_STATUSES, type TeamMember, type TeamState, type TeamTask } from './types.ts'
 import { installTeamScheduler } from './scheduler.ts'
 import { resolveTeamProfile } from './profiles.ts'
+
+export { steerCaptainReport } from './members.ts'
 
 /** Resolved plugin config consumed by the tools. */
 export interface ToolsConfig {
@@ -407,19 +410,6 @@ export async function haltTeamWork(input: {
   }
 }
 
-export function steerCaptainReport(captain: Pick<Agent, 'steer'>, from: string, content: string): boolean {
-  try {
-    captain.steer(createUserMessage({
-      content: [{ type: 'text', text: `AgentTeams message from member ${from}:\n\n${content}` }],
-      source: { kind: 'plugin', plugin: 'dsh-agent-teams' },
-    }))
-    return true
-  } catch {
-    // The plugin mailbox was persisted before this best-effort live delivery.
-    return false
-  }
-}
-
 /** Context queued after the human rejects a staged plan. */
 export function stagedPlanDiscardContext(teamName: string): string {
   return [
@@ -447,8 +437,10 @@ export function stagedPlanFeedbackContext(teamName: string): string {
  */
 export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): AgentTeamsRuntime {
   installRetiredMemberGuard(ctx, config.stateDir)
-  const memberSelections = installMemberSelectionRuntime(ctx, config.stateDir)
   const scheduler = installTeamScheduler(ctx, { stateDir: config.stateDir, executionPrompt: config.executionPrompt })
+  const memberSelections = installMemberSelectionRuntime(ctx, config.stateDir, (workspace, teamId, memberName) => (
+    scheduler.kickMember(workspace, teamId, memberName)
+  ))
 
   const updateStagedPlanBatch: AgentTeamsRuntime['updateStagedPlanBatch'] = async (captain, teamId, mutations, signal) => {
     if (mutations.length === 0) throw new Error('at least one staged plan operation is required')

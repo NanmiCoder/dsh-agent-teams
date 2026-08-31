@@ -16,12 +16,12 @@ import type { Context } from '@deepseek-ai/cordis'
 import { installModelSelection, type Agent, type ModelSelection } from '@deepseek-ai/dsh-agent'
 // Declaration merge only: makes ctx.subagents visible.
 import { foldSubagentDescriptor, SubagentError } from '@deepseek-ai/dsh-subagent'
-import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
+import { createUserMessage, LlmError, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { Session, SessionId } from '@deepseek-ai/dsh-session'
 import { join } from 'node:path'
-import { appendMailbox, CAPTAIN_KEY, createMessage, readRetiredMemberIds, readTeamSync, readTeam, withTeamLock, writeTeam } from './state.ts'
+import { acknowledgeMailbox, appendMailbox, CAPTAIN_KEY, createMessage, readRetiredMemberIds, readTeamSync, readTeam, releaseMailboxDelivery, withTeamLock, writeTeam } from './state.ts'
 import { appendTeamEvent, captainSessionOf } from './events.ts'
-import { TERMINAL_TASK_STATUSES, type TeamMember, type TeamState } from './types.ts'
+import { TERMINAL_TASK_STATUSES, type TeamMember, type TeamState, type TeamTask } from './types.ts'
 
 /** Persona snapshot of a profile protocol; the full text lives on team.json. */
 export const PERSONA_PROTOCOL_MAX_CHARS = 400
@@ -144,34 +144,26 @@ export function selectFallbackRoute(
   return { retry: true, switched: true, selection: fallback }
 }
 
-/**
- * Bridge one unrecoverable member turn failure into durable team state
- * (issue #94).
- *
- * A member turn can die mid-request — for example `STREAM_CLOSED` when an
- * SSE stream ends without `[DONE]` — without the harness ever reporting an
- * idle edge or disposing the handle. The member then stays `working` and its
- * open attempt stays `claimed`/`in_progress` forever: the scheduler's
- * availability gate never reopens, mailbox flushes never reach the member,
- * and the captain is never told. The `agent/request-error` hook fires before
- * the failed turn closes, so it is the one reliable observation point.
- *
- * Semantics: the owned open attempt is marked `failed` rather than returned
- * to `pending`. `claimed`/`in_progress` → `failed` are existing legal
- * transitions, the terminal record keeps the failed generation inspectable,
- * and requeueing instead would re-dispatch the same work on the next kick and
- * recreate an unbounded failure/dispatch loop for transport-class errors (the
- * issue #66 feedback shape) because automatic retry budgeting does not exist.
- * The captain mailbox notification is the recovery path.
- *
- * The write is skipped when the member owns no open attempt and was not
- * recorded `working`: that failure self-heals on the eventual idle edge and
- * would only spam the captain's mailbox.
- *
- * All mutations run under the team lock through the ordinary durable path.
- * Errors propagate to the caller, which logs and never rethrows into the
- * request-error waterfall.
- */
+/** Deliver a durable member report to the live captain at its next model step. */
+export function steerCaptainReport(captain: Pick<Agent, 'steer'>, from: string, content: string): boolean {
+  try {
+    captain.steer(createUserMessage({
+      content: [{ type: 'text', text: `AgentTeams message from member ${from}:\n\n${content}` }],
+      source: { kind: 'plugin', plugin: 'dsh-agent-teams' },
+    }))
+    return true
+  } catch {
+    return false
+  }
+}
+
+interface FailedMemberAttempt {
+  readonly captainSessionId: string
+  readonly memberId: string
+  readonly task?: Pick<TeamTask, 'id' | 'attempt' | 'attemptId'>
+}
+
+/** Record a final turn failure, never an intermediate request retry. */
 export async function failMemberOpenAttempt(
   ctx: Context,
   stateRoot: string,
@@ -179,26 +171,42 @@ export async function failMemberOpenAttempt(
   memberName: string,
   failure: { readonly code: string; readonly message: string },
   fallbackSession: Session,
-): Promise<void> {
+  observed: FailedMemberAttempt,
+): Promise<boolean> {
   const summary = `${failure.message} (code ${failure.code})`
-  await withTeamLock(`team:${stateRoot}:${teamId}`, async () => {
+  const lockKey = `team:${stateRoot}:${teamId}`
+  const prepared = await withTeamLock(lockKey, async () => {
     const team = await readTeam(stateRoot, teamId)
-    if (team === undefined || team.halted === true) return
-    const member = team.members.find(candidate => candidate.name === memberName && candidate.status !== 'removed')
+    if (team === undefined || team.halted === true || team.captainSessionId !== observed.captainSessionId) return
+    const member = team.members.find(candidate => candidate.name === memberName
+      && candidate.id === observed.memberId && candidate.status !== 'removed')
     if (member === undefined) return
     const task = team.tasks.find(candidate => candidate.assignee === memberName
       && (candidate.status === 'claimed' || candidate.status === 'in_progress'))
+    // A reassign, completion, or recreated member may win the lock while the
+    // final error is queued. Only the capability observed at that event may fail.
+    if (task?.id !== observed.task?.id || task?.attemptId !== observed.task?.attemptId
+      || task?.attempt !== observed.task?.attempt) return
     if (task === undefined && member.status !== 'working') return
     if (task !== undefined) {
       task.status = 'failed'
       task.output = summary
       task.updatedAt = Date.now()
     }
-    member.status = 'idle'
-    const message = createMessage(memberName, CAPTAIN_KEY, task === undefined
-      ? `Member "${memberName}" hit an unrecoverable turn failure: ${summary}. No open attempt was owned; the member is available again.`
-      : `Member "${memberName}" hit an unrecoverable turn failure: ${summary}. Task ${task.id} ("${task.subject}") was marked failed; reassign it or retry when ready.`)
+    if (ctx.agents.get(brandedSessionId(member.id))?.status !== 'running') member.status = 'idle'
+    const message = {
+      ...createMessage(memberName, CAPTAIN_KEY, task === undefined
+        ? `Member "${memberName}" hit an unrecoverable turn failure: ${summary}. No open attempt was owned.`
+        : `Member "${memberName}" hit an unrecoverable turn failure: ${summary}. Task ${task.id} ("${task.subject}") was marked failed; reassign it or retry when ready.`),
+      deliveryClaimedAt: Date.now(),
+    }
+    await writeTeam(stateRoot, team)
     await appendMailbox(stateRoot, team.id, CAPTAIN_KEY, message)
+    if (task !== undefined) {
+      appendTeamEvent(ctx, captainSessionOf(ctx, team.captainSessionId, fallbackSession), 'agent-teams/task-updated', {
+        teamId, taskId: task.id, status: task.status, assignee: memberName, output: task.output,
+      })
+    }
     appendTeamEvent(ctx, captainSessionOf(ctx, team.captainSessionId, fallbackSession), 'agent-teams/message-sent', {
       teamId: team.id,
       messageId: message.id,
@@ -207,8 +215,17 @@ export async function failMemberOpenAttempt(
       content: message.content,
       ts: message.ts,
     })
-    await writeTeam(stateRoot, team)
+    return { captainSessionId: team.captainSessionId, message }
   })
+  if (prepared === undefined) return false
+  // Use the same lease/acknowledgment contract as send_message, outside the
+  // team lock: steering can synchronously start another agent turn.
+  const captain = ctx.agents.get(brandedSessionId(prepared.captainSessionId))
+  const delivered = captain !== undefined && steerCaptainReport(captain, memberName, prepared.message.content)
+  await withTeamLock(lockKey, () => delivered
+    ? acknowledgeMailbox(stateRoot, teamId, CAPTAIN_KEY, [prepared.message.id])
+    : releaseMailboxDelivery(stateRoot, teamId, CAPTAIN_KEY, [prepared.message.id]))
+  return true
 }
 
 async function updateFallbackState(
@@ -340,7 +357,11 @@ export async function resolveMemberLlmSelection(
  * record. Legacy members without a complete saved route retain Harness's
  * descriptor provider/model behavior.
  */
-export function installMemberSelectionRuntime(ctx: Context, stateDir: string): MemberSelectionRuntime {
+export function installMemberSelectionRuntime(
+  ctx: Context,
+  stateDir: string,
+  onFailureSettled?: (workspace: string, teamId: string, memberName: string) => Promise<void>,
+): MemberSelectionRuntime {
   const pending = new Map<string, MemberLlmSelection>()
   ctx.subagents.registerContinuableSetup((childCtx) => {
     const child = childCtx.agent
@@ -353,87 +374,95 @@ export function installMemberSelectionRuntime(ctx: Context, stateDir: string): M
 
     const parentSessionId = child.session.header.parentSession
     if (parentSessionId === undefined) return () => undefined
+    const identity = descriptor.label.slice(MEMBER_LABEL_PREFIX.length)
+    const separator = identity.indexOf(':')
+    if (separator < 1 || separator === identity.length - 1) return () => undefined
+    const teamId = identity.slice(0, separator)
+    const memberName = identity.slice(separator + 1)
+    const workspace = child.session.header.cwd ?? process.cwd()
+    const stateRoot = join(workspace, stateDir)
     const key = pendingSelectionKey(parentSessionId, descriptor.label)
     let selection = pending.get(key)
     if (selection === undefined) {
-      const identity = descriptor.label.slice(MEMBER_LABEL_PREFIX.length)
-      const separator = identity.indexOf(':')
-      if (separator < 1 || separator === identity.length - 1) return () => undefined
-      const teamId = identity.slice(0, separator)
-      const memberName = identity.slice(separator + 1)
-      const workspace = child.session.header.cwd ?? process.cwd()
-      const team = readTeamSync(join(workspace, stateDir), teamId)
+      const team = readTeamSync(stateRoot, teamId)
       if (team?.captainSessionId !== parentSessionId) return () => undefined
       const durableMember = team.members.find(member => member.name === memberName)
       selection = selectionFromMember(durableMember)
-      // An old team record has no provider/reasoning snapshot. Its durable
-      // Harness descriptor still restores provider/model, so leave it alone.
-      if (selection === undefined) return () => undefined
-      if (descriptor.agentProvider !== durableMember?.provider || descriptor.agentModel !== durableMember?.model) {
+      if (selection !== undefined && (descriptor.agentProvider !== durableMember?.provider || descriptor.agentModel !== durableMember?.model)) {
         throw new Error(
           `agent-teams: saved model route for member "${memberName}" does not match its subagent descriptor`,
         )
       }
     }
 
+    let lastFailedTurn: number | undefined
+    // Harness emits agent/error only after request recovery is exhausted. In
+    // particular, llm-retry's "always" policy calls downstream request-error
+    // listeners before it retries; that waterfall cannot declare a turn dead.
+    const disposeFailure = childCtx.on('agent/error', async (payload) => {
+      if (payload.agent.id !== child.id || payload.turn === lastFailedTurn) return
+      lastFailedTurn = payload.turn
+      try {
+        // Capture the attempt synchronously at the event, before any lock wait
+        // can let a captain reassign it or replace the member/team generation.
+        const snapshot = readTeamSync(stateRoot, teamId)
+        if (snapshot?.captainSessionId !== parentSessionId) return
+        const member = snapshot.members.find(item => item.id === child.id && item.name === memberName && item.status !== 'removed')
+        if (member === undefined) return
+        const task = snapshot.tasks.find(item => item.assignee === memberName
+          && (item.status === 'claimed' || item.status === 'in_progress'))
+        const failure = payload.error instanceof LlmError ? payload.error.failure : {
+          code: 'UNKNOWN',
+          message: payload.error instanceof Error ? payload.error.message : String(payload.error),
+        }
+        const recorded = await failMemberOpenAttempt(ctx, stateRoot, teamId, memberName, failure, child.session, {
+          captainSessionId: parentSessionId, memberId: child.id, task,
+        })
+        if (!recorded) return
+        // The final-error event precedes driver quiescence. Observe the real
+        // lifecycle and kick explicitly even if its idle event was missed.
+        // Never force an active Agent's status to idle or retry the failed task.
+        await child.whenIdle()
+        await withTeamLock(`team:${stateRoot}:${teamId}`, async () => {
+          const team = await readTeam(stateRoot, teamId)
+          const current = team?.members.find(item => item.id === child.id && item.name === memberName && item.status !== 'removed')
+          if (team?.captainSessionId !== parentSessionId || current === undefined || child.status !== 'idle') return
+          if (current.status !== 'idle') {
+            current.status = 'idle'
+            await writeTeam(stateRoot, team)
+          }
+        })
+        await onFailureSettled?.(workspace, teamId, memberName)
+      } catch (error: unknown) {
+        ctx.logger.warn(`agent-teams: failed to record member turn failure: ${String(error)}`)
+      }
+    })
+    // Legacy teams still need failure reporting even without a saved route.
+    if (selection === undefined) return disposeFailure
     const selectionRef = { current: modelSelection(selection), assembled: undefined as ModelSelection | undefined }
     const disposeSelection = installModelSelection(childCtx, selectionRef)
     const fallback = selection.fallback
     let switched = false
-    // Installed unconditionally: with no fallback configured this handler is
-    // still the only place that observes a member turn dying mid-request, so
-    // it must bridge the failure into team state (issue #94) even though it
-    // has no route to switch to.
-    const disposeFallback = childCtx.on('agent/request-error', async (payload) => {
-      if (payload.agent.id !== child.id) return undefined
+    const disposeFallback = childCtx.on('agent/request-error', async (payload, next) => {
+      if (payload.agent.id !== child.id || payload.signal.aborted) return next()
       const transition = selectFallbackRoute(selectionRef.current ?? { provider: selection.provider, model: selection.model }, fallback, payload.failure.code, switched)
       // selectFallbackRoute only retries when a fallback route exists; the
       // explicit guard narrows that fact for the compiler.
       if (fallback !== undefined && transition.retry) {
         switched = transition.switched
         selectionRef.current = transition.selection
-        const workspace = child.session.header.cwd ?? process.cwd()
-        const identity = descriptor.label.slice(MEMBER_LABEL_PREFIX.length)
-        const separator = identity.indexOf(':')
-        if (separator > 0) {
-          const teamId = identity.slice(0, separator)
-          const memberName = identity.slice(separator + 1)
-          void updateFallbackState(join(workspace, stateDir), teamId, memberName, fallback, ctx).catch((error: unknown) => {
-            ctx.logger.warn(`agent-teams: failed to persist fallback route: ${String(error)}`)
-          })
-        }
+        await updateFallbackState(stateRoot, teamId, memberName, fallback, ctx).catch((error: unknown) => {
+          ctx.logger.warn(`agent-teams: failed to persist fallback route: ${String(error)}`)
+        })
         ctx.logger.warn(`agent-teams: member ${child.id} switching to fallback ${fallback.provider}/${fallback.model} after ${payload.failure.code}`)
         return { kind: 'retry' as const }
       }
-      // Unrecoverable: no fallback configured, the code is not one a route
-      // switch can fix (transport-class failures like STREAM_CLOSED), or the
-      // fallback route already failed. Leave the failure terminal (no retry —
-      // retrying without a route change would loop) and bridge it into team
-      // state so the scheduler gate reopens and the captain is notified.
-      const workspace = child.session.header.cwd ?? process.cwd()
-      const identity = descriptor.label.slice(MEMBER_LABEL_PREFIX.length)
-      const separator = identity.indexOf(':')
-      if (separator > 0) {
-        const teamId = identity.slice(0, separator)
-        const memberName = identity.slice(separator + 1)
-        try {
-          await failMemberOpenAttempt(
-            ctx,
-            join(workspace, stateDir),
-            teamId,
-            memberName,
-            { code: payload.failure.code, message: payload.failure.message },
-            child.session,
-          )
-        } catch (error: unknown) {
-          ctx.logger.warn(`agent-teams: failed to record member turn failure: ${String(error)}`)
-        }
-      }
-      return undefined
+      return next()
     })
     return () => {
       disposeFallback()
       disposeSelection()
+      disposeFailure()
     }
   })
 

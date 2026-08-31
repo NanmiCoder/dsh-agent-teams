@@ -1514,7 +1514,7 @@ try {
           `$f = '${transientJson.replaceAll("'", "''")}';
            $s = [System.IO.File]::Open($f, [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::ReadWrite);
            [Console]::Out.WriteLine('HELD_T'); [Console]::Out.Flush();
-           Start-Sleep -Milliseconds 140; $s.Dispose()`],
+           Start-Sleep -Milliseconds 80; $s.Dispose()`],
         { stdio: ['ignore', 'pipe', 'inherit'] },
       )
       const flashed = await new Promise((resolve, reject) => {
@@ -1537,8 +1537,10 @@ try {
         flasher.on('exit', onExit)
       })
       try {
-        // The flasher releases after ~140 ms; archiveTeamDir retries the
-        // rename across that window, so archiving must still succeed.
+        // The flasher releases after ~80 ms (plus process exit jitter): the
+        // lock must outlive the first rename attempt but land comfortably
+        // inside the 3x50 ms retry budget, including the PowerShell dispose
+        // jitter that previously pushed a 140 ms hold past it (issue #108).
         await archiveTeamDir(atomicStateRoot, transientTeam.id)
         const archived = await readFile(join(atomicStateRoot, 'archive', transientTeam.id, 'team.json'), 'utf8')
         check(

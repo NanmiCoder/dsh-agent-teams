@@ -86,7 +86,7 @@
 
 ## 使用协议
 
-插件提示段会指导模型按两阶段协议执行：创建 staged 团队 → 写入可编辑成员占位 → 拆任务并声明依赖 → 等待用户审查 → **Approve & Run** 后原子创建成员并启动调度 → 队长监控/引导 → 汇报后 `agent_teams_delete`。staged 阶段没有子会话、不会领取任务。只有用户明确要求跳过审查时才使用 `approval: automatic`。成员之间可以直接互发消息，无需队长中转。驻留成员在中断或正常结束一轮后若仍持有 `claimed/in_progress` 任务，该 attempt 会停驻；只有显式重试/转派/接管才会撤销它。若该停驻成员随后不再出现在 live Agent registry，下一次 Captain 状态检查或调度 kick 会创建新的 attempt 并重新唤醒原成员，避免任务永久显示进行中但没有 Agent 运行。
+插件提示段会指导模型按两阶段协议执行：创建 staged 团队 → 写入可编辑成员占位 → 拆任务并声明依赖 → 等待用户审查 → **Approve & Run** 后原子创建成员并启动调度 → 队长监控/引导 → 汇报后 `agent_teams_delete`。staged 阶段没有子会话、不会领取任务。只有用户明确要求跳过审查时才使用 `approval: automatic`。成员之间可以直接互发消息，无需队长中转。驻留成员在中断或正常结束一轮后若仍持有 `claimed/in_progress` 任务，该 attempt 会停驻；只有显式重试/转派/接管才会撤销它。本进程已经观察过的停驻 attempt 在 Harness 回收其 AgentHandle 后仍保持原 attempt，Captain 轮询 `agent_teams_status` 不会因此重铸。只有冷启动或从未被本进程观察过的开放任务，才会自动恢复一次；恢复投递失败会回到原来的 capability，而不会变成可无限重派的 `pending`。
 
 ## 命名多角色 profiles
 

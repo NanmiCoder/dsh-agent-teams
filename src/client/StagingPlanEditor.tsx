@@ -8,7 +8,7 @@
 
 import { useCallback, useEffect, useId, useState, useSyncExternalStore, type FormEvent } from 'react'
 import type { ModelDirectory } from '@deepseek-ai/dsh-client-ui-model-selection/client'
-import { Menu, type MenuEntry } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, Menu, type MenuEntry } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ActivityMember, ActivityTask, ActivityTeam } from './activity-monitor.ts'
 import type { AgentTeamsTranslate } from './locales.ts'
 import css from './ActivityPanel.module.css'
@@ -61,7 +61,7 @@ function errorMessage(error: unknown): string {
 
 function DisclosureChevron({ open }: { readonly open: boolean }) {
   return (
-    <svg className={css.planChevron} data-open={open} width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden>
+    <svg className={css.planChevron} data-open={open} width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M4 2.5 7.5 6 4 9.5" />
     </svg>
   )
@@ -443,30 +443,40 @@ function StagedMemberEditor({ team, member, modelDirectory, onPendingChange, t }
           <strong>{member.name}</strong>
           <span>{role || t('plan.member.roleFallback')}</span>
         </span>
-        <span className={css.planCardMeta} title={route}>{route}</span>
-        {dirty && <em className={css.planDirty}>{t('plan.unsaved')}</em>}
+        {dirty
+          ? <em className={css.planDirty}>{t('plan.unsaved')}</em>
+          : <span className={css.planCardMeta} data-mono title={route}>{route}</span>}
         <DisclosureChevron open={open} />
       </button>
       {open && (
         <form id={bodyId} className={css.planCardBody} onSubmit={(event) => { void save(event) }}>
           <fieldset disabled={busy}>
-            <label>{t('plan.member.role')}<input name="role" value={role} onChange={(event) => { setRole(event.currentTarget.value); markEdited() }} /></label>
-            <StagedModelPicker
-              directory={modelDirectory}
-              provider={provider}
-              model={model}
-              reasoningEffort={reasoningEffort}
-              busy={busy}
-              onChange={(selection) => { void persist(selection) }}
-              t={t}
-            />
-            <label>{t('plan.member.prompt')}<textarea name="executionPrompt" value={executionPrompt} onChange={(event) => { setExecutionPrompt(event.currentTarget.value); markEdited() }} rows={3} /></label>
+            <label className={css.planField}>
+              {t('plan.member.role')}
+              <input className={css.planInput} name="role" value={role} onChange={(event) => { setRole(event.currentTarget.value); markEdited() }} />
+            </label>
+            <span className={css.planField}>
+              {t('plan.member.model')}
+              <StagedModelPicker
+                directory={modelDirectory}
+                provider={provider}
+                model={model}
+                reasoningEffort={reasoningEffort}
+                busy={busy}
+                onChange={(selection) => { void persist(selection) }}
+                t={t}
+              />
+            </span>
+            <label className={css.planField}>
+              {t('plan.member.prompt')}
+              <textarea className={css.planInput} name="executionPrompt" value={executionPrompt} onChange={(event) => { setExecutionPrompt(event.currentTarget.value); markEdited() }} rows={3} />
+            </label>
           </fieldset>
           <span className={css.planActions}>
             <Feedback value={feedback} />
-            <button type="submit" disabled={busy || !dirty || provider.trim() === '' || model.trim() === ''}>
+            <Button type="submit" variant="primary" size="sm" disabled={busy || !dirty || provider.trim() === '' || model.trim() === ''}>
               {busy ? t('plan.saving') : t('plan.save')}
-            </button>
+            </Button>
           </span>
         </form>
       )}
@@ -481,19 +491,19 @@ function StagedTaskEditor({ team, task, onPendingChange, t }: {
   readonly t: AgentTeamsTranslate
 }) {
   const bodyId = useId()
-  const taskDependencies = task.dependencies.join(', ')
+  const remoteDependencies = task.dependencies.join('\u0000')
   const [open, setOpen] = useState(false)
   const [subject, setSubject] = useState(task.subject)
   const [description, setDescription] = useState(task.description ?? '')
   const [assignee, setAssignee] = useState(task.assignee)
-  const [dependencies, setDependencies] = useState(taskDependencies)
-  const remoteSignature = JSON.stringify([task.subject, task.description ?? '', task.assignee, taskDependencies])
+  const [dependencies, setDependencies] = useState<readonly string[]>(task.dependencies)
+  const remoteSignature = JSON.stringify([task.subject, task.description ?? '', task.assignee, remoteDependencies])
   const [savedSignature, setSavedSignature] = useState(remoteSignature)
   const [busy, setBusy] = useState(false)
   const [confirmingRemove, setConfirmingRemove] = useState(false)
   const [feedback, setFeedback] = useState<PlanFeedback>()
   useDismissSuccess(feedback, setFeedback)
-  const signature = JSON.stringify([subject, description, assignee, dependencies])
+  const signature = JSON.stringify([subject, description, assignee, dependencies.join('\u0000')])
   const dirty = signature !== savedSignature
 
   useEffect(() => {
@@ -505,13 +515,19 @@ function StagedTaskEditor({ team, task, onPendingChange, t }: {
     setSubject(task.subject)
     setDescription(task.description ?? '')
     setAssignee(task.assignee)
-    setDependencies(taskDependencies)
+    setDependencies(remoteDependencies === '' ? [] : remoteDependencies.split('\u0000'))
     setSavedSignature(remoteSignature)
-  }, [task.subject, task.description, task.assignee, taskDependencies, remoteSignature])
+  }, [task.subject, task.description, task.assignee, remoteDependencies, remoteSignature])
 
   const markEdited = (): void => {
     setFeedback(undefined)
     setConfirmingRemove(false)
+  }
+  const toggleDependency = (id: string): void => {
+    setDependencies((current) => current.includes(id)
+      ? current.filter((item) => item !== id)
+      : [...current, id])
+    markEdited()
   }
   const save = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault()
@@ -526,7 +542,7 @@ function StagedTaskEditor({ team, task, onPendingChange, t }: {
         subject,
         description,
         assignee,
-        dependencies: dependencies.split(',').map((item) => item.trim()).filter(Boolean),
+        dependencies: [...dependencies],
       })
       setSavedSignature(signature)
       setFeedback({ tone: 'success', message: t('plan.saved') })
@@ -553,6 +569,10 @@ function StagedTaskEditor({ team, task, onPendingChange, t }: {
     }
   }
 
+  // Candidate prerequisites: every other staged task. Tasks that already
+  // depend on this one are excluded so the picker cannot create a 2-cycle.
+  const candidates = team.tasks.filter((candidate) => candidate.id !== task.id
+    && !candidate.dependencies.includes(task.id))
   const dependencySummary = task.dependencies.length === 0
     ? t('plan.dependencies.none')
     : t('plan.dependencies.count', { count: task.dependencies.length })
@@ -567,40 +587,62 @@ function StagedTaskEditor({ team, task, onPendingChange, t }: {
       >
         <span className={css.planTaskId}>{task.id}</span>
         <span className={css.planTaskSummary} title={subject}>{subject}</span>
-        <span className={css.planCardMeta}>{assignee || t('plan.task.unassigned')} · {dependencySummary}</span>
-        {dirty && <em className={css.planDirty}>{t('plan.unsaved')}</em>}
+        {dirty
+          ? <em className={css.planDirty}>{t('plan.unsaved')}</em>
+          : <span className={css.planCardMeta}>{assignee || t('plan.task.unassigned')} · {dependencySummary}</span>}
         <DisclosureChevron open={open} />
       </button>
       {open && (
         <form id={bodyId} className={css.planCardBody} onSubmit={(event) => { void save(event) }}>
           <fieldset disabled={busy}>
-            <label>{t('plan.task.subject')}<input name="subject" required value={subject} onChange={(event) => { setSubject(event.currentTarget.value); markEdited() }} /></label>
-            <label>{t('plan.task.description')}<textarea name="description" value={description} onChange={(event) => { setDescription(event.currentTarget.value); markEdited() }} rows={3} /></label>
-            <span className={css.planGrid}>
-              <label>{t('plan.task.assignee')}
-                <select name="assignee" value={assignee} onChange={(event) => { setAssignee(event.currentTarget.value); markEdited() }}>
-                  <option value="">{t('plan.task.unassigned')}</option>
-                  {team.members.map((member) => <option key={member.name} value={member.name}>{member.name}</option>)}
-                </select>
-              </label>
-              <label>
-                {t('plan.task.dependencies')}
-                <input name="dependencies" value={dependencies} onChange={(event) => { setDependencies(event.currentTarget.value); markEdited() }} />
-                <small>{t('plan.task.dependenciesHint')}</small>
-              </label>
+            <label className={css.planField}>
+              {t('plan.task.subject')}
+              <input className={css.planInput} name="subject" required value={subject} onChange={(event) => { setSubject(event.currentTarget.value); markEdited() }} />
+            </label>
+            <label className={css.planField}>
+              {t('plan.task.description')}
+              <textarea className={css.planInput} name="description" value={description} onChange={(event) => { setDescription(event.currentTarget.value); markEdited() }} rows={3} />
+            </label>
+            <label className={css.planField}>
+              {t('plan.task.assignee')}
+              <select className={css.planInput} name="assignee" value={assignee} onChange={(event) => { setAssignee(event.currentTarget.value); markEdited() }}>
+                <option value="">{t('plan.task.unassigned')}</option>
+                {team.members.map((member) => <option key={member.name} value={member.name}>{member.name}</option>)}
+              </select>
+            </label>
+            <span className={css.planField} role="group" aria-label={t('plan.task.dependencies')}>
+              {t('plan.task.dependencies')}
+              <span className={css.planDeps} data-plan-dependencies>
+                {candidates.length === 0
+                  ? <span className={css.planDepEmpty}>{t('plan.task.noOtherTasks')}</span>
+                  : candidates.map((candidate) => (
+                    <button
+                      key={candidate.id}
+                      type="button"
+                      className={css.planDepChip}
+                      aria-pressed={dependencies.includes(candidate.id)}
+                      title={candidate.subject}
+                      disabled={busy}
+                      onClick={() => { toggleDependency(candidate.id) }}
+                    >
+                      {candidate.id}
+                    </button>
+                  ))}
+              </span>
+              <small>{t('plan.task.dependenciesHint')}</small>
             </span>
           </fieldset>
           {confirmingRemove && (
             <span className={css.planConfirm} role="alert">
               <span>{t('plan.removeWarning', { task: task.id })}</span>
-              <button type="button" onClick={() => { setConfirmingRemove(false) }}>{t('plan.cancel')}</button>
-              <button type="button" data-danger data-confirming onClick={() => { void remove() }}>{t('plan.removeConfirm')}</button>
+              <Button variant="outline" size="sm" onClick={() => { setConfirmingRemove(false) }}>{t('plan.cancel')}</Button>
+              <Button variant="primary" size="sm" className={css.dangerButton} data-danger data-confirming onClick={() => { void remove() }}>{t('plan.removeConfirm')}</Button>
             </span>
           )}
           <span className={css.planActions}>
             <Feedback value={feedback} />
-            <button type="button" data-danger onClick={() => { setConfirmingRemove(true); setFeedback(undefined) }} disabled={busy || confirmingRemove}>{t('plan.remove')}</button>
-            <button type="submit" disabled={busy || !dirty || subject.trim() === ''}>{busy ? t('plan.saving') : t('plan.save')}</button>
+            <Button variant="ghost" size="sm" className={css.planDangerText} data-danger onClick={() => { setConfirmingRemove(true); setFeedback(undefined) }} disabled={busy || confirmingRemove}>{t('plan.remove')}</Button>
+            <Button type="submit" variant="primary" size="sm" disabled={busy || !dirty || subject.trim() === ''}>{busy ? t('plan.saving') : t('plan.save')}</Button>
           </span>
         </form>
       )}
@@ -621,6 +663,7 @@ export function StagingPlanEditor({ team, modelDirectory, onContinuePlanning, on
   const [tasksOpen, setTasksOpen] = useState(true)
   const [newTask, setNewTask] = useState('')
   const [busy, setBusy] = useState(false)
+  const [approving, setApproving] = useState(false)
   const [discardArmed, setDiscardArmed] = useState(false)
   const [pendingEditors, setPendingEditors] = useState<ReadonlySet<string>>(new Set())
   const [feedback, setFeedback] = useState<PlanFeedback>()
@@ -666,8 +709,11 @@ export function StagingPlanEditor({ team, modelDirectory, onContinuePlanning, on
     }
   }
 
+  // On success the host flips the team to `running`; the next poll unmounts
+  // this editor, so the approving state intentionally stays set until then.
   const approve = async (): Promise<void> => {
     setBusy(true)
+    setApproving(true)
     setFeedback(undefined)
     try {
       await mutatePlan({
@@ -678,6 +724,7 @@ export function StagingPlanEditor({ team, modelDirectory, onContinuePlanning, on
     } catch (error: unknown) {
       setFeedback({ tone: 'error', message: t('plan.failed', { message: errorMessage(error) }) })
       setBusy(false)
+      setApproving(false)
     }
   }
 
@@ -722,22 +769,19 @@ export function StagingPlanEditor({ team, modelDirectory, onContinuePlanning, on
     <section className={css.planEditor} data-staging-editor>
       <header className={css.planHeader}>
         <span>
-          <span>
-            <strong>{t('plan.title')}</strong>
-            <small>{t('plan.readySummary', { members: team.members.length, tasks: team.tasks.length, links: dependencyLinks })}</small>
-          </span>
-          <em>{t('plan.badge')}</em>
+          <strong>{t('plan.title')}</strong>
+          <em>{t(waitingForFeedback ? 'captain.state.awaitingFeedback' : 'plan.badge')}</em>
         </span>
         <p>{t('plan.description')}</p>
       </header>
 
       <ol className={css.planFlow} aria-label={t('plan.flow.aria')}>
-        <li data-active><span>1</span>{t('plan.flow.review')}</li>
-        <li><span>2</span>{t('plan.flow.spawn')}</li>
-        <li><span>3</span>{t('plan.flow.run')}</li>
+        <li data-active><span><b>1</b>{t('plan.flow.review')}</span></li>
+        <li data-active={approving || undefined}><span><b>2</b>{t('plan.flow.spawn')}</span></li>
+        <li><span><b>3</b>{t('plan.flow.run')}</span></li>
       </ol>
 
-      <section className={css.planSection}>
+      <section className={css.group}>
         <button type="button" className={css.planSectionToggle} aria-expanded={membersOpen} aria-controls={membersId} onClick={() => { setMembersOpen((current) => !current) }}>
           <span><strong>{t('plan.members.title')}</strong><small>{t('plan.members.count', { count: team.members.length })}</small></span>
           <DisclosureChevron open={membersOpen} />
@@ -760,7 +804,7 @@ export function StagingPlanEditor({ team, modelDirectory, onContinuePlanning, on
         )}
       </section>
 
-      <section className={css.planSection}>
+      <section className={css.group}>
         <button type="button" className={css.planSectionToggle} aria-expanded={tasksOpen} aria-controls={tasksId} onClick={() => { setTasksOpen((current) => !current) }}>
           <span><strong>{t('plan.tasks.title')}</strong><small>{t('plan.tasks.count', { count: team.tasks.length, links: dependencyLinks })}</small></span>
           <DisclosureChevron open={tasksOpen} />
@@ -772,15 +816,19 @@ export function StagingPlanEditor({ team, modelDirectory, onContinuePlanning, on
               : team.tasks.map((task) => <StagedTaskEditor key={task.id} team={team} task={task} onPendingChange={onPendingChange} t={t} />)}
           </div>
         )}
+        <form className={css.planNewTask} onSubmit={(event) => { void addTask(event) }}>
+          <input
+            className={css.planInput}
+            name="newTask"
+            value={newTask}
+            aria-label={t('plan.newTaskLabel')}
+            onChange={(event) => { setNewTask(event.currentTarget.value); setFeedback(undefined) }}
+            placeholder={t('plan.newTask')}
+            disabled={busy}
+          />
+          <Button type="submit" variant="outline" size="sm" disabled={busy || newTask.trim() === ''}>{busy && !approving ? t('plan.adding') : t('plan.addTask')}</Button>
+        </form>
       </section>
-
-      <form className={css.planNewTask} onSubmit={(event) => { void addTask(event) }}>
-        <label>
-          <span>{t('plan.newTaskLabel')}</span>
-          <input name="newTask" value={newTask} onChange={(event) => { setNewTask(event.currentTarget.value); setFeedback(undefined) }} placeholder={t('plan.newTask')} disabled={busy} />
-        </label>
-        <button type="submit" disabled={busy || newTask.trim() === ''}>{busy ? t('plan.adding') : t('plan.addTask')}</button>
-      </form>
 
       <div
         className={css.planApproveRow}
@@ -791,9 +839,11 @@ export function StagingPlanEditor({ team, modelDirectory, onContinuePlanning, on
         <span className={css.planApproveCopy}>
           <strong>{discardArmed
             ? t('plan.discardConfirmTitle')
-            : waitingForFeedback
-              ? t('plan.feedbackTitle')
-              : t('plan.approveTitle')}</strong>
+            : approving
+              ? t('plan.approving')
+              : waitingForFeedback
+                ? t('plan.feedbackTitle')
+                : t('plan.approveTitle')}</strong>
           <small>{discardArmed
             ? t('plan.discardWarning')
             : waitingForFeedback
@@ -805,21 +855,21 @@ export function StagingPlanEditor({ team, modelDirectory, onContinuePlanning, on
         <Feedback value={feedback} />
         {discardArmed ? (
           <span className={css.planApproveActions}>
-            <button type="button" disabled={busy} onClick={() => { setDiscardArmed(false) }}>{t('plan.cancel')}</button>
-            <button type="button" data-plan-discard data-danger data-confirming disabled={busy} onClick={() => { void discard() }}>
+            <Button variant="outline" disabled={busy} onClick={() => { setDiscardArmed(false) }}>{t('plan.cancel')}</Button>
+            <Button variant="primary" className={css.dangerButton} data-plan-discard data-danger data-confirming disabled={busy} onClick={() => { void discard() }}>
               {busy ? t('plan.discarding') : t('plan.discardConfirm')}
-            </button>
+            </Button>
           </span>
         ) : (
           <span className={css.planReviewActions}>
-            <button type="button" data-plan-approve disabled={busy || !runnable || hasPendingEdits} onClick={() => { void approve() }}>
-              {t('plan.approve')}
-            </button>
+            <Button variant="primary" className={css.planPrimary} data-plan-approve disabled={busy || !runnable || hasPendingEdits} onClick={() => { void approve() }}>
+              {approving ? t('plan.approving') : t('plan.approve')}
+            </Button>
             <span className={css.planSecondaryActions}>
-              <button type="button" data-plan-continue disabled={busy} onClick={() => { void continueInChat() }}>
+              <Button variant="ghost" data-plan-continue disabled={busy} onClick={() => { void continueInChat() }}>
                 {t(waitingForFeedback ? 'plan.returnToChat' : 'plan.continue')}
-              </button>
-              <button type="button" data-plan-discard data-danger disabled={busy} onClick={() => { setDiscardArmed(true); setFeedback(undefined) }}>{t('plan.discard')}</button>
+              </Button>
+              <Button variant="ghost" className={css.planDangerText} data-plan-discard data-danger disabled={busy} onClick={() => { setDiscardArmed(true); setFeedback(undefined) }}>{t('plan.discard')}</Button>
             </span>
           </span>
         )}

@@ -161,14 +161,36 @@ export function getActivitySnapshotsSnapshot(): ActivitySnapshots {
   return activitySnapshots
 }
 
-/** Publish one or both successful state-route responses. */
+let teamsFingerprint = ''
+let archivedFingerprint = ''
+
+/**
+ * Publish one or both successful state-route responses.
+ *
+ * Each poll parses a fresh JSON body, so array identity alone would notify
+ * every subscriber once a second even while nothing changed. Compare the
+ * serialised payload and keep the previous array when it is byte-identical,
+ * so React store subscribers only re-render on real state transitions.
+ */
 export function updateActivitySnapshots(update: Partial<ActivitySnapshots>): void {
-  const next = {
-    teams: update.teams ?? activitySnapshots.teams,
-    archivedTeams: update.archivedTeams ?? activitySnapshots.archivedTeams,
+  let teams = activitySnapshots.teams
+  let archivedTeams = activitySnapshots.archivedTeams
+  if (update.teams !== undefined) {
+    const fingerprint = JSON.stringify(update.teams)
+    if (fingerprint !== teamsFingerprint) {
+      teamsFingerprint = fingerprint
+      teams = update.teams
+    }
   }
-  if (next.teams === activitySnapshots.teams && next.archivedTeams === activitySnapshots.archivedTeams) return
-  activitySnapshots = next
+  if (update.archivedTeams !== undefined) {
+    const fingerprint = JSON.stringify(update.archivedTeams)
+    if (fingerprint !== archivedFingerprint) {
+      archivedFingerprint = fingerprint
+      archivedTeams = update.archivedTeams
+    }
+  }
+  if (teams === activitySnapshots.teams && archivedTeams === activitySnapshots.archivedTeams) return
+  activitySnapshots = { teams, archivedTeams }
   for (const listener of snapshotListeners) listener()
 }
 

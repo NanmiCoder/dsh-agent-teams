@@ -764,17 +764,17 @@ check('a real dependency keeps the layered DAG layout', !usesParallelTaskGrid([
 const dag = compactDagLayout(projectionTasks.filter(task => Number.isFinite(task.depth)))
 check('compact DAG lays dependency depths out left-to-right',
   dag.nodes.find(node => node.task.id === 't1')?.x === 0
-    && dag.nodes.find(node => node.task.id === 't2')?.x === 118
-    && dag.nodes.find(node => node.task.id === 't4')?.x === 236)
+    && dag.nodes.find(node => node.task.id === 't2')?.x === 156
+    && dag.nodes.find(node => node.task.id === 't4')?.x === 312)
 check('compact DAG keeps stable rows and reference node geometry',
-  dag.nodes.find(node => node.task.id === 't3')?.y === 38
-    && dag.width === 328
-    && dag.height === 68
-    && COMPACT_DAG_NODE_WIDTH === 92
-    && COMPACT_DAG_NODE_HEIGHT === 30)
+  dag.nodes.find(node => node.task.id === 't3')?.y === 48
+    && dag.width === 440
+    && dag.height === 88
+    && COMPACT_DAG_NODE_WIDTH === 128
+    && COMPACT_DAG_NODE_HEIGHT === 40)
 check('compact DAG emits one curved SVG edge per valid dependency',
   dag.edges.length === 3
-    && dag.edges.some(edge => edge.from === 't1' && edge.to === 't2' && edge.path.startsWith('M92 15C')))
+    && dag.edges.some(edge => edge.from === 't1' && edge.to === 't2' && edge.path.startsWith('M128 20C')))
 check(
   'task model labels prefer the snapshot field and fall back to the assignee route',
   memberRouteLabel({ provider: 'openai', model: 'gpt-5.6-sol' }) === 'openai/gpt-5.6-sol'

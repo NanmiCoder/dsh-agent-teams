@@ -74,9 +74,13 @@ export function AgentTeamsCard({ node, openMember, sessionId, t }: AgentTeamsCar
   return (
     <section className={css.root} data-agent-teams-card data-team-id={resolved.teamId}>
       <header className={css.head}>
-        <img className={css.leadAvatar} src={LEAD_ART} alt="" aria-hidden />
-        <span className={css.teamName} title={resolved.teamName}>{resolved.teamName}</span>
-        <span className={css.memberCount}>{t('card.memberCount', { count: resolved.members.length })}</span>
+        <span className={css.leadTile}>
+          <img className={css.leadAvatar} src={LEAD_ART} alt="" aria-hidden />
+        </span>
+        <span className={css.titles}>
+          <span className={css.teamName} title={resolved.teamName}>{resolved.teamName}</span>
+          <span className={css.memberCount}>{t('card.memberCount', { count: resolved.members.length })}</span>
+        </span>
         <button
           type="button"
           className={css.panelButton}

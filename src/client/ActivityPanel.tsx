@@ -22,8 +22,8 @@ import {
   type CSSProperties, type PointerEvent as ReactPointerEvent,
 } from 'react'
 import {
-  IconBranchOutline16, IconChevronDownOutline14, IconPanelLeftOutline16,
-  IconStopFill16, IconWarningOutline16, Modal,
+  Button, IconBranchOutline16, IconChevronDownOutline14, IconPanelLeftOutline16,
+  IconStopFill16, IconWarningOutline16, Modal, StateDot, type StateDotState,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ModelDirectory, ModelDirectoryResolver } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
@@ -129,9 +129,8 @@ function stableHash(value: string): number {
 
 const ACCENTS = [
   'var(--dsw-alias-state-business-primary)',
-  'var(--dsw-alias-state-success)',
-  'var(--dsw-alias-state-danger)',
-  'var(--dsw-alias-state-warning)',
+  'var(--dsw-alias-state-success-primary)',
+  'var(--dsw-alias-state-warn-primary)',
   'var(--dsw-alias-label-tertiary)',
 ] as const
 
@@ -176,21 +175,38 @@ function taskTone(state: ActivityTask['state'], status: string): string {
   return state
 }
 
+/** Map a visual tone onto the host StateDot vocabulary; null means neutral. */
+function dotStateFor(tone: string): StateDotState | null {
+  switch (tone) {
+    case 'running': return 'ongoing'
+    case 'completed': return 'done'
+    case 'blocked': return 'warning'
+    case 'failed': return 'error'
+    default: return null
+  }
+}
+
+/** Host-native status dot; neutral grey for pending/cancelled/idle tones. */
+function StatusDot({ tone, size = 10 }: { readonly tone: string; readonly size?: number }) {
+  const state = dotStateFor(tone)
+  if (state === null) return <span className={css.neutralDot} style={{ width: size, height: size }} aria-hidden />
+  return <StateDot state={state} size={size} />
+}
+
 function Chevron({ open }: { readonly open: boolean }) {
   return (
-    <svg className={css.chevron} data-open={open} width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden>
+    <svg className={css.chevron} data-open={open} width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M3.5 2l3 3-3 3" />
     </svg>
   )
 }
 
+/** Running-work indicator: the host pixel-chase when active, a quiet dot otherwise. */
 function WorkGlyph({ active }: { readonly active: boolean }) {
   return (
-    <svg className={css.workGlyph} data-active={active} width="11" height="11" viewBox="0 0 11 11" fill="currentColor" aria-hidden>
-      {[[0, 0], [4.2, 0], [8.4, 0], [0, 4.2], [4.2, 4.2], [8.4, 4.2]].map(([x, y], index) => (
-        <rect key={`${x}:${y}`} x={x} y={y} width="2.6" height="2.6" rx=".6" style={{ animationDelay: `${index * 0.15}s` }} />
-      ))}
-    </svg>
+    <span className={css.workGlyph} data-active={active} aria-hidden>
+      {active ? <StateDot state="ongoing" size={10} /> : <span className={css.neutralDot} />}
+    </span>
   )
 }
 
@@ -204,6 +220,7 @@ function CollapsedBadge({ count, busy, onClick, t }: {
   return (
     <button type="button" className={css.badge} data-agent-teams-collapsed data-busy={busy} onClick={onClick} aria-label={t('activity.badgeAria', { count })}>
       <span className={css.badgeDot} data-busy={busy} aria-hidden />
+      <span>{t('activity.badgeLabel')}</span>
       <span className={css.badgeCount}>{count}</span>
     </button>
   )
@@ -223,6 +240,17 @@ function memberStateLabel(
   if (member.status === 'removed') return t(historic ? 'member.state.left' : 'member.state.removed')
   if (owned.length > 0) return t('member.state.pending')
   return t('member.state.unassigned')
+}
+
+/** Visual tone of a member row, aligned with task tones for the status dot. */
+function memberTone(member: ActivityMember, tasks: readonly ActivityTask[], staged: boolean, ended: boolean): string {
+  if (staged || ended) return 'idle'
+  const owned = tasks.filter((task) => task.assignee === member.name)
+  if (member.activity === 'working') return 'running'
+  if (owned.some((task) => task.status === 'failed')) return 'failed'
+  if (owned.some((task) => task.state === 'blocked')) return 'blocked'
+  if (owned.length > 0 && owned.every((task) => task.status === 'completed')) return 'completed'
+  return 'idle'
 }
 
 function memberStatusText(
@@ -303,21 +331,21 @@ function ProgressOverview({ team, t, discarded = false }: { readonly team: Activ
   ))
   const summaryTone = discarded ? 'discarded' : blocked > 0 ? 'warning' : settled ? 'completed' : 'running'
   return (
-    <section className={css.progressOverview} aria-label={t('progress.aria')} data-progress-summary>
-      <span className={css.progressTitle}>{t('progress.title')}</span>
+    <section className={css.progress} aria-label={t('progress.aria')} data-progress-summary>
       {team.tasks.length > 0 ? (
-        <span className={css.progressSegments} aria-hidden>
+        <span className={css.progressTrack} aria-hidden>
           {team.tasks.map((task) => <span key={task.id} data-state={discarded ? 'cancelled' : taskTone(task.state, task.status)} />)}
         </span>
       ) : <span className={css.progressEmpty} />}
-      <span className={css.progressLegend}>
-        <span data-state="running">{t('progress.running', { count: running })}</span>
-        <span data-state="blocked">{t('progress.blocked', { count: blocked })}</span>
-        <span data-state="completed">{t('progress.delivered', { count: completed })}</span>
-      </span>
-      <span className={css.progressSummary} data-state={summaryTone}>
-        <span className={css.progressSummaryDot} />
-        <span>{taskSummary(team, t, discarded)}</span>
+      <span className={css.progressFooter}>
+        <span className={css.progressLegend}>
+          <span><span className={css.legendDot} data-state="running" aria-hidden />{t('progress.running', { count: running })}</span>
+          <span><span className={css.legendDot} data-state="blocked" aria-hidden />{t('progress.blocked', { count: blocked })}</span>
+          <span><span className={css.legendDot} data-state="completed" aria-hidden />{t('progress.delivered', { count: completed })}</span>
+        </span>
+        <span className={css.progressSummary} data-state={summaryTone} title={taskSummary(team, t, discarded)}>
+          {taskSummary(team, t, discarded)}
+        </span>
       </span>
     </section>
   )
@@ -371,17 +399,19 @@ function DependencyMap({ tasks, members, t, discarded = false }: {
     ?? tasks[0]!
   const detailTask = tasks.find((task) => task.id === focusedTaskId) ?? fallbackTask
   const detailModel = taskModelLabel(detailTask, members)
+  const detailTone = discarded ? 'cancelled' : taskTone(detailTask.state, detailTask.status)
   const waitingOn = detailTask.dependencies.filter((dependency) => (
     tasks.find((task) => task.id === dependency)?.status !== 'completed'
   ))
   const dependents = tasks.filter((task) => task.dependencies.includes(detailTask.id))
   return (
-    <section className={css.dependencySection} aria-label={t('dependency.aria')} data-dependency-map>
-      <header className={css.sectionHead}>
-        <button type="button" className={css.sectionToggleTitle} onClick={() => { setOpen((current) => !current) }} aria-expanded={open}>
+    <section className={css.group} aria-label={t('dependency.aria')} data-dependency-map>
+      <header className={css.groupHead}>
+        <button type="button" className={css.groupToggle} onClick={() => { setOpen((current) => !current) }} aria-expanded={open}>
           <Chevron open={open} /><IconBranchOutline16 /> {t(parallel ? 'dependency.parallel' : 'dependency.title')}
+          <span className={css.groupCount}>{tasks.length}</span>
         </button>
-        <span className={css.sectionHint}>{pinnedTaskId === null
+        <span className={css.groupHint}>{pinnedTaskId === null
           ? t(parallel ? 'dependency.hint.parallel' : 'dependency.hint.chain')
           : t('dependency.hint.pinned', { taskId: pinnedTaskId })}</span>
       </header>
@@ -441,7 +471,8 @@ function DependencyMap({ tasks, members, t, discarded = false }: {
             <span className={css.taskDetailHead}>
               <span className={css.taskDetailId}>{detailTask.id}</span>
               <span className={css.taskDetailSubject} title={detailTask.subject}>{detailTask.subject.replace(/^开发\s*/u, '')}</span>
-              <span className={css.taskDetailBadge} data-state={discarded ? 'cancelled' : taskTone(detailTask.state, detailTask.status)}>
+              <span className={css.taskDetailBadge} data-state={detailTone}>
+                <StatusDot tone={detailTone} size={8} />
                 {discarded ? t('task.status.notRun') : taskStatusLabel(detailTask.status, t)}
               </span>
             </span>
@@ -487,6 +518,7 @@ function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscarded, on
   const [stopError, setStopError] = useState('')
   const discarded = historic && team.phase === 'staged'
   const stopped = !historic && team.halted === true
+  const staged = team.phase === 'staged' && !historic
   const busyCount = team.members.filter((member) => member.activity === 'working').length
   const assignedCount = team.tasks.filter((task) => task.assignee !== '' && task.assignee !== CAPTAIN_ASSIGNEE).length
   const captainOwned = team.tasks.filter((task) => task.assignee === CAPTAIN_ASSIGNEE
@@ -502,6 +534,18 @@ function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscarded, on
     task.status !== 'completed' && task.status !== 'failed' && task.status !== 'cancelled'
   )).length
   const canStop = !historic && team.phase === 'running' && team.halted !== true && teamIsActive(team)
+  const showPlanEditor = staged && modelDirectory !== undefined && onContinuePlanning !== undefined && onDiscarded !== undefined
+  const captainTone = discarded || stopped
+    ? 'idle'
+    : captainBusy || busyCount > 0
+      ? 'running'
+      : staged
+        ? 'idle'
+        : allCompleted
+          ? 'completed'
+          : allSettled
+            ? 'idle'
+            : 'idle'
   const stopTeam = async (): Promise<void> => {
     if (stopping) return
     setStopping(true)
@@ -532,28 +576,31 @@ function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscarded, on
     <>
       <section className={css.team} data-team-id={team.teamId}>
         <header className={css.teamHead}>
-          <span className={css.teamName} title={team.name}>{team.name}</span>
-          {historic && <span className={css.historicPill}>{t(discarded ? 'team.discarded' : 'team.ended')}</span>}
-          {stopped && <span className={css.historicPill}>{t('team.stopped')}</span>}
-          <span className={css.teamStats}>
+          <span className={css.teamTitleRow}>
+            <span className={css.teamName} title={team.name}>{team.name}</span>
+            {historic && <span className={css.historicPill}>{t(discarded ? 'team.discarded' : 'team.ended')}</span>}
+            {stopped && <span className={css.historicPill}>{t('team.stopped')}</span>}
+            {staged && <span className={css.teamPill}>{t('plan.badge')}</span>}
+            {canStop && (
+              <button
+                type="button"
+                className={css.teamStopButton}
+                aria-label={t('team.stop')}
+                title={t('team.stop')}
+                onClick={() => { setStopError(''); setStopOpen(true) }}
+              >
+                <IconStopFill16 />
+              </button>
+            )}
+          </span>
+          <span className={css.teamMeta}>
             <span data-stat="members">{t('team.stats.members', { count: team.members.length })}</span>
             <span data-stat="tasks">{t('team.stats.completed', { completed: completedCount, total: team.tasks.length })}</span>
             <span data-stat="messages">{t('team.stats.messages', { count: team.messageCount })}</span>
           </span>
-          {canStop && (
-            <button
-              type="button"
-              className={css.teamStopButton}
-              aria-label={t('team.stop')}
-              title={t('team.stop')}
-              onClick={() => { setStopError(''); setStopOpen(true) }}
-            >
-              <IconStopFill16 />
-            </button>
-          )}
         </header>
 
-        {team.phase === 'staged' && !historic && modelDirectory !== undefined && onContinuePlanning !== undefined && onDiscarded !== undefined && (
+        {showPlanEditor && (
           <StagingPlanEditor
             team={team}
             modelDirectory={modelDirectory}
@@ -563,146 +610,165 @@ function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscarded, on
           />
         )}
 
-      <section className={css.delegationSection} aria-label={t('delegation.aria')} data-delegation-map>
-        <div className={css.captainNode}>
-          <span className={css.captainAvatar}>
-            <img className={css.leadAvatar} src={LEAD_ART} alt="" aria-hidden />
-          </span>
-          <span className={css.captainInfo}>
-            <span className={css.captainLine}>
-              <span className={css.captainName}>{t('captain.name')}</span>
-              <span className={css.captainRole}>{t('captain.role')}</span>
-            </span>
-            <span className={css.captainSummary}>{discarded
-              ? t('captain.summary.discarded', { tasks: team.tasks.length, members: team.members.length })
-              : captainBusy
-                ? t('captain.summary.withTakeover', { tasks: assignedCount, captainTasks: captainTaskIds })
-              : team.phase === 'staged'
-                ? t(team.planReviewState === 'awaiting_feedback'
-                  ? 'captain.summary.awaitingFeedback'
-                  : 'captain.summary.staged', { tasks: team.tasks.length, members: team.members.length })
-                : t('captain.summary', { tasks: assignedCount, members: team.members.length })}</span>
-          </span>
-          <span className={css.captainState} data-busy={captainBusy || busyCount > 0}>
-            <WorkGlyph active={captainBusy || busyCount > 0} />
-            {discarded
-              ? t('captain.state.discarded')
-              : captainBusy
-                ? t('captain.state.takeover', { tasks: captainTaskIds })
-              : team.phase === 'staged'
-                ? t(team.planReviewState === 'awaiting_feedback'
-                  ? 'captain.state.awaitingFeedback'
-                  : 'captain.state.staged')
-              : busyCount > 0
-                ? t('captain.state.working', { count: busyCount })
-                : t(allCompleted
-                  ? 'captain.state.collected'
-                  : allSettled
-                    ? 'captain.state.settled'
-                    : 'captain.state.waiting')}
-          </span>
-        </div>
-
-        <ProgressOverview team={team} t={t} discarded={discarded} />
-
-        <button type="button" className={css.membersToggle} onClick={() => { setMembersOpen((current) => !current) }} aria-expanded={membersOpen} data-members-toggle>
-          <span><Chevron open={membersOpen} />{t('members.toggle', { count: team.members.length })}</span>
-          <span>{t(membersOpen ? 'members.collapse' : 'members.expand')}</span>
-        </button>
-
-        {membersOpen && <div className={css.delegationTree}>
-          {team.members.length === 0 && <span className={css.emptyHint}>{t('members.empty')}</span>}
-          {team.members.map((member) => {
-            const owned = team.tasks.filter((task) => task.assignee === member.name)
-            const memberModel = memberRouteLabel(member)
-            return (
-              <div key={member.id || member.name} className={css.memberBlock} data-activity={member.activity}>
-                <span className={css.memberBranch} aria-hidden><span /></span>
-                <button
-                  type="button"
-                  className={css.memberRow}
-                  data-activity={member.activity}
-                  onClick={() => {
-                    if (member.id !== '') {
-                      onNavigate(team.captainSessionId as SessionId, member.id as SessionId)
-                    }
-                  }}
-                >
-                  <span className={css.memberAvatar} data-unread={member.unread > 0}>
-                    {memberArtUrl(member.name, member.role) !== null ? (
-                      <img className={css.memberArt} src={memberArtUrl(member.name, member.role) ?? ''} alt="" aria-hidden />
-                    ) : (
-                      <span className={css.memberInitial} style={{ background: accentOf(member.id) }}>{memberInitial(member.name)}</span>
-                    )}
-                    <img className={css.stateArt} data-activity={member.activity} src={ACTION_ART[member.activity]} alt="" aria-hidden />
-                  </span>
-                  <span className={css.memberInfo}>
-                    <span className={css.memberLine}>
-                      <span className={css.memberName}>{member.name}</span>
-                      {member.role !== '' && <span className={css.memberRole}>{member.role}</span>}
-                      <span className={css.memberState} data-activity={member.activity}>
-                        <WorkGlyph active={member.activity === 'working'} />
-                        {discarded
-                          ? t('member.state.notCreated')
-                          : stopped
-                            ? t('member.state.stopped')
-                            : team.phase === 'staged'
-                              ? t('member.state.staged')
-                              : memberStateLabel(member, team.tasks, historic, t)}
-                      </span>
-                    </span>
-                    <span className={css.memberStatusLine}>{discarded
-                      ? t('member.status.discarded')
-                      : stopped
-                        ? t('member.status.stopped')
-                        : team.phase === 'staged'
-                          ? t('member.status.staged')
-                      : historic && owned.length > 0 && owned.every((task) => (
-                        task.status === 'completed' || task.status === 'failed' || task.status === 'cancelled'
-                      ))
-                        ? t('member.status.settled')
-                      : memberStatusText(member, team.tasks, t)}</span>
-                    {memberModel !== '' && (
-                      <span className={css.memberModel} data-member-model={memberModel}>
-                        {t('member.model', { model: memberModel })}
-                      </span>
-                    )}
-                  </span>
-                  <span className={css.memberCount}>{member.done}/{member.total}</span>
-                </button>
-                <div className={css.assignmentLine}>
-                  <span className={css.assignmentLabel}>{t(discarded
-                    ? 'assignment.discarded'
+        {!showPlanEditor && (
+          <section className={css.group} aria-label={t('delegation.aria')} data-delegation-map>
+            <div className={`${css.row} ${css.captainRow}`}>
+              <span className={css.avatarTile}>
+                <img className={css.leadAvatar} src={LEAD_ART} alt="" aria-hidden />
+              </span>
+              <span className={css.rowMain}>
+                <span className={css.rowTitle}>
+                  <span className={css.rowName}>{t('captain.name')}</span>
+                  <span className={css.rowRole}>{t('captain.role')}</span>
+                </span>
+                <span className={css.rowSub}>{discarded
+                  ? t('captain.summary.discarded', { tasks: team.tasks.length, members: team.members.length })
+                  : captainBusy
+                    ? t('captain.summary.withTakeover', { tasks: assignedCount, captainTasks: captainTaskIds })
+                  : team.phase === 'staged'
+                    ? t(team.planReviewState === 'awaiting_feedback'
+                      ? 'captain.summary.awaitingFeedback'
+                      : 'captain.summary.staged', { tasks: team.tasks.length, members: team.members.length })
+                    : t('captain.summary', { tasks: assignedCount, members: team.members.length })}</span>
+              </span>
+              <span className={css.rowAside}>
+                <span className={css.statusText} data-tone={captainTone}>
+                  <StatusDot tone={captainTone} />
+                  {discarded
+                    ? t('captain.state.discarded')
+                    : captainBusy
+                      ? t('captain.state.takeover', { tasks: captainTaskIds })
                     : team.phase === 'staged'
-                      ? 'assignment.staged'
-                      : 'assignment.label')}</span>
-                  <span className={css.assignmentTasks}>
-                    {owned.length === 0
-                      ? <span className={css.taskEmpty}>{t('assignment.empty')}</span>
-                      : owned.map((task) => {
-                          const model = taskModelLabel(task, team.members)
-                          const shortModel = compactModelLabel(model)
-                          return (
-                            <span
-                              key={task.id}
-                              className={css.assignmentChip}
-                              data-state={discarded ? 'cancelled' : taskTone(task.state, task.status)}
-                              data-task-model={model || undefined}
-                              title={taskTitle(task, model)}
-                            >
-                              {task.state === 'running' && shortModel !== '' ? `${task.id} · ${shortModel}` : task.id}
-                            </span>
-                          )
-                        })}
-                  </span>
-                </div>
-              </div>
-            )
-          })}
-        </div>}
-      </section>
+                      ? t(team.planReviewState === 'awaiting_feedback'
+                        ? 'captain.state.awaitingFeedback'
+                        : 'captain.state.staged')
+                    : busyCount > 0
+                      ? t('captain.state.working', { count: busyCount })
+                      : t(allCompleted
+                        ? 'captain.state.collected'
+                        : allSettled
+                          ? 'captain.state.settled'
+                          : 'captain.state.waiting')}
+                </span>
+              </span>
+            </div>
+            <div className={css.divider} />
+            <ProgressOverview team={team} t={t} discarded={discarded} />
+          </section>
+        )}
 
-      <DependencyMap tasks={team.tasks} members={team.members} t={t} discarded={discarded} />
+        {!showPlanEditor && (
+          <section className={css.group} data-members-group>
+            <header className={css.groupHead}>
+              <button type="button" className={css.groupToggle} onClick={() => { setMembersOpen((current) => !current) }} aria-expanded={membersOpen} data-members-toggle>
+                <Chevron open={membersOpen} />
+                {t('members.title')}
+                <span className={css.groupCount}>{team.members.length}</span>
+              </button>
+              {busyCount > 0 && <span className={css.groupHint}>{t('captain.state.working', { count: busyCount })}</span>}
+            </header>
+            {membersOpen && <div className={css.memberList}>
+              {team.members.length === 0 && <span className={css.emptyHint}>{t('members.empty')}</span>}
+              {team.members.map((member) => {
+                const owned = team.tasks.filter((task) => task.assignee === member.name)
+                const memberModel = memberRouteLabel(member)
+                const tone = memberTone(member, team.tasks, team.phase === 'staged', discarded || stopped)
+                return (
+                  <div key={member.id || member.name} className={css.memberBlock} data-activity={member.activity}>
+                    <button
+                      type="button"
+                      className={`${css.row} ${css.memberRow}`}
+                      data-activity={member.activity}
+                      onClick={() => {
+                        if (member.id !== '') {
+                          onNavigate(team.captainSessionId as SessionId, member.id as SessionId)
+                        }
+                      }}
+                    >
+                      <span className={`${css.avatarTile} ${css.memberAvatar}`} data-unread={member.unread > 0}>
+                        {memberArtUrl(member.name, member.role) !== null ? (
+                          <img className={css.memberArt} src={memberArtUrl(member.name, member.role) ?? ''} alt="" aria-hidden />
+                        ) : (
+                          <span className={css.memberInitial} style={{ background: accentOf(member.id) }}>{memberInitial(member.name)}</span>
+                        )}
+                        {!historic && !stopped && team.phase !== 'staged' && (
+                          <img className={css.stateArt} data-activity={member.activity} src={ACTION_ART[member.activity]} alt="" aria-hidden />
+                        )}
+                      </span>
+                      <span className={css.rowMain}>
+                        <span className={css.rowTitle}>
+                          <span className={css.rowName}>{member.name}</span>
+                          {member.role !== '' && <span className={css.rowRole}>{member.role}</span>}
+                        </span>
+                        <span className={css.rowSub}>{discarded
+                          ? t('member.status.discarded')
+                          : stopped
+                            ? t('member.status.stopped')
+                            : team.phase === 'staged'
+                              ? t('member.status.staged')
+                          : historic && owned.length > 0 && owned.every((task) => (
+                            task.status === 'completed' || task.status === 'failed' || task.status === 'cancelled'
+                          ))
+                            ? t('member.status.settled')
+                          : memberStatusText(member, team.tasks, t)}</span>
+                        {memberModel !== '' && (
+                          <span className={css.memberModel} data-member-model={memberModel}>
+                            {t('member.model', { model: memberModel })}
+                          </span>
+                        )}
+                      </span>
+                      <span className={css.rowAside}>
+                        <span className={css.statusText} data-tone={tone} data-activity={member.activity}>
+                          <StatusDot tone={tone} />
+                          {discarded
+                            ? t('member.state.notCreated')
+                            : stopped
+                              ? t('member.state.stopped')
+                              : team.phase === 'staged'
+                                ? t('member.state.staged')
+                                : memberStateLabel(member, team.tasks, historic, t)}
+                        </span>
+                        {member.total > 0 && (
+                          <span className={css.memberCount}>{t('member.count', { done: member.done, total: member.total })}</span>
+                        )}
+                      </span>
+                    </button>
+                    <div className={css.assignmentLine}>
+                      <span className={css.assignmentLabel}>{t(discarded
+                        ? 'assignment.discarded'
+                        : team.phase === 'staged'
+                          ? 'assignment.staged'
+                          : 'assignment.label')}</span>
+                      <span className={css.assignmentTasks}>
+                        {owned.length === 0
+                          ? <span className={css.taskEmpty}>{t('assignment.empty')}</span>
+                          : owned.map((task) => {
+                              const model = taskModelLabel(task, team.members)
+                              const shortModel = compactModelLabel(model)
+                              const chipTone = discarded ? 'cancelled' : taskTone(task.state, task.status)
+                              return (
+                                <span
+                                  key={task.id}
+                                  className={css.assignmentChip}
+                                  data-state={chipTone}
+                                  data-task-model={model || undefined}
+                                  title={taskTitle(task, model)}
+                                >
+                                  <span className={css.chipDot} data-state={chipTone} aria-hidden />
+                                  {task.state === 'running' && shortModel !== '' ? `${task.id} · ${shortModel}` : task.id}
+                                </span>
+                              )
+                            })}
+                      </span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>}
+          </section>
+        )}
+
+        <DependencyMap tasks={team.tasks} members={team.members} t={t} discarded={discarded} />
       </section>
       <Modal
         open={stopOpen}
@@ -712,11 +778,10 @@ function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscarded, on
         description={t('team.stopDescription', { tasks: unfinishedCount, members: busyCount })}
         footer={(
           <span className={css.stopModalActions}>
-            <button type="button" disabled={stopping} onClick={() => { setStopOpen(false) }}>{t('team.stopCancel')}</button>
-            <button type="button" data-danger disabled={stopping} onClick={() => { void stopTeam() }}>
-              <IconStopFill16 />
+            <Button variant="outline" disabled={stopping} onClick={() => { setStopOpen(false) }}>{t('team.stopCancel')}</Button>
+            <Button variant="primary" className={css.dangerButton} disabled={stopping} icon={<IconStopFill16 />} onClick={() => { void stopTeam() }}>
               {stopping ? t('team.stopping') : t('team.stopConfirm')}
-            </button>
+            </Button>
           </span>
         )}
       >
@@ -749,6 +814,21 @@ function historicCardTeam(data: AgentTeamsCardData, owner: string): ActivityTeam
     messageCount: 0,
     captainInbox: [],
   }
+}
+
+/** One-line panel subtitle summarising the visible teams. */
+function panelSubtitle(
+  live: readonly ActivityTeam[],
+  archivedCount: number,
+  t: AgentTeamsTranslate,
+): string {
+  const working = live.reduce((total, team) => total + team.members.filter((member) => member.activity === 'working').length, 0)
+  if (working > 0) return t('activity.subtitle.working', { count: working })
+  if (live.some((team) => team.phase === 'staged')) return t('activity.subtitle.staged')
+  if (live.some((team) => team.halted === true)) return t('activity.subtitle.stopped')
+  if (live.length > 0) return t('activity.subtitle.waiting')
+  if (archivedCount > 0) return t('activity.subtitle.archived', { count: archivedCount })
+  return ''
 }
 
 /** The top-right activity floater. Teams follow the current session: live
@@ -1027,6 +1107,7 @@ export function ActivityPanel({ sessionsList, modelDirectories, openMember, t }:
     [visibleTeams],
   )
   const hasTeams = visibleCount > 0
+  const subtitle = panelSubtitle(visibleTeams, visibleArchived.length + visibleHistoric.length, t)
 
   // Auto-height panels do not store their live content height. Capture the
   // rendered box when a pointer gesture starts so movement and a first manual
@@ -1191,8 +1272,11 @@ export function ActivityPanel({ sessionsList, modelDirectories, openMember, t }:
             data-drag-handle={!compact || undefined}
           >
             <span className={css.panelTitle}>
-              {t('activity.title')}
-              <span className={css.panelDot} data-busy={busy} aria-hidden />
+              <span>
+                <span className={css.panelDot} data-busy={busy} aria-hidden />
+                {t('activity.title')}
+              </span>
+              {subtitle !== '' && <span className={css.panelSubtitle}>{subtitle}</span>}
             </span>
             <span className={css.panelControls}>
               {!compact && (

@@ -76,7 +76,7 @@
   display: inline-flex;
   flex: none;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   height: 28px;
   padding: 0 10px;
   border: 1px solid var(--dsw-alias-border-l2, rgb(0 0 0 / 10%));

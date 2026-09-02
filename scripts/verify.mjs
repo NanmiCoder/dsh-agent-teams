@@ -353,6 +353,23 @@ check(
     && agentTeamsCardCss.includes('object-fit: contain'),
   'portrait CSS should preserve each transparent role silhouette and use a compact unread dot',
 )
+const identityMarkSource = await readFile(new URL('../src/client/identity-mark.tsx', import.meta.url), 'utf8')
+check(
+  'captain and members render identity marks instead of cartoon whale portraits',
+  identityMarkSource.includes('ECHO_WHALE_PATH')
+    && identityMarkSource.includes('data-sprite-render="echo-whale-v2"')
+    && activityPanelSource.includes('CaptainMark')
+    && activityPanelSource.includes('MemberMark')
+    && agentTeamsCardSource.includes('CaptainMark')
+    && agentTeamsCardSource.includes('MemberMark')
+    && stagingPlanSource.includes('MemberMark')
+    && !activityPanelSource.includes('LEAD_ART')
+    && !agentTeamsCardSource.includes('LEAD_ART')
+    && !activityPanelSource.includes('memberArtUrl')
+    && !agentTeamsCardSource.includes('memberArtUrl')
+    && !stagingPlanSource.includes('memberArtUrl'),
+  'activity UI should use the host echo-whale plus per-name marks, not the packaged PNGs',
+)
 const requiredHarnessTokenBridges = [
   '--dsw-alias-line-normal: var(--dsw-static-neutral-bluish-150',
   '--dsw-alias-bg-module: var(--dsw-alias-bg-layer-1',
@@ -441,6 +458,18 @@ check(
     && activityPanelSource.includes('data-stop-feedback')
     && activityPanelSource.includes('focusComposer()')
     && !activityPanelSource.includes('[data-composer-card] textarea'),
+)
+check(
+  'disclosure, feedback, and activity marks use host icons instead of ad-hoc stroke glyphs',
+  activityPanelSource.includes('IconTriangleRightFill14')
+    && activityPanelSource.includes('IconAgentPresetOutline16')
+    && activityPanelSource.includes('IconUserOutline16')
+    && activityPanelSource.includes('IconLoadingOutline16')
+    && stagingPlanSource.includes('IconCheckOutline14')
+    && stagingPlanSource.includes('IconPlayOutline16')
+    && agentTeamsCardSource.includes('IconPanelLeftOutline16')
+    && !activityPanelSource.includes('viewBox="0 0 10 10"')
+    && !stagingPlanSource.includes('viewBox="0 0 12 12"'),
 )
 
 console.log('2/8 pure rules')

@@ -1,0 +1,24 @@
+/* Compact identity marks: host echo-whale for the captain, original
+   geometric glyphs for members. Ink follows currentColor so both themes work. */
+
+.mark {
+  display: block;
+  flex: none;
+  overflow: visible;
+}
+
+.captain {
+  color: var(--dsw-alias-label-primary);
+}
+
+.captainEye {
+  fill: var(--dsw-alias-label-primary-inverted, #fff);
+}
+
+.captainAccent {
+  fill: var(--dsw-alias-state-business-primary);
+}
+
+.member {
+  color: var(--dsw-alias-state-business-primary);
+}

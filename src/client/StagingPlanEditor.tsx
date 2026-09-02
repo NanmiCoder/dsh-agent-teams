@@ -8,8 +8,25 @@
 
 import { useCallback, useEffect, useId, useState, useSyncExternalStore, type FormEvent } from 'react'
 import type { ModelDirectory } from '@deepseek-ai/dsh-client-ui-model-selection/client'
-import { Button, Menu, type MenuEntry } from '@deepseek-ai/dsh-client-ui-primitives'
+import {
+  Button,
+  IconCheckOutline14,
+  IconChevronLeftOutline14,
+  IconChevronRightOutline14,
+  IconChecklistOutline14,
+  IconLoadingOutline16,
+  IconNewChatOutline16,
+  IconPlayOutline16,
+  IconPlusOutline16,
+  IconTrashOutline16,
+  IconTriangleRightFill14,
+  IconUserOutline16,
+  IconWarningOutline16,
+  Menu,
+  type MenuEntry,
+} from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ActivityMember, ActivityTask, ActivityTeam } from './activity-monitor.ts'
+import { MemberMark } from './identity-mark.tsx'
 import type { AgentTeamsTranslate } from './locales.ts'
 import css from './ActivityPanel.module.css'
 
@@ -61,9 +78,9 @@ function errorMessage(error: unknown): string {
 
 function DisclosureChevron({ open }: { readonly open: boolean }) {
   return (
-    <svg className={css.planChevron} data-open={open} width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M4 2.5 7.5 6 4 9.5" />
-    </svg>
+    <span className={css.planChevron} data-open={open} aria-hidden>
+      <IconTriangleRightFill14 size={12} />
+    </span>
   )
 }
 
@@ -78,8 +95,8 @@ function Feedback({ value }: { readonly value: PlanFeedback | undefined }) {
     >
       <span aria-hidden>
         {value.tone === 'success'
-          ? <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m2.5 6.2 2.2 2.2 4.8-5" /></svg>
-          : <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M6 2.3v4.1M6 8.8v.1" /></svg>}
+          ? <IconCheckOutline14 size={12} />
+          : <IconWarningOutline16 size={12} />}
       </span>
       {value.message}
     </span>
@@ -164,7 +181,7 @@ function StagedModelPicker({
         <span className={css.planModelMenuRow}>
           <span>{t('plan.member.model')}</span>
           <strong>{modelLabel}</strong>
-          <DisclosureChevron open={false} />
+          <IconChevronRightOutline14 size={12} />
         </span>
       ),
       disabled: state.status === 'loading' && catalogRoutes.length === 0,
@@ -175,7 +192,7 @@ function StagedModelPicker({
         <span className={css.planModelMenuRow}>
           <span>{t('plan.member.reasoning')}</span>
           <strong>{effortLabel}</strong>
-          <DisclosureChevron open={false} />
+          <IconChevronRightOutline14 size={12} />
         </span>
       ),
       disabled: selected?.model.reasoning === undefined,
@@ -187,7 +204,7 @@ function StagedModelPicker({
       id: MODEL_MENU_BACK,
       label: (
         <span className={css.planModelMenuBack}>
-          <DisclosureChevron open={false} />
+          <IconChevronLeftOutline14 size={12} />
           {t('plan.model.back')}
         </span>
       ),
@@ -217,7 +234,7 @@ function StagedModelPicker({
       id: MODEL_MENU_BACK,
       label: (
         <span className={css.planModelMenuBack}>
-          <DisclosureChevron open={false} />
+          <IconChevronLeftOutline14 size={12} />
           {t('plan.model.back')}
         </span>
       ),
@@ -439,6 +456,9 @@ function StagedMemberEditor({ team, member, modelDirectory, onPendingChange, t }
         aria-controls={bodyId}
         onClick={() => { setOpen((current) => !current) }}
       >
+        <span className={css.planCardAvatar} aria-hidden>
+          <MemberMark name={member.name} role={role} size={16} />
+        </span>
         <span className={css.planCardIdentity}>
           <strong>{member.name}</strong>
           <span>{role || t('plan.member.roleFallback')}</span>
@@ -474,7 +494,7 @@ function StagedMemberEditor({ team, member, modelDirectory, onPendingChange, t }
           </fieldset>
           <span className={css.planActions}>
             <Feedback value={feedback} />
-            <Button type="submit" variant="primary" size="sm" disabled={busy || !dirty || provider.trim() === '' || model.trim() === ''}>
+            <Button type="submit" variant="primary" size="sm" disabled={busy || !dirty || provider.trim() === '' || model.trim() === ''} icon={busy ? <IconLoadingOutline16 size={14} className={css.iconSpin} /> : <IconCheckOutline14 size={14} />}>
               {busy ? t('plan.saving') : t('plan.save')}
             </Button>
           </span>
@@ -636,13 +656,13 @@ function StagedTaskEditor({ team, task, onPendingChange, t }: {
             <span className={css.planConfirm} role="alert">
               <span>{t('plan.removeWarning', { task: task.id })}</span>
               <Button variant="outline" size="sm" onClick={() => { setConfirmingRemove(false) }}>{t('plan.cancel')}</Button>
-              <Button variant="primary" size="sm" className={css.dangerButton} data-danger data-confirming onClick={() => { void remove() }}>{t('plan.removeConfirm')}</Button>
+              <Button variant="primary" size="sm" className={css.dangerButton} data-danger data-confirming icon={<IconTrashOutline16 size={14} />} onClick={() => { void remove() }}>{t('plan.removeConfirm')}</Button>
             </span>
           )}
           <span className={css.planActions}>
             <Feedback value={feedback} />
-            <Button variant="ghost" size="sm" className={css.planDangerText} data-danger onClick={() => { setConfirmingRemove(true); setFeedback(undefined) }} disabled={busy || confirmingRemove}>{t('plan.remove')}</Button>
-            <Button type="submit" variant="primary" size="sm" disabled={busy || !dirty || subject.trim() === ''}>{busy ? t('plan.saving') : t('plan.save')}</Button>
+            <Button variant="ghost" size="sm" className={css.planDangerText} data-danger icon={<IconTrashOutline16 size={14} />} onClick={() => { setConfirmingRemove(true); setFeedback(undefined) }} disabled={busy || confirmingRemove}>{t('plan.remove')}</Button>
+            <Button type="submit" variant="primary" size="sm" disabled={busy || !dirty || subject.trim() === ''} icon={busy ? <IconLoadingOutline16 size={14} className={css.iconSpin} /> : <IconCheckOutline14 size={14} />}>{busy ? t('plan.saving') : t('plan.save')}</Button>
           </span>
         </form>
       )}
@@ -783,7 +803,11 @@ export function StagingPlanEditor({ team, modelDirectory, onContinuePlanning, on
 
       <section className={css.group}>
         <button type="button" className={css.planSectionToggle} aria-expanded={membersOpen} aria-controls={membersId} onClick={() => { setMembersOpen((current) => !current) }}>
-          <span><strong>{t('plan.members.title')}</strong><small>{t('plan.members.count', { count: team.members.length })}</small></span>
+          <span>
+            <IconUserOutline16 size={14} />
+            <strong>{t('plan.members.title')}</strong>
+            <small>{t('plan.members.count', { count: team.members.length })}</small>
+          </span>
           <DisclosureChevron open={membersOpen} />
         </button>
         {membersOpen && (
@@ -806,7 +830,11 @@ export function StagingPlanEditor({ team, modelDirectory, onContinuePlanning, on
 
       <section className={css.group}>
         <button type="button" className={css.planSectionToggle} aria-expanded={tasksOpen} aria-controls={tasksId} onClick={() => { setTasksOpen((current) => !current) }}>
-          <span><strong>{t('plan.tasks.title')}</strong><small>{t('plan.tasks.count', { count: team.tasks.length, links: dependencyLinks })}</small></span>
+          <span>
+            <IconChecklistOutline14 size={14} />
+            <strong>{t('plan.tasks.title')}</strong>
+            <small>{t('plan.tasks.count', { count: team.tasks.length, links: dependencyLinks })}</small>
+          </span>
           <DisclosureChevron open={tasksOpen} />
         </button>
         {tasksOpen && (
@@ -826,7 +854,7 @@ export function StagingPlanEditor({ team, modelDirectory, onContinuePlanning, on
             placeholder={t('plan.newTask')}
             disabled={busy}
           />
-          <Button type="submit" variant="outline" size="sm" disabled={busy || newTask.trim() === ''}>{busy && !approving ? t('plan.adding') : t('plan.addTask')}</Button>
+          <Button type="submit" variant="outline" size="sm" disabled={busy || newTask.trim() === ''} icon={<IconPlusOutline16 size={14} />}>{busy && !approving ? t('plan.adding') : t('plan.addTask')}</Button>
         </form>
       </section>
 
@@ -856,20 +884,20 @@ export function StagingPlanEditor({ team, modelDirectory, onContinuePlanning, on
         {discardArmed ? (
           <span className={css.planApproveActions}>
             <Button variant="outline" disabled={busy} onClick={() => { setDiscardArmed(false) }}>{t('plan.cancel')}</Button>
-            <Button variant="primary" className={css.dangerButton} data-plan-discard data-danger data-confirming disabled={busy} onClick={() => { void discard() }}>
+            <Button variant="primary" className={css.dangerButton} data-plan-discard data-danger data-confirming disabled={busy} icon={<IconTrashOutline16 size={14} />} onClick={() => { void discard() }}>
               {busy ? t('plan.discarding') : t('plan.discardConfirm')}
             </Button>
           </span>
         ) : (
           <span className={css.planReviewActions}>
-            <Button variant="primary" className={css.planPrimary} data-plan-approve disabled={busy || !runnable || hasPendingEdits} onClick={() => { void approve() }}>
+            <Button variant="primary" className={css.planPrimary} data-plan-approve disabled={busy || !runnable || hasPendingEdits} icon={approving ? <IconLoadingOutline16 size={14} className={css.iconSpin} /> : <IconPlayOutline16 size={14} />} onClick={() => { void approve() }}>
               {approving ? t('plan.approving') : t('plan.approve')}
             </Button>
             <span className={css.planSecondaryActions}>
-              <Button variant="ghost" data-plan-continue disabled={busy} onClick={() => { void continueInChat() }}>
+              <Button variant="ghost" data-plan-continue disabled={busy} icon={<IconNewChatOutline16 size={14} />} onClick={() => { void continueInChat() }}>
                 {t(waitingForFeedback ? 'plan.returnToChat' : 'plan.continue')}
               </Button>
-              <Button variant="ghost" className={css.planDangerText} data-plan-discard data-danger disabled={busy} onClick={() => { setDiscardArmed(true); setFeedback(undefined) }}>{t('plan.discard')}</Button>
+              <Button variant="ghost" className={css.planDangerText} data-plan-discard data-danger disabled={busy} icon={<IconTrashOutline16 size={14} />} onClick={() => { setDiscardArmed(true); setFeedback(undefined) }}>{t('plan.discard')}</Button>
             </span>
           </span>
         )}

@@ -103,18 +103,36 @@
 }
 
 .badgeDot,
-.panelDot {
+.panelDot,
+.activityMark {
   width: 8px;
   height: 8px;
   border-radius: 50%;
   background: var(--at-muted);
 }
 
+.activityMark {
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--at-text-3);
+}
+
 .badgeDot[data-busy='true'],
-.panelDot[data-busy='true'] {
+.panelDot[data-busy='true'],
+.activityMark[data-busy='true'] {
   background: var(--at-accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--at-accent) 18%, transparent);
   animation: agentTeamsPulse 1.6s ease-in-out infinite;
+}
+
+.activityMark[data-busy='true'] {
+  background: transparent;
+  box-shadow: none;
+  color: var(--at-accent);
 }
 
 .badgeCount,
@@ -201,13 +219,21 @@
 }
 
 .panelSubtitle {
+  display: inline-flex;
   overflow: hidden;
+  align-items: center;
+  gap: 5px;
   color: var(--at-text-3);
   font-size: 11px;
   font-weight: 400;
   line-height: 16px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.panelSubtitle svg {
+  flex: none;
+  color: var(--at-warn);
 }
 
 .panelControls {
@@ -487,12 +513,18 @@
   white-space: nowrap;
 }
 
-.chevron {
+.chevron,
+.planChevron {
+  display: inline-flex;
   flex: none;
+  align-items: center;
+  justify-content: center;
+  color: var(--at-text-3);
   transition: transform 160ms cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
-.chevron[data-open='true'] {
+.chevron[data-open='true'],
+.planChevron[data-open='true'] {
   transform: rotate(90deg);
 }
 
@@ -630,6 +662,14 @@
   flex: none;
   align-items: center;
   justify-content: center;
+}
+
+.iconSpin {
+  animation: agentTeamsSpin 0.8s linear infinite;
+}
+
+@keyframes agentTeamsSpin {
+  to { transform: rotate(360deg); }
 }
 
 /* ------------------------------------------------------------- captain */
@@ -825,43 +865,26 @@
 
 .stateArt {
   position: absolute;
-  right: -6px;
+  right: -5px;
   bottom: -5px;
-  width: 20px;
-  height: 20px;
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
   box-sizing: border-box;
-  border: 0;
-  border-radius: 0;
-  object-fit: contain;
-  background: transparent;
-  filter: drop-shadow(0 0 1px var(--at-group)) drop-shadow(0 1px 1px rgb(0 0 0 / 18%));
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--at-surface);
+  box-shadow: 0 0 0 1px var(--at-hairline);
+  color: var(--at-text-3);
 }
 
 .stateArt[data-activity='working'] {
-  animation: agentTeamsFloat 2.4s ease-in-out infinite;
-}
-
-.stateArt[data-activity='idle'] {
-  animation: agentTeamsBreathe 4.2s ease-in-out infinite;
+  color: var(--at-accent);
 }
 
 .stateArt[data-activity='unknown'] {
-  animation: agentTeamsThink 2.8s ease-in-out infinite;
-}
-
-@keyframes agentTeamsFloat {
-  0%, 100% { transform: translateY(0) rotate(-4deg); }
-  50% { transform: translateY(-2px) rotate(4deg); }
-}
-
-@keyframes agentTeamsBreathe {
-  0%, 100% { opacity: 0.85; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.05); }
-}
-
-@keyframes agentTeamsThink {
-  0%, 100% { transform: rotate(-7deg); }
-  50% { transform: rotate(7deg); }
+  color: var(--at-warn);
 }
 
 .memberModel,
@@ -1357,7 +1380,7 @@
 .planSectionToggle > span {
   display: flex;
   min-width: 0;
-  align-items: baseline;
+  align-items: center;
   gap: 6px;
 }
 
@@ -1406,7 +1429,7 @@
 .planCardHeader {
   display: grid;
   min-height: 46px;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 44%) 14px;
+  grid-template-columns: 24px minmax(0, 1fr) minmax(0, 44%) 14px;
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
@@ -1421,6 +1444,26 @@
   min-width: 0;
   flex-direction: column;
   gap: 1px;
+}
+
+.planCardAvatar {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 7px;
+  background: var(--at-tile);
+  box-shadow: inset 0 0 0 1px var(--at-hairline);
+  color: var(--at-text-3);
+}
+
+.planCardAvatar img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
 }
 
 .planCardIdentity strong,
@@ -1479,16 +1522,6 @@
   font-style: normal;
   font-weight: 600;
   line-height: 18px;
-}
-
-.planChevron {
-  flex: none;
-  color: var(--at-text-3);
-  transition: transform 180ms cubic-bezier(0.2, 0.7, 0.2, 1);
-}
-
-.planChevron[data-open='true'] {
-  transform: rotate(90deg);
 }
 
 .planCardBody {
@@ -1721,10 +1754,6 @@ select.planInput {
   gap: 7px;
 }
 
-.planModelMenuBack svg {
-  transform: rotate(180deg);
-}
-
 .planModelEffortRow {
   display: flex;
   min-width: 0;
@@ -1822,8 +1851,8 @@ select.planInput {
 }
 
 .planFeedback svg {
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
 }
 
 @keyframes plan-feedback-in {
@@ -1944,8 +1973,10 @@ select.planInput {
   .badge,
   .badgeDot,
   .panelDot,
+  .activityMark,
   .chipDot,
   .stateArt,
+  .iconSpin,
   .memberAvatar[data-unread='true']::after,
   .planChevron,
   .planFeedback,

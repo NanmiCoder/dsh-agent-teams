@@ -1,7 +1,7 @@
 /**
  * AgentTeams conversation card: the lightweight in-conversation summary for
- * one team — the captain's whale avatar and name, the member roster as
- * clickable whale avatars (opening the member's subagent transcript), and
+ * one team — the captain's echo-whale mark and name, the member roster as
+ * clickable identity marks (opening the member's subagent transcript), and
  * an "activity panel" button that re-activates the top-right floater.
  *
  * The floater and this card share the `agent-teams:open-panel` window event
@@ -11,6 +11,7 @@
  */
 
 import { useEffect, useMemo, useSyncExternalStore } from 'react'
+import { IconPanelLeftOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import {
@@ -19,7 +20,7 @@ import {
   subscribeActivitySnapshots,
 } from './activity-monitor.ts'
 import type { AgentTeamsCardData } from './agent-teams-card-definition.ts'
-import { LEAD_ART, memberArtUrl } from './artwork.ts'
+import { CaptainMark, MemberMark } from './identity-mark.tsx'
 import css from './AgentTeamsCard.module.css'
 
 /** Window event name the floater listens for to open itself. */
@@ -75,7 +76,7 @@ export function AgentTeamsCard({ node, openMember, sessionId, t }: AgentTeamsCar
     <section className={css.root} data-agent-teams-card data-team-id={resolved.teamId}>
       <header className={css.head}>
         <span className={css.leadTile}>
-          <img className={css.leadAvatar} src={LEAD_ART} alt="" aria-hidden />
+          <CaptainMark size={22} />
         </span>
         <span className={css.titles}>
           <span className={css.teamName} title={resolved.teamName}>{resolved.teamName}</span>
@@ -88,6 +89,7 @@ export function AgentTeamsCard({ node, openMember, sessionId, t }: AgentTeamsCar
           aria-label={t('action.openActivityPanel')}
           title={t('action.openActivityPanel')}
         >
+          <IconPanelLeftOutline16 size={14} />
           {t('activity.panelButton')}
         </button>
       </header>
@@ -103,11 +105,7 @@ export function AgentTeamsCard({ node, openMember, sessionId, t }: AgentTeamsCar
               }}
               title={member.role === '' ? member.name : `${member.name} · ${member.role}`}
             >
-              {memberArtUrl(member.name, member.role) !== null ? (
-                <img className={css.memberArt} src={memberArtUrl(member.name, member.role) ?? ''} alt="" aria-hidden />
-              ) : (
-                <span className={css.memberInitial}>{member.name.trim().slice(0, 1).toUpperCase() || '?'}</span>
-              )}
+              <MemberMark name={member.name} role={member.role} size={16} />
               <span className={css.memberName}>{member.name}</span>
             </button>
           ))}

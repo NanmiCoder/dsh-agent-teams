@@ -22,8 +22,20 @@ import {
   type CSSProperties, type PointerEvent as ReactPointerEvent,
 } from 'react'
 import {
-  Button, IconBranchOutline16, IconChevronDownOutline14, IconPanelLeftOutline16,
-  IconStopFill16, IconWarningOutline16, Modal, StateDot, type StateDotState,
+  Button,
+  IconAgentPresetOutline16,
+  IconBranchOutline16,
+  IconChevronDownOutline14,
+  IconLoadingOutline16,
+  IconPanelLeftOutline16,
+  IconStopFill16,
+  IconThinkOutline14,
+  IconTriangleRightFill14,
+  IconUserOutline16,
+  IconWarningOutline16,
+  Modal,
+  StateDot,
+  type StateDotState,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ModelDirectory, ModelDirectoryResolver } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
@@ -55,8 +67,8 @@ import {
   type ActivityTask,
   type ActivityTeam,
 } from './activity-monitor.ts'
-import { ACTION_ART, LEAD_ART, memberArtUrl } from './artwork.ts'
 import { OPEN_PANEL_EVENT } from './AgentTeamsCard.tsx'
+import { CaptainMark, MemberMark } from './identity-mark.tsx'
 import { StagingPlanEditor } from './StagingPlanEditor.tsx'
 import type { AgentTeamsCardData } from './agent-teams-card-definition.ts'
 import type { AgentTeamsLocaleKey, AgentTeamsTranslate } from './locales.ts'
@@ -113,30 +125,6 @@ function initialPanelLayout(): PanelLayout {
 function initialPanelBounds(): PanelBounds {
   if (typeof window === 'undefined') return { width: 1440, height: 900, anchorRight: 1440 }
   return { width: window.innerWidth, height: window.innerHeight, anchorRight: window.innerWidth }
-}
-
-/** Initial-letter fallback for unmatched roles. */
-function memberInitial(name: string): string {
-  return name.trim().slice(0, 1).toUpperCase() || '?'
-}
-
-function stableHash(value: string): number {
-  let hash = 0
-  for (let index = 0; index < value.length; index += 1) {
-    hash = ((hash << 5) - hash + value.charCodeAt(index)) | 0
-  }
-  return Math.abs(hash)
-}
-
-const ACCENTS = [
-  'var(--dsw-alias-state-business-primary)',
-  'var(--dsw-alias-state-success-primary)',
-  'var(--dsw-alias-state-warn-primary)',
-  'var(--dsw-alias-label-tertiary)',
-] as const
-
-function accentOf(id: string): string {
-  return ACCENTS[stableHash(id) % ACCENTS.length] ?? ACCENTS[0]
 }
 
 /** Badge text follows the raw task status (finer than the 4 visual states):
@@ -196,9 +184,28 @@ function StatusDot({ tone, size = 10 }: { readonly tone: string; readonly size?:
 
 function Chevron({ open }: { readonly open: boolean }) {
   return (
-    <svg className={css.chevron} data-open={open} width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M3.5 2l3 3-3 3" />
-    </svg>
+    <span className={css.chevron} data-open={open} aria-hidden>
+      <IconTriangleRightFill14 size={12} />
+    </span>
+  )
+}
+
+function ActivityMark({ busy }: { readonly busy: boolean }) {
+  return (
+    <span className={css.activityMark} data-busy={busy} aria-hidden>
+      <IconAgentPresetOutline16 size={16} />
+    </span>
+  )
+}
+
+function MemberActivityBadge({ activity }: { readonly activity: ActivityMember['activity'] }) {
+  if (activity === 'idle') return null
+  return (
+    <span className={css.stateArt} data-activity={activity} aria-hidden>
+      {activity === 'working'
+        ? <IconLoadingOutline16 size={10} className={css.iconSpin} />
+        : <IconThinkOutline14 size={10} />}
+    </span>
   )
 }
 
@@ -220,7 +227,7 @@ function CollapsedBadge({ count, busy, onClick, t }: {
 }) {
   return (
     <button type="button" className={css.badge} data-agent-teams-collapsed data-busy={busy} onClick={onClick} aria-label={t('activity.badgeAria', { count })}>
-      <span className={css.badgeDot} data-busy={busy} aria-hidden />
+      <ActivityMark busy={busy} />
       <span>{t('activity.badgeLabel')}</span>
       <span className={css.badgeCount}>{count}</span>
     </button>
@@ -409,7 +416,7 @@ function DependencyMap({ tasks, members, t, discarded = false }: {
     <section className={css.group} aria-label={t('dependency.aria')} data-dependency-map>
       <header className={css.groupHead}>
         <button type="button" className={css.groupToggle} onClick={() => { setOpen((current) => !current) }} aria-expanded={open}>
-          <Chevron open={open} /><IconBranchOutline16 /> {t(parallel ? 'dependency.parallel' : 'dependency.title')}
+          <Chevron open={open} /><IconBranchOutline16 size={14} /> {t(parallel ? 'dependency.parallel' : 'dependency.title')}
           <span className={css.groupCount}>{tasks.length}</span>
         </button>
         <span className={css.groupHint}>{pinnedTaskId === null
@@ -454,7 +461,10 @@ function DependencyMap({ tasks, members, t, discarded = false }: {
                     onFocus={() => { setKeyboardTaskId(task.id) }}
                     onBlur={() => { setKeyboardTaskId(null) }}
                   >
-                    <span className={css.dagNodeHead}><span className={css.dagNodeDot} />{task.id}</span>
+                    <span className={css.dagNodeHead}>
+                      <StatusDot tone={discarded ? 'cancelled' : taskTone(task.state, task.status)} size={8} />
+                      {task.id}
+                    </span>
                     <span className={css.dagNodeLabel}>
                       {task.state === 'running' && shortModel !== '' ? shortModel : compactTaskLabel(task.subject)}
                     </span>
@@ -590,7 +600,7 @@ function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscarded, on
                 title={t('team.stop')}
                 onClick={() => { setStopError(''); setStopOpen(true) }}
               >
-                <IconStopFill16 />
+                <IconStopFill16 size={14} />
               </button>
             )}
           </span>
@@ -620,7 +630,7 @@ function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscarded, on
           <section className={css.group} aria-label={t('delegation.aria')} data-delegation-map>
             <div className={`${css.row} ${css.captainRow}`}>
               <span className={css.avatarTile}>
-                <img className={css.leadAvatar} src={LEAD_ART} alt="" aria-hidden />
+                <CaptainMark size={28} />
               </span>
               <span className={css.rowMain}>
                 <span className={css.rowTitle}>
@@ -668,6 +678,7 @@ function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscarded, on
             <header className={css.groupHead}>
               <button type="button" className={css.groupToggle} onClick={() => { setMembersOpen((current) => !current) }} aria-expanded={membersOpen} data-members-toggle>
                 <Chevron open={membersOpen} />
+                <IconUserOutline16 size={14} />
                 {t('members.title')}
                 <span className={css.groupCount}>{team.members.length}</span>
               </button>
@@ -692,13 +703,9 @@ function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscarded, on
                       }}
                     >
                       <span className={`${css.avatarTile} ${css.memberAvatar}`} data-unread={member.unread > 0}>
-                        {memberArtUrl(member.name, member.role) !== null ? (
-                          <img className={css.memberArt} src={memberArtUrl(member.name, member.role) ?? ''} alt="" aria-hidden />
-                        ) : (
-                          <span className={css.memberInitial} style={{ background: accentOf(member.id) }}>{memberInitial(member.name)}</span>
-                        )}
+                        <MemberMark name={member.name} role={member.role} size={22} />
                         {!historic && !stopped && team.phase !== 'staged' && (
-                          <img className={css.stateArt} data-activity={member.activity} src={ACTION_ART[member.activity]} alt="" aria-hidden />
+                          <MemberActivityBadge activity={member.activity} />
                         )}
                       </span>
                       <span className={css.rowMain}>
@@ -785,7 +792,7 @@ function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscarded, on
         footer={(
           <span className={css.stopModalActions}>
             <Button variant="outline" disabled={stopping} onClick={() => { setStopOpen(false) }}>{t('team.stopCancel')}</Button>
-            <Button variant="primary" className={css.dangerButton} disabled={stopping} icon={<IconStopFill16 />} onClick={() => { void stopTeam() }}>
+            <Button variant="primary" className={css.dangerButton} disabled={stopping} icon={<IconStopFill16 size={14} />} onClick={() => { void stopTeam() }}>
               {stopping ? t('team.stopping') : t('team.stopConfirm')}
             </Button>
           </span>
@@ -1280,10 +1287,15 @@ export function ActivityPanel({ sessionsList, modelDirectories, openMember, t }:
           >
             <span className={css.panelTitle}>
               <span>
-                <span className={css.panelDot} data-busy={busy} aria-hidden />
+                <ActivityMark busy={busy} />
                 {t('activity.title')}
               </span>
-              {subtitle !== '' && <span className={css.panelSubtitle}>{subtitle}</span>}
+              {subtitle !== '' && (
+                <span className={css.panelSubtitle}>
+                  {stale && <IconWarningOutline16 size={12} />}
+                  {subtitle}
+                </span>
+              )}
             </span>
             <span className={css.panelControls}>
               {!compact && (

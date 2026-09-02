@@ -67,6 +67,8 @@ export interface ActivityMonitorTarget {
 export interface ActivitySnapshots {
   readonly teams: readonly ActivityTeam[]
   readonly archivedTeams: readonly ActivityTeam[]
+  /** True after consecutive poll failures; the last successful snapshot is kept. */
+  readonly stale: boolean
 }
 
 interface RegisteredTarget extends ActivityMonitorTarget {
@@ -78,7 +80,7 @@ const targets = new Map<string, RegisteredTarget>()
 const targetListeners = new Set<() => void>()
 const snapshotListeners = new Set<() => void>()
 let targetSnapshot: readonly ActivityMonitorTarget[] = []
-let activitySnapshots: ActivitySnapshots = { teams: [], archivedTeams: [] }
+let activitySnapshots: ActivitySnapshots = { teams: [], archivedTeams: [], stale: false }
 
 function targetKey(sessionId: string, teamId: string): string {
   return `${sessionId}\u0000${teamId}`
@@ -161,14 +163,41 @@ export function getActivitySnapshotsSnapshot(): ActivitySnapshots {
   return activitySnapshots
 }
 
-/** Publish one or both successful state-route responses. */
+let teamsFingerprint = ''
+let archivedFingerprint = ''
+
+/**
+ * Publish one or both successful state-route responses.
+ *
+ * Each poll parses a fresh JSON body, so array identity alone would notify
+ * every subscriber once a second even while nothing changed. Compare the
+ * serialised payload and keep the previous array when it is byte-identical,
+ * so React store subscribers only re-render on real state transitions.
+ */
 export function updateActivitySnapshots(update: Partial<ActivitySnapshots>): void {
-  const next = {
-    teams: update.teams ?? activitySnapshots.teams,
-    archivedTeams: update.archivedTeams ?? activitySnapshots.archivedTeams,
+  let teams = activitySnapshots.teams
+  let archivedTeams = activitySnapshots.archivedTeams
+  const stale = update.stale ?? activitySnapshots.stale
+  if (update.teams !== undefined) {
+    const fingerprint = JSON.stringify(update.teams)
+    if (fingerprint !== teamsFingerprint) {
+      teamsFingerprint = fingerprint
+      teams = update.teams
+    }
   }
-  if (next.teams === activitySnapshots.teams && next.archivedTeams === activitySnapshots.archivedTeams) return
-  activitySnapshots = next
+  if (update.archivedTeams !== undefined) {
+    const fingerprint = JSON.stringify(update.archivedTeams)
+    if (fingerprint !== archivedFingerprint) {
+      archivedFingerprint = fingerprint
+      archivedTeams = update.archivedTeams
+    }
+  }
+  if (
+    teams === activitySnapshots.teams
+    && archivedTeams === activitySnapshots.archivedTeams
+    && stale === activitySnapshots.stale
+  ) return
+  activitySnapshots = { teams, archivedTeams, stale }
   for (const listener of snapshotListeners) listener()
 }
 
@@ -181,6 +210,8 @@ export const ACTIVITY_POLL_MS = 1000
  * every ordinary session into a one-second filesystem scan.
  */
 export const ACTIVITY_PROBE_MS = 5000
+/** Consecutive failed live polls before the panel surfaces a stale snapshot. */
+export const ACTIVITY_STALE_FAILURES = 3
 /** Host route serving live and archived team snapshots. */
 export const ACTIVITY_STATE_URL = '/plugins/dsh-agent-teams/state'
 export const ACTIVITY_HALT_URL = '/plugins/dsh-agent-teams/halt'
@@ -206,6 +237,10 @@ export interface ActivityPollingRuntime {
   readonly cancel?: (timer: unknown) => void
   readonly publishSnapshots?: (update: Partial<ActivitySnapshots>) => void
   readonly settleTargets?: (keys: ReadonlySet<string>) => void
+  /** When true, the live cadence drops to the probe interval. */
+  readonly hidden?: () => boolean
+  /** Subscribe to visibility changes; return an unsubscribe. */
+  readonly onVisibilityChange?: (listener: () => void) => () => void
 }
 
 /** Handle returned by one current-session polling loop. */
@@ -245,6 +280,12 @@ export function startActivityPolling(
   const cancel = runtime.cancel ?? ((timer) => { clearInterval(timer as ReturnType<typeof setInterval>) })
   const publishSnapshots = runtime.publishSnapshots ?? updateActivitySnapshots
   const settleTargets = runtime.settleTargets ?? settleActivityMonitorTargets
+  const isHidden = runtime.hidden ?? ((): boolean => typeof document !== 'undefined' && document.hidden)
+  const onVisibilityChange = runtime.onVisibilityChange ?? ((listener: () => void): (() => void) => {
+    if (typeof document === 'undefined') return () => {}
+    document.addEventListener('visibilitychange', listener)
+    return () => { document.removeEventListener('visibilitychange', listener) }
+  })
   let cancelled = false
   let inFlight = false
   // Explicit card targets are demanded work: start at the live cadence. A
@@ -252,12 +293,17 @@ export function startActivityPolling(
   let hot = monitorTargets.length > 0
   let discoveryComplete = false
   let discoveredLiveKeys = new Set<string>()
+  let consecutiveFailures = 0
   let controller: AbortController | undefined
   let timer: unknown
-  const intervalMs = (): number => (hot ? ACTIVITY_POLL_MS : ACTIVITY_PROBE_MS)
+  const intervalMs = (): number => (hot && !isHidden() ? ACTIVITY_POLL_MS : ACTIVITY_PROBE_MS)
   const reschedule = (): void => {
     cancel(timer)
     timer = schedule(() => { void tick() }, intervalMs())
+  }
+  const noteFailure = (): void => {
+    consecutiveFailures += 1
+    if (consecutiveFailures >= ACTIVITY_STALE_FAILURES) publishSnapshots({ stale: true })
   }
   const tick = async (): Promise<void> => {
     if (inFlight || cancelled) return
@@ -268,11 +314,19 @@ export function startActivityPolling(
         cache: 'no-store',
         signal: controller.signal,
       })
-      if (!liveResponse.ok) return
+      if (!liveResponse.ok) {
+        noteFailure()
+        return
+      }
       const body = (await liveResponse.json()) as { teams?: unknown }
-      if (cancelled || !Array.isArray(body.teams)) return
+      if (cancelled) return
+      if (!Array.isArray(body.teams)) {
+        noteFailure()
+        return
+      }
+      consecutiveFailures = 0
       const liveTeams = body.teams as readonly ActivityTeam[]
-      publishSnapshots({ teams: liveTeams })
+      publishSnapshots({ teams: liveTeams, stale: false })
       const previousDiscoveredKeys = discoveredLiveKeys
       discoveredLiveKeys = new Set(discoverySessionId === undefined || discoverySessionId === ''
         ? []
@@ -313,12 +367,18 @@ export function startActivityPolling(
     } catch (error: unknown) {
       if ((error as { name?: unknown })?.name === 'AbortError') return
       // Host restarting; keep the last snapshot and retry on the next tick.
+      noteFailure()
     } finally {
       inFlight = false
     }
   }
   const firstTick = tick()
   if (timer === undefined) timer = schedule(() => { void tick() }, intervalMs())
+  const unsubscribeVisibility = onVisibilityChange(() => {
+    if (cancelled) return
+    reschedule()
+    if (!isHidden()) void tick()
+  })
   return {
     firstTick,
     stop: () => {
@@ -326,6 +386,7 @@ export function startActivityPolling(
       cancelled = true
       controller?.abort()
       cancel(timer)
+      unsubscribeVisibility()
     },
   }
 }

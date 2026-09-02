@@ -1,7 +1,8 @@
 /**
- * Shared whale artwork lookup for the activity panel and the conversation
- * card: role keywords map to the packaged role images; the captain always
- * uses the lead whale.
+ * Shared whale artwork lookup kept for packaging and the host asset allowlist.
+ * The activity UI no longer paints these PNGs; it uses identity-mark.tsx.
+ * Role keywords still map to eight distinct packaged role images so verify
+ * can prove the V2 set stays reachable.
  * @module dsh-agent-teams/client/artwork
  */
 

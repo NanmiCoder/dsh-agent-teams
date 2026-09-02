@@ -50,6 +50,7 @@ import {
 import {
   ACTIVITY_POLL_MS,
   ACTIVITY_PROBE_MS,
+  ACTIVITY_STALE_FAILURES,
   getActivityMonitorTargetsSnapshot,
   monitorAgentTeam,
   settleActivityMonitorTargets,
@@ -75,7 +76,7 @@ import {
   en as agentTeamsEn,
   zh as agentTeamsZh,
 } from '../lib/client/locales.js'
-import { openAgentTeamMember } from '../lib/client/session-navigation.js'
+import { openAgentTeamMember, focusComposer } from '../lib/client/session-navigation.js'
 import { steerCaptainReport } from '../lib/tools.js'
 import { parseProfileInvocation, resolveTeamProfile, formatProfilesForPrompt } from '../lib/profiles.js'
 import { memberPersona, memberWelcome } from '../lib/members.js'
@@ -352,6 +353,23 @@ check(
     && agentTeamsCardCss.includes('object-fit: contain'),
   'portrait CSS should preserve each transparent role silhouette and use a compact unread dot',
 )
+const identityMarkSource = await readFile(new URL('../src/client/identity-mark.tsx', import.meta.url), 'utf8')
+check(
+  'captain and members render identity marks instead of cartoon whale portraits',
+  identityMarkSource.includes('ECHO_WHALE_PATH')
+    && identityMarkSource.includes('data-sprite-render="echo-whale-v2"')
+    && activityPanelSource.includes('CaptainMark')
+    && activityPanelSource.includes('MemberMark')
+    && agentTeamsCardSource.includes('CaptainMark')
+    && agentTeamsCardSource.includes('MemberMark')
+    && stagingPlanSource.includes('MemberMark')
+    && !activityPanelSource.includes('LEAD_ART')
+    && !agentTeamsCardSource.includes('LEAD_ART')
+    && !activityPanelSource.includes('memberArtUrl')
+    && !agentTeamsCardSource.includes('memberArtUrl')
+    && !stagingPlanSource.includes('memberArtUrl'),
+  'activity UI should use the host echo-whale plus per-name marks, not the packaged PNGs',
+)
 const requiredHarnessTokenBridges = [
   '--dsw-alias-line-normal: var(--dsw-static-neutral-bluish-150',
   '--dsw-alias-bg-module: var(--dsw-alias-bg-layer-1',
@@ -433,6 +451,25 @@ check(
     && !agentTeamsCardSource.includes('setInterval(')
     && !agentTeamsCardSource.includes('fetch('),
   'the global panel must recover cardless sessions without duplicate card pollers',
+)
+check(
+  'the panel reports stale polls, halt failures, and focuses the composer through a helper',
+  activityPanelSource.includes('activity.subtitle.stale')
+    && activityPanelSource.includes('data-stop-feedback')
+    && activityPanelSource.includes('focusComposer()')
+    && !activityPanelSource.includes('[data-composer-card] textarea'),
+)
+check(
+  'disclosure, feedback, and activity marks use host icons instead of ad-hoc stroke glyphs',
+  activityPanelSource.includes('IconTriangleRightFill14')
+    && activityPanelSource.includes('IconAgentPresetOutline16')
+    && activityPanelSource.includes('IconUserOutline16')
+    && activityPanelSource.includes('IconLoadingOutline16')
+    && stagingPlanSource.includes('IconCheckOutline14')
+    && stagingPlanSource.includes('IconPlayOutline16')
+    && agentTeamsCardSource.includes('IconPanelLeftOutline16')
+    && !activityPanelSource.includes('viewBox="0 0 10 10"')
+    && !stagingPlanSource.includes('viewBox="0 0 12 12"'),
 )
 
 console.log('2/8 pure rules')
@@ -764,17 +801,17 @@ check('a real dependency keeps the layered DAG layout', !usesParallelTaskGrid([
 const dag = compactDagLayout(projectionTasks.filter(task => Number.isFinite(task.depth)))
 check('compact DAG lays dependency depths out left-to-right',
   dag.nodes.find(node => node.task.id === 't1')?.x === 0
-    && dag.nodes.find(node => node.task.id === 't2')?.x === 118
-    && dag.nodes.find(node => node.task.id === 't4')?.x === 236)
+    && dag.nodes.find(node => node.task.id === 't2')?.x === 116
+    && dag.nodes.find(node => node.task.id === 't4')?.x === 232)
 check('compact DAG keeps stable rows and reference node geometry',
-  dag.nodes.find(node => node.task.id === 't3')?.y === 38
-    && dag.width === 328
-    && dag.height === 68
-    && COMPACT_DAG_NODE_WIDTH === 92
-    && COMPACT_DAG_NODE_HEIGHT === 30)
+  dag.nodes.find(node => node.task.id === 't3')?.y === 48
+    && dag.width === 340
+    && dag.height === 88
+    && COMPACT_DAG_NODE_WIDTH === 108
+    && COMPACT_DAG_NODE_HEIGHT === 40)
 check('compact DAG emits one curved SVG edge per valid dependency',
   dag.edges.length === 3
-    && dag.edges.some(edge => edge.from === 't1' && edge.to === 't2' && edge.path.startsWith('M92 15C')))
+    && dag.edges.some(edge => edge.from === 't1' && edge.to === 't2' && edge.path.startsWith('M108 20C')))
 check(
   'task model labels prefer the snapshot field and fall back to the assignee route',
   memberRouteLabel({ provider: 'openai', model: 'gpt-5.6-sol' }) === 'openai/gpt-5.6-sol'
@@ -1029,6 +1066,77 @@ check(
   cardIntervals.length === 1 && cardIntervals[0] === ACTIVITY_POLL_MS,
 )
 
+const visIntervals = []
+let visHidden = false
+let visListener = () => {}
+const visPoller = startActivityPolling([{
+  key: 'vis-target',
+  sessionId: 'vis-session',
+  teamId: 'vis-team',
+}], {
+  fetchState: async () => ({ ok: true, json: async () => ({ teams: [] }) }),
+  schedule: (_callback, intervalMs) => {
+    visIntervals.push(intervalMs)
+    return 'vis-timer'
+  },
+  cancel: () => {},
+  publishSnapshots: () => {},
+  hidden: () => visHidden,
+  onVisibilityChange: (listener) => {
+    visListener = listener
+    return () => { visListener = () => {} }
+  },
+})
+await visPoller.firstTick
+visHidden = true
+visListener()
+visHidden = false
+visListener()
+visPoller.stop()
+check(
+  'a hidden tab drops to the probe cadence and restores the live cadence when visible',
+  visIntervals[0] === ACTIVITY_POLL_MS
+    && visIntervals.includes(ACTIVITY_PROBE_MS)
+    && visIntervals.at(-1) === ACTIVITY_POLL_MS,
+)
+
+const staleUpdates = []
+let staleTick = () => {}
+let staleOk = false
+const stalePoller = startActivityPolling([{
+  key: 'stale-target',
+  sessionId: 'stale-session',
+  teamId: 'stale-team',
+}], {
+  fetchState: async () => {
+    if (!staleOk) return { ok: false, json: async () => ({}) }
+    return { ok: true, json: async () => ({ teams: [] }) }
+  },
+  schedule: (callback) => {
+    staleTick = callback
+    return 'stale-timer'
+  },
+  cancel: () => {},
+  publishSnapshots: (update) => { staleUpdates.push(update) },
+})
+await stalePoller.firstTick
+for (let i = 1; i < ACTIVITY_STALE_FAILURES; i += 1) {
+  staleTick()
+  await new Promise((resolve) => setImmediate(resolve))
+}
+check(
+  'consecutive live-poll failures mark the snapshot stale',
+  staleUpdates.some((update) => update.stale === true),
+)
+staleOk = true
+staleTick()
+await new Promise((resolve) => setImmediate(resolve))
+stalePoller.stop()
+check(
+  'a recovered live poll clears the stale flag',
+  staleUpdates.filter((update) => update.stale !== undefined).at(-1)?.stale === false,
+)
+
 const pollTarget = { key: 'poll-target', sessionId: 'poll-session', teamId: 'poll-team' }
 let resolveSlowLive
 const slowLive = new Promise((resolve) => { resolveSlowLive = resolve })
@@ -1113,6 +1221,15 @@ check(
   'pre-rc.8 member navigation keeps the ordinary session fallback',
   legacyNavigation === 'session' && legacyNavigationCalls[0] === 'member-session',
 )
+const composerRoot = {
+  focused: false,
+  querySelector(selector) {
+    if (selector !== '[data-composer-card] textarea') return null
+    return { focus: () => { composerRoot.focused = true } }
+  },
+}
+check('focusComposer no-ops when the host composer is absent', focusComposer({ querySelector: () => null }) === false)
+check('focusComposer focuses the host composer textarea', focusComposer(composerRoot) === true && composerRoot.focused === true)
 check(
   'agent team cards derive a stable id from the standard create tool call',
   JSON.stringify(parseAgentTeamsCreateArgs('{"name":" Repo Review 2W! "}'))

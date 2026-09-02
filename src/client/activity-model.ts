@@ -35,10 +35,10 @@ export interface CompactDagLayout<T extends RelationshipTask> {
   readonly edges: readonly CompactDagEdge[]
 }
 
-/** Panel DAG geometry: nodes wide enough for an 11px id + label row. */
-export const COMPACT_DAG_NODE_WIDTH = 128
+/** Panel DAG geometry: a 3-node chain fits the default 388px docked panel. */
+export const COMPACT_DAG_NODE_WIDTH = 108
 export const COMPACT_DAG_NODE_HEIGHT = 40
-export const COMPACT_DAG_COLUMN_GAP = 28
+export const COMPACT_DAG_COLUMN_GAP = 8
 export const COMPACT_DAG_ROW_GAP = 8
 
 /** Compact `provider/model` route, or just the model when the provider is absent. */

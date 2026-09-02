@@ -40,3 +40,18 @@ export async function openAgentTeamMember(
     : { parentSessionId, childSessionId, mode: 'continuable' })
   return 'subagent'
 }
+
+/**
+ * Focus the host composer textarea after the activity panel yields.
+ *
+ * The composer card is a host private surface (`[data-composer-card]`). Keep
+ * the selector in one place so a missing node cannot throw, and so a future
+ * host API can replace this without hunting call sites.
+ */
+export function focusComposer(root: ParentNode | null | undefined = typeof document === 'undefined' ? undefined : document): boolean {
+  if (root === null || root === undefined) return false
+  const textarea = root.querySelector<HTMLTextAreaElement>('[data-composer-card] textarea')
+  if (textarea === null) return false
+  textarea.focus()
+  return true
+}

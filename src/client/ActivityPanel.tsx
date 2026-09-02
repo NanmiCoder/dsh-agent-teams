@@ -76,6 +76,7 @@ import {
   type PanelLayout,
   type PanelResizeEdge,
 } from './panel-geometry.ts'
+import { focusComposer } from './session-navigation.ts'
 import css from './ActivityPanel.module.css'
 
 /** Grace before the panel collapses once no team remains. */
@@ -599,6 +600,11 @@ function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscarded, on
             <span data-stat="messages">{t('team.stats.messages', { count: team.messageCount })}</span>
           </span>
         </header>
+        {stopError !== '' && !stopOpen && (
+          <p className={css.stopModalError} role="alert" data-stop-feedback>
+            <IconWarningOutline16 />{stopError}
+          </p>
+        )}
 
         {showPlanEditor && (
           <StagingPlanEditor
@@ -785,7 +791,7 @@ function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscarded, on
           </span>
         )}
       >
-        {stopError !== '' && <p className={css.stopModalError} role="alert"><IconWarningOutline16 />{stopError}</p>}
+        {stopError !== '' && <p className={css.stopModalError} role="alert" data-stop-feedback><IconWarningOutline16 />{stopError}</p>}
       </Modal>
     </>
   )
@@ -821,7 +827,9 @@ function panelSubtitle(
   live: readonly ActivityTeam[],
   archivedCount: number,
   t: AgentTeamsTranslate,
+  stale = false,
 ): string {
+  if (stale) return t('activity.subtitle.stale')
   const working = live.reduce((total, team) => total + team.members.filter((member) => member.activity === 'working').length, 0)
   if (working > 0) return t('activity.subtitle.working', { count: working })
   if (live.some((team) => team.phase === 'staged')) return t('activity.subtitle.staged')
@@ -878,11 +886,9 @@ export function ActivityPanel({ sessionsList, modelDirectories, openMember, t }:
   const returnToComposer = (): void => {
     setOpen(false)
     setOpenOwner(undefined)
-    window.requestAnimationFrame(() => {
-      document.querySelector<HTMLTextAreaElement>('[data-composer-card] textarea')?.focus()
-    })
+    window.requestAnimationFrame(() => { focusComposer() })
   }
-  const { teams, archivedTeams } = useSyncExternalStore(
+  const { teams, archivedTeams, stale } = useSyncExternalStore(
     subscribeActivitySnapshots,
     getActivitySnapshotsSnapshot,
   )
@@ -1107,7 +1113,7 @@ export function ActivityPanel({ sessionsList, modelDirectories, openMember, t }:
     [visibleTeams],
   )
   const hasTeams = visibleCount > 0
-  const subtitle = panelSubtitle(visibleTeams, visibleArchived.length + visibleHistoric.length, t)
+  const subtitle = panelSubtitle(visibleTeams, visibleArchived.length + visibleHistoric.length, t, stale)
 
   // Auto-height panels do not store their live content height. Capture the
   // rendered box when a pointer gesture starts so movement and a first manual
@@ -1257,6 +1263,7 @@ export function ActivityPanel({ sessionsList, modelDirectories, openMember, t }:
           style={panelStyle}
           data-agent-teams-activity
           data-panel-mode={geometry.mode}
+          data-stale={stale || undefined}
           data-height-mode={autoHeight ? 'auto' : 'manual'}
           data-compact={compact || undefined}
           data-dragging={interaction === 'dragging' || undefined}

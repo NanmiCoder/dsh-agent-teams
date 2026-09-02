@@ -769,7 +769,7 @@ export function StagingPlanEditor({ team, modelDirectory, onContinuePlanning, on
     <section className={css.planEditor} data-staging-editor>
       <header className={css.planHeader}>
         <span>
-          <strong>{t('plan.title')}</strong>
+          <strong title={team.name}>{t('plan.reviewTitle', { team: team.name })}</strong>
           <em>{t(waitingForFeedback ? 'captain.state.awaitingFeedback' : 'plan.badge')}</em>
         </span>
         <p>{t('plan.description')}</p>

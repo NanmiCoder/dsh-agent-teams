@@ -4,7 +4,7 @@
  *
  * Members are durable continuable subagents of the captain, so a member keeps
  * its conversation across turns and across harness restarts: the captain
- * wakes it with {@link ctx.subagents.followup}, it works through its turn
+ * wakes it with {@link ctx.subagents.sendMessage}, it works through its turn
  * (updating team state through the `agent_teams_*` tools), and becomes idle
  * again. Its final assistant message is not readable programmatically, so the
  * member persists its report into the captain's mailbox and the task records,
@@ -45,6 +45,34 @@ const MEMBER_DENIED_TOOLS = [
  */
 function brandedSessionId(value: string): SessionId {
   return value as SessionId
+}
+
+/** Adjacent delivery + child setup across Harness alpha.2 (`followup` / `registerContinuableSetup`) and alpha.4 (`sendMessage` / `agent/created`). */
+type AdjacentDeliver = (
+  sender: Agent,
+  targetId: SessionId,
+  content: { type: 'text'; text: string }[],
+  options: { signal: AbortSignal; source?: { kind: 'plugin'; plugin: string } },
+) => Promise<unknown>
+
+interface SubagentSeam {
+  registerContinuableSetup?: (setup: (childCtx: Context & { agent?: Agent }) => () => void) => unknown
+  sendMessage?: AdjacentDeliver
+  followup?: AdjacentDeliver
+}
+
+function subagentSeam(ctx: Context): SubagentSeam {
+  return ctx.subagents as unknown as SubagentSeam
+}
+
+function continuableEvents(session: Session): Parameters<typeof foldSubagentDescriptor>[0] {
+  const live = session as Session & {
+    events?: Parameters<typeof foldSubagentDescriptor>[0]
+    snapshotEvents?: () => Parameters<typeof foldSubagentDescriptor>[0]
+    header: Session['header'] & { seedLength?: number }
+  }
+  const events = typeof live.snapshotEvents === 'function' ? live.snapshotEvents() : live.events ?? []
+  return events.slice(live.header.seedLength ?? 0)
 }
 
 /** Runtime knobs for member spawning, resolved from plugin config. */
@@ -363,20 +391,20 @@ export function installMemberSelectionRuntime(
   onFailureSettled?: (workspace: string, teamId: string, memberName: string) => Promise<void>,
 ): MemberSelectionRuntime {
   const pending = new Map<string, MemberLlmSelection>()
-  ctx.subagents.registerContinuableSetup((childCtx) => {
-    const child = childCtx.agent
-    if (child === undefined) return () => undefined
-    const suffix = child.session.events.slice(child.session.header.seedLength ?? 0)
+  const wired = new Map<Agent, () => void>()
+
+  const attachMember = (child: Agent, childCtx: Context): (() => void) | undefined => {
+    const suffix = continuableEvents(child.session)
     const descriptor = foldSubagentDescriptor(suffix)
     if (descriptor?.mode !== 'continuable' || !descriptor.label.startsWith(MEMBER_LABEL_PREFIX)) {
-      return () => undefined
+      return undefined
     }
 
     const parentSessionId = child.session.header.parentSession
-    if (parentSessionId === undefined) return () => undefined
+    if (parentSessionId === undefined) return undefined
     const identity = descriptor.label.slice(MEMBER_LABEL_PREFIX.length)
     const separator = identity.indexOf(':')
-    if (separator < 1 || separator === identity.length - 1) return () => undefined
+    if (separator < 1 || separator === identity.length - 1) return undefined
     const teamId = identity.slice(0, separator)
     const memberName = identity.slice(separator + 1)
     const workspace = child.session.header.cwd ?? process.cwd()
@@ -385,7 +413,7 @@ export function installMemberSelectionRuntime(
     let selection = pending.get(key)
     if (selection === undefined) {
       const team = readTeamSync(stateRoot, teamId)
-      if (team?.captainSessionId !== parentSessionId) return () => undefined
+      if (team?.captainSessionId !== parentSessionId) return undefined
       const durableMember = team.members.find(member => member.name === memberName)
       selection = selectionFromMember(durableMember)
       if (selection !== undefined && (descriptor.agentProvider !== durableMember?.provider || descriptor.agentModel !== durableMember?.model)) {
@@ -464,7 +492,29 @@ export function installMemberSelectionRuntime(
       disposeSelection()
       disposeFailure()
     }
-  })
+  }
+
+  const register = subagentSeam(ctx).registerContinuableSetup
+  if (typeof register === 'function') {
+    register((childCtx) => {
+      const child = childCtx.agent
+      if (child === undefined) return () => undefined
+      return attachMember(child, childCtx) ?? (() => undefined)
+    })
+  } else {
+    ctx.on('agent/created', ({ agent }) => {
+      if (wired.has(agent)) return
+      const dispose = attachMember(agent, agent.ctx)
+      if (dispose === undefined) return
+      wired.set(agent, dispose)
+    })
+    ctx.on('agent/disposed', ({ agent }) => {
+      const dispose = wired.get(agent)
+      if (dispose === undefined) return
+      wired.delete(agent)
+      dispose()
+    })
+  }
 
   return {
     async withPending<T>(
@@ -652,13 +702,16 @@ export async function deliverToMember(
   signal: AbortSignal,
 ): Promise<boolean> {
   try {
-    await ctx.subagents.followup(captain, brandedSessionId(childId), [{ type: 'text', text }], {
-      source: { kind: 'plugin', plugin: 'dsh-agent-teams' },
+    const seam = subagentSeam(ctx)
+    const deliver = seam.sendMessage ?? seam.followup
+    if (deliver === undefined) throw new Error('subagents.sendMessage/followup is unavailable')
+    await deliver.call(seam, captain, brandedSessionId(childId), [{ type: 'text', text }], {
       signal,
+      ...seam.sendMessage === undefined ? { source: { kind: 'plugin', plugin: 'dsh-agent-teams' } } : {},
     })
     return true
   } catch (error: unknown) {
-    ctx.logger.warn(`agent-teams: followup to member ${childId} failed: ${String(error)}`)
+    ctx.logger.warn(`agent-teams: delivery to member ${childId} failed: ${String(error)}`)
     return false
   }
 }
@@ -683,31 +736,32 @@ export function interruptMember(ctx: Context, captain: Agent, childId: string): 
  *
  * Upstream `interrupt()` deliberately preserves continuable sessions and the
  * upstream seam exposes no targeted forget/retire method. The durable
- * AgentTeams index therefore rejects `followup()` before it can cold-resume a
+ * AgentTeams index therefore rejects adjacent delivery before it can cold-resume a
  * retired member. Catalog rows deliberately remain discoverable: Harness rc.8
  * uses the direct-child catalog to authorize historical transcript reads and
  * `openSubagent()`, so filtering those rows would make an archived member's
  * persisted conversation inaccessible. Exact ids keep unrelated subagents
- * untouched while the followup boundary still prevents further model turns.
+ * untouched while the delivery boundary still prevents further model turns.
  */
 export function installRetiredMemberGuard(ctx: Context, stateDir: string): void {
-  const runtime = ctx.subagents
+  const runtime = subagentSeam(ctx)
   ctx.effect(() => {
-    const followup = runtime.followup
-    const guardedFollowup: typeof runtime.followup = async (parent, childId, content, options) => {
-      const retired = await readRetiredMemberIds(join(parent.session.header.cwd ?? process.cwd(), stateDir))
+    const method = runtime.sendMessage !== undefined ? 'sendMessage' : 'followup'
+    const original = runtime[method]
+    if (typeof original !== 'function') return () => undefined
+    const guarded: AdjacentDeliver = async (sender, childId, content, options) => {
+      const retired = await readRetiredMemberIds(join(sender.session.header.cwd ?? process.cwd(), stateDir))
       if (retired.has(childId)) {
         throw new SubagentError(
           `AgentTeams member "${childId}" was retired and cannot be resumed`,
           'NOT_RESUMABLE',
         )
       }
-      return followup.call(runtime, parent, childId, content, options)
+      return original.call(runtime, sender, childId, content, options)
     }
-
-    runtime.followup = guardedFollowup
+    runtime[method] = guarded
     return () => {
-      if (runtime.followup === guardedFollowup) runtime.followup = followup
+      if (runtime[method] === guarded) runtime[method] = original
     }
   }, 'agent-teams: retired member guard')
 }

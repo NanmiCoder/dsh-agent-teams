@@ -1331,23 +1331,42 @@ function descriptorEvent(label, agentProvider = 'descriptor-provider', agentMode
   }
 }
 
-function fakeChildContext({ label, parentSessionId, cwd, agentProvider, agentModel }) {
+// alpha.5 dropped `registerContinuableSetup`; the plugin installs the member
+// bridge from the global `agent/session-start` event instead. This fake ctx
+// records that listener and exposes a dispatch helper per child Agent.
+function fakePluginContext() {
   const listeners = new Map()
   return {
     listeners,
-    context: {
-      agent: {
-        session: {
-          header: { parentSession: parentSessionId, cwd, seedLength: 0 },
-          events: [descriptorEvent(label, agentProvider, agentModel)],
-        },
-      },
+    on(name, listener) {
+      listeners.set(name, listener)
+      return () => listeners.delete(name)
+    },
+    emitSessionStart(agent) {
+      return listeners.get('agent/session-start')?.({ agent })
+    },
+  }
+}
+
+function fakeChildContext({ label, parentSessionId, cwd, agentProvider, agentModel }) {
+  const listeners = new Map()
+  const agent = {
+    id: label,
+    status: 'idle',
+    whenIdle: async () => undefined,
+    session: {
+      header: { parentSession: parentSessionId, cwd },
+      ownEvents: () => [descriptorEvent(label, agentProvider, agentModel)],
+    },
+    // The bridge installs per-child listeners on `agent.ctx`.
+    ctx: {
       on(name, listener) {
         listeners.set(name, listener)
         return () => listeners.delete(name)
       },
     },
   }
+  return { listeners, agent, context: agent }
 }
 
 async function routedConfig(child) {
@@ -1361,27 +1380,19 @@ async function routedConfig(child) {
   }))
 }
 
-let setupMemberSelection
-const selectionRuntime = installMemberSelectionRuntime({
-  subagents: {
-    registerContinuableSetup: (setup) => {
-      setupMemberSelection = setup
-      return () => undefined
-    },
-  },
-}, '.agent-teams')
+const pluginCtx = fakePluginContext()
+const selectionRuntime = installMemberSelectionRuntime(pluginCtx, '.agent-teams')
 const freshChild = fakeChildContext({
   label: 'agent-teams:fresh-team:backend',
   parentSessionId: 'captain-session',
   cwd: process.cwd(),
 })
-let disposeFresh
 await selectionRuntime.withPending(
   'captain-session',
   'agent-teams:fresh-team:backend',
   overriddenSelection,
   async () => {
-    disposeFresh = setupMemberSelection(freshChild.context)
+    pluginCtx.emitSessionStart(freshChild.agent)
   },
 )
 const freshRoute = await routedConfig(freshChild)
@@ -1391,7 +1402,9 @@ check(
     && freshRoute.model === 'other-model'
     && freshRoute.reasoningEffort === 'low',
 )
-disposeFresh()
+// Per-child listeners now unwind with the Agent's scope; the fake ctx has no
+// scope to dispose, so emitting session-start again must stay inert instead.
+pluginCtx.emitSessionStart(freshChild.agent)
 
 const restoreWorkspace = await mkdtemp(join(tmpdir(), 'dsh-agent-teams-selection-'))
 try {
@@ -1420,7 +1433,7 @@ try {
     agentProvider: 'cold-provider',
     agentModel: 'cold-model',
   })
-  const disposeCold = setupMemberSelection(coldChild.context)
+  pluginCtx.emitSessionStart(coldChild.agent)
   const coldRoute = await routedConfig(coldChild)
   check(
     'cold-resumed child restores provider, model, and reasoning from team.json',
@@ -1428,7 +1441,6 @@ try {
       && coldRoute.model === 'cold-model'
       && coldRoute.reasoningEffort === 'high',
   )
-  disposeCold()
 } finally {
   await rm(restoreWorkspace, { recursive: true, force: true })
 }

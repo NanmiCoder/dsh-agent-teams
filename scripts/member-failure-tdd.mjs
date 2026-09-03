@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { LlmError } from '@deepseek-ai/dsh-llm'
 import { apply as installRetry } from '@deepseek-ai/dsh-llm-retry'
+import { queueSubagentPrompt } from '@deepseek-ai/dsh-subagent/internal'
 import { installMemberSelectionRuntime } from '../lib/members.js'
 import { installTeamScheduler } from '../lib/scheduler.js'
 import { appendMailbox, createMessage, createTeamDir, readTeam, readMailbox, readUnreadMailbox, withTeamLock, writeTeam } from '../lib/state.js'
@@ -44,44 +45,49 @@ async function fixture(t, { captainStatus = 'idle', fallback, captainOffline = f
   }
   let resolveIdle
   const idle = new Promise(resolve => { resolveIdle = resolve })
+  const childListeners = new Map()
   const child = {
     id: 'worker-session', status: 'running',
     whenIdle: () => child.status === 'idle' ? Promise.resolve() : idle,
     session: {
-      header: { cwd: workspace, parentSession: captain.id, seedLength: 0 },
-      events: [{ type: 'subagent/descriptor', data: {
+      header: { cwd: workspace, parentSession: captain.id },
+      ownEvents: () => [{ type: 'subagent/descriptor', data: {
         version: 3, mode: 'continuable', provider: 'spawn', label: 'agent-teams:team:worker',
         agentProvider: 'fake', agentModel: 'primary',
       } }],
       append(type, data) { sessionEvents.push({ type, data }) },
     },
+    // alpha.5 bridge reads this member id from the payload; keep the branded
+    // SessionId shape of the real runtime (`ctx.agents.get(id)` uses it).
+    ctx: {
+      on(name, listener) { childListeners.set(name, listener); return () => childListeners.delete(name) },
+    },
   }
+  Object.defineProperty(child, Symbol.toPrimitive, { value: () => child.id })
+  child.ctx.agent = child
   await createTeamDir(stateRoot, {
     id: 'team', name: 'Team', captainSessionId: captain.id, createdAt: 1, taskSeq: 1,
     members: [{ id: child.id, name: 'worker', status: 'working', joinedAt: 1, provider: 'fake', model: 'primary' }],
     tasks: [{ id: 't1', subject: 'work', assignee: 'worker', status: 'in_progress', dependencies: [], attempt: 1, attemptId: 'a1', createdAt: 1, updatedAt: 1 }],
   })
-  let setup
+  // alpha.5: the bridge installs from the global `agent/session-start` event.
+  let sessionStart
   const ctx = {
     logger: { debug() {}, warn(message) { warnings.push(message) } },
     agents: { get(id) { return id === child.id ? child : id === captain.id && !captainOffline ? captain : undefined } },
-    on() { return () => {} },
+    on(name, listener) { if (name === 'agent/session-start') sessionStart = listener; return () => {} },
     subagents: {
-      registerContinuableSetup(fn) { setup = fn },
-      async followup(_captain, id, content) { deliveries.push({ id, content }); return 'accepted' },
+      // alpha.5 Queue seam: deliveries go through the symbol-keyed host prompt queue.
+      async [queueSubagentPrompt](_captain, id, content) { deliveries.push({ id, content }); return 'accepted' },
     },
   }
   const scheduler = installTeamScheduler(ctx, { stateDir: '.agent-teams' })
   const runtime = installMemberSelectionRuntime(ctx, '.agent-teams', (workspace, teamId, memberName) => (
     scheduler.kickMember(workspace, teamId, memberName)
   ))
-  const dispose = await runtime.withPending(captain.id, 'agent-teams:team:worker', {
+  await runtime.withPending(captain.id, 'agent-teams:team:worker', {
     provider: 'fake', model: 'primary', ...fallback ? { fallback } : {},
-  }, () => setup({
-    agent: child,
-    on(name, listener) { listeners.set(name, listener); return () => listeners.delete(name) },
-  }))
-  t.after(dispose)
+  }, () => sessionStart({ agent: child }))
   let retryHandler
   let projection
   let retryState = {}
@@ -101,7 +107,7 @@ async function fixture(t, { captainStatus = 'idle', fallback, captainOffline = f
   const payload = (policy, code = failure.code, signal = new AbortController().signal) => ({
     agent: child, turn: 1, step: 0, provider: 'fake', failure: { ...failure, code }, retryPolicy: policy, signal,
   })
-  const memberError = (value, next = async () => undefined) => listeners.get('agent/request-error')?.(value, next) ?? next()
+  const memberError = (value, next = async () => undefined) => childListeners.get('agent/request-error')?.(value, next) ?? next()
   const settleSilently = () => {
     // The real driver settles after emitting agent/error. Deliberately omit
     // agent/status so recovery cannot depend on that edge reaching the plugin.
@@ -116,7 +122,7 @@ async function fixture(t, { captainStatus = 'idle', fallback, captainOffline = f
     unread: () => readUnreadMailbox(stateRoot, 'team', 'captain'),
     retry: (policy, code) => { const value = payload(policy, code); return retryHandler(value, () => memberError(value)) },
     terminal({ settle = true, turn = 1 } = {}) {
-      pendingFailures.push(listeners.get('agent/error')?.({ agent: child, turn, step: 0, error: new LlmError(failure.message, failure.code) }))
+      pendingFailures.push(childListeners.get('agent/error')?.({ agent: child, turn, step: 0, error: new LlmError(failure.message, failure.code) }))
       if (settle) settleSilently()
     },
   }

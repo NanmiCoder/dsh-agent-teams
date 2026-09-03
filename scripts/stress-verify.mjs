@@ -9,6 +9,7 @@
  * never reimplemented here.
  */
 
+import { queueSubagentPrompt } from '@deepseek-ai/dsh-subagent/internal'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -36,8 +37,11 @@ function check(label, condition, detail = '') {
 
 function session(parentSession) {
   return {
-    header: { cwd: workspace, parentSession, seedLength: 0 },
+    header: { cwd: workspace, parentSession },
     events: [],
+    ownEvents() {
+      return this.events.slice(this.header.inheritedEventCount ?? 0)
+    },
     append() {},
     requestHeader() {
       return { config: { provider: 'stress', model: 'stress-model', reasoningEffort: 'high' } }
@@ -102,9 +106,6 @@ function mountRuntime() {
       },
     },
     subagents: {
-      registerContinuableSetup() {
-        return () => {}
-      },
       getProvider(name) {
         if (name !== 'spawn') return undefined
         return { prepareContinuable() {}, capabilities: { persona: true, toolFilter: true } }
@@ -132,7 +133,7 @@ function mountRuntime() {
       async listDescendants(parentId) {
         return this.listChildren(parentId)
       },
-      async followup(_parent, childId, content) {
+      async [queueSubagentPrompt](_parent, childId, content) {
         const remaining = failDeliveryCount.get(childId) ?? 0
         if (remaining > 0) {
           failDeliveryCount.set(childId, remaining - 1)

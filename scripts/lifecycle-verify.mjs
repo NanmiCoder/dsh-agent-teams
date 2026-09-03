@@ -8,6 +8,7 @@
  * rounds, removal recovery, mailbox fallback and concurrent claims.
  */
 
+import { queueSubagentPrompt, queueHostSubagentPrompt } from '@deepseek-ai/dsh-subagent/internal'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -38,8 +39,11 @@ function check(label, condition, detail = '') {
 
 function session(parentSession) {
   return {
-    header: { cwd: workspace, parentSession, seedLength: 0 },
+    header: { cwd: workspace, parentSession },
     events: [],
+    ownEvents() {
+      return this.events.slice(this.header.inheritedEventCount ?? 0)
+    },
     append() {},
     requestHeader() {
       return { config: { provider: 'fake', model: 'fake-model', reasoningEffort: 'high' } }
@@ -83,15 +87,15 @@ function publishStatus(subject, status) {
 }
 
 /**
- * Compose one child's scoped context like the harness does, so the plugin's
- * continuable setup can install its per-child listeners (model selection and
- * the `agent/request-error` bridge) against a dispatchable registry.
+ * Give one child the Agent-scoped context the bridge needs: the plugin reads
+ * `agent.ctx` from the `agent/session-start` payload and installs its
+ * per-child listeners (model selection, request-error bridge) there, exactly
+ * like the harness Agent does.
  */
 function childContext(child) {
   const registry = new Map()
   childListeners.set(child.id, registry)
-  return {
-    agent: child,
+  child.ctx = {
     on(name, listener) {
       const current = registry.get(name) ?? []
       current.push(listener)
@@ -99,6 +103,7 @@ function childContext(child) {
       return () => registry.set(name, (registry.get(name) ?? []).filter(candidate => candidate !== listener))
     },
   }
+  return child.ctx
 }
 
 /** Dispatch one failed model request to a child's request-error listeners. */
@@ -163,10 +168,6 @@ const ctx = {
     },
   },
   subagents: {
-    registerContinuableSetup(setup) {
-      continuableSetups.push(setup)
-      return () => {}
-    },
     getProvider(name) {
       if (name !== 'spawn') return undefined
       return { prepareContinuable() {}, capabilities: { persona: true, toolFilter: true } }
@@ -193,7 +194,10 @@ const ctx = {
           },
         }]
       }
-      for (const setup of continuableSetups) setup(childContext(child))
+      // alpha.5: the plugin installs the member bridge from the global
+      // `agent/session-start` event instead of registerContinuableSetup.
+      childContext(child)
+      for (const listener of listeners.get('agent/session-start') ?? []) listener({ agent: child })
       return { childId: id, messageId: `welcome-${childSeq}` }
     },
     async listChildren(parentId) {
@@ -208,14 +212,15 @@ const ctx = {
     async listDescendants(parentId) {
       return this.listChildren(parentId)
     },
-    async followup(_parent, childId, content) {
+    // alpha.5 host-protocol Queue seam: symbol-keyed method on the runtime,
+    // invoked by the plugin through queueHostSubagentPrompt.
+    async [queueSubagentPrompt](_parent, childId, content) {
       if (failNextDelivery.delete(childId)) throw new Error('injected delivery failure')
       deliveries.push({ childId, content })
       const child = liveAgents.get(childId)
       if (child) child.status = 'running'
       return `message-${++messageSeq}`
-    },
-    interrupt(childId) {
+    },    interrupt(childId) {
       const child = liveAgents.get(childId)
       if (child) {
         child.interruptCount = (child.interruptCount ?? 0) + 1
@@ -936,9 +941,9 @@ try {
   let removedFollowupRejected = false
   const deliveriesBeforeRemovedFollowup = deliveries.length
   try {
-    await ctx.subagents.followup(captain, alpha.id, [{ type: 'text', text: 'must not resume' }], {
-      source: { kind: 'plugin', plugin: 'verification' }, signal: new AbortController().signal,
-    })
+    await queueHostSubagentPrompt(ctx.subagents, captain, alpha.id, [{ type: 'text', text: 'must not resume' }], {
+      kind: 'plugin', plugin: 'verification',
+    }, new AbortController().signal)
   } catch (error) {
     removedFollowupRejected = error?.code === 'NOT_RESUMABLE'
   }
@@ -1136,9 +1141,9 @@ try {
   let coldFollowupRejected = false
   const deliveriesBeforeColdFollowup = deliveries.length
   try {
-    await ctx.subagents.followup(captain, gamma.id, [{ type: 'text', text: 'must stay retired' }], {
-      source: { kind: 'plugin', plugin: 'verification' }, signal: new AbortController().signal,
-    })
+    await queueHostSubagentPrompt(ctx.subagents, captain, gamma.id, [{ type: 'text', text: 'must stay retired' }], {
+      kind: 'plugin', plugin: 'verification',
+    }, new AbortController().signal)
   } catch (error) {
     coldFollowupRejected = error?.code === 'NOT_RESUMABLE'
   }
@@ -1147,11 +1152,11 @@ try {
   check('team shutdown leaves unrelated continuable subagents untouched',
     (await ctx.subagents.listChildren(captain.id))
       .some(child => child.id === 'foreign-session' && child.mode === 'continuable'))
-  const foreignFollowup = await ctx.subagents.followup(captain, 'foreign-session', [
+  const foreignFollowup = await queueHostSubagentPrompt(ctx.subagents, captain, 'foreign-session', [
     { type: 'text', text: 'unrelated work still routes' },
   ], {
-    source: { kind: 'plugin', plugin: 'verification' }, signal: new AbortController().signal,
-  })
+    kind: 'plugin', plugin: 'verification',
+  }, new AbortController().signal)
   check('team shutdown leaves unrelated continuable followup untouched',
     typeof foreignFollowup === 'string'
       && deliveries.some(delivery => delivery.childId === 'foreign-session'))

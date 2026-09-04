@@ -97,3 +97,12 @@ CI 在 Linux 上重新构建并发布，不能把这个本地 tarball 哈希当�
 本机 Docker daemon 未启动，**未进行 Docker 运行验证**。真实业务 / UI 结果限定于上述 macOS、
 Alpha.2 和 DeepSeek Flash 组合；没有声称验证 Windows、其他模型供应商、所有旧版本或未来 Alpha。
 Linux CI 构建检查不等同于 Linux 上的真实 API / UI 验收。
+
+## 当前版本发布证据边界（2026-09-04）
+
+本文前面的 `0.1.15-alpha.1`、历史 tarball 和真实业务/UI记录保留为历史 Alpha.2 组合记录，不是当前工作树 `package.json` 版本 `0.1.15` 的完整重新发布证明。当前整改后的证据必须来自当前源码重新构建的 `lib`、主 `pnpm verify`、最终 tarball 和指定 Alpha.2 profile 的安装/冷启动冒烟测试；未重新执行的真实自然语言 Captain、Brownfield 接管、升级/回滚和多进程共享工作区场景不得写成已完成。当前发布建议仍为内部 Alpha / 受控评估，不作一般用户正式上线承诺。
+## P0-4 host user-confirmation capability boundary
+
+Long-lived requirement/design approval and Work Item accept/deliver require a host-issued user-confirmation capability. The plugin rejects forged, cross-session, cross-project, cross-version, payload-hash-mismatched, future-issued, expired and replayed capabilities, and fails closed when no provider is installed. See docs/host-user-confirmation-capability.md for the executable host contract.
+
+The local deterministic capability suite is implementation evidence only. It does not prove that a real Harness UI emitted the event, that the user was authenticated by the host, or that a production token was signed and consumed by the host. Those rows remain NOT PROVEN until the real host evidence bundle is attached.

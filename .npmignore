@@ -1,0 +1,17 @@
+# Local runtime state, evidence, and source-only material must not ship.
+.git/
+.github/
+.agent-teams/
+.agent-project/
+.acceptance-dsh.*
+.release-verification/
+*.log
+*.stdout
+*.stderr
+*.tgz
+*.tar.gz
+.npmrc
+node_modules/
+src/
+scripts/
+docs/

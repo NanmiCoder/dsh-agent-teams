@@ -66,6 +66,9 @@ import {
   type MemberRuntimeConfig,
 } from './members.ts'
 import { TERMINAL_TASK_STATUSES, type TeamMember, type TeamState, type TeamTask } from './types.ts'
+import { assertImplementationPlanningAllowed, assertProjectTeamBinding, readProjectState } from './project.ts'
+import { projectTaskBindingError } from './quality-gates.ts'
+import { ensureProjectWorkItemForTeam } from './project-tools.ts'
 import { installTeamScheduler } from './scheduler.ts'
 import { resolveTeamProfile } from './profiles.ts'
 
@@ -155,6 +158,155 @@ function teamLockKey(stateRoot: string, teamId: string): string {
 /** Process-local lock key enforcing one active team per captain session. */
 function captainLockKey(stateRoot: string, captainId: string): string {
   return `captain:${stateRoot}:${captainId}`
+}
+
+async function assertProjectImplementationAllowed(workspace: string, kind: unknown): Promise<void> {
+  if (kind !== 'implementation' && kind !== 'verification' && kind !== 'repair' && kind !== 'integration') return
+  const state = await readProjectState(workspace)
+  // No project state means this is the legacy AgentTeams mode. Preserve the
+  // upstream quality-task behavior; project binding is enforced once a
+  // durable .agent-project state exists and the team is bound to it.
+  if (state === undefined) return
+  assertImplementationPlanningAllowed(state)
+}
+
+type ProjectSnapshot = NonNullable<Awaited<ReturnType<typeof readProjectState>>>
+
+function applyProjectBinding(team: TeamState, project: ProjectSnapshot, bindExistingTasks = false): void {
+  team.projectId = project.id
+  team.projectRequirementId = project.requirement?.id
+  team.projectRequirementVersion = project.requirement?.version
+  team.projectDesignId = project.design?.id
+  team.projectDesignVersion = project.design?.version
+  team.projectLinkState = 'link_pending'
+  if (!bindExistingTasks) return
+  for (const task of team.tasks) {
+    const kind = taskKindOf(task)
+    if (kind !== 'implementation' && kind !== 'verification' && kind !== 'repair' && kind !== 'integration') continue
+    task.projectId = team.projectId
+    task.requirementId = team.projectRequirementId
+    task.requirementVersion = team.projectRequirementVersion
+    task.designId = team.projectDesignId
+    task.designVersion = team.projectDesignVersion
+  }
+}
+
+const PROJECT_EXECUTION_KINDS: readonly TaskKind[] = ['implementation', 'verification', 'repair', 'integration']
+
+function isProjectExecutionKind(kind: unknown): boolean {
+  return typeof kind === 'string' && PROJECT_EXECUTION_KINDS.includes(kind as TaskKind)
+}
+
+function validateBoundProjectTeam(team: TeamState, project: ProjectSnapshot, requireGate: boolean): void {
+  if (team.projectId === undefined) return
+  if (team.projectId !== project.id) {
+    throw new Error('Team project binding does not match the current project (' + team.projectId + ' vs ' + project.id + ')')
+  }
+  if (requireGate) assertImplementationPlanningAllowed(project)
+  const currentTeam: TeamState = {
+    ...team,
+    projectId: project.id,
+    projectRequirementId: project.requirement?.id,
+    projectRequirementVersion: project.requirement?.version,
+    projectDesignId: project.design?.id,
+    projectDesignVersion: project.design?.version,
+  }
+  for (const task of team.tasks) {
+    const bindingError = projectTaskBindingError(currentTeam, task)
+    if (bindingError !== undefined) throw new Error('project Team task ' + task.id + ' is invalid: ' + bindingError)
+  }
+  team.projectRequirementId = project.requirement?.id
+  team.projectRequirementVersion = project.requirement?.version
+  team.projectDesignId = project.design?.id
+  team.projectDesignVersion = project.design?.version
+}
+
+async function linkBoundProjectTeam(workspace: string, team: TeamState): Promise<void> {
+  if (team.projectId === undefined) return
+  const linked = await ensureProjectWorkItemForTeam(
+    workspace,
+    team.id,
+    team.name,
+    team.tasks.map((task) => task.id),
+  )
+  if (linked === undefined) throw new Error('project context disappeared before the Team Work Item link could be persisted')
+  const item = linked.workItems.find((candidate) => candidate.teamId === team.id)
+  if (item === undefined) throw new Error('project Work Item link was not present after persistence')
+  team.projectLinkState = 'linked'
+}
+
+async function markProjectLinkPending(
+  stateRoot: string,
+  teamId: string,
+  halt: boolean,
+  linkState: 'link_pending' | 'degraded' = 'link_pending',
+): Promise<void> {
+  await withTeamLock(teamLockKey(stateRoot, teamId), async () => {
+    const fresh = await readTeam(stateRoot, teamId)
+    if (fresh === undefined) return
+    // If the project context could not be read before binding metadata was
+    // materialized, keep this record a halted Legacy-shaped record rather than
+    // persisting partial Project binding metadata.  A halted record cannot be
+    // scheduled; once a real Project Team exists, link_pending/degraded is
+    // persisted with the complete binding.
+    if (fresh.projectId !== undefined) fresh.projectLinkState = linkState
+    if (halt) {
+      fresh.halted = true
+      fresh.haltedAt = Date.now()
+    }
+    await writeTeam(stateRoot, fresh)
+  })
+}
+
+async function refreshProjectBinding(workspace: string, team: TeamState, kind?: unknown): Promise<void> {
+  const project = await readProjectState(workspace)
+  if (project === undefined) {
+    if (team.projectId !== undefined) throw new Error('bound project Team cannot execute without its project context')
+    return
+  }
+  if (team.projectId === undefined) {
+    if (isProjectExecutionKind(kind)) {
+      throw new Error('this Team is an unbound Legacy Team; create or bind a Project Team before running project execution tasks')
+    }
+    return
+  }
+  if (team.projectLinkState !== 'linked') {
+    throw new Error('project Team execution is blocked until its Project Work Item link is established')
+  }
+  if (team.projectId !== project.id) {
+    throw new Error('Team project binding does not match the current project')
+  }
+  if (isProjectExecutionKind(kind)) assertImplementationPlanningAllowed(project)
+  // Refresh only the Team's current binding. Existing tasks retain the
+  // requirement/design version captured when they were created, so a reopened
+  // project gate can invalidate stale tasks instead of silently rebinding them.
+  team.projectId = project.id
+  team.projectRequirementId = project.requirement?.id
+  team.projectRequirementVersion = project.requirement?.version
+  team.projectDesignId = project.design?.id
+  team.projectDesignVersion = project.design?.version
+}
+
+async function assertCurrentProjectTask(workspace: string, team: TeamState, task: TeamTask): Promise<void> {
+  const project = await readProjectState(workspace)
+  if (project === undefined) {
+    if (team.projectId === undefined) return
+    throw new Error('task ' + task.id + ' is a project execution task but the project context is unavailable')
+  }
+  const kind = taskKindOf(task)
+  if (team.projectId === undefined) {
+    if (isProjectExecutionKind(kind)) {
+      throw new Error('task ' + task.id + ' belongs to an unbound Legacy Team and cannot execute as a project task')
+    }
+    return
+  }
+  if (team.projectLinkState !== 'linked') {
+    throw new Error('task ' + task.id + ' is blocked until its Project Work Item link is established')
+  }
+  assertProjectTeamBinding(project, team)
+  if (isProjectExecutionKind(kind)) assertImplementationPlanningAllowed(project)
+  const bindingError = projectTaskBindingError(team, task)
+  if (bindingError !== undefined) throw new Error('task ' + task.id + ' is stale or invalid: ' + bindingError)
 }
 
 /** The team this captain currently leads, or a loud failure. */
@@ -450,6 +602,9 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
     return withTeamLock(teamLockKey(stateRoot, teamId), async () => {
       const fresh = await requireFreshCaptainTeam(stateRoot, teamId, captain.id)
       requireStagedTeam(fresh)
+      if (fresh.projectId !== undefined && fresh.projectLinkState !== 'linked') {
+        throw new Error('project Team plan editing is blocked until its Project Work Item link is established')
+      }
       for (const mutation of mutations) {
         if (mutation.action === 'update_member') {
           const member = requireMember(fresh, mutation.memberName)
@@ -480,6 +635,9 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         } else if (mutation.action === 'add_task') {
           const subject = mutation.subject.trim()
           if (subject === '') throw new Error('task subject must not be empty')
+          if (fresh.projectId !== undefined) {
+            throw new Error('bound project staged plans cannot add implicit kind="work" tasks; use an explicit project task through agent_teams_create_task after the gate')
+          }
           fresh.taskSeq += 1
           const now = Date.now()
           fresh.tasks.push({
@@ -511,6 +669,11 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
           fresh.members = fresh.members.filter((candidate) => candidate !== member)
         }
       }
+      if (fresh.projectId !== undefined) {
+        const project = await readProjectState(workspace)
+        if (project === undefined) throw new Error('bound project Team cannot edit a plan without its project context')
+        validateBoundProjectTeam(fresh, project, false)
+      }
       validateStagedGraph(fresh, false)
       fresh.planReviewState = 'awaiting_review'
       await writeTeam(stateRoot, fresh)
@@ -526,13 +689,36 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
     const workspace = workspaceOf(captain)
     const stateRoot = stateRootOf(workspace, config)
     const runSignal = signal ?? new AbortController().signal
-    const approved = await withTeamLock(teamLockKey(stateRoot, teamId), async () => {
+      const approved = await withTeamLock(teamLockKey(stateRoot, teamId), async () => {
       const fresh = await requireFreshCaptainTeam(stateRoot, teamId, captain.id)
       requireStagedTeam(fresh)
       // A staged removal has no child session to retain in history. Drop those
       // placeholders before transitioning to the stricter running shape.
       fresh.members = fresh.members.filter((member) => member.status !== 'removed')
       validateStagedGraph(fresh, true)
+      if (fresh.projectId !== undefined) {
+        let project: ProjectSnapshot | undefined
+        try {
+          project = await readProjectState(workspace)
+        } catch (error: unknown) {
+          fresh.projectLinkState = 'degraded'
+          await writeTeam(stateRoot, fresh)
+          throw new Error('bound project Team approval is blocked because the project context could not be read: ' + String(error))
+        }
+        if (project === undefined) {
+          fresh.projectLinkState = 'link_pending'
+          await writeTeam(stateRoot, fresh)
+          throw new Error('bound project Team approval is blocked because the project context is unavailable')
+        }
+        validateBoundProjectTeam(fresh, project, true)
+        try {
+          await linkBoundProjectTeam(workspace, fresh)
+        } catch (error: unknown) {
+          fresh.projectLinkState = 'link_pending'
+          await writeTeam(stateRoot, fresh)
+          throw new Error('bound project Team approval is blocked because the Project Work Item link failed: ' + String(error))
+        }
+      }
       const spawned: TeamMember[] = []
       try {
         const selections = new Map<TeamMember, Awaited<ReturnType<typeof resolveMemberLlmSelection>>>()
@@ -764,6 +950,46 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         })
       })
       if (created.committed) {
+        let project: ProjectSnapshot | undefined
+        try {
+          project = await readProjectState(workspace)
+        } catch (error: unknown) {
+          await markProjectLinkPending(stateRoot, created.state.id, true, 'degraded').catch(() => undefined)
+          for (const member of created.state.members) {
+            if (member.id !== '') interruptMember(ctx, captain, member.id)
+          }
+          throw new Error('Team creation is blocked because the project context could not be read safely: ' + String(error))
+        }
+        if (project !== undefined) {
+          await withTeamLock(teamLockKey(stateRoot, created.state.id), async () => {
+            const fresh = await readTeam(stateRoot, created.state.id)
+            if (fresh === undefined) return
+            applyProjectBinding(fresh, project, true)
+            await writeTeam(stateRoot, fresh)
+            Object.assign(created.state, fresh)
+          })
+        }
+        if (created.state.projectId !== undefined) {
+          try {
+            const currentProject = await readProjectState(workspace)
+            if (currentProject === undefined) throw new Error('project context disappeared before Team linking')
+            validateBoundProjectTeam(created.state, currentProject, false)
+            await withTeamLock(teamLockKey(stateRoot, created.state.id), async () => {
+              const fresh = await readTeam(stateRoot, created.state.id)
+              if (fresh === undefined) throw new Error('created Team disappeared before Project Work Item linking')
+              validateBoundProjectTeam(fresh, currentProject, false)
+              await linkBoundProjectTeam(workspace, fresh)
+              await writeTeam(stateRoot, fresh)
+              Object.assign(created.state, fresh)
+            })
+          } catch (error: unknown) {
+            await markProjectLinkPending(stateRoot, created.state.id, true).catch(() => undefined)
+            for (const member of created.state.members) {
+              if (member.id !== '') interruptMember(ctx, captain, member.id)
+            }
+            throw new Error('Project Team creation is blocked because the Project Work Item link failed: ' + String(error))
+          }
+        }
         try {
           await scheduler.kickTeam(workspace, created.state.id, captain)
         } catch (error: unknown) {
@@ -1193,6 +1419,11 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
       sourceTaskId: { type: 'string', description: 'Source implementation/artifact. Required for kind=repair.' },
       sourceFindingIds: { type: 'array', items: { type: 'string' }, description: 'Finding ids this repair must close.' },
       coverageOf: { type: 'array', items: { type: 'string' }, description: 'User-constraint / goal items this task covers.' },
+      projectId: { type: 'string', description: 'Bound long-lived project id. Required for project execution task kinds.' },
+      requirementId: { type: 'string', description: 'Bound approved requirement id.' },
+      requirementVersion: { type: 'number', description: 'Bound approved requirement version.' },
+      designId: { type: 'string', description: 'Bound approved design id.' },
+      designVersion: { type: 'number', description: 'Bound approved design version.' },
       resume: { type: 'boolean', description: 'If true, clear halted in the same lock before creating the task.' },
       resumeReason: { type: 'string', description: 'Required non-empty reason when resume=true.' },
     },
@@ -1222,8 +1453,10 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
       // validation so a blank value can neither be rejected spuriously nor be
       // persisted into team.json, where it would brick the team on reload.
       const input = normalizeBlankOptionalTaskFields(args)
+      await assertProjectImplementationAllowed(workspace, input.kind)
       const created = await withTeamLock(teamLockKey(stateRoot, team.id), async () => {
         const fresh = await requireFreshCaptainTeam(stateRoot, team.id, captain.id)
+        await refreshProjectBinding(workspace, fresh, input.kind)
         const gate = validateCreateTask(fresh, {
           subject: input.subject,
           description: input.description,
@@ -1242,6 +1475,11 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
           sourceTaskId: input.sourceTaskId,
           sourceFindingIds: input.sourceFindingIds,
           coverageOf: input.coverageOf,
+          projectId: input.projectId,
+          requirementId: input.requirementId ?? fresh.projectRequirementId,
+          requirementVersion: input.requirementVersion ?? fresh.projectRequirementVersion,
+          designId: input.designId ?? fresh.projectDesignId,
+          designVersion: input.designVersion ?? fresh.projectDesignVersion,
           resume: input.resume,
           resumeReason: input.resumeReason,
         })
@@ -1273,6 +1511,9 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
           ? sanitizeReviewAcceptance(input.acceptance)
           : input.acceptance
         const task: TeamTask = {
+          // Keep the canonical fields returned by validateCreateTask, including
+          // projectId/requirementId/designId and their approved versions.
+          ...(gate.task ?? {}),
           id: `t${fresh.taskSeq + 1}`,
           subject: args.subject,
           description: args.description,
@@ -1357,6 +1598,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
       const revoked = await withTeamLock(teamLockKey(stateRoot, team.id), async () => {
         const fresh = await requireFreshCaptainTeam(stateRoot, team.id, captain.id)
         const task = requireTask(fresh, args.task_id)
+        await assertCurrentProjectTask(workspace, fresh, task)
         if (task.status === 'completed') throw new Error(`completed task ${task.id} is immutable and cannot be reassigned`)
         if (task.reassigning === true) throw new Error(`task ${task.id} is already being reassigned`)
         const targetMember = target === CAPTAIN_KEY ? undefined : requireMember(fresh, target)
@@ -1470,6 +1712,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
       return withTeamLock(teamLockKey(stateRoot, team.id), async () => {
         const { team: fresh, identity } = await requireFreshParticipant(stateRoot, team.id, caller.id)
         const task = requireTask(fresh, args.task_id)
+        await assertCurrentProjectTask(workspace, fresh, task)
         if (task.reassigning === true) {
           throw new Error(`task ${task.id} is being reassigned; wait for the handoff to finish`)
         }
@@ -1626,6 +1869,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
       const updated = await withTeamLock(teamLockKey(stateRoot, team.id), async () => {
         const { team: fresh, identity } = await requireFreshParticipant(stateRoot, team.id, caller.id)
         const task = requireTask(fresh, args.task_id)
+        await assertCurrentProjectTask(workspace, fresh, task)
         if (identity.kind === 'captain'
           && task.assignee !== undefined
           && task.assignee !== CAPTAIN_KEY) {
@@ -1685,6 +1929,15 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         const followUp = (task.status === 'failed' && (task.verdict === 'needs_revision' || task.verdict === 'reject'))
           ? applyQualityFollowUp(fresh, task)
           : undefined
+        if (followUp !== undefined && fresh.projectId !== undefined) {
+          const project = await readProjectState(workspace)
+          if (project === undefined) throw new Error('bound project Team repair requires a readable project state')
+          assertProjectTeamBinding(project, fresh)
+          for (const created of followUp.created) {
+            const bindingError = projectTaskBindingError(fresh, created)
+            if (bindingError !== undefined) throw new Error('project repair task is invalid: ' + bindingError)
+          }
+        }
         if (followUp?.escalated === true) {
           await appendMailbox(stateRoot, fresh.id, CAPTAIN_KEY, createMessage(
             CAPTAIN_KEY,
@@ -2324,6 +2577,19 @@ export function applyQualityFollowUp(team: TeamState, closed: TeamTask): { creat
       ...draft.sourceTaskId === undefined ? {} : { sourceTaskId: draft.sourceTaskId },
       ...draft.sourceFindingIds === undefined ? {} : { sourceFindingIds: draft.sourceFindingIds },
       ...draft.reviewedTaskId === undefined ? {} : { reviewedTaskId: idBySubject.get(draft.reviewedTaskId) ?? draft.reviewedTaskId },
+      ...draft.projectId === undefined ? {} : { projectId: draft.projectId },
+      ...draft.requirementId === undefined ? {} : { requirementId: draft.requirementId },
+      ...draft.requirementVersion === undefined ? {} : { requirementVersion: draft.requirementVersion },
+      ...draft.designId === undefined ? {} : { designId: draft.designId },
+      ...draft.designVersion === undefined ? {} : { designVersion: draft.designVersion },
+    }
+    if (team.projectId !== undefined) {
+      if (next.kind === undefined || next.kind === 'work') throw new Error('project Team repair materialization produced an unbound work task')
+      next.projectId = team.projectId
+      next.requirementId = team.projectRequirementId
+      next.requirementVersion = team.projectRequirementVersion
+      next.designId = team.projectDesignId
+      next.designVersion = team.projectDesignVersion
     }
     team.tasks.push(next)
     created.push(next)

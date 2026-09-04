@@ -14,11 +14,18 @@ export interface PanelLayout {
   readonly heightMode: PanelHeightMode
 }
 
-/** The shell-overlay box and the right edge of its current conversation. */
+/**
+ * The shell-overlay box and the right edge of its current conversation.
+ *
+ * Every horizontal/vertical value in this module is local to the shell
+ * overlay: (0, 0) is the overlay's top-left corner, never the browser
+ * viewport. The host may omit anchorRight while the overlay is being
+ * measured; in that case the overlay's own right edge is the safe anchor.
+ */
 export interface PanelBounds {
   readonly width: number
   readonly height: number
-  readonly anchorRight: number
+  readonly anchorRight?: number
 }
 
 export const PANEL_LAYOUT_STORAGE_KEY = 'dsh-agent-teams:activity-panel:v1'
@@ -28,6 +35,8 @@ export const PANEL_DEFAULT_HEIGHT = 640
 export const PANEL_MIN_WIDTH = 320
 export const PANEL_MAX_WIDTH = 640
 export const PANEL_MIN_HEIGHT = 360
+// Docked mode is the third shell column. Keep a stable shell gutter so the
+// conversation and the AgentTeams column remain visibly separate siblings.
 export const PANEL_DOCK_TOP = 64
 export const PANEL_DOCK_RIGHT = 18
 export const PANEL_DOCK_BOTTOM = 48
@@ -50,6 +59,24 @@ function finite(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value)
 }
 
+/**
+ * Normalize host measurements before applying local geometry rules.
+ *
+ * Harness can render an additive slot for one frame before its final box is
+ * available. Keeping all downstream math finite prevents a transient
+ * missing/invalid anchor from producing NaN CSS coordinates (which browsers
+ * commonly resolve as the top-left corner). The fallback anchor is explicitly
+ * the shell's right edge, still in shell-local coordinates.
+ */
+function normalizeBounds(bounds: PanelBounds): Required<PanelBounds> {
+  const width = finite(bounds.width) ? Math.max(1, bounds.width) : 1
+  const height = finite(bounds.height) ? Math.max(1, bounds.height) : 1
+  const anchorRight = finite(bounds.anchorRight)
+    ? clamp(bounds.anchorRight, 0, width)
+    : width
+  return { width, height, anchorRight }
+}
+
 /** Decode one versioned localStorage value, rejecting partial/corrupt state. */
 export function parsePanelLayout(value: string | null): PanelLayout {
   if (value === null) return DEFAULT_PANEL_LAYOUT
@@ -70,6 +97,9 @@ export function parsePanelLayout(value: string | null): PanelLayout {
       height: record.height,
       // v1 values written before content-fit height existed have no mode.
       // Treat them as automatic so the upgrade removes legacy blank space.
+      // Docked panels are a shell column and always content-fit. Older
+      // persisted docked values may contain a manual height from the former
+      // floating implementation; migrate those values to auto on restore.
       heightMode: record.mode === 'floating' && record.heightMode === 'manual' ? 'manual' : 'auto',
     }
   } catch {
@@ -79,26 +109,28 @@ export function parsePanelLayout(value: string | null): PanelLayout {
 
 /** Whether the panel should become a simple inset overlay with no gestures. */
 export function compactPanelForBounds(bounds: PanelBounds): boolean {
-  return bounds.width <= PANEL_COMPACT_BREAKPOINT
+  return normalizeBounds(bounds).width <= PANEL_COMPACT_BREAKPOINT
 }
 
 /** Docked and compact panels always fit content; floating panels may be user-sized. */
 export function panelUsesAutoHeight(layout: PanelLayout, bounds: PanelBounds): boolean {
-  return compactPanelForBounds(bounds) || layout.mode === 'docked' || layout.heightMode === 'auto'
+  return compactPanelForBounds(bounds) || layout.heightMode === 'auto'
 }
 
 /** CSS max-height ceiling that keeps an auto-height panel inside its shell. */
 export function panelMaximumHeight(layout: PanelLayout, bounds: PanelBounds): number {
+  const normalized = normalizeBounds(bounds)
   const bottomInset = compactPanelForBounds(bounds) || layout.mode === 'floating'
     ? PANEL_FLOAT_MARGIN
     : PANEL_DOCK_BOTTOM
-  return Math.max(1, bounds.height - layout.y - bottomInset)
+  return Math.max(1, normalized.height - layout.y - bottomInset)
 }
 
 /** Resolve persisted state into a visible rectangle inside the current shell. */
 export function resolvePanelGeometry(layout: PanelLayout, bounds: PanelBounds): PanelLayout {
-  const boundsWidth = Math.max(1, bounds.width)
-  const boundsHeight = Math.max(1, bounds.height)
+  const normalized = normalizeBounds(bounds)
+  const boundsWidth = normalized.width
+  const boundsHeight = normalized.height
 
   if (compactPanelForBounds(bounds)) {
     return {
@@ -117,12 +149,15 @@ export function resolvePanelGeometry(layout: PanelLayout, bounds: PanelBounds): 
   const minimumHeight = Math.min(PANEL_MIN_HEIGHT, maximumHeight)
 
   if (layout.mode === 'docked') {
-    const y = clamp(PANEL_DOCK_TOP, PANEL_FLOAT_MARGIN, Math.max(PANEL_FLOAT_MARGIN, boundsHeight - minimumHeight - PANEL_FLOAT_MARGIN))
+    // A docked panel is a real third shell column. Do not inherit the
+    // floating panel's 12px inset; that inset is the visible top gap.
+    const y = clamp(PANEL_DOCK_TOP, 0, Math.max(0, boundsHeight - minimumHeight))
     const availableHeight = Math.max(1, boundsHeight - y - PANEL_DOCK_BOTTOM)
-    const height = clamp(availableHeight, Math.min(minimumHeight, availableHeight), maximumHeight)
-    const anchorRight = clamp(bounds.anchorRight, 0, boundsWidth)
-    const maximumX = Math.max(PANEL_FLOAT_MARGIN, boundsWidth - width - PANEL_FLOAT_MARGIN)
-    const x = clamp(anchorRight - PANEL_DOCK_RIGHT - width, PANEL_FLOAT_MARGIN, maximumX)
+    const height = layout.heightMode === 'manual'
+      ? clamp(layout.height, Math.min(minimumHeight, availableHeight), availableHeight)
+      : availableHeight
+    const maximumX = Math.max(0, normalized.anchorRight - PANEL_DOCK_RIGHT - width)
+    const x = clamp(normalized.anchorRight - PANEL_DOCK_RIGHT - width, 0, maximumX)
     return { mode: 'docked', x, y, width, height, heightMode: layout.heightMode }
   }
 

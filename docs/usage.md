@@ -157,3 +157,17 @@ profiles:
 - 离线与生命周期：`pnpm build && pnpm typecheck && pnpm verify`。除基础检查外，还包含 8 成员、31 节点多层 DAG（运行中扩展至 38 任务）的故障矩阵：并发接管/移除、50 次迟到写入、4 个开放任务冷重启、7 路认领竞争、40 次终态覆盖、42 条消息突发和最终归档；组合验证 `dsh --profile agent-teams-check --dump-config`
 - 真实 e2e：`dsh plugin --profile headless add <path>` 后 `dsh --profile headless "用 AgentTeams …"`，核对 `.agent-teams/` 状态文件与会话日志事件流
 - GUI：独立实例 + ego-browser（详见 `verification-guide.md`）
+
+## Long-lived project mode: current behavior and operating contract
+
+The project layer currently provides durable context in `.agent-project/status.json`, shallow Greenfield/Brownfield discovery, clarification records, requirement and design gates, Work Items linked to AgentTeams runs, read-only status/report views, and explicit acceptance/delivery states. This is a protocol-driven workflow supported by Captain and project tools; it is not an autonomous lifecycle controller.
+
+For a multi-iteration software change or an existing-repository takeover, Captain must first inspect `agent_project_status` or `agent_project_report`; when no context exists, it must call `agent_project_init` and then read the resulting discovery. The current discovery records the repository shape and common manifests, but it does not automatically infer the complete architecture, requirements, build/test strategy, or current product baseline. Unresolved scope, compatibility, security, data, ownership, or acceptance decisions must be recorded with `agent_project_clarification` and brought back to the user.
+
+Captain then writes draft requirements and a draft design with `agent_project_requirement_update` and `agent_project_design_update`. The user must explicitly confirm each before Captain records `approved` and passes `agent_project_gate(action="assert_implementation_allowed")`. The prompt describes the operating sequence but is not a security boundary; actual authorization and user-decision provenance are not enforced by prompt text alone.
+
+Only after the implementation gate passes should Captain create implementation Work Items or coordinate implementation tasks. During execution, `agent_project_work_item_update` and `agent_project_work_item_sync` must remain aligned with Team/task IDs, verification results, review findings, repair attempts, and blockers. If a gate closes, project context cannot be loaded, or the project/Team link cannot be persisted, the run must stop and surface the blocker.
+
+Implementation completion is not user acceptance and is not delivery. The intended project progression is `implemented_not_accepted` -> explicit user acceptance via `agent_project_work_item_accept(action="accept")` -> `agent_project_work_item_accept(action="deliver")`, with evidence and remaining risks presented before the user decision. Requirement or scope changes require revalidation of affected design and Work Items; old approvals and acceptance cannot be silently reused.
+
+Legacy AgentTeams mode remains available for an explicitly short-lived team/task run when no durable project context exists. In that mode, the plugin does not claim to provide project-level requirements, design approval, acceptance, delivery tracking, or iteration history. Captain behavior and user confirmation still depend on the model, the user, and host/tool enforcement; the current implementation does not provide a fully automatic natural-language-to-delivery controller.

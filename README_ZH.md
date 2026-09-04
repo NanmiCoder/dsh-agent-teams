@@ -30,7 +30,7 @@
 
 ## 版本更新
 
-[最新版本](https://github.com/NanmiCoder/dsh-agent-teams/releases/latest) [v0.1.15](https://github.com/NanmiCoder/dsh-agent-teams/releases/tag/v0.1.15) 适配 Harness **0.1.2-alpha.2**。旧宿主用户应安装明确兼容的固定插件版本。也可浏览[完整发布历史](https://github.com/NanmiCoder/dsh-agent-teams/releases)；同一份说明随 npm 包发布到 `release-notes/` 目录。
+[最新版本](https://github.com/NanmiCoder/dsh-agent-teams/releases/latest) [v0.1.15](https://github.com/NanmiCoder/dsh-agent-teams/releases/tag/v0.1.15) 面向 Harness **0.1.2-alpha.2**。旧宿主用户应安装明确兼容的固定插件版本。也可浏览[完整发布历史](https://github.com/NanmiCoder/dsh-agent-teams/releases)；同一份说明随 npm 包发布到 `release-notes/` 目录。
 
 ## 为什么需要 AgentTeams？
 
@@ -58,9 +58,9 @@
 | 其他旧 RC / 未更新的源码宿主 | 固定当前已能正常使用的插件版本，不要跟随 `@latest` | 不能推断所有旧宿主都兼容 0.1.14。 |
 | Alpha.1、后续 Alpha 或其他源码提交 | 尚未验证 | 请对齐上面明确验证的宿主版本，或单独验证。 |
 
-**插件默认发行跟进当前已适配的 Harness 开发者预览版：`latest=0.1.15`，对应 Harness Alpha.2。** 宿主版本名里的 Alpha 不要求插件也另走 Alpha 渠道。继续使用旧宿主的用户，应明确安装兼容的固定插件版本，不要跟随 `@latest`。可选 peer dependencies 并不是运行时版本拦截：装得上，不代表不兼容的宿主能加载成功。
+**插件默认发行跟进当前已适配的 Harness 开发者预览版：`latest=0.1.15`，对应 Harness Alpha.2。** 当前发布边界是内部 Alpha / 受控评估，不是面向一般用户的正式生产上线承诺。宿主版本名里的 Alpha 不要求插件也另走 Alpha 渠道。继续使用旧宿主的用户，应明确安装兼容的固定插件版本，不要跟随 `@latest`。可选 peer dependencies 并不是运行时版本拦截：装得上，不代表不兼容的宿主能加载成功。
 
-详见[兼容性记录](./docs/alpha2-compatibility.md)和[真实业务 / UI 验收报告](./docs/alpha2-release-acceptance.md)。
+详见[兼容性记录](./docs/alpha2-compatibility.md)和[有范围的业务 / UI 验收记录](./docs/alpha2-release-acceptance.md)。当前版本的离线构建和回归门禁不能替代完整真实 Harness / 真实模型自然语言 E2E、Brownfield 接管、升级回滚和多进程共享工作区验收。
 
 ### npm：使用 Harness Alpha.2
 
@@ -161,6 +161,16 @@ dsh web
 
 完整工具列表、状态模型、Web UI 行为、配置与已知限制见 [docs/usage.md](./docs/usage.md)。
 
+## 长期软件工程项目模式
+
+本 fork 还提供一套独立于单次 AgentTeams 运行的长期项目状态层。初始化项目后，Captain 可以先记录需求、澄清问题和设计，再通过确认门进入实现规划；项目状态保存在工作区的 .agent-project/status.json，团队运行状态仍保存在 .agent-teams，两者不会混为一谈。
+
+项目级工具包括 agent_project_init、agent_project_clarification、agent_project_requirement_update、agent_project_design_update、agent_project_gate、agent_project_work_item_update、agent_project_work_item_sync、agent_project_work_item_accept 和 agent_project_report。其中 implemented_not_accepted → accepted → delivered 必须经过明确的用户验收，Review 失败会进入修复/复审轮次，不会自动伪装成已交付。
+
+在 Web 面板中，项目总览会显示阶段、需求/设计门、Work Item 状态统计、待验收、阻塞、Review/验证失败、待决策、待澄清、风险以及关联团队/进行中执行数。该面板是只读视图；状态变更必须通过项目工具完成。项目路由还会读取关联的 .agent-teams 执行记录，用于显示最新的团队关联和进度投影。
+
+详细的 AI 可读协议、路线图和验收边界见 docs/AI_PROJECT_CHARTER.md、docs/AI_AGENT_RULES.md 和 docs/AI_PROJECT_ROADMAP.md。
+
 ## 插件开发 Skill
 
 仓库同时提供开放 Agent Skills 包 [`dsh-plugin-development`](./skills/dsh-plugin-development/SKILL.md)：
@@ -195,3 +205,8 @@ pnpm verify
 ## 许可证
 
 [MIT](./LICENSE)
+
+
+## 发布证据边界
+
+版本 `0.1.15` 面向 Harness `0.1.2-alpha.2`，当前仅限内部 Alpha / 受控评估。当前版本有 `pnpm typecheck`、`pnpm build` 和 `pnpm verify` 离线门禁，但不宣称已经完成一般用户正式生产资格：真实 Harness 与真实模型自然语言 E2E、深度 Brownfield 接管、升级/迁移/回滚、多进程共享工作区以及广泛平台/模型矩阵仍未验证。历史验收记录不能替代当前工作树中未重新执行的场景证据。

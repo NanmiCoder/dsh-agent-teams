@@ -38,8 +38,34 @@ import { collectArchivedTeamsActivity, collectTeamsActivity } from './snapshot.t
 import { findTeamByCaptain } from './state.ts'
 import { formatProfilesForPrompt, type TeamProfileConfig } from './profiles.ts'
 import { qualityPlanningPrompt } from './quality-gates.ts'
+import { projectWorkspaceSnapshot, registerProjectTools } from './project-tools.ts'
+import type { ProjectDecisionCapabilityProvider } from './project.ts'
 
 import { authenticatedWebRoutes, type BrowserRequestGate, type WebRouteHost } from './web-routes.ts'
+
+export {
+  createInitialProjectState,
+  discoverProject,
+  readProjectState,
+  summarizeProjectState,
+  updateProjectState,
+  validateProjectState,
+  withProjectLock,
+  writeProjectState,
+  type CreateProjectInput,
+  type ProjectContext,
+  type ProjectDecisionCapabilityProvider,
+  type ProjectDecision,
+  type ProjectDiscovery,
+  type ProjectLifecycle,
+  type ProjectMilestone,
+  type ProjectMode,
+  type ProjectPhase,
+  type ProjectState,
+  type ProjectStatusSummary,
+  type ProjectWorkItem,
+  type ProjectWorkItemStatus,
+} from './project.ts'
 
 /** Web-server service key candidates, newest first. */
 const WEB_SERVER_KEYS = ['webServer', 'httpServer'] as const
@@ -78,6 +104,8 @@ export interface Config {
    * Disable to keep the natural-language trigger as the only entry point.
    */
   slashCommand?: boolean
+  /** Host adapter for real user-confirmation events; absent means production decisions fail closed. */
+  decisionCapabilityProvider?: ProjectDecisionCapabilityProvider
 }
 
 // `z.object()` has an implicit `{}` default in Schemastery.  Fallback routes
@@ -128,6 +156,7 @@ export const Config: z<Config> = z.object({
   maxMembers: z.natural().min(1).default(8),
   promptSectionOrder: z.natural().default(117),
   slashCommand: z.boolean().default(true),
+  decisionCapabilityProvider: z.any(),
 })
 
 /** The model-facing usage policy: when and how to drive AgentTeams. */
@@ -140,10 +169,19 @@ export function usageSectionText(toolNames: string, profilesText = ''): string {
 5. If the user explicitly asks to pause a running member, its open attempt remains parked after interruption; after answering the user, send that same member guidance with agent_teams_send_message so it continues the same attempt. Do not interrupt members for an ordinary user question that did not request a pause. If work must change owner, restart from scratch, or be taken over, call agent_teams_reassign_task first. Prefer another idle member or a retry with the same member. Use assignee=captain only for one ready task that you will personally drive to a terminal status in this same turn; never start a second captain takeover while one is unfinished, and never end your turn with captain-owned work open. Reassignment revokes the old attempt and waits for that member to quiesce, preventing late results from overwriting the new attempt.
 6. Tasks carry attempt_id capabilities. Members must use the current attempt_id for updates; stale-attempt errors mean ownership changed. Check status after progress notifications until every required task is terminal and every member is idle/ready; do not busy-poll or require reports from members with no assigned work.
 7. If the user names a configured profile / template / fixed roster, pass that name as profile= to agent_teams_create. After a successful profile create, do not recreate the same members. Seed profiles provide their template tasks; captain-planning profiles provide only the roster and guardrails, so you must design their DAG while staged. Add repair or retry tasks when review/test fails, but never make a new task depend on a failed task. Do not send_message to start the next stage; the scheduler assigns ready work after approval. Watch every required task until it is terminal before deleting the team. Never perform a real deployment without explicit user confirmation.
-8. Quality kinds (requirements, implementation, verification, review, repair, integration) need a contract: non-empty objective and acceptance; implementation/repair also need inScope and verify. Review/requirements can complete only with verdict=pass; needs_revision/reject must fail with findings. The system then opens repair + next review that depend on the successful source, never the failed review. Do not approve your own implementation. create_task no longer silently resumes a halted team — call agent_teams_resume with a reason, or create_task({resume:true, resumeReason}).
+8. Quality kinds (requirements, implementation, verification, review, repair, integration) need a contract: non-empty objective and acceptance; implementation/repair also need inScope and verify. Review/requirements can complete only with verdict=pass; needs_revision/reject must fail with findings. The system then opens repair + next review that depend on the successful source, never the failed review. Do not approve your own implementation. create_task no longer silently resumes a halted team - call agent_teams_resume with a reason, or create_task({resume:true, resumeReason}).
 9. ${qualityPlanningPrompt()}
-10. Present the team's results to the user, then agent_teams_delete the team unless the user wants to keep working with it. Stopping a team aborts the Captain's current turn as well as member work; only a later explicit user turn may resume it.
-
+10. PROJECT MODE SELECTION: classify the request before creating implementation work. Use LONG-LIVED PROJECT MODE when the user asks to build, evolve, maintain, or take over software across iterations, or when an .agent-project context already exists. Use LEGACY AGENTTEAMS MODE only for an explicitly short-lived team/task run with no durable project context. In legacy mode, do not claim that requirements, design approval, acceptance, delivery, or iteration history are project-tracked.
+11. LONG-LIVED PROJECT - START CONTEXT: first call agent_project_status or agent_project_report to check the current project context. If it is absent, call agent_project_init for the current authorized workspace, then read agent_project_status or agent_project_report again. Use the returned Greenfield/Brownfield discovery as the baseline. Next action: either continue to clarification or explain the loaded state. Stop and ask the user if initialization, discovery, or context loading fails; do not start implementation work from an untracked goal.
+12. LONG-LIVED PROJECT - CLARIFY: inspect the discovery and existing context, then call agent_project_clarification(action='ask') for unresolved scope, compatibility, data, security, ownership, or acceptance decisions. Next action: ask the user the recorded questions and persist answers with the clarification tool. Stop and wait when an answer changes the goal or acceptance boundary; do not silently guess or convert an Agent assumption into approval.
+13. LONG-LIVED PROJECT - REQUIREMENTS: call agent_project_requirement_update to write a draft with scope and acceptance criteria. Present the draft to the user. Next action: wait for an explicit user confirmation in a later user turn or an equivalent host-controlled user action, then record status='approved'. Stop before approval if criteria are missing, clarifications remain open, or confirmation is absent. Never infer approval from silence, another agent, or a model judgement.
+14. LONG-LIVED PROJECT - DESIGN AND IMPLEMENTATION GATE: call agent_project_design_update to write a draft linked to the approved requirements, including architecture, boundaries, interfaces, trade-offs, migration, and test strategy. Present it to the user. Next action: after explicit user confirmation, record status='approved' and call agent_project_gate(action="assert_implementation_allowed"). Stop implementation planning if the design is not approved, the gate fails, or the requirements/design versions no longer match.
+15. LONG-LIVED PROJECT - PLAN AND EXECUTE: only after the implementation gate passes, create or update project Work Items with agent_project_work_item_update and then coordinate AgentTeams implementation tasks. Link team_id and task_ids as soon as the Team plan exists, and call agent_project_work_item_sync as execution progresses. Next action: keep agent_project_status or agent_project_report, Work Items, and Team/task results aligned. Stop if project context is missing, the gate closes, or project/Team linking or synchronization cannot be persisted.
+16. LONG-LIVED PROJECT - VERIFY AND REVIEW: collect verification commands/results, review findings, repair attempts, and Team outcomes. Call agent_project_status or agent_project_report and preserve the Work Item state implemented_not_accepted when implementation is complete but user acceptance is pending. Next action: present evidence, failed checks, remaining risks, and changed scope to the user. Stop before acceptance when evidence is incomplete; code completion, a passing Team status, or a Captain statement is not delivery.
+17. LONG-LIVED PROJECT - ACCEPT AND DELIVER: after presenting evidence, stop for explicit user acceptance. Only after that user decision call agent_project_work_item_accept(action='accept'), re-read the result, and call agent_project_work_item_accept(action='deliver') only when delivery is appropriate. Next action: record the acceptance/delivery result and risks in project context. Stop and record a blocker if acceptance is declined, evidence is incomplete, or delivery preconditions fail; never turn implementation completion into acceptance automatically.
+18. LONG-LIVED PROJECT - ITERATE: when the requirement or scope changes, explain impact, re-open affected design and Work Items as needed, and obtain confirmation again. Next action: re-run the relevant gate and synchronize the next Team execution. Stop and ask the user when the change introduces a new decision or invalidates prior evidence. Do not carry an old approval or acceptance across changed scope without revalidation.
+19. PROJECT CONTINUITY AND LIMITS: when a project context exists, every execution round must leave a durable status update, Work Item/Team linkage, verification outcome, and acceptance or blocker visible for the next round. This prompt is an operating protocol, not a security boundary: do not represent Captain compliance as authorization. Host and tool layers must enforce permissions, workspace scope, and real user decision provenance.
+20. Present the team's results to the user, then agent_teams_delete the team unless the user wants to keep working with it. Stopping a team aborts the Captain's current turn as well as member work; only a later explicit user turn may resume it.
 Tools: ${toolNames}${profilesText === '' ? '' : `\n\n${profilesText}`}`
 }
 
@@ -189,6 +227,7 @@ export function apply(ctx: Context, config: Config): void {
   // Exported for TDD / docs checks. Not a public runtime API.
 
   const agentTeamsRuntime = registerAgentTeamsTools(ctx, resolved)
+  registerProjectTools(ctx, { decisionCapabilityProvider: config.decisionCapabilityProvider })
 
   // Deterministic activation surfaces: the closed-namespace `/agent-teams`
   // host command (surfaces in the Web GUI slash menu via the Harness
@@ -245,6 +284,30 @@ export function apply(ctx: Context, config: Config): void {
       res.end(body)
     },
   }), 'agent-teams: activity route')
+
+    ctx.effect(() => webServer.register({
+      kind: 'exact',
+      path: '/plugins/dsh-agent-teams/project',
+      handler: async (req, res) => {
+        if (req.method !== 'GET') {
+          res.writeHead(405, { allow: 'GET', 'cache-control': 'no-store' })
+          res.end()
+          return
+        }
+        const projects = await Promise.all(workspaceRegistry.list().map(async (workspace) => {
+          try {
+            return await projectWorkspaceSnapshot(workspace.path, workspace.title)
+          } catch {
+            return null
+          }
+        }))
+        res.writeHead(200, {
+          'content-type': 'application/json; charset=utf-8',
+          'cache-control': 'no-store',
+        })
+        res.end(JSON.stringify({ projects: projects.filter((project) => project !== null) }))
+      },
+    }), 'agent-teams: project route')
 
     ctx.effect(() => webServer.register({
       kind: 'exact',

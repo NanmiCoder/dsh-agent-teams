@@ -63,6 +63,7 @@ function mountRuntime() {
   const definitions = new Map()
   const listeners = new Map()
   const liveAgents = new Map()
+  const effectCleanups = []
   const captain = makeAgent('stress-captain')
   liveAgents.set(captain.id, captain)
 
@@ -76,7 +77,11 @@ function mountRuntime() {
   }
 
   const ctx = {
-    effect(setup) { return setup() },
+    effect(setup) {
+      const cleanup = setup()
+      if (typeof cleanup === 'function') effectCleanups.push(cleanup)
+      return cleanup
+    },
     tools: {
       register(definition) {
         definitions.set(definition.name, definition)
@@ -171,6 +176,9 @@ function mountRuntime() {
     definitions,
     liveAgents,
     publishStatus,
+    async dispose() {
+      for (const cleanup of effectCleanups.splice(0).reverse()) await cleanup()
+    },
   }
 }
 
@@ -403,6 +411,7 @@ try {
   const staleAgents = new Map()
   for (const [taskId, held] of heldBeforeRestart) staleAgents.set(taskId, held.owner)
   const previousGeneration = runtime.generation
+  await runtime?.dispose?.()
   runtime = mountRuntime()
   await call('agent_teams_status', {})
   await settle()
@@ -533,7 +542,19 @@ try {
         && child.mode === 'continuable'
         && child.label.startsWith('agent-teams:')).length === 8)
 } finally {
-  await rm(workspace, { recursive: true, force: true })
+  try {
+    await runtime?.dispose?.()
+  } finally {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      try {
+        await rm(workspace, { recursive: true, force: true })
+        break
+      } catch (error) {
+        if (attempt === 4) throw error
+        await new Promise(resolve => setTimeout(resolve, 100))
+      }
+    }
+  }
 }
 
 if (failures.length > 0) {

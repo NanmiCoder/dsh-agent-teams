@@ -55,7 +55,6 @@ import {
   type ActivityTask,
   type ActivityTeam,
 } from './activity-monitor.ts'
-import { ACTION_ART, LEAD_ART, memberArtUrl } from './artwork.ts'
 import { OPEN_PANEL_EVENT } from './AgentTeamsCard.tsx'
 import { StagingPlanEditor } from './StagingPlanEditor.tsx'
 import type { AgentTeamsCardData } from './agent-teams-card-definition.ts'
@@ -77,6 +76,7 @@ import {
   type PanelResizeEdge,
 } from './panel-geometry.ts'
 import css from './ActivityPanel.module.css'
+import { ProjectOverviewPanel } from './ProjectOverviewPanel.tsx'
 
 /** Grace before the panel collapses once no team remains. */
 const AUTOCLOSE_GRACE_MS = 2000
@@ -86,11 +86,6 @@ const AUTOCLOSE_GRACE_MS = 2000
  * right after load. New activity after this window auto-expands as usual.
  */
 const AUTO_OPEN_SETTLE_MS = 4000
-/** Root marker shared with the panel CSS while the shell overlay is expanded. */
-const PANEL_OPEN_ATTRIBUTE = 'data-agent-teams-panel-open'
-/** Shared width concession consumed by the conversation root CSS. */
-const PANEL_SHIFT_PROPERTY = '--agent-teams-panel-shift'
-const PANEL_CONVERSATION_GAP = 14
 const MOVE_THRESHOLD = 4
 const CAPTAIN_ASSIGNEE = 'captain'
 
@@ -161,12 +156,53 @@ function formatTaskIds(ids: readonly string[], t: AgentTeamsTranslate): string {
 
 function taskTitle(task: ActivityTask, model: string): string {
   const extras = [
-    task.kind,
-    task.round === undefined ? undefined : `r${task.round}`,
-    task.verdict,
+    taskKindLabel(task.kind),
+    task.round === undefined ? undefined : `第 ${task.round} 轮`,
+    verdictLabel(task.verdict),
     model === '' ? undefined : model,
   ].filter((item): item is string => item !== undefined)
   return extras.length === 0 ? `${task.id} · ${task.subject}` : `${task.id} · ${task.subject} · ${extras.join(' · ')}`
+}
+
+const AGENT_NAME_LABELS: Record<string, string> = {
+  'requirements-designer': '需求与设计',
+  'frontend-engineer': '前端工程师',
+  'qa-engineer': '测试工程师',
+  reviewer: '代码审查员',
+  'integration-lead': '集成负责人',
+  captain: '队长',
+}
+
+const TASK_KIND_LABELS: Record<string, string> = {
+  requirements: '需求与设计',
+  implementation: '开发实现',
+  verification: '测试验证',
+  review: '代码审查',
+  repair: '修复',
+  integration: '集成收尾',
+  work: '工作项',
+}
+
+const VERDICT_LABELS: Record<string, string> = {
+  pass: '通过',
+  needs_revision: '需要修复',
+  reject: '拒绝',
+}
+
+function agentNameLabel(name: string): string {
+  return AGENT_NAME_LABELS[name] ?? name
+}
+
+function roleLabel(role: string): string {
+  return TASK_KIND_LABELS[role] ?? AGENT_NAME_LABELS[role] ?? role
+}
+
+function taskKindLabel(kind: string | undefined): string | undefined {
+  return kind === undefined ? undefined : (TASK_KIND_LABELS[kind] ?? kind)
+}
+
+function verdictLabel(verdict: string | undefined): string | undefined {
+  return verdict === undefined ? undefined : (VERDICT_LABELS[verdict] ?? verdict)
 }
 
 /** Badge/bar coloring key: visual state, widened for terminal statuses. */
@@ -194,7 +230,7 @@ function WorkGlyph({ active }: { readonly active: boolean }) {
   )
 }
 
-/** Collapsed badge: an always-visible corner pill while any team exists. */
+/** Collapsed state: an icon-only rail at the far right of the shell. */
 function CollapsedBadge({ count, busy, onClick, t }: {
   readonly count: number
   readonly busy: boolean
@@ -202,9 +238,10 @@ function CollapsedBadge({ count, busy, onClick, t }: {
   readonly t: AgentTeamsTranslate
 }) {
   return (
-    <button type="button" className={css.badge} data-agent-teams-collapsed data-busy={busy} onClick={onClick} aria-label={t('activity.badgeAria', { count })}>
-      <span className={css.badgeDot} data-busy={busy} aria-hidden />
-      <span className={css.badgeCount}>{count}</span>
+    <button type="button" className={css.collapsedRail} data-agent-teams-collapsed data-agent-teams-collapsed-rail data-busy={busy} onClick={onClick} aria-label={t('activity.badgeAria', { count })} title={t('activity.title')}>
+      <span className={css.collapsedRailIcon}>
+        <span className={css.sidebarSearchIcon} aria-hidden />
+      </span>
     </button>
   )
 }
@@ -334,6 +371,7 @@ function DependencyMap({ tasks, members, t, discarded = false }: {
   const [keyboardTaskId, setKeyboardTaskId] = useState<string | null>(null)
   const [pinnedTaskId, setPinnedTaskId] = useState<string | null>(null)
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const hoverTaskRef = useRef<string | null>(null)
   const focusedTaskId = dependencyFocusTaskId(pinnedTaskId, keyboardTaskId, hoverTaskId)
   const layout = useMemo(() => compactDagLayout(tasks), [tasks])
   const parallel = useMemo(() => usesParallelTaskGrid(tasks), [tasks])
@@ -341,20 +379,23 @@ function DependencyMap({ tasks, members, t, discarded = false }: {
     () => focusedTaskId === null ? null : relatedTaskIds(focusedTaskId, tasks),
     [focusedTaskId, tasks],
   )
-  const scheduleHover = (id: string | null): void => {
+  const scheduleHover = useCallback((id: string | null): void => {
     if (hoverTimer.current !== null) {
       clearTimeout(hoverTimer.current)
       hoverTimer.current = null
     }
+    if (hoverTaskRef.current === id) return
     if (id === null) {
+      hoverTaskRef.current = null
       setHoverTaskId(null)
       return
     }
     hoverTimer.current = setTimeout(() => {
       hoverTimer.current = null
+      hoverTaskRef.current = id
       setHoverTaskId(id)
     }, 180)
-  }
+  }, [])
   useEffect(() => () => {
     if (hoverTimer.current !== null) clearTimeout(hoverTimer.current)
   }, [])
@@ -418,8 +459,9 @@ function DependencyMap({ tasks, members, t, discarded = false }: {
                     aria-pressed={pinnedTaskId === task.id}
                     title={taskTitle(task, model)}
                     onClick={() => { setPinnedTaskId((current) => current === task.id ? null : task.id) }}
-                    onMouseEnter={() => { scheduleHover(task.id) }}
-                    onMouseLeave={() => { scheduleHover(null) }}
+                    onPointerEnter={() => { scheduleHover(task.id) }}
+                    onPointerLeave={() => { scheduleHover(null) }}
+                    onPointerCancel={() => { scheduleHover(null) }}
                     onFocus={() => { setKeyboardTaskId(task.id) }}
                     onBlur={() => { setKeyboardTaskId(null) }}
                   >
@@ -446,7 +488,7 @@ function DependencyMap({ tasks, members, t, discarded = false }: {
               </span>
             </span>
             <span className={css.taskDetailLine}>
-              {detailTask.assignee || t('task.assignee.unclaimed')} · {discarded
+              {detailTask.assignee === '' ? t('task.assignee.unclaimed') : agentNameLabel(detailTask.assignee)} · {discarded
                 ? t('task.detail.notRun')
                 : detailTask.status === 'completed'
                 ? t('task.detail.completed')
@@ -565,9 +607,11 @@ function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscarded, on
 
       <section className={css.delegationSection} aria-label={t('delegation.aria')} data-delegation-map>
         <div className={css.captainNode}>
-          <span className={css.captainAvatar}>
-            <img className={css.leadAvatar} src={LEAD_ART} alt="" aria-hidden />
-          </span>
+          {/* Legacy captain avatar retained for reference; intentionally disabled in the text-first UI.
+              <span className={css.captainAvatar}>
+                <span className={css.leadAvatar} data-role="captain" aria-hidden>LEAD</span>
+              </span>
+          */}
           <span className={css.captainInfo}>
             <span className={css.captainLine}>
               <span className={css.captainName}>{t('captain.name')}</span>
@@ -628,18 +672,15 @@ function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscarded, on
                     }
                   }}
                 >
-                  <span className={css.memberAvatar} data-unread={member.unread > 0}>
-                    {memberArtUrl(member.name, member.role) !== null ? (
-                      <img className={css.memberArt} src={memberArtUrl(member.name, member.role) ?? ''} alt="" aria-hidden />
-                    ) : (
-                      <span className={css.memberInitial} style={{ background: accentOf(member.id) }}>{memberInitial(member.name)}</span>
-                    )}
-                    <img className={css.stateArt} data-activity={member.activity} src={ACTION_ART[member.activity]} alt="" aria-hidden />
-                  </span>
+                  {/* Legacy member avatar retained for reference; intentionally disabled in the text-first UI.
+                      <span className={css.memberAvatar} data-unread={member.unread > 0}>
+                        <span className={css.memberInitial} data-role={member.role || undefined} style={{ background: accentOf(member.id) }} aria-hidden>{memberInitial(member.role || member.name)}</span>
+                      </span>
+                  */}
                   <span className={css.memberInfo}>
                     <span className={css.memberLine}>
-                      <span className={css.memberName}>{member.name}</span>
-                      {member.role !== '' && <span className={css.memberRole}>{member.role}</span>}
+                      <span className={css.memberName}>{agentNameLabel(member.name)}</span>
+                      {member.role !== '' && <span className={css.memberRole}>{roleLabel(member.role)}</span>}
                       <span className={css.memberState} data-activity={member.activity}>
                         <WorkGlyph active={member.activity === 'working'} />
                         {discarded
@@ -774,7 +815,18 @@ export function ActivityPanel({ sessionsList, modelDirectories, openMember, t }:
   const [autoOpened, setAutoOpened] = useState(false)
   const [wasActive, setWasActive] = useState(false)
   const [historic, setHistoric] = useState<ReadonlyMap<string, { data: AgentTeamsCardData; owner: string }>>(new Map())
-  const [layout, setLayout] = useState<PanelLayout>(initialPanelLayout)
+  // AgentTeams is always the right-hand shell surface. Do not restore legacy
+  // floating geometry saved by an older plugin version.
+  const [layout, setLayout] = useState<PanelLayout>(() => {
+    const saved = initialPanelLayout()
+    return {
+      ...saved,
+      mode: 'docked',
+      x: 0,
+      y: 0,
+      heightMode: 'auto',
+    }
+  })
   const [bounds, setBounds] = useState<PanelBounds>(initialPanelBounds)
   const [interaction, setInteraction] = useState<'dragging' | 'resizing' | null>(null)
   const panelRef = useRef<HTMLElement | null>(null)
@@ -885,26 +937,7 @@ export function ActivityPanel({ sessionsList, modelDirectories, openMember, t }:
     setOpenOwner(undefined)
   }, [current, openOwner])
 
-  // Only the wide docked mode asks the conversation column to yield. Floating
-  // and compact modes are intentionally true overlays. The width is written as
-  // one shared variable so the panel and the concession cannot drift apart.
   useLayoutEffect(() => {
-    const root = document.documentElement
-    const shouldYield = expanded && geometry.mode === 'docked' && !compact
-    if (shouldYield) {
-      root.setAttribute(PANEL_OPEN_ATTRIBUTE, '')
-      root.style.setProperty(PANEL_SHIFT_PROPERTY, `${geometry.width + PANEL_CONVERSATION_GAP + 18}px`)
-    } else {
-      root.removeAttribute(PANEL_OPEN_ATTRIBUTE)
-      root.style.removeProperty(PANEL_SHIFT_PROPERTY)
-    }
-    return () => {
-      root.removeAttribute(PANEL_OPEN_ATTRIBUTE)
-      root.style.removeProperty(PANEL_SHIFT_PROPERTY)
-    }
-  }, [compact, expanded, geometry.mode, geometry.width])
-
-  useEffect(() => {
     if (current === undefined) return
     // Cards keep live teams on the normal cadence. The current-session scope
     // also performs one cold-start discovery pass so archived/cardless teams
@@ -1149,19 +1182,67 @@ export function ActivityPanel({ sessionsList, modelDirectories, openMember, t }:
       : dockPanelLayout(liveGeometry, boundsRef.current))
   }, [commitLayout, panelGeometryForGesture])
 
-  const autoHeight = panelUsesAutoHeight(geometry, bounds)
+  // A docked expanded panel occupies the same available vertical rail as
+  // Harness. Floating mode keeps its user-controlled height.
+  const fullHeight = geometry.mode === 'docked' && geometry.heightMode === 'auto' && !compact
+  const autoHeight = !fullHeight && panelUsesAutoHeight(geometry, bounds)
+  const availableHeight = panelMaximumHeight(geometry, bounds)
 
   const panelStyle: CSSProperties = {
     width: geometry.width,
-    height: autoHeight ? 'auto' : geometry.height,
-    maxHeight: panelMaximumHeight(geometry, bounds),
-    transform: `translate3d(${geometry.x}px, ${geometry.y}px, 0)`,
+    ...(geometry.mode === 'docked'
+      ? { height: '100%', maxHeight: '100%' }
+      : {
+          position: 'absolute',
+          zIndex: 30,
+          top: geometry.y,
+          left: geometry.x,
+          height: autoHeight ? 'auto' : (fullHeight ? availableHeight : geometry.height),
+          maxHeight: availableHeight,
+        }),
   }
+
+  useLayoutEffect(() => {
+    if (typeof document === 'undefined') return
+    const root = document.documentElement
+    const conversation = document.querySelector<HTMLElement>("[data-phase='active']")
+    // Expanded history can remain visible after the live team disappears;
+    // it still owns the right shell column and must reserve it immediately.
+    const occupied = expanded ? geometry.width : (hasTeams ? 56 : 0)
+    if (occupied > 0) {
+      root.dataset.agentTeamsPanelOpen = 'true'
+      root.style.setProperty('--agent-teams-panel-shift', occupied + 'px')
+      // The host mounts the panel in an additive overlay layer. Apply the
+      // reservation directly to the conversation root as well, so host
+      // positioning/flex rules cannot let the panel cover the last column.
+      conversation?.style.setProperty('box-sizing', 'border-box', 'important')
+      conversation?.style.setProperty('width', 'calc(100% - ' + occupied + 'px)', 'important')
+      conversation?.style.setProperty('max-width', 'calc(100% - ' + occupied + 'px)', 'important')
+      conversation?.style.setProperty('min-width', '0', 'important')
+      conversation?.style.setProperty('margin-right', '0', 'important')
+    } else {
+      delete root.dataset.agentTeamsPanelOpen
+      root.style.removeProperty('--agent-teams-panel-shift')
+    }
+    return () => {
+      delete root.dataset.agentTeamsPanelOpen
+      root.style.removeProperty('--agent-teams-panel-shift')
+      conversation?.style.removeProperty('box-sizing')
+      conversation?.style.removeProperty('width')
+      conversation?.style.removeProperty('max-width')
+      conversation?.style.removeProperty('min-width')
+      conversation?.style.removeProperty('margin-right')
+    }
+  }, [expanded, geometry.width, hasTeams])
 
   if (!hasTeams && !expanded) return null
 
   return (
-    <>
+    <div
+      className={css.activityOverlayRoot}
+      data-agent-teams-root
+      data-panel-mode={expanded ? geometry.mode : 'collapsed'}
+    >
       {!expanded && (
         <CollapsedBadge count={visibleCount} busy={busy} t={t} onClick={() => {
           if (current === undefined) return
@@ -1170,7 +1251,7 @@ export function ActivityPanel({ sessionsList, modelDirectories, openMember, t }:
         }} />
       )}
       {expanded && (
-        <aside
+<aside
           ref={panelRef}
           className={css.panel}
           style={panelStyle}
@@ -1182,14 +1263,7 @@ export function ActivityPanel({ sessionsList, modelDirectories, openMember, t }:
           data-resizing={interaction === 'resizing' || undefined}
           aria-label={t('activity.panelAria')}
         >
-          <header
-            className={css.panelHead}
-            onPointerDown={beginMove}
-            onPointerMove={updateGesture}
-            onPointerUp={endGesture}
-            onPointerCancel={cancelGesture}
-            data-drag-handle={!compact || undefined}
-          >
+          <header className={css.panelHead} data-drag-handle>
             <span className={css.panelTitle}>
               {t('activity.title')}
               <span className={css.panelDot} data-busy={busy} aria-hidden />
@@ -1208,10 +1282,10 @@ export function ActivityPanel({ sessionsList, modelDirectories, openMember, t }:
                   <IconPanelLeftOutline16 />
                 </button>
               )}
-              <button
-                type="button"
-                className={css.iconButton}
-                data-control="collapse"
+                <button
+                  type="button"
+                  className={css.iconButton}
+                  data-control="collapse"
                 onClick={() => {
                   setOpen(false)
                   setOpenOwner(undefined)
@@ -1223,6 +1297,7 @@ export function ActivityPanel({ sessionsList, modelDirectories, openMember, t }:
               </button>
             </span>
           </header>
+          <ProjectOverviewPanel t={t} embedded />
           <div className={css.teams}>
             {visibleCount === 0
               ? <span className={css.emptyHint}>{t('activity.empty')}</span>
@@ -1267,7 +1342,7 @@ export function ActivityPanel({ sessionsList, modelDirectories, openMember, t }:
               aria-hidden
             />
           )}
-          {!compact && geometry.mode === 'floating' && (
+          {!compact && (
             <>
               <div
                 className={css.resizeHandle}
@@ -1291,6 +1366,6 @@ export function ActivityPanel({ sessionsList, modelDirectories, openMember, t }:
           )}
         </aside>
       )}
-    </>
+    </div>
   )
 }

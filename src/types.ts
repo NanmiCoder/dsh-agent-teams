@@ -134,6 +134,12 @@ export interface TeamTask {
   sourceFindingIds?: string[]
   /** User-constraint / goal items this task claims to cover. */
   coverageOf?: string[]
+  /** Durable binding to a long-lived project; legacy tasks omit these fields. */
+  projectId?: string
+  requirementId?: string
+  requirementVersion?: number
+  designId?: string
+  designVersion?: number
   createdAt: number
   updatedAt: number
 }
@@ -205,12 +211,24 @@ export interface TeamProfileSnapshot {
 
 /** The full durable team record. */
 export interface TeamState {
+  /** Durable TeamState schema version; absent means the legacy shape. */
+  schemaVersion?: number
   /** Original team name. */
   name: string
   /** Sanitized directory id; the team's stable identity. */
   id: string
   /** Team purpose/goal. */
   description?: string
+  /** Durable binding to a long-lived project. Missing means legacy AgentTeams mode. */
+  projectId?: string
+  projectRequirementId?: string
+  projectRequirementVersion?: number
+  projectDesignId?: string
+  projectDesignVersion?: number
+  /** Project Work Item association state. Missing means legacy compatibility or an old record. */
+  projectLinkState?: 'linked' | 'link_pending' | 'degraded'
+  /** Monotonic durable revision used for cross-process compare-and-swap writes. */
+  revision?: number
   /** Immutable named profile snapshot, when created from a profile. */
   profile?: TeamProfileSnapshot
   /** Session id of the captain agent that owns this team. */

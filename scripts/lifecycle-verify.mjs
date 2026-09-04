@@ -24,6 +24,7 @@ const children = []
 const deliveries = []
 const listeners = new Map()
 const childListeners = new Map()
+const effectCleanups = []
 const continuableSetups = []
 const failNextDelivery = new Set()
 const failures = []
@@ -137,7 +138,11 @@ let advertisedModels = []
 children.push({ id: 'foreign-session', label: 'unrelated continuable', mode: 'continuable' })
 
 const ctx = {
-  effect(setup) { return setup() },
+  effect(setup) {
+    const cleanup = setup()
+    if (typeof cleanup === 'function') effectCleanups.push(cleanup)
+    return cleanup
+  },
   tools: {
     register(definition) {
       definitions.set(definition.name, definition)
@@ -293,6 +298,9 @@ const commandDefinitions = new Map()
 ctx.commands = {
   register(definition) {
     commandDefinitions.set(definition.name, definition)
+    return () => {
+      if (commandDefinitions.get(definition.name) === definition) commandDefinitions.delete(definition.name)
+    }
   },
 }
 const liveProfiles = {
@@ -893,7 +901,11 @@ try {
       && (await task(t2.task_id))?.attemptId === betaClaim.attempt_id)
   publishStatus(beta, 'idle')
   publishStatus(gamma, 'idle')
-  await new Promise(resolve => setTimeout(resolve, 20))
+  for (let waited = 0; waited < 2000; waited += 20) {
+    const candidate = await task(t3.task_id)
+    if (candidate?.status === 'claimed' && candidate.assignee === 'gamma') break
+    await new Promise(resolve => setTimeout(resolve, 20))
+  }
   const gate = await task(t3.task_id)
   check('completing dependencies dispatches the downstream task', gate?.status === 'claimed' && gate.assignee === 'gamma')
   const gateClaim = await call('agent_teams_claim_task', { task_id: t3.task_id }, gamma)
@@ -1265,7 +1277,19 @@ try {
       && (await bridgeTask())?.status === 'failed')
   await call('agent_teams_delete', {})
 } finally {
-  await rm(workspace, { recursive: true, force: true })
+  try {
+    for (const cleanup of effectCleanups.splice(0).reverse()) await cleanup()
+  } finally {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      try {
+        await rm(workspace, { recursive: true, force: true })
+        break
+      } catch (error) {
+        if (attempt === 4) throw error
+        await new Promise(resolve => setTimeout(resolve, 100))
+      }
+    }
+  }
 }
 
 if (failures.length > 0) {

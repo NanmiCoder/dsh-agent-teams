@@ -30,7 +30,7 @@ Ask in natural language. The plugin provides the team protocol, eleven coordinat
 
 ## Releases
 
-The [latest release](https://github.com/NanmiCoder/dsh-agent-teams/releases/latest), [v0.1.15](https://github.com/NanmiCoder/dsh-agent-teams/releases/tag/v0.1.15), supports Harness **0.1.2-alpha.2**. Older hosts must use a pinned compatible plugin version. Browse the [complete release history](https://github.com/NanmiCoder/dsh-agent-teams/releases); the same notes ship in the npm package under `release-notes/`.
+The [latest release](https://github.com/NanmiCoder/dsh-agent-teams/releases/latest), [v0.1.15](https://github.com/NanmiCoder/dsh-agent-teams/releases/tag/v0.1.15), targets Harness **0.1.2-alpha.2**. Older hosts must use a pinned compatible plugin version. Browse the [complete release history](https://github.com/NanmiCoder/dsh-agent-teams/releases); the same notes ship in the npm package under `release-notes/`.
 
 ## Why AgentTeams?
 
@@ -59,9 +59,9 @@ The conversation card and activity panel use Harness's official locale service. 
 | Other older RC / unchanged source checkout | Pin your working plugin version; do not follow `@latest` | Do not assume every older host works with 0.1.14. |
 | Alpha.1, later Alpha versions, or other source revisions | Not verified | Match the documented host version or validate separately. |
 
-**The default plugin release follows the current supported Harness developer preview: `latest=0.1.15`, for Harness Alpha.2.** The host's Alpha version does not require a separate Alpha plugin channel. Users staying on an older host must install an explicit compatible plugin version instead of `@latest`. Optional peer dependencies are not a runtime version check: a successful install on an incompatible host does not mean the plugin can activate.
+**The default plugin release follows the current supported Harness developer preview: `latest=0.1.15`, for Harness Alpha.2.** This is an internal Alpha / controlled-evaluation release boundary, not a general production-readiness claim. The host's Alpha version does not require a separate Alpha plugin channel. Users staying on an older host must install an explicit compatible plugin version instead of `@latest`. Optional peer dependencies are not a runtime version check: a successful install on an incompatible host does not mean the plugin can activate.
 
-See the [compatibility details](./docs/alpha2-compatibility.md) and [real business / UI acceptance report](./docs/alpha2-release-acceptance.md).
+See the [compatibility details](./docs/alpha2-compatibility.md) and the [scoped business / UI acceptance record](./docs/alpha2-release-acceptance.md). The current release has offline build and regression gates, but its evidence does not cover a full real-Harness/real-model natural-language E2E, Brownfield takeover, upgrade/rollback, or multi-process shared-workspace release qualification.
 
 ### npm: Harness Alpha.2
 
@@ -172,6 +172,16 @@ Defaults work without extra setup. A trusted profile can override member behavio
 
 See [docs/usage.md](./docs/usage.md) for the full tool reference, state model, Web UI behavior, configuration, and known limits.
 
+## Long-lived software engineering projects
+
+This fork adds a project state layer that is independent from any single AgentTeams run. After initializing a project, the Captain can capture requirements, clarification questions, and design decisions before crossing the implementation gate. Durable project state lives in .agent-project/status.json; the current AgentTeams run remains in .agent-teams, so the two lifecycles are not conflated.
+
+The project tools include agent_project_init, agent_project_clarification, agent_project_requirement_update, agent_project_design_update, agent_project_gate, agent_project_work_item_update, agent_project_work_item_sync, agent_project_work_item_accept, and agent_project_report. The transition implemented_not_accepted → accepted → delivered requires explicit user acceptance. Review failures create repair/review work instead of being silently reported as delivered.
+
+The Web project overview shows the project phase, requirement/design gates, Work Item status counts, awaiting acceptance, blocked work, Review/verification failures, pending decisions, open clarifications, risks, and linked/active team execution counts. It is read-only; mutations must go through project tools. The project route also reads linked .agent-teams execution records so the overview can expose the latest team association and progress projection.
+
+See docs/AI_PROJECT_CHARTER.md, docs/AI_AGENT_RULES.md, and docs/AI_PROJECT_ROADMAP.md for the AI-readable protocol, roadmap, and acceptance boundaries.
+
 ## Plugin development Skill
 
 The repository also ships the open Agent Skills package [`dsh-plugin-development`](./skills/dsh-plugin-development/SKILL.md):
@@ -228,3 +238,8 @@ Use an explicit profile flag: `/agent-teams --profile demo-delivery implement th
 ## License
 
 [MIT](./LICENSE)
+
+
+## Release evidence boundary
+
+Version `0.1.15` targets Harness `0.1.2-alpha.2` and is limited to an internal Alpha / controlled evaluation. The current release has offline `pnpm typecheck`, `pnpm build`, and `pnpm verify` gates, but does not claim completed general production qualification: real-Harness and real-model natural-language E2E, deep Brownfield takeover, upgrade/migration/rollback, multi-process shared-workspace, and broad platform/model coverage remain unverified. The historical acceptance record must not be read as evidence for any unrerun current-worktree scenario.

@@ -32,6 +32,8 @@ import {
   writeTeam,
 } from './state.ts'
 import type { TeamMember, TeamState, TeamTask } from './types.ts'
+import { assertProjectTeamBinding, readProjectState } from './project.ts'
+import { projectTaskBindingError } from './quality-gates.ts'
 
 /** Per-dependency output cap in the assignment prompt. */
 export const DEPENDENCY_OUTPUT_MAX_CHARS = 2_000
@@ -48,6 +50,33 @@ export interface TeamScheduler {
   kickTeam(workspace: string, teamId: string, captain?: Agent): Promise<void>
   /** Try to flush fallback mail or give one member one ready task. */
   kickMember(workspace: string, teamId: string, memberName: string, captain?: Agent): Promise<void>
+}
+
+async function projectDispatchError(workspace: string, team: TeamState, task?: TeamTask): Promise<string | undefined> {
+  let project: Awaited<ReturnType<typeof readProjectState>>
+  try {
+    project = await readProjectState(workspace)
+  } catch (error) {
+    return 'project state is unavailable or corrupt: ' + String(error)
+  }
+  if (team.projectId === undefined) {
+    if (project !== undefined && task !== undefined
+      && (task.kind === 'implementation' || task.kind === 'verification' || task.kind === 'repair' || task.kind === 'integration')) {
+      return 'unbound Legacy Team cannot dispatch a project execution task'
+    }
+    return undefined
+  }
+  if (project === undefined) return 'bound project state is missing'
+  try {
+    assertProjectTeamBinding(project, team)
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error)
+  }
+  if (task !== undefined) {
+    const bindingError = projectTaskBindingError(team, task)
+    if (bindingError !== undefined) return bindingError
+  }
+  return undefined
 }
 
 /** One completed recursive dependency shown to the assignee. */
@@ -287,6 +316,7 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
       const stateRoot = stateRootOf(workspace, config)
       const team = await readTeam(stateRoot, teamId)
       if (team === undefined || team.halted === true || team.phase === 'staged') return
+      if (await projectDispatchError(workspace, team) !== undefined) return
       const captain = liveCaptain(ctx, team.captainSessionId, suppliedCaptain)
       if (captain === undefined) return
       for (const member of team.members) {
@@ -301,6 +331,7 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
       await serializeMember(queueKey, async () => {
         let team = await readTeam(stateRoot, teamId)
         if (team === undefined || team.halted === true || team.phase === 'staged') return
+        if (await projectDispatchError(workspace, team) !== undefined) return
         const captain = liveCaptain(ctx, team.captainSessionId, suppliedCaptain)
         if (captain === undefined) return
         let member = team.members.find(candidate => candidate.name === memberName && candidate.status !== 'removed')
@@ -335,6 +366,7 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
         const ticket = await withTeamLock(teamLockKey(stateRoot, team.id), async (): Promise<DispatchTicket | undefined> => {
           const fresh = await readTeam(stateRoot, team!.id)
           if (fresh === undefined || fresh.halted === true || fresh.phase === 'staged') return undefined
+          if (await projectDispatchError(workspace, fresh) !== undefined) return undefined
           const currentMember = fresh.members.find(candidate => candidate.name === memberName && candidate.status !== 'removed')
           if (currentMember === undefined || currentMember.id === '' || !isMemberAvailable(ctx, currentMember)) return undefined
           const owned = ownedOpenTask(fresh.tasks, currentMember.name)
@@ -352,6 +384,13 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
             ? nextReadyTask(fresh.tasks, currentMember.name)
             : undefined
           if (task === undefined) {
+            if (currentMember.status !== 'idle') {
+              currentMember.status = 'idle'
+              await writeTeam(stateRoot, fresh)
+            }
+            return undefined
+          }
+          if (await projectDispatchError(workspace, fresh, task) !== undefined) {
             if (currentMember.status !== 'idle') {
               currentMember.status = 'idle'
               await writeTeam(stateRoot, fresh)

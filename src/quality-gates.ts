@@ -62,6 +62,11 @@ export interface CreateTaskInput {
   sourceTaskId?: string
   sourceFindingIds?: string[]
   coverageOf?: string[]
+  projectId?: string
+  requirementId?: string
+  requirementVersion?: number
+  designId?: string
+  designVersion?: number
   resume?: boolean
   resumeReason?: string
 }
@@ -105,6 +110,11 @@ export interface PlannedFollowUpTask {
   sourceTaskId?: string
   sourceFindingIds?: string[]
   reviewedTaskId?: string
+  projectId?: string
+  requirementId?: string
+  requirementVersion?: number
+  designId?: string
+  designVersion?: number
 }
 
 export interface PlanQualityFollowUpResult {
@@ -324,8 +334,56 @@ function dependencyClosureContains(
   return false
 }
 
+const PROJECT_EXECUTION_KINDS: readonly TaskKind[] = ['implementation', 'verification', 'repair', 'integration']
+
+export function projectExecutionBindingError(team: TeamState, input: CreateTaskInput, kind: TaskKind): string | undefined {
+  if (team.projectId === undefined) return undefined
+  if (kind === 'work') {
+    return 'bound project teams must not use kind="work"; use an explicit project task kind'
+  }
+  if (!PROJECT_EXECUTION_KINDS.includes(kind)) return undefined
+  const expected: Record<string, string | number | undefined> = {
+    projectId: team.projectId,
+    requirementId: team.projectRequirementId,
+    requirementVersion: team.projectRequirementVersion,
+    designId: team.projectDesignId,
+    designVersion: team.projectDesignVersion,
+  }
+  const actual: Record<string, string | number | undefined> = {
+    projectId: input.projectId,
+    requirementId: input.requirementId,
+    requirementVersion: input.requirementVersion,
+    designId: input.designId,
+    designVersion: input.designVersion,
+  }
+  for (const field of Object.keys(expected)) {
+    if (expected[field] === undefined || actual[field] !== expected[field]) {
+      return kind + ' task must use the bound project ' + field + ' (' + String(expected[field]) + ')'
+    }
+  }
+  return undefined
+}
+
+export function projectTaskBindingError(
+  team: TeamState,
+  task: Pick<TeamTask, 'kind' | 'projectId' | 'requirementId' | 'requirementVersion' | 'designId' | 'designVersion'>,
+): string | undefined {
+  const kind = taskKindOf(task)
+  return projectExecutionBindingError(team, {
+    subject: 'existing task',
+    kind,
+    projectId: task.projectId,
+    requirementId: task.requirementId,
+    requirementVersion: task.requirementVersion,
+    designId: task.designId,
+    designVersion: task.designVersion,
+  }, kind)
+}
+
 export function validateCreateTask(team: TeamState, input: CreateTaskInput): ValidateCreateTaskResult {
   const kind = input.kind ?? 'work'
+  const projectBindingError = projectExecutionBindingError(team, input, kind)
+  if (projectBindingError !== undefined) return { ok: false, error: projectBindingError }
   if (!(TASK_KINDS as readonly string[]).includes(kind)) {
     return { ok: false, error: `unknown task kind "${String(kind)}"` }
   }
@@ -438,6 +496,11 @@ export function validateCreateTask(team: TeamState, input: CreateTaskInput): Val
       ...input.sourceTaskId === undefined ? {} : { sourceTaskId: input.sourceTaskId },
       ...input.sourceFindingIds === undefined ? {} : { sourceFindingIds: input.sourceFindingIds },
       ...input.coverageOf === undefined ? {} : { coverageOf: input.coverageOf },
+      ...input.projectId === undefined ? {} : { projectId: input.projectId },
+      ...input.requirementId === undefined ? {} : { requirementId: input.requirementId },
+      ...input.requirementVersion === undefined ? {} : { requirementVersion: input.requirementVersion },
+      ...input.designId === undefined ? {} : { designId: input.designId },
+      ...input.designVersion === undefined ? {} : { designVersion: input.designVersion },
     },
   }
 }
@@ -631,6 +694,11 @@ export function planQualityFollowUp(team: TeamState, closed: TeamTask): PlanQual
     acceptance: findings.map((finding) => finding.requiredFix),
     sourceTaskId: sourceId,
     sourceFindingIds: findingIds,
+    projectId: source?.projectId ?? closed.projectId,
+    requirementId: source?.requirementId ?? closed.requirementId,
+    requirementVersion: source?.requirementVersion ?? closed.requirementVersion,
+    designId: source?.designId ?? closed.designId,
+    designVersion: source?.designVersion ?? closed.designVersion,
   }
   const reviewer = schedulableAssignee(
     closed.assignee !== implementer ? closed.assignee : undefined,

@@ -6,8 +6,8 @@
   min-width: 0;
   padding: 10px 12px;
   box-sizing: border-box;
-  border: 1px solid var(--dsw-alias-line-normal);
-  border-radius: 10px;
+  border: 0;
+  border-radius: 0;
   background: var(--dsw-alias-bg-module-platform);
 }
 
@@ -26,7 +26,7 @@
   border-radius: 0;
   object-fit: contain;
   background: transparent;
-  filter: drop-shadow(0 1px 1px rgb(18 45 72 / 20%));
+
 }
 
 .teamName {
@@ -87,7 +87,7 @@
   gap: 5px;
   max-width: 160px;
   padding: 3px 8px 3px 3px;
-  border: 1px solid var(--dsw-alias-line-normal);
+  border: 0;
   border-radius: 999px;
   background: var(--dsw-alias-bg-module);
   color: var(--dsw-alias-label-secondary);
@@ -116,7 +116,7 @@
   border-radius: 0;
   object-fit: contain;
   background: transparent;
-  filter: drop-shadow(0 1px 1px rgb(18 45 72 / 18%));
+
 }
 
 .memberInitial {
@@ -139,3 +139,30 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Artwork is intentionally text/status-only; keep the slot usable without decorative imagery. */
+.leadAvatar {
+  background: var(--dsw-alias-bg-fill-neutral);
+  border-color: var(--dsw-alias-line-normal);
+  color: var(--dsw-alias-label-secondary);
+}
+
+/* Harness-native baseline: cards stay readable in light, dark, and system themes. */
+.card {
+  background: var(--dsw-alias-bg-module);
+  border: 0;
+  border-color: transparent;
+  border-radius: 0;
+  box-shadow: none;
+  filter: none;
+  backdrop-filter: none;
+}
+
+/* Legacy avatar implementation retained for reference only; JSX is intentionally commented out.
+   If this legacy markup is ever restored, keep it hidden until the text-first design is explicitly reversed.
+   .leadAvatar,
+   .memberArt,
+   .memberInitial {
+     display: none !important;
+   }
+*/

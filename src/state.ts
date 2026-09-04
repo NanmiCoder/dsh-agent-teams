@@ -14,11 +14,11 @@
  */
 
 import { createHash, randomUUID } from 'node:crypto'
-import { readFileSync } from 'node:fs'
-import { mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { copyFileSync, readFileSync, readdirSync, renameSync, statSync } from 'node:fs'
+import { copyFile, mkdir, open, readFile, readdir, rename, rm, stat, utimes, writeFile } from 'node:fs/promises'
+import { basename, dirname, join } from 'node:path'
 import { TERMINAL_TASK_STATUSES, type TaskStatus, type TeamMember, type TeamMessage, type TeamProfileSnapshot, type TeamState, type TeamTask } from './types.ts'
-import { hasValidQualityTaskFields, isReviewPolicy, normalizeBlankOptionalTaskFields } from './quality-gates.ts'
+import { hasValidQualityTaskFields, isReviewPolicy, normalizeBlankOptionalTaskFields, projectTaskBindingError } from './quality-gates.ts'
 
 export {
   buildCoverageMatrix,
@@ -48,8 +48,319 @@ const MAILBOX_DELIVERY_LEASE_MS = 60_000
 /** Durable deny-list for AgentTeams members that must never be resumed. */
 const RETIRED_MEMBERS_FILE = 'retired-members.json'
 
+export const TEAM_STATE_VERSION = 2 as const
+
+export function migrateTeamState(value: unknown): { state: TeamState; migrated: boolean } {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) throw new Error('team state must be a JSON object before migration')
+  const record = { ...(value as Record<string, unknown>) }
+  const rawVersion = record.schemaVersion === undefined ? 1 : record.schemaVersion
+  if (typeof rawVersion !== 'number' || !Number.isInteger(rawVersion) || rawVersion < 1 || rawVersion > TEAM_STATE_VERSION) throw new Error('unsupported team state schemaVersion: ' + String(rawVersion))
+  const migrated = rawVersion !== TEAM_STATE_VERSION || record.schemaVersion === undefined
+  record.schemaVersion = TEAM_STATE_VERSION
+  if (record.revision === undefined) record.revision = 0
+  return { state: record as unknown as TeamState, migrated }
+}
+
 /** In-process per-team mutation queues (promise chains). */
 const locks = new Map<string, Promise<unknown>>()
+
+const heldFileLocks = new Map<string, { token: string; count: number }>()
+const FILE_LOCK_RETRIES = 600
+const FILE_LOCK_RETRY_DELAY_MS = 25
+const FILE_LOCK_STALE_MS = 30_000
+
+export interface FileLockOptions {
+  retries?: number
+  retryDelayMs?: number
+  staleMs?: number
+}
+
+function fileLockPathForKey(key: string): string {
+  if (key.startsWith('team:')) {
+    const separator = key.lastIndexOf(':')
+    const root = key.slice('team:'.length, separator)
+    const teamId = key.slice(separator + 1)
+    return teamPersistenceLockPath(root, teamId)
+  }
+  if (key.startsWith('captain:')) {
+    const separator = key.lastIndexOf(':')
+    const root = key.slice('captain:'.length, separator)
+    return join(root, '.captain-' + keyDigest(key) + '.lock')
+  }
+  if (key.startsWith('retired-members:')) return join(key.slice('retired-members:'.length), '.retired-members.lock')
+  return join(process.cwd(), '.agent-teams-locks', keyDigest(key) + '.lock')
+}
+
+/** Serialize one durable resource across independent Node processes. */
+export async function withFileLock<T>(file: string, fn: () => Promise<T>, options: FileLockOptions = {}): Promise<T> {
+  const lockFile = file.endsWith('.lock') ? file : file + '.lock'
+  const held = heldFileLocks.get(lockFile)
+  if (held !== undefined) {
+    held.count += 1
+    try { return await fn() } finally { held.count -= 1 }
+  }
+  const retries = options.retries ?? FILE_LOCK_RETRIES
+  const retryDelayMs = options.retryDelayMs ?? FILE_LOCK_RETRY_DELAY_MS
+  const staleMs = options.staleMs ?? FILE_LOCK_STALE_MS
+  await mkdir(dirname(lockFile), { recursive: true })
+  const token = process.pid + ':' + randomUUID()
+  let acquired = false
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      const handle = await open(lockFile, 'wx')
+      try {
+        await handle.writeFile(JSON.stringify({ pid: process.pid, token, createdAt: Date.now() }), 'utf8')
+        await handle.sync().catch(() => undefined)
+      } finally {
+        await handle.close()
+      }
+      acquired = true
+      break
+    } catch (error: unknown) {
+      const code = error instanceof Error && 'code' in error ? (error as NodeJS.ErrnoException).code : undefined
+      if (!['EEXIST', 'EPERM', 'EBUSY', 'EACCES'].includes(code ?? '')) throw error
+      try {
+        const details = await stat(lockFile)
+        if (Date.now() - details.mtimeMs > staleMs) await rm(lockFile, { force: true })
+      } catch (statError: unknown) {
+        const statCode = statError instanceof Error && 'code' in statError ? (statError as NodeJS.ErrnoException).code : undefined
+        if (!['ENOENT', 'EPERM', 'EBUSY', 'EACCES'].includes(statCode ?? '')) throw statError
+      }
+      if (attempt >= retries) break
+      await sleep(retryDelayMs)
+    }
+  }
+  if (!acquired) throw new Error('timed out acquiring persistence lock: ' + lockFile)
+  heldFileLocks.set(lockFile, { token, count: 1 })
+  const heartbeat = setInterval(() => { void utimes(lockFile, new Date(), new Date()).catch(() => undefined) }, Math.max(1000, Math.floor(staleMs / 3)))
+  try {
+    return await fn()
+  } finally {
+    clearInterval(heartbeat)
+    heldFileLocks.delete(lockFile)
+    try {
+      const owner = await readFile(lockFile, 'utf8')
+      if (owner.includes(token)) await rm(lockFile, { force: true })
+    } catch {
+      // Cleanup must not replace a successful state mutation with a lock error.
+    }
+  }
+}
+
+/** Replace a UTF-8 durable file without direct-overwrite fallback. */
+export async function writeDurableText(file: string, content: string): Promise<void> {
+  await mkdir(dirname(file), { recursive: true })
+  const temporary = file + "." + process.pid + "." + randomUUID() + ".tmp"
+  try {
+    const handle = await open(temporary, "wx")
+    try {
+      await handle.writeFile(content, "utf8")
+      await handle.sync().catch(() => undefined)
+    } finally {
+      await handle.close()
+    }
+  } catch (error: unknown) {
+    await rm(temporary, { force: true }).catch(() => undefined)
+    throw error
+  }
+  let targetExists = false
+  try {
+    await stat(file)
+    targetExists = true
+  } catch (error: unknown) {
+    const code = error instanceof Error && "code" in error ? (error as NodeJS.ErrnoException).code : undefined
+    if (code !== "ENOENT") throw error
+  }
+  if (targetExists) {
+    const backup = file + ".bak." + Date.now() + "-" + randomUUID()
+    await copyFile(file, backup)
+  }
+  // If rename cannot complete, leave the complete temp file for recovery.
+  // Never fall back to a direct JSON overwrite.
+  await renameWithRetry(temporary, file)
+}
+
+type DurableTextValidator = (content: string) => boolean
+
+async function durableCandidates(file: string): Promise<string[]> {
+  let entries
+  try {
+    entries = await readdir(dirname(file), { withFileTypes: true })
+  } catch (error: unknown) {
+    const code = error instanceof Error && "code" in error ? (error as NodeJS.ErrnoException).code : undefined
+    if (code === "ENOENT") return []
+    throw error
+  }
+  const name = basename(file)
+  const paths = entries
+    .filter((entry) => entry.isFile() && (entry.name.startsWith(name + ".bak.") || (entry.name.startsWith(name + ".") && entry.name.endsWith(".tmp"))))
+    .map((entry) => join(dirname(file), entry.name))
+  const timed: Array<{ candidate: string; time: number }> = []
+  for (const candidate of paths) {
+    try { timed.push({ candidate, time: (await stat(candidate)).mtimeMs }) } catch { /* concurrent cleanup */ }
+  }
+  return timed.sort((left, right) => right.time - left.time).map((entry) => entry.candidate)
+}
+
+/** Read durable state and recover a valid backup/temp after an interrupted write. */
+export async function readDurableText(file: string, validator: DurableTextValidator, label = file): Promise<string | undefined> {
+  let targetContent: string | undefined
+  let targetWasPresent = false
+  let targetValid = false
+  let targetMtime = -Infinity
+  try {
+    targetContent = await readFile(file, "utf8")
+    targetWasPresent = true
+    try { targetValid = validator(targetContent) } catch { targetValid = false }
+    if (targetValid) targetMtime = (await stat(file)).mtimeMs
+  } catch (error: unknown) {
+    const code = error instanceof Error && "code" in error ? (error as NodeJS.ErrnoException).code : undefined
+    if (code !== "ENOENT") targetWasPresent = true
+  }
+  const candidates = await durableCandidates(file)
+  const validCandidates: Array<{ candidate: string; content: string; time: number }> = []
+  let sawReadableCandidate = false
+  for (const candidate of candidates) {
+    let content: string
+    try { content = await readFile(candidate, "utf8") } catch { continue }
+    sawReadableCandidate = true
+    try {
+      if (!validator(content)) continue
+      validCandidates.push({ candidate, content, time: (await stat(candidate)).mtimeMs })
+    } catch { /* candidate changed or is invalid */ }
+  }
+  validCandidates.sort((left, right) => right.time - left.time)
+  if (targetValid && targetContent !== undefined) {
+    const newerTemp = validCandidates.find((entry) => entry.candidate.endsWith(".tmp") && entry.time > targetMtime)
+    if (newerTemp === undefined) return targetContent
+    const preserved = file + ".bak-replaced-" + Date.now() + "-" + randomUUID()
+    try {
+      await rename(file, preserved)
+      await renameWithRetry(newerTemp.candidate, file)
+    } catch (error: unknown) {
+      const code = error instanceof Error && 'code' in error ? (error as NodeJS.ErrnoException).code : undefined
+      if (code === 'ENOENT') {
+        // A concurrent reader may have promoted the same recovery candidate.
+        // Re-read the canonical file before reporting corruption.
+        try {
+          const promoted = await readFile(file, 'utf8')
+          if (validator(promoted)) return promoted
+        } catch {
+          // The other promotion may still be in progress; restore below if
+          // this reader moved the original target aside.
+        }
+      }
+      try { await rename(preserved, file) } catch { /* retain evidence if restore is blocked */ }
+      throw new Error("failed to promote crash temp for " + label + ": " + String(error))
+    }
+    return newerTemp.content
+  }
+  const candidate = validCandidates[0]
+  if (candidate !== undefined) {
+    const corrupt = targetWasPresent ? file + ".corrupt-" + Date.now() + "-" + randomUUID() : undefined
+    try {
+      if (corrupt !== undefined) await rename(file, corrupt)
+      if (candidate.candidate.endsWith(".tmp")) await renameWithRetry(candidate.candidate, file)
+      else {
+        const restore = file + "." + process.pid + "." + randomUUID() + ".tmp"
+        await copyFile(candidate.candidate, restore)
+        await renameWithRetry(restore, file)
+      }
+      return candidate.content
+    } catch (error: unknown) {
+      if (corrupt !== undefined) await rename(corrupt, file).catch(() => undefined)
+      throw new Error("failed to recover " + label + ": " + String(error))
+    }
+  }
+  if (!targetWasPresent && !sawReadableCandidate) return undefined
+  if (targetWasPresent) {
+    const corrupt = file + ".corrupt-" + Date.now() + "-" + randomUUID()
+    try { await rename(file, corrupt) } catch (error: unknown) {
+      throw new Error("corrupt durable state could not be isolated: " + label + ": " + String(error))
+    }
+  }
+  throw new Error("corrupt durable state: " + label)
+}
+
+/** Synchronous recovery twin used by cold-resume member composition. */
+function readDurableTextSync(file: string, validator: DurableTextValidator, label = file): string | undefined {
+  let targetContent: string | undefined
+  let targetWasPresent = false
+  let targetValid = false
+  let targetMtime = -Infinity
+  try {
+    targetContent = readFileSync(file, "utf8")
+    targetWasPresent = true
+    try { targetValid = validator(targetContent) } catch { targetValid = false }
+    if (targetValid) targetMtime = statSync(file).mtimeMs
+  } catch (error: unknown) {
+    const code = error instanceof Error && "code" in error ? (error as NodeJS.ErrnoException).code : undefined
+    if (code !== "ENOENT") targetWasPresent = true
+  }
+  let entries
+  try { entries = readdirSync(dirname(file), { withFileTypes: true }) }
+  catch (error: unknown) {
+    const code = error instanceof Error && "code" in error ? (error as NodeJS.ErrnoException).code : undefined
+    if (code === "ENOENT" && !targetWasPresent) return undefined
+    throw error
+  }
+  const name = basename(file)
+  const candidates = entries
+    .filter((entry) => entry.isFile() && (entry.name.startsWith(name + ".bak.") || (entry.name.startsWith(name + ".") && entry.name.endsWith(".tmp"))))
+    .map((entry) => join(dirname(file), entry.name))
+  const validCandidates: Array<{ candidate: string; content: string; time: number }> = []
+  let sawReadableCandidate = false
+  for (const candidate of candidates) {
+    let content: string
+    try { content = readFileSync(candidate, "utf8") } catch { continue }
+    sawReadableCandidate = true
+    try {
+      if (!validator(content)) continue
+      validCandidates.push({ candidate, content, time: statSync(candidate).mtimeMs })
+    } catch { /* candidate changed or is invalid */ }
+  }
+  validCandidates.sort((left, right) => right.time - left.time)
+  if (targetValid && targetContent !== undefined) {
+    const newerTemp = validCandidates.find((entry) => entry.candidate.endsWith(".tmp") && entry.time > targetMtime)
+    if (newerTemp === undefined) return targetContent
+    const preserved = file + ".bak-replaced-" + Date.now() + "-" + randomUUID()
+    try { renameSync(file, preserved); renameSync(newerTemp.candidate, file) }
+    catch (error: unknown) {
+      try { renameSync(preserved, file) } catch { /* retain evidence if restore is blocked */ }
+      throw new Error("failed to promote crash temp for " + label + ": " + String(error))
+    }
+    return newerTemp.content
+  }
+  const candidate = validCandidates[0]
+  if (candidate !== undefined) {
+    const corrupt = targetWasPresent ? file + ".corrupt-" + Date.now() + "-" + randomUUID() : undefined
+    try {
+      if (corrupt !== undefined) renameSync(file, corrupt)
+      if (candidate.candidate.endsWith(".tmp")) renameSync(candidate.candidate, file)
+      else {
+        const restore = file + ".sync-" + randomUUID() + ".tmp"
+        copyFileSync(candidate.candidate, restore)
+        renameSync(restore, file)
+      }
+      return candidate.content
+    } catch (error: unknown) {
+      if (corrupt !== undefined) { try { renameSync(corrupt, file) } catch {} }
+      throw new Error("failed to recover " + label + ": " + String(error))
+    }
+  }
+  if (!targetWasPresent && !sawReadableCandidate) return undefined
+  if (targetWasPresent) {
+    const corrupt = file + ".corrupt-" + Date.now() + "-" + randomUUID()
+    try { renameSync(file, corrupt) } catch (error: unknown) {
+      throw new Error("corrupt durable state could not be isolated: " + label + ": " + String(error))
+    }
+  }
+  throw new Error("corrupt durable state: " + label)
+}
+
+function teamPersistenceLockPath(stateRoot: string, teamId: string): string {
+  return join(stateRoot, '.locks', teamId + '.lock')
+}
 
 /**
  * Serialize mutations of one team across the whole process.
@@ -61,12 +372,14 @@ export async function withTeamLock<T>(key: string, fn: () => Promise<T>): Promis
   const previous = locks.get(key) ?? Promise.resolve()
   let release!: () => void
   const gate = new Promise<void>((resolve) => { release = resolve })
-  locks.set(key, previous.then(() => gate))
+  const current = previous.then(() => gate)
+  locks.set(key, current)
   await previous
   try {
-    return await fn()
+    return await withFileLock(fileLockPathForKey(key), fn)
   } finally {
     release()
+    if (locks.get(key) === current) locks.delete(key)
   }
 }
 
@@ -202,8 +515,21 @@ export function invalidateTaskAttempt(
  */
 export async function createTeamDir(stateRoot: string, state: TeamState): Promise<void> {
   const dir = join(stateRoot, state.id)
-  await mkdir(join(dir, 'inbox'), { recursive: true })
-  await atomicWriteText(join(dir, 'team.json'), JSON.stringify(state, null, 2))
+  const file = join(dir, 'team.json')
+  await withFileLock(teamPersistenceLockPath(stateRoot, state.id), async () => {
+    try {
+      await stat(file)
+      throw new Error('team ' + state.id + ' already exists')
+    } catch (error: unknown) {
+      const code = error instanceof Error && 'code' in error ? (error as NodeJS.ErrnoException).code : undefined
+      if (code !== 'ENOENT') throw error
+    }
+    const initial = { ...state, schemaVersion: TEAM_STATE_VERSION, revision: state.revision ?? 0 }
+    if (!isTeamState(initial, state.id)) throw new Error('invalid initial AgentTeams state in team ' + state.id)
+    await mkdir(join(dir, 'inbox'), { recursive: true })
+    await writeDurableText(file, JSON.stringify(initial, null, 2))
+    state.revision = initial.revision
+  })
 }
 
 /**
@@ -212,20 +538,20 @@ export async function createTeamDir(stateRoot: string, state: TeamState): Promis
  * @param teamId - the team's sanitized id.
  */
 export async function readTeam(stateRoot: string, teamId: string): Promise<TeamState | undefined> {
-  try {
-    const raw = await readFile(join(stateRoot, teamId, 'team.json'), 'utf8')
-    const value: unknown = JSON.parse(stripLeadingBom(raw))
-    const team = coerceTeamState(value, teamId)
-    if (team === undefined) {
-      throw new Error(`invalid AgentTeams state in team "${teamId}"`)
-    }
+  const file = join(stateRoot, teamId, 'team.json')
+  return withFileLock(teamPersistenceLockPath(stateRoot, teamId), async () => {
+    const raw = await readDurableText(file, (candidate) => {
+      try { return coerceTeamState(migrateTeamState(JSON.parse(stripLeadingBom(candidate))).state, teamId) !== undefined } catch { return false }
+    }, 'AgentTeams state in team ' + teamId)
+    if (raw === undefined) return undefined
+    const migrated = migrateTeamState(JSON.parse(stripLeadingBom(raw)))
+    const team = coerceTeamState(migrated.state, teamId)
+    if (team === undefined) throw new Error('invalid AgentTeams state in team ' + teamId)
+    team.revision ??= 0
+    team.schemaVersion = TEAM_STATE_VERSION
+    if (migrated.migrated) await writeDurableText(file, JSON.stringify(team, null, 2))
     return team
-  } catch (error: unknown) {
-    if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
-      return undefined
-    }
-    throw error
-  }
+  })
 }
 
 /**
@@ -238,20 +564,15 @@ export async function readTeam(stateRoot: string, teamId: string): Promise<TeamS
  * @returns the team record, or `undefined` when absent.
  */
 export function readTeamSync(stateRoot: string, teamId: string): TeamState | undefined {
-  try {
-    const raw = readFileSync(join(stateRoot, teamId, 'team.json'), 'utf8')
-    const value: unknown = JSON.parse(stripLeadingBom(raw))
-    const team = coerceTeamState(value, teamId)
-    if (team === undefined) {
-      throw new Error(`invalid AgentTeams state in team "${teamId}"`)
-    }
-    return team
-  } catch (error: unknown) {
-    if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
-      return undefined
-    }
-    throw error
-  }
+  const file = join(stateRoot, teamId, 'team.json')
+  const raw = readDurableTextSync(file, (candidate) => {
+      try { return coerceTeamState(migrateTeamState(JSON.parse(stripLeadingBom(candidate))).state, teamId) !== undefined } catch { return false }
+  }, 'AgentTeams state in team ' + teamId)
+  if (raw === undefined) return undefined
+  const team = coerceTeamState(migrateTeamState(JSON.parse(stripLeadingBom(raw))).state, teamId)
+  if (team === undefined) throw new Error('invalid AgentTeams state in team ' + teamId)
+  team.revision ??= 0
+  return team
 }
 
 /**
@@ -260,7 +581,22 @@ export function readTeamSync(stateRoot: string, teamId: string): TeamState | und
  * @param state - the record to persist.
  */
 export async function writeTeam(stateRoot: string, state: TeamState): Promise<void> {
-  await atomicWriteText(join(stateRoot, state.id, 'team.json'), JSON.stringify(state, null, 2))
+  const file = join(stateRoot, state.id, 'team.json')
+  await withFileLock(teamPersistenceLockPath(stateRoot, state.id), async () => {
+    const raw = await readDurableText(file, (candidate) => {
+      try { return coerceTeamState(migrateTeamState(JSON.parse(stripLeadingBom(candidate))).state, state.id) !== undefined } catch { return false }
+    }, 'AgentTeams state in team ' + state.id)
+    const current = raw === undefined ? undefined : coerceTeamState(migrateTeamState(JSON.parse(stripLeadingBom(raw))).state, state.id)
+    if (current === undefined && raw !== undefined) throw new Error('invalid AgentTeams state in team ' + state.id)
+    const expectedRevision = state.revision ?? 0
+    const currentRevision = current?.revision ?? 0
+    if (current !== undefined && currentRevision !== expectedRevision) throw new Error('concurrent AgentTeams state update in team ' + state.id)
+    const next = { ...state, schemaVersion: TEAM_STATE_VERSION, revision: expectedRevision + 1 }
+    if (!isTeamState(next, state.id)) throw new Error('invalid AgentTeams state in team ' + state.id)
+    await mkdir(dirname(file), { recursive: true })
+    await writeDurableText(file, JSON.stringify(next, null, 2))
+    state.revision = next.revision
+  })
 }
 
 /** Read the durable set of member session ids retired by remove/delete. */
@@ -770,7 +1106,7 @@ export function isTeamTask(value: unknown): value is TeamTask {
     && isOptionalString(value['handoffId'])
     && (value['reassigning'] === undefined || typeof value['reassigning'] === 'boolean')
     && isFiniteNumber(value['createdAt'])
-    && isFiniteNumber(value['updatedAt'])
+     && isFiniteNumber(value['updatedAt'])
     && hasValidQualityTaskFields(value)
 }
 
@@ -781,6 +1117,11 @@ function isTeamState(value: unknown, expectedId: string): value is TeamState {
     && typeof value['name'] === 'string'
     && value['name'].trim() !== ''
     && isOptionalString(value['description'])
+    && (value['projectId'] === undefined || (typeof value['projectId'] === 'string' && value['projectId'].trim() !== ''))
+    && (value['projectRequirementId'] === undefined || (typeof value['projectRequirementId'] === 'string' && value['projectRequirementId'].trim() !== ''))
+    && (value['projectRequirementVersion'] === undefined || (Number.isSafeInteger(value['projectRequirementVersion']) && (value['projectRequirementVersion'] as number) > 0))
+    && (value['projectDesignId'] === undefined || (typeof value['projectDesignId'] === 'string' && value['projectDesignId'].trim() !== ''))
+    && (value['projectDesignVersion'] === undefined || (Number.isSafeInteger(value['projectDesignVersion']) && (value['projectDesignVersion'] as number) > 0))
     && (value['profile'] === undefined || isTeamProfileSnapshot(value['profile']))
     && typeof value['captainSessionId'] === 'string'
     && value['captainSessionId'] !== ''
@@ -796,11 +1137,43 @@ function isTeamState(value: unknown, expectedId: string): value is TeamState {
       || value['planReviewState'] === 'awaiting_review'
       || value['planReviewState'] === 'awaiting_feedback')
     && (value['approvedAt'] === undefined || isFiniteNumber(value['approvedAt']))
+    && (value['revision'] === undefined || (Number.isSafeInteger(value['revision']) && (value['revision'] as number) >= 0))
+    && (value['projectLinkState'] === undefined
+      || value['projectLinkState'] === 'linked'
+      || value['projectLinkState'] === 'link_pending'
+      || value['projectLinkState'] === 'degraded')
     && (value['halted'] === undefined || typeof value['halted'] === 'boolean')
     && (value['haltedAt'] === undefined || isFiniteNumber(value['haltedAt']))
     && (value['reviewPolicy'] === undefined || isReviewPolicy(value['reviewPolicy']))
     && (value['escalated'] === undefined || typeof value['escalated'] === 'boolean')
   if (!validShape) return false
+
+  const projectBindingFields = [
+    value['projectRequirementId'],
+    value['projectRequirementVersion'],
+    value['projectDesignId'],
+    value['projectDesignVersion'],
+    value['projectLinkState'],
+  ]
+  if (value['projectId'] === undefined) {
+    if (projectBindingFields.some((field) => field !== undefined)) return false
+  } else {
+    // A bound Team may be staged while its Work Item link is being created;
+    // link_pending/degraded are durable blocked states.  The link state is
+    // nevertheless mandatory so an old/incomplete binding cannot be mistaken
+    // for a healthy Project Team.
+    const linkState = value['projectLinkState']
+    if (!['linked', 'link_pending', 'degraded'].includes(linkState as string)) return false
+    if (value['projectRequirementId'] === undefined
+      || value['projectRequirementVersion'] === undefined
+      || value['projectDesignId'] === undefined
+      || value['projectDesignVersion'] === undefined) return false
+    const boundTeam = value as unknown as TeamState
+    for (const task of value['tasks'] as TeamTask[]) {
+      if (task.kind === undefined || task.kind === 'work') return false
+      if (projectTaskBindingError(boundTeam, task) !== undefined) return false
+    }
+  }
 
   const members = value['members'] as TeamMember[]
   const tasks = value['tasks'] as TeamTask[]
@@ -855,14 +1228,22 @@ export async function removeTeamDir(stateRoot: string, teamId: string): Promise<
  * @param from - source path.
  * @param to - destination path.
  */
-async function renameWithRetry(from: string, to: string): Promise<void> {
+const ARCHIVE_RENAME_RETRIES = 8
+const ARCHIVE_RENAME_RETRY_DELAY_MS = 50
+
+async function renameWithRetry(
+  from: string,
+  to: string,
+  retries = ATOMIC_RENAME_RETRIES,
+  retryDelayMs = ATOMIC_RENAME_RETRY_DELAY_MS,
+): Promise<void> {
   for (let attempt = 0; ; attempt += 1) {
     try {
       await rename(from, to)
       return
     } catch (error: unknown) {
-      if (isRetryableRenameError(error) && attempt < ATOMIC_RENAME_RETRIES) {
-        await sleep(ATOMIC_RENAME_RETRY_DELAY_MS)
+      if (isRetryableRenameError(error) && attempt < retries) {
+        await sleep(retryDelayMs)
         continue
       }
       throw error
@@ -890,7 +1271,7 @@ export async function archiveTeamDir(stateRoot: string, teamId: string): Promise
     // The same Windows EPERM-on-rename applies at the directory boundary: a
     // delete-sharing violation on any file below `target` blocks the move, so
     // retry the transient-lock case before giving up.
-    await renameWithRetry(target, previous)
+    await renameWithRetry(target, previous, ARCHIVE_RENAME_RETRIES, ARCHIVE_RENAME_RETRY_DELAY_MS)
     displaced = true
   } catch (error: unknown) {
     // Only ENOENT means there was nothing to displace; any other failure
@@ -901,11 +1282,11 @@ export async function archiveTeamDir(stateRoot: string, teamId: string): Promise
   }
 
   try {
-    await renameWithRetry(source, target)
+    await renameWithRetry(source, target, ARCHIVE_RENAME_RETRIES, ARCHIVE_RENAME_RETRY_DELAY_MS)
   } catch (error: unknown) {
     if (displaced) {
       try {
-        await renameWithRetry(previous, target)
+        await renameWithRetry(previous, target, ARCHIVE_RENAME_RETRIES, ARCHIVE_RENAME_RETRY_DELAY_MS)
       } catch (restoreError: unknown) {
         throw new AggregateError(
           [error, restoreError],

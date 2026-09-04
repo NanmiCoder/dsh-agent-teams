@@ -1,7 +1,6 @@
 /**
  * AgentTeams conversation card: a lightweight in-conversation summary shown
- * when a team is created — the captain's name, the member roster with whale
- * avatars, and an entry point that re-activates the top-right activity
+ * when a team is created — the team name, engineering-role roster, and an entry point that re-activates the top-right activity
  * panel (useful after the floater was closed, or when re-opening an old
  * session for review).
  *
@@ -22,17 +21,22 @@ import type { ChatConversationViewNode } from '@deepseek-ai/dsh-client-ui-chat/c
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-session/types'
 
+/** Engineering-role data rendered by the conversation card and activity panel. */
+export interface AgentTeamsMember {
+  readonly id: string
+  /** Stable display name for the engineering role/agent. */
+  readonly name: string
+  /** Responsibility assigned to the role. */
+  readonly role: string
+}
+
 /** Final keyed Chat payload for the team summary card. */
 export interface AgentTeamsCardData {
   readonly teamId: string
   /** The captain session that owns this team (panel follows it). */
   readonly captainSessionId: string
   readonly teamName: string
-  readonly members: readonly {
-    readonly id: string
-    readonly name: string
-    readonly role: string
-  }[]
+  readonly members: readonly AgentTeamsMember[]
 }
 
 declare module '@deepseek-ai/dsh-client-ui-chat/client' {

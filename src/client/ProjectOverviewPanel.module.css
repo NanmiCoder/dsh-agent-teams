@@ -1,0 +1,275 @@
+.panel {
+  /* DeepSeek Harness 原生外壳：保留深色底板，去掉卡片边框和圆角。 */
+  border: 0 !important;
+  border-radius: 0 !important;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  --overview-bg-module: var(--dsw-alias-bg-module-platform, var(--dsw-alias-bg-layer-1, #1c1c1c));
+  --overview-bg-neutral: var(--dsw-alias-bg-fill-neutral, #2d2f33);
+  --overview-label-primary: var(--dsw-alias-label-primary, #f1f1f1);
+  --overview-label-secondary: var(--dsw-alias-label-secondary, #b8b8b8);
+  --overview-label-tertiary: var(--dsw-alias-label-tertiary, #8f8f8f);
+  --overview-line-normal: var(--dsw-alias-line-normal, rgba(255, 255, 255, 0.28));
+  --overview-primary: var(--dsw-alias-state-business-primary, #4d6bfe);
+  --overview-danger: var(--dsw-alias-state-error-primary, #e5484d);
+  width: min(430px, calc(100vw - 24px));
+  max-height: min(70vh, 680px);
+  overflow: auto;
+  padding: 10px 12px;
+  color: var(--dsw-alias-label-primary, var(--overview-label-primary));
+  background: var(--dsw-alias-bg-module-platform, var(--overview-bg-module));
+  border: 1px solid var(--dsw-alias-line-normal, var(--overview-line-normal));
+  border-radius: 10px;
+  box-shadow: none;
+  backdrop-filter: none;
+  box-sizing: border-box;
+  transition: box-shadow 120ms ease, border-color 120ms ease;
+}
+
+.panel[data-dragging='true'] {
+  box-shadow: none;
+}
+
+.embeddedPanel {
+  --overview-bg-module: var(--dsw-alias-bg-module-platform, var(--dsw-alias-bg-layer-1, #1c1c1c));
+  --overview-bg-neutral: var(--dsw-alias-bg-fill-neutral, #2d2f33);
+  --overview-label-primary: var(--dsw-alias-label-primary, #f1f1f1);
+  --overview-label-secondary: var(--dsw-alias-label-secondary, #b8b8b8);
+  --overview-label-tertiary: var(--dsw-alias-label-tertiary, #8f8f8f);
+  --overview-line-normal: var(--dsw-alias-line-normal, rgba(255, 255, 255, 0.28));
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 260px;
+  overflow: auto;
+  padding: 10px 12px;
+  color: var(--overview-label-primary);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--overview-line-normal);
+  box-sizing: border-box;
+}
+
+.embeddedPanel .header,
+.embeddedPanel .header:active {
+  cursor: default;
+}
+
+.embeddedReopenButton {
+  position: static;
+  z-index: auto;
+  display: block;
+  flex: 0 0 auto;
+  width: 100%;
+  padding: 8px 12px;
+  color: var(--dsw-alias-label-secondary, #b8b8b8);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--dsw-alias-line-normal, rgba(255, 255, 255, 0.28));
+  border-radius: 0;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+  border-bottom: 0;
+  background: transparent;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.header:active {
+  cursor: grabbing;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+.visibilityButton,
+.reopenButton {
+  color: var(--overview-label-tertiary);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 11px;
+  line-height: 18px;
+  cursor: pointer;
+}
+
+.visibilityButton {
+  padding: 0 5px;
+}
+
+.visibilityButton:hover,
+.visibilityButton:focus-visible,
+.reopenButton:hover,
+.reopenButton:focus-visible {
+  color: var(--overview-label-primary);
+  background: color-mix(in srgb, var(--overview-label-primary) 8%, transparent);
+  border-color: var(--overview-line-normal);
+  outline: none;
+}
+
+.reopenButton {
+  position: absolute;
+  z-index: 20;
+  padding: 5px 8px;
+  background: var(--overview-bg-module);
+  border-color: var(--overview-line-normal);
+  box-shadow: none;
+}
+
+.eyebrow {
+  display: none;
+}
+
+.title {
+  margin: 0;
+  color: var(--dsw-alias-label-primary, var(--overview-label-primary));
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.readOnly {
+  flex: none;
+  color: var(--overview-label-tertiary);
+  font-size: 11px;
+}
+
+.error,
+.empty {
+  margin: 0;
+  padding: 8px 10px;
+  color: var(--overview-label-secondary);
+  background: var(--overview-bg-neutral);
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.error {
+  color: var(--overview-danger);
+  background: color-mix(in srgb, var(--overview-danger) 10%, var(--overview-bg-module));
+}
+
+.projects {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+}
+
+.project {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.project + .project {
+  padding-top: 10px;
+  border-top: 1px solid color-mix(in srgb, var(--overview-line-normal) 70%, transparent);
+}
+
+.projectHeading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.projectName {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace,
+.phase,
+.gates,
+.attention {
+  color: var(--overview-label-tertiary);
+  font-size: 11px;
+}
+
+.workspace {
+  flex: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.phase {
+  margin-top: 4px;
+}
+
+.metrics,
+.gates,
+.attention {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 9px;
+  margin-top: 8px;
+}
+
+.metrics span,
+.gates span,
+.attention span {
+  white-space: nowrap;
+}
+
+.metrics span {
+  color: var(--overview-label-secondary);
+  font-size: 11px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .panel {
+    --overview-bg-module: var(--dsw-alias-bg-module-platform, #202124);
+    --overview-bg-neutral: var(--dsw-alias-bg-fill-neutral, #2b2d31);
+    --overview-label-primary: var(--dsw-alias-label-primary, #f5f7fb);
+    --overview-label-secondary: var(--dsw-alias-label-secondary, #c7ccd6);
+    --overview-label-tertiary: var(--dsw-alias-label-tertiary, #9aa3b2);
+    --overview-line-normal: var(--dsw-alias-line-normal, #454951);
+  }
+}
+
+/* Keep the embedded project summary on the same Harness font stack and tiers. */
+.embeddedPanel,
+.embeddedPanel * {
+  font-family: inherit;
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.embeddedPanel { font-size: 12px; line-height: 18px; }
+.embeddedPanel .title { font-size: 16px; line-height: 22px; }
+.embeddedPanel .projectName,
+.embeddedPanel .phase { font-size: 14px; line-height: 20px; }
+.embeddedPanel .metrics,
+.embeddedPanel .gates,
+.embeddedPanel .attention { font-size: 12px; line-height: 18px; }
+.embeddedPanel .workspace,
+.embeddedPanel .readOnly,
+.embeddedPanel .error,
+.embeddedPanel .empty { font-size: 10px; line-height: 15px; }

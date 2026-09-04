@@ -6,12 +6,14 @@
   --agent-teams-panel-shift: 420px;
 }
 
-/* The panel lives in shell.overlay. Only its wide docked mode marks the page,
-   allowing the center conversation to concede the exact measured width while
-   the shell's sidebar and details tracks keep their own geometry. */
+/* The panel lives in shell.overlay as the shell's right-most column. Only its
+   wide docked mode marks the page, allowing the center conversation to yield
+   the exact measured width without covering the host sidebar. */
 :global(html[data-agent-teams-panel-open]) :global([data-phase='active']) {
   box-sizing: border-box;
-  padding-right: var(--agent-teams-panel-shift);
+  width: calc(100% - var(--agent-teams-panel-shift));
+  min-width: 0;
+  margin-right: var(--agent-teams-panel-shift);
 }
 
 /* The reference export used an older DSW token vocabulary. Harness rc.8
@@ -51,8 +53,8 @@
   border: 1px solid var(--dsw-alias-line-normal);
   border-radius: 999px;
   background: color-mix(in srgb, var(--dsw-alias-bg-module-platform) 92%, transparent);
-  backdrop-filter: blur(16px);
-  box-shadow: 0 8px 28px color-mix(in srgb, var(--dsw-alias-label-primary) 14%, transparent);
+
+
   color: var(--dsw-alias-label-secondary);
   font: inherit;
   font-size: 12px;
@@ -92,7 +94,7 @@
 .badgeDot[data-busy='true'],
 .panelDot[data-busy='true'] {
   background: var(--dsw-alias-state-business-primary);
-  animation: agentTeamsPulse 1.25s ease-in-out infinite;
+
 }
 
 .badgeCount,
@@ -111,35 +113,48 @@
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
+  height: 100%;
+  min-height: 0;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--dsw-alias-line-strong) 58%, transparent);
-  border-radius: 16px;
+  border: 0 !important;
+  border-radius: 0 !important;
   background: color-mix(in srgb, var(--dsw-alias-bg-module) 95%, transparent);
-  backdrop-filter: blur(20px) saturate(1.08);
-  box-shadow:
-    0 12px 32px color-mix(in srgb, var(--dsw-alias-label-primary) 12%, transparent),
-    0 32px 72px color-mix(in srgb, var(--dsw-alias-label-primary) 16%, transparent);
-  animation: agentTeamsPanelIn 160ms ease-out;
+
+
+
   will-change: transform;
+}
+
+/* shell.overlay is an additive slot whose immediate wrapper is not guaranteed
+   to cover the viewport. Docked AgentTeams must therefore be positioned in
+   the host viewport explicitly; otherwise the wrapper collapses the panel to
+   a small rectangle in the middle of the conversation. */
+:global([data-agent-teams-activity][data-panel-mode='docked']) {
+  position: absolute !important;
+  z-index: 30;
+  top: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  left: auto !important;
+  height: 100vh !important;
+  max-height: 100vh !important;
+  transform: none !important;
 }
 
 .panel[data-dragging],
 .panel[data-resizing] {
   user-select: none;
-  box-shadow:
-    0 16px 38px color-mix(in srgb, var(--dsw-alias-label-primary) 14%, transparent),
-    0 36px 78px color-mix(in srgb, var(--dsw-alias-label-primary) 18%, transparent);
+
 }
 
-@keyframes agentTeamsPanelIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+/* The panel is fixed to the right dock; the dock toggle is intentionally removed. */
+.panel [data-control='dock'] {
+  display: none !important;
 }
 
-@keyframes agentTeamsPulse {
-  0%, 100% { opacity: 0.42; }
-  50% { opacity: 1; }
-}
+
+
+
 
 .panelHead {
   display: flex;
@@ -149,13 +164,13 @@
   min-height: 44px;
   padding: 0 14px 0 16px;
   border-bottom: 1px solid var(--dsw-alias-line-normal);
-  cursor: grab;
-  touch-action: none;
+  cursor: default;
+  touch-action: auto;
 }
 
 .panelHead:active,
 .panel[data-dragging] .panelHead {
-  cursor: grabbing;
+  cursor: default;
 }
 
 .panel[data-compact] .panelHead {
@@ -436,7 +451,7 @@
 
 .captainNode {
   display: grid;
-  grid-template-columns: 48px minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 9px;
   align-items: center;
   min-height: 56px;
@@ -467,7 +482,7 @@
   border-radius: 0;
   object-fit: contain;
   background: transparent;
-  filter: drop-shadow(0 1px 1px rgb(18 45 72 / 20%));
+
 }
 
 .leadAvatar {
@@ -564,13 +579,10 @@
 }
 
 .workGlyph[data-active='true'] rect {
-  animation: agentTeamsDot 1.1s ease-in-out infinite;
+
 }
 
-@keyframes agentTeamsDot {
-  0%, 100% { opacity: 0.25; }
-  50% { opacity: 1; }
-}
+
 
 .progressOverview {
   display: flex;
@@ -786,7 +798,7 @@
 
 .memberRow {
   display: grid;
-  grid-template-columns: 46px minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
   align-items: center;
   width: 100%;
@@ -829,13 +841,10 @@
   border-radius: 50%;
   background: var(--dsw-alias-state-business-primary);
   content: '';
-  animation: agentTeamsUnreadPulse 1.8s ease-in-out infinite;
+
 }
 
-@keyframes agentTeamsUnreadPulse {
-  0%, 100% { opacity: 0.78; transform: scale(0.92); }
-  50% { opacity: 1; transform: scale(1.16); }
-}
+
 
 .memberInitial {
   display: inline-flex;
@@ -862,37 +871,26 @@
   border-radius: 0;
   object-fit: contain;
   background: transparent;
-  filter:
-    drop-shadow(0 0 1px var(--dsw-alias-bg-module))
-    drop-shadow(0 1px 1px rgb(18 45 72 / 24%));
+
 }
 
 .stateArt[data-activity='working'] {
-  animation: agentTeamsFloat 2.4s ease-in-out infinite;
+
 }
 
 .stateArt[data-activity='idle'] {
-  animation: agentTeamsBreathe 4.2s ease-in-out infinite;
+
 }
 
 .stateArt[data-activity='unknown'] {
-  animation: agentTeamsThink 2.8s ease-in-out infinite;
+
 }
 
-@keyframes agentTeamsFloat {
-  0%, 100% { transform: translateY(0) rotate(-4deg); }
-  50% { transform: translateY(-2px) rotate(4deg); }
-}
 
-@keyframes agentTeamsBreathe {
-  0%, 100% { opacity: 0.82; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.06); }
-}
 
-@keyframes agentTeamsThink {
-  0%, 100% { transform: rotate(-7deg); }
-  50% { transform: rotate(7deg); }
-}
+
+
+
 
 .memberState {
   margin-left: auto;
@@ -1261,7 +1259,7 @@
   border: 1px solid color-mix(in srgb, var(--dsw-alias-state-business-primary) 30%, var(--dsw-alias-line-normal));
   border-radius: 10px;
   background: color-mix(in srgb, var(--dsw-alias-bg-module-platform) 94%, var(--dsw-alias-state-business-primary));
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--dsw-alias-label-primary) 5%, transparent);
+
 }
 
 .planHeader > span {
@@ -1581,7 +1579,7 @@
 .planCard select:focus-visible,
 .planNewTask input:focus-visible {
   border-color: var(--dsw-alias-state-business-primary);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--dsw-alias-state-business-primary) 16%, transparent);
+
 }
 
 .planGrid {
@@ -1820,7 +1818,7 @@
   color: var(--dsw-alias-label-secondary);
   font-size: 9px;
   line-height: 13px;
-  animation: plan-feedback-in 180ms ease-out;
+
 }
 
 .planFeedback[data-tone='success'] {
@@ -1846,10 +1844,7 @@
   height: 11px;
 }
 
-@keyframes plan-feedback-in {
-  from { opacity: 0; transform: translateY(-2px); }
-  to { opacity: 1; transform: translateY(0); }
-}
+
 
 .planConfirm {
   flex-wrap: wrap;
@@ -1893,8 +1888,8 @@
   border: 1px solid var(--dsw-alias-line-normal);
   border-radius: 8px;
   background: color-mix(in srgb, var(--dsw-alias-bg-module-platform) 94%, transparent);
-  box-shadow: 0 -5px 16px color-mix(in srgb, var(--dsw-alias-bg-base) 35%, transparent);
-  backdrop-filter: blur(8px);
+
+
 }
 
 .planApproveRow[data-armed='true'] {
@@ -2001,32 +1996,6 @@
   line-height: 14px;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .panel,
-  .badge,
-  .badgeDot,
-  .panelDot,
-  .workGlyph rect,
-  .stateArt,
-  .memberAvatar[data-unread='true']::after {
-    animation: none;
-    transition: none;
-  }
-
-  .planChevron,
-  .planFeedback,
-  .planActions button,
-  .planNewTask button,
-  .planApproveRow button,
-  .planConfirm button,
-  .planCard input,
-  .planCard textarea,
-  .planCard select,
-  .planNewTask input {
-    animation: none;
-    transition: none;
-  }
-}
 
 @media (max-width: 960px) {
   :global(html[data-agent-teams-panel-open]) :global([data-phase='active']) {
@@ -2045,7 +2014,7 @@
   }
 
   .captainNode {
-    grid-template-columns: 48px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .captainState {
@@ -2122,7 +2091,7 @@
 
   .planFlow li {
     gap: 3px;
-    font-size: 7.5px;
+    font-size: 8px;
   }
 
   .planFlow li:not(:last-child)::after {
@@ -2141,4 +2110,386 @@
   .planApproveActions button {
     width: 100%;
   }
+}
+
+/* Artwork is intentionally text/status-only; keep the slot usable without decorative imagery. */
+.captainAvatar {
+  background: var(--dsw-alias-bg-fill-neutral);
+  border-color: var(--dsw-alias-line-normal);
+  color: var(--dsw-alias-label-secondary);
+}
+.memberAvatar {
+  background: var(--dsw-alias-bg-fill-neutral);
+  border-color: var(--dsw-alias-line-normal);
+  color: var(--dsw-alias-label-secondary);
+}
+.leadAvatar {
+  background: var(--dsw-alias-bg-fill-neutral);
+  border-color: var(--dsw-alias-line-normal);
+  color: var(--dsw-alias-label-secondary);
+}
+
+/* Harness-native baseline: quiet surfaces, token-driven themes, and no ambient motion. */
+.panel {
+  background: var(--dsw-alias-bg-module);
+  border-color: var(--dsw-alias-line-normal);
+  box-shadow: none;
+  filter: none;
+  backdrop-filter: none;
+}
+
+/* Legacy avatar implementation retained for reference only; JSX is intentionally commented out.
+   If this legacy markup is ever restored, keep it hidden until the text-first design is explicitly reversed.
+   .captainAvatar,
+   .memberAvatar,
+   .leadAvatar,
+   .memberArt,
+   .memberInitial {
+     display: none !important;
+   }
+*/
+
+.panelHead {
+  background: var(--dsw-alias-bg-module);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition-duration: 0ms !important;
+  }
+}
+
+/* Harness-native typography and left-sidebar search entry. */
+.panel,
+.panel * {
+  font-family: inherit;
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.panel { font-size: 12px; line-height: 18px; }
+.panelTitle { font-size: 18px; line-height: 26px; }
+.sectionHead,
+.sectionToggleTitle,
+.teamName,
+.captainName,
+.memberName { font-size: 14px; line-height: 20px; }
+.captainRole,
+.memberRole,
+.teamStats,
+.captainSummary,
+.memberStatusLine,
+.progressTitle,
+.membersToggle,
+.taskDetailSubject { font-size: 12px; line-height: 18px; }
+.memberModel,
+.taskDetailModel,
+.taskDetailLine,
+.taskDetailMeta,
+.assignmentLabel,
+.memberCount,
+.taskEmpty { font-size: 10px; line-height: 15px; }
+.sectionHint,
+.dagNodeLabel,
+.taskDetailBadge,
+.assignmentChip { font-size: 8px; line-height: 12px; }
+.dagNodeLabel {
+  font-size: 10px;
+}
+
+/* The collapsed entry is a right-side rail, never a fake search row in the
+   host's native left sidebar and never a floater over the chat output. */
+.collapsedRail {
+  position: absolute;
+  z-index: 20;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: inline-flex;
+  width: 56px;
+  min-height: 100%;
+  box-sizing: border-box;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 12px 4px 0;
+  border: 0;
+  border-left: 1px solid var(--dsw-alias-line-normal);
+  border-radius: 0;
+  background: var(--dsw-alias-bg-module);
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  cursor: pointer;
+  box-shadow: none;
+}
+
+/* Also normalize a stale instance from a previously loaded bundle while the
+   page is being refreshed. The old horizontal label/count must never remain
+   in the native left sidebar. */
+:global([data-agent-teams-collapsed]) {
+  position: absolute !important;
+  z-index: 20 !important;
+  top: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  left: auto !important;
+  display: inline-flex !important;
+  width: 56px !important;
+  height: 100vh !important;
+  min-height: 100vh !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  padding: 12px 4px 0 !important;
+  border: 0 !important;
+  border-left: 1px solid var(--dsw-alias-line-normal) !important;
+  border-radius: 0 !important;
+  background: var(--dsw-alias-bg-module) !important;
+  box-shadow: none !important;
+}
+
+:global([data-agent-teams-collapsed] > span:not(:first-child)) {
+  display: none !important;
+}
+
+/* A previous bundle could leave the old horizontal search row in the DOM
+   after a hot reload. The current rail is explicitly marked so the stale
+   left-sidebar copy cannot remain visible beside it. */
+:global([data-agent-teams-collapsed]:not([data-agent-teams-collapsed-rail])) {
+  display: none !important;
+}
+
+:global([data-agent-teams-collapsed][data-agent-teams-collapsed-rail]) {
+  position: absolute !important;
+  inset: 0 0 0 auto !important;
+  z-index: 30 !important;
+  display: inline-flex !important;
+  width: 56px !important;
+  height: 100vh !important;
+  min-height: 100vh !important;
+  box-sizing: border-box !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  padding: 12px 4px 0 !important;
+  border: 0 !important;
+  border-left: 1px solid var(--dsw-alias-line-normal) !important;
+  border-radius: 0 !important;
+  background: var(--dsw-alias-bg-module) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+.collapsedRail:hover,
+.collapsedRail:focus-visible {
+  background: var(--dsw-alias-bg-fill-neutral);
+  color: var(--dsw-alias-label-primary);
+}
+
+.collapsedRail:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 2px;
+}
+
+.collapsedRailIcon {
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+}
+
+.collapsedRail:hover .collapsedRailIcon,
+.collapsedRail:focus-visible .collapsedRailIcon {
+  background: var(--dsw-alias-bg-fill-neutral);
+}
+
+.sidebarSearchIcon {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  flex: none;
+  box-sizing: border-box;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+  opacity: .82;
+}
+
+.sidebarSearchIcon::after {
+  position: absolute;
+  right: -5px;
+  bottom: -3px;
+  width: 7px;
+  height: 1.5px;
+  border-radius: 1px;
+  background: currentColor;
+  content: '';
+  transform: rotate(45deg);
+  transform-origin: left center;
+}
+
+/* agent-teams-final-right-rail: Harness-native collapsed rail geometry. */
+.activityOverlayRoot {
+  position: absolute !important;
+  z-index: 30 !important;
+  inset: 0 !important;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.activityOverlayRoot > * {
+  pointer-events: auto;
+}
+
+:global(button[class*='sidebarSearchButton']),
+:global([data-agent-teams-collapsed]:not([data-agent-teams-collapsed-rail])) {
+  display: none !important;
+}
+
+:global([data-agent-teams-collapsed][data-agent-teams-collapsed-rail]) {
+  position: absolute !important;
+  z-index: 31 !important;
+  inset: 0 0 0 auto !important;
+  display: inline-flex !important;
+  width: 56px !important;
+  height: 100% !important;
+  min-height: 100% !important;
+  box-sizing: border-box !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  padding: 18px 10px 6px !important;
+  border: 0 !important;
+  border-left: 1px solid var(--dsw-alias-border-l1, var(--dsw-alias-line-normal, #303030)) !important;
+  border-radius: 0 !important;
+  background: var(--dsw-specific-sidebar-fill, var(--dsw-alias-bg-module, #171717)) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+:global([data-agent-teams-collapsed][data-agent-teams-collapsed-rail] .collapsedRailIcon) {
+  display: inline-flex !important;
+  width: 36px !important;
+  height: 36px !important;
+  flex: none !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 50% !important;
+  background: transparent !important;
+}
+
+:global([data-agent-teams-collapsed][data-agent-teams-collapsed-rail]:hover .collapsedRailIcon),
+:global([data-agent-teams-collapsed][data-agent-teams-collapsed-rail]:focus-visible .collapsedRailIcon) {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(255, 255, 255, .08)) !important;
+}
+
+:global([data-agent-teams-activity]) {
+  position: absolute !important;
+  z-index: 30 !important;
+  top: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  left: auto !important;
+  height: 100% !important;
+  max-height: none !important;
+  border-radius: 0 !important;
+  transform: none !important;
+}
+
+/* The AgentTeams surface is the third shell column, never an overlay over
+ * the conversation. Keep this contract at the end of the module so legacy
+ * compatibility rules above cannot restore viewport-wide positioning. */
+:global(html[data-agent-teams-panel-open='true']) :global([data-phase='active']) {
+  box-sizing: border-box !important;
+  width: calc(100% - var(--agent-teams-panel-shift, 0px)) !important;
+  max-width: calc(100% - var(--agent-teams-panel-shift, 0px)) !important;
+  min-width: 0 !important;
+  margin-right: 0 !important;
+  padding-right: 0 !important;
+}
+
+:global(html[data-agent-teams-panel-open='true']) :global([data-phase='active'] > *) {
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+
+:global(html[data-agent-teams-panel-open='true']) :global([data-shell-overlay]) {
+  --agent-teams-shell-column: var(--agent-teams-panel-shift, 0px);
+}
+
+/* Final native-style placement. The old horizontal collapsed entry must not
+   survive beside the current right-hand rail, and the activity surface must
+   never fall back to the middle of the conversation. */
+:global([data-agent-teams-collapsed]:not([data-agent-teams-collapsed-rail])) {
+  display: none !important;
+}
+
+:global([data-agent-teams-collapsed][data-agent-teams-collapsed-rail]) {
+  position: absolute !important;
+  z-index: 31 !important;
+  inset: 0 0 0 auto !important;
+  display: inline-flex !important;
+  width: 56px !important;
+  height: 100vh !important;
+  min-height: 100vh !important;
+  box-sizing: border-box !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  padding: 18px 10px 6px !important;
+  border: 0 !important;
+  border-left: 1px solid var(--dsw-alias-border-l1, var(--dsw-alias-line-normal, #303030)) !important;
+  border-radius: 0 !important;
+  background: var(--dsw-specific-sidebar-fill, var(--dsw-alias-bg-module, #171717)) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+:global([data-agent-teams-collapsed][data-agent-teams-collapsed-rail] .collapsedRailIcon) {
+  display: inline-flex !important;
+  width: 36px !important;
+  height: 36px !important;
+  flex: none !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 50% !important;
+  background: transparent !important;
+}
+
+:global([data-agent-teams-collapsed][data-agent-teams-collapsed-rail]:hover .collapsedRailIcon),
+:global([data-agent-teams-collapsed][data-agent-teams-collapsed-rail]:focus-visible .collapsedRailIcon) {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(255, 255, 255, .08)) !important;
+}
+
+:global([data-agent-teams-activity]) {
+  position: absolute !important;
+  z-index: 30 !important;
+  top: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  left: auto !important;
+  height: 100vh !important;
+  max-height: 100vh !important;
+  border-radius: 0 !important;
+  transform: none !important;
+}
+
+/* AgentTeams is the third shell column. Reserve its occupied width on the
+   conversation even though the slot itself is mounted in an overlay layer. */
+:global(html[data-agent-teams-panel-open='true']) :global([data-phase='active']) {
+  box-sizing: border-box !important;
+  width: calc(100% - var(--agent-teams-panel-shift, 0px)) !important;
+  max-width: calc(100% - var(--agent-teams-panel-shift, 0px)) !important;
+  min-width: 0 !important;
+  margin-right: var(--agent-teams-panel-shift, 0px) !important;
+  padding-right: 0 !important;
+  overflow-x: hidden !important;
+}
+
+:global(html[data-agent-teams-panel-open='true']) :global([data-phase='active'] > *) {
+  min-width: 0 !important;
+  max-width: 100% !important;
 }

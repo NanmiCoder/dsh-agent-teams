@@ -1,4 +1,6 @@
-这是一个面向长期软件项目的全流程 Agent Teams 插件，是Software Development Lifecycle Agent Teams。
+产品名：ProjectFlow Agent Teams
+
+这是一个面向长期软件项目的全流程 Software Development Lifecycle Agent Teams 插件。
 用户用自然语言提出目标，系统负责需求澄清、方案设计、任务规划、多 Agent 开发、验证验收和项目状态维护；既支持从零开始，也支持接管已有代码库。
 插件目标：
 通用软件工程团队插件，以 Captain 为项目负责人，以持久化项目上下文为事实源，以质量门和人工决策点控制生命周期，并通过多个专业 Agent 完成从需求到交付的持续软件开发。

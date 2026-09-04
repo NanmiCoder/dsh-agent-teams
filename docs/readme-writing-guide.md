@@ -1,11 +1,11 @@
 ## DSH 插件 README 写作规范
 
 > 给 coding agent 写 DeepSeek Harness 插件 README 时照做的章节模板与写作规则。
-> 提炼自 `dsh-agent-teams` 成品 README 的多轮迭代（功能/原理/UI/工具/安装/配置/使用/验证/限制全结构），并对照 DSH 仓库内包 README 的风格（`packages/preset`、`packages/bundle`、`packages/client/ui-workflow-run`：精炼、表格化）。
+> 提炼自 `ProjectFlow Agent Teams` 成品 README 的多轮迭代（功能/原理/UI/工具/安装/配置/使用/验证/限制全结构），并对照 DSH 仓库内包 README 的风格（`packages/preset`、`packages/bundle`、`packages/client/ui-workflow-run`：精炼、表格化）。
 
 ### 0. 语言与篇幅策略
 
-- **独立插件项目**（面向安装用户，如 `dsh-agent-teams`）：中文为主，命令、工具名、标识符、字段名保留英文；解释性句子用中文。
+- **独立插件项目**（面向安装用户，如 `ProjectFlow Agent Teams`）：中文为主，命令、工具名、标识符、字段名保留英文；解释性句子用中文。
 - **DSH 仓库内包**（`packages/*/README.md`）：英文为主，一段话简介 + 分节 + 表格，每节不超过几段；仓库内 README 是给维护者/协作者的，不需要"安装/使用"教程。
 - 本文模板两种场景同构：结构顺序不变，语言与详略按读者切换。
 - 篇幅：独立插件 README 200–400 行封顶；超过说明某节在堆砌实现细节（见 §2 避免清单）。
@@ -105,7 +105,7 @@ dsh plugin --profile web add /absolute/path/to/<plugin>
 - 写**真实限制**而非套话：设计取舍（文件级持久化、单队长单团队）、环境依赖（优先使用 `shell.overlay`，旧版无 slot 时才由 portal 自管几何；宽屏让位、窄屏 overlay）、模型行为（不守仪式）、边界（旧会话无历史事件）。
 - 每条给**缓解或指引**（"以 status 为准""待队长下次操作投递"），不写无解的抱怨。
 
-### 6. 五条可复用模式（自 `dsh-agent-teams` 提炼）
+### 6. 五条可复用模式（自 `ProjectFlow Agent Teams` 提炼）
 
 1. **能力接缝表开篇**：架构解释永远从"DSH 能力 | 插件用法"表格开始——比任何叙述都快地建立"它怎么融入 DSH"的心智模型。
 2. **验证命令全部可复制**：`cd /path/to/…` + 绝对路径 + 注释标注预期输出；用户可以直接粘贴执行，而不是"看图理解"。

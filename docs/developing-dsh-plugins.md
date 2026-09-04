@@ -1,8 +1,8 @@
 # 从零开发一个 DeepSeek Harness（DSH）插件
 
-> 本文是 dsh-agent-teams 插件（host 工具 + 浏览器活动面板 + 对话流卡片）开发全过程的经验蒸馏。
+> 本文是 ProjectFlow Agent Teams 插件（host 工具 + 浏览器活动面板 + 对话流卡片）开发全过程的经验蒸馏。
 > 覆盖 bundle 插件从骨架、host 面、client 面、构建安装到踩坑修复的完整流程，供 coding agent 直接照做。
-> 参考实现：`dsh-agent-teams`（成品）、DSH 仓库 `packages/workflow/tool-workflow`（工具插件模板）、
+> 参考实现：`ProjectFlow Agent Teams`（成品）、DSH 仓库 `packages/workflow/tool-workflow`（工具插件模板）、
 > `packages/client/tsdown.client.ts`（client bundle 协议）、`packages/bundle/base|cordis.patch.yml`（host 组合）、
 > `packages/client/modules/src/index.ts`（浏览器名册扫描）、`packages/client/ui-workflow-run`（对话流 UI 模板）。
 
@@ -497,7 +497,7 @@ ln -sfn /path/to/DSH/packages/core/tools     node_modules/@deepseek-ai/dsh-tools
 ```sh
 pnpm build
 # 内测阶段：dsh 来自官方 npm 包；本地路径或 git 地址安装插件（未发布 npm 前）
-npx -p @deepseek-ai/dsh dsh plugin --profile web add /absolute/path/to/dsh-agent-teams
+npx -p @deepseek-ai/dsh dsh plugin --profile web add /absolute/path/to/ProjectFlow Agent Teams
 # 重启 dsh（web 或 headless）后生效
 ```
 

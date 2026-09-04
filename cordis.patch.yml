@@ -12,7 +12,7 @@
       # Node-resolvable package name — must stay in sync with package.json
       # `name`. Quoted because `@` is a reserved indicator in YAML and cannot
       # open a plain scalar.
-      name: '@nanmicoder/dsh-agent-teams'
+      name: '@dengdengbei/projectflow-agent-teams'
       config:
         # Team state lives under `<session workspace>/<stateDir>/<teamId>/`
         # (team.json + inbox/*.jsonl mailboxes).

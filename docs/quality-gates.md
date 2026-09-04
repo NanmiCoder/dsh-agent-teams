@@ -3,7 +3,7 @@
 > 状态：已实现（本文件是唯一执行规格）
 > 读者：新开窗口的实现 Agent。只按本文实现，不要再发明需求，不要先写代码再补测试。
 > 仓库：当前工作区根目录。不要从本机绝对路径推断工作区。
-> 基线：`feat/captain-planning-team-stop` 上的 Captain 动态规划、DAG 调度、`attempt_id`、失败阻断、停止整队。
+> 基线：`feat/captain-planning-team-stop` 上的 Captain 动态规划、DAG 调度、`attempt_id`、失败阻断、停止 ProjectFlow 团队。
 > 本文把“多轮需求/代码审查直到通过”从 prompt 协议升级为机器可判定状态。
 
 ## 0. 一句话目标
@@ -32,7 +32,7 @@
 | `attempt` + `attemptId` | `beginTaskAttempt()` / `update_task` | 迟到写入必须继续被拒绝 |
 | Captain 动态规划 | `taskPlanning: captain` | 不要改回固定 seed DAG 才能审查 |
 | 并行 ready tasks | `src/scheduler.ts` | 无真实依赖仍可并行 |
-| 停止整队 | `haltTeamWork()`、`POST /plugins/dsh-agent-teams/halt` | 停止仍不删除团队 |
+| 停止 ProjectFlow 团队 | `haltTeamWork()`、`POST /plugins/dsh-agent-teams/halt` | 停止仍不删除团队 |
 | 现有验证入口 | `pnpm typecheck`、`pnpm build`、`pnpm verify` | 新检查必须挂进 `pnpm verify` |
 
 ### 1.2 当前缺口（必须修）

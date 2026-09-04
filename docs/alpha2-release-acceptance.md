@@ -28,9 +28,9 @@
 
 | 产物 | 实际结果 |
 | --- | --- |
-| `/tmp/dsh-agent-teams-release-0831-summary.json` | 顶层 8 个指定键、三个渠道、金额为整数分，与独立预期逐项相等。 |
-| `/tmp/dsh-agent-teams-release-0831-report.html` | 离线中文 HTML，净收入卡片、渠道订单数及合计行、退款与取消口径；无外链或脚本。 |
-| `/tmp/dsh-agent-teams-release-0831-review.md` | reviewer 重新读取指定文件复算，记录问题、修复和复核结论。 |
+| `/tmp/projectflow-agent-teams-release-0831-summary.json` | 顶层 8 个指定键、三个渠道、金额为整数分，与独立预期逐项相等。 |
+| `/tmp/projectflow-agent-teams-release-0831-report.html` | 离线中文 HTML，净收入卡片、渠道订单数及合计行、退款与取消口径；无外链或脚本。 |
+| `/tmp/projectflow-agent-teams-release-0831-review.md` | reviewer 重新读取指定文件复算，记录问题、修复和复核结论。 |
 
 10 条订单，排除 1 条取消订单，计入 9 条；gross=93490、discount=6990、
 refund=21500、net=65000 分（**¥650.00**）。渠道净收入为 web=23000、
@@ -86,7 +86,7 @@ work 任务的文字约束不是文件写入沙箱，不应把它当作强制访
 完整检查包含真实 Alpha.2 Connection + HTTP 的认证与生命周期回归，以及发布渠道保护测试。
 GitHub Actions 使用 Node.js 24，在 Linux 上重新构建、检查并发布。
 
-最终本地发布包 `nanmicoder-dsh-agent-teams-0.1.15-alpha.1.tgz` 的 67 个运行时及资源文件，
+最终本地发布包 `dengdengbei-projectflow-agent-teams-0.1.15-alpha.1.tgz` 的 67 个运行时及资源文件，
 与真实业务测试包逐字节一致。使用 Alpha.2 CLI 将最终包安装到 Web profile，确认安装版本为
 0.1.15-alpha.1，50 个安装后的 lib 文件与 tarball 一致。冷启动后打开业务历史会话，
 活动面板恢复 3 名成员、3/3 完成和 DAG，认证 state 接口返回 200。

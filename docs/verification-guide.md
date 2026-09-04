@@ -1,6 +1,6 @@
 ## 验证 DSH 插件真的可用（实战方法）
 
-> 本文从 dsh-agent-teams 插件（多智能体团队协作 + Web UI 活动面板）的完整验证历程蒸馏而来。
+> 本文从 ProjectFlow Agent Teams 插件（多智能体团队协作 + Web UI 活动面板）的完整验证历程蒸馏而来。
 > 全部命令都真实执行过；每一层都踩过坑，坑已标注在对应步骤。原则：**不碰正在运行的实例，验证在独立 profile / 独立端口 / 临时目录上进行，测完清理**。
 
 ### 验证金字塔总览
@@ -156,7 +156,7 @@ zstdcat ~/.dsh/sessions/<ws>/session-<id>/session.jsonl.zstd \
 # 从零安装（内测 npm 流程，peer 从内测 registry 解析）：
 npx -p @deepseek-ai/dsh@0.0.1-rc.1 dsh plugin --profile agent-teams-beta add @deepseek-ai/dsh-base
 npx -p @deepseek-ai/dsh@0.0.1-rc.1 dsh plugin --profile agent-teams-beta add @deepseek-ai/dsh-web-app
-npx -p @deepseek-ai/dsh@0.0.1-rc.1 dsh plugin --profile agent-teams-beta add /abs/path/to/dsh-agent-teams
+npx -p @deepseek-ai/dsh@0.0.1-rc.1 dsh plugin --profile agent-teams-beta add /abs/path/to/ProjectFlow Agent Teams
 # 启动（managed background task，保存 task id；CLI 与 bundle 同通道）：
 npx -p @deepseek-ai/dsh@0.0.1-rc.1 dsh --profile agent-teams-beta --host 127.0.0.1 --port 3081
 # 看到精确 URL 后再 curl

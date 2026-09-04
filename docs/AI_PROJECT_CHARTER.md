@@ -4,7 +4,7 @@
 
 ## 1. 项目定位
 
-本项目基于 DeepSeek Harness 的 dsh-agent-teams 二次开发，目标是构建一个通用、可长期运行的软件工程 Agent Teams 插件。
+本项目是基于 DeepSeek Harness Agent Teams 能力独立维护的二次开发项目，产品名为 ProjectFlow Agent Teams，目标是构建一个通用、可长期运行的软件工程生命周期插件。
 
 项目同时支持：
 
@@ -76,7 +76,7 @@ Captain 负责项目目标、需求、设计、计划、状态汇总和用户沟
 
 ### 5.5 增量兼容上游
 
-优先复用现有 dsh-agent-teams 扩展点，新增能力放在独立模块中，避免无必要修改调度核心，保持 fork 可同步上游。
+优先复用现有 DSH Agent Teams 扩展点，新增能力放在独立模块中，避免无必要修改调度核心；保留上游来源和许可证说明，但以 ProjectFlow Agent Teams 的独立产品身份维护。
 
 ### 5.6 关键点打扰用户
 
@@ -264,10 +264,9 @@ DeepSeek Harness
 ## 14. 立项决议
 
 - 项目类型：通用软件工程 Agent Teams 插件。
-- 基础仓库：https://github.com/DengDengBei/dsh-agent-teams-ddb
+- 基础仓库：https://github.com/DengDengBei/projectflow-agent-teams
 - 上游仓库：https://github.com/NanmiCoder/dsh-agent-teams
 - 许可证：MIT。
 - 当前阶段：Phase 0，立项与边界已确认。
 - 下一阶段：Phase 1，项目上下文与状态模型。
 - 当前不做：RuoYi 专用逻辑、Software Company 式部门模拟、独立复杂 UI、生产部署自动化。
-

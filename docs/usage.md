@@ -1,10 +1,10 @@
 # 使用指南（详细）
 
-本文档收纳 dsh-agent-teams 的详细使用内容：工作原理、Web UI 行为、工具一览、配置与已知限制。README 只保留简介与快速上手。
+本文档收纳 ProjectFlow Agent Teams 的详细使用内容：工作原理、Web UI 行为、工具一览、配置与已知限制。README 只保留简介与快速上手。
 
 ## 工作原理
 
-`dsh-agent-teams` 复用 DSH 的能力接缝（capability seam），不依赖 workflow 引擎：
+`ProjectFlow Agent Teams` 复用 DSH 的能力接缝（capability seam），不依赖 workflow 引擎。为兼容现有宿主，内部 `/plugins/dsh-agent-teams/*` 路由标识暂保持不变：
 
 | DSH 能力 | AgentTeams 用法 |
 |---|---|

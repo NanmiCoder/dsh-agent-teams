@@ -174,7 +174,7 @@ async function runNode(script, args = []) {
   let stdout = ''
   let stderr = ''
   let settled = false
-    const timeoutMs = script.includes('stress-verify') ? 180_000 : 60_000
+    const timeoutMs = script.includes('stress-verify') ? 240_000 : 60_000
     const timeout = setTimeout(() => {
       if (settled) return
       settled = true

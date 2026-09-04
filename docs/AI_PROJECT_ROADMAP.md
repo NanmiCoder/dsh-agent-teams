@@ -8,7 +8,7 @@
     phase: phase-5-ui-release
     status: in_progress
     next_phase: phase-5-release-readiness
-    repository: https://github.com/DengDengBei/dsh-agent-teams-ddb
+    repository: https://github.com/DengDengBei/projectflow-agent-teams
     upstream: https://github.com/NanmiCoder/dsh-agent-teams
 
 ## 里程碑

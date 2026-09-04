@@ -1,26 +1,32 @@
+<h1 align="center">ProjectFlow Agent Teams</h1>
+
+<p align="center">Software Development Lifecycle Agent Teams for long-running software projects.</p>
+
 <p align="right">
   <strong>English</strong> · <a href="./README_ZH.md">简体中文</a>
 </p>
 
 <p align="center">
-  <img src="./assets/readme/hero.svg" width="100%" alt="dsh-agent-teams turns one DeepSeek Harness session into a coordinated multi-agent team">
+  <img src="./assets/readme/hero.svg" width="100%" alt="ProjectFlow Agent Teams turns one DeepSeek Harness session into a lifecycle-oriented software team">
 </p>
 
 <p align="center">
-  <a href="https://dshfind.com/en/plugins/NanmiCoder/dsh-agent-teams?ref=badge"><img src="https://img.shields.io/badge/recommended%20by-dshfind-FFD700?style=flat-square" alt="Recommended by dshfind"></a>
-  <a href="https://dshfind.com/en/plugins/NanmiCoder/dsh-agent-teams?ref=badge"><img src="https://dshfind.com/api/badge/NanmiCoder/dsh-agent-teams?lang=en" alt="dshfind score"></a>
-  <a href="https://dshfind.com/en/plugins/NanmiCoder/dsh-agent-teams?ref=badge"><img src="https://dshfind.com/api/badge/NanmiCoder/dsh-agent-teams?metric=downloads&amp;lang=en" alt="dshfind downloads"></a>
+  <a href="https://dshfind-disabled.invalid/en/plugins/DengDengBei/projectflow-agent-teams?ref=badge"><img src="https://img.shields.io/badge/recommended%20by-dshfind-FFD700?style=flat-square" alt="Recommended by dshfind"></a>
+  <a href="https://dshfind-disabled.invalid/en/plugins/DengDengBei/projectflow-agent-teams?ref=badge"><img src="https://dshfind-disabled.invalid/api/badge/DengDengBei/projectflow-agent-teams?lang=en" alt="dshfind score"></a>
+  <a href="https://dshfind-disabled.invalid/en/plugins/DengDengBei/projectflow-agent-teams?ref=badge"><img src="https://dshfind-disabled.invalid/api/badge/DengDengBei/projectflow-agent-teams?metric=downloads&amp;lang=en" alt="dshfind downloads"></a>
 </p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/@nanmicoder/dsh-agent-teams"><img src="https://img.shields.io/npm/v/@nanmicoder/dsh-agent-teams?style=flat-square&amp;color=5B4CF0" alt="npm version"></a>
+  <a href="https://www.npmjs.com/package/@dengdengbei/projectflow-agent-teams"><img src="https://img.shields.io/npm/v/@dengdengbei/projectflow-agent-teams?style=flat-square&amp;color=5B4CF0" alt="npm version"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-0B7285?style=flat-square" alt="MIT license"></a>
   <a href="./cordis.patch.yml"><img src="https://img.shields.io/badge/DSH-Web%20%2B%20Headless-5B4CF0?style=flat-square" alt="DSH Web and Headless"></a>
 </p>
 
-## One prompt. A working team.
+## One goal. A software team that can carry it through.
 
-`dsh-agent-teams` turns the current DeepSeek Harness session into a captain that can assemble durable sub-agents, split a goal into dependency-aware tasks, and coordinate work through direct messages.
+`ProjectFlow Agent Teams` turns a DeepSeek Harness session into a Captain for long-running software projects: clarifying requirements, preserving project context, coordinating agents, enforcing quality gates, and producing acceptance evidence.
+
+ProjectFlow Agent Teams is an independently maintained derivative project based on the original Agent Teams foundation at https://github.com/DengDengBei/projectflow-agent-teams. It adds a lifecycle-oriented workflow, persistent project context, brownfield takeover, a redesigned UI, and release-grade verification.
 
 Ask in natural language. The plugin provides the team protocol, eleven coordination tools, persistent state, an automatic shared-task scheduler, and a live Web UI—without requiring a separate workflow engine.
 
@@ -30,7 +36,7 @@ Ask in natural language. The plugin provides the team protocol, eleven coordinat
 
 ## Releases
 
-The [latest release](https://github.com/NanmiCoder/dsh-agent-teams/releases/latest), [v0.1.15](https://github.com/NanmiCoder/dsh-agent-teams/releases/tag/v0.1.15), targets Harness **0.1.2-alpha.2**. Older hosts must use a pinned compatible plugin version. Browse the [complete release history](https://github.com/NanmiCoder/dsh-agent-teams/releases); the same notes ship in the npm package under `release-notes/`.
+The [latest release](https://github.com/DengDengBei/projectflow-agent-teams/releases/latest), [v0.1.15](https://github.com/DengDengBei/projectflow-agent-teams/releases/tag/v0.1.15), targets Harness **0.1.2-alpha.2**. Older hosts must use a pinned compatible plugin version. Browse the [complete release history](https://github.com/DengDengBei/projectflow-agent-teams/releases); the same notes ship in the npm package under `release-notes/`.
 
 ## Why AgentTeams?
 
@@ -70,7 +76,7 @@ If you install Harness through npm, upgrade the host first, then install the mat
 ```sh
 npm install --global @deepseek-ai/dsh@0.1.2-alpha.2
 dsh --version
-dsh plugin --profile web add @nanmicoder/dsh-agent-teams@latest
+dsh plugin --profile web add @dengdengbei/projectflow-agent-teams@latest
 ```
 
 To pin this release, replace `@latest` with `@0.1.15`. Check the required host version in the release notes when updating. These examples target the `web` profile; use your actual profile if different. Stop and restart the running Harness process after changing either host or plugin, then refresh the browser.
@@ -80,7 +86,7 @@ To pin this release, replace `@latest` with `@0.1.15`. Check the required host v
 If you are keeping the previous RC host, **do not install the plugin's `@latest`**. For Harness 0.1.0-rc.8, keep or reinstall the pinned 0.1.14 plugin:
 
 ```sh
-dsh plugin --profile web add @nanmicoder/dsh-agent-teams@0.1.14
+dsh plugin --profile web add @dengdengbei/projectflow-agent-teams@0.1.15
 ```
 
 Restart the old host and refresh the browser. If you also upgraded Harness, restore the matching older host before using 0.1.14; rolling back only the plugin is not a supported Alpha.2 configuration. Do not delete credentials or `.agent-teams` data to fix a version mismatch.
@@ -90,8 +96,8 @@ Restart the old host and refresh the browser. If you also upgraded Harness, rest
 ### Build the Alpha.2 plugin from source
 
 ```sh
-git clone --branch v0.1.15 https://github.com/NanmiCoder/dsh-agent-teams.git
-cd dsh-agent-teams
+git clone --branch v0.1.15 https://github.com/DengDengBei/projectflow-agent-teams.git
+cd projectflow-agent-teams
 pnpm install --frozen-lockfile
 pnpm build
 dsh plugin --profile web add .
@@ -187,7 +193,7 @@ See docs/AI_PROJECT_CHARTER.md, docs/AI_AGENT_RULES.md, and docs/AI_PROJECT_ROAD
 The repository also ships the open Agent Skills package [`dsh-plugin-development`](./skills/dsh-plugin-development/SKILL.md):
 
 ```sh
-npx skills add NanmiCoder/dsh-agent-teams --skill dsh-plugin-development
+npx skills add DengDengBei/projectflow-agent-teams --skill dsh-plugin-development
 ```
 
 ## Documentation

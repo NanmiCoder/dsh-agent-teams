@@ -67,18 +67,16 @@ function run(name, args, cwd, capture = true) {
     const child = spawn(command.file, command.args, { cwd, env: childEnv, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
     let stdout = ''
     let stderr = ''
-    if (capture) {
-      child.stdout.on('data', (chunk) => {
-        const text = chunk.toString()
-        stdout += text
-        if (!capture) process.stdout.write(text)
-      })
-      child.stderr.on('data', (chunk) => {
-        const text = chunk.toString()
-        stderr += text
-        if (!capture) process.stderr.write(text)
-      })
-    }
+    child.stdout.on('data', (chunk) => {
+      const text = chunk.toString()
+      stdout += text
+      if (!capture) process.stdout.write(text)
+    })
+    child.stderr.on('data', (chunk) => {
+      const text = chunk.toString()
+      stderr += text
+      if (!capture) process.stderr.write(text)
+    })
     child.once('error', rejectRun)
     child.once('close', (code) => {
       if (code !== 0) { rejectRun(new Error(name + ' ' + args.join(' ') + ' exited ' + String(code) + '\n' + (stdout + '\n' + stderr).slice(-8000))); return }
@@ -205,7 +203,10 @@ try {
     '--ignore-scripts', '--no-audit', '--no-fund', '--include=peer',
     '--cache', npmCache, tarball, ...runtimePeerSpecs,
   ], root, false)
-  const installedRoot = join(profile, 'node_modules', '@nanmicoder', 'dsh-agent-teams')
+  const packageSegments = snapshotPackage.name.split('/')
+  const installedRoot = packageSegments[0].startsWith('@')
+    ? join(profile, 'node_modules', packageSegments[0], packageSegments[1])
+    : join(profile, 'node_modules', packageSegments[0])
   await stat(join(installedRoot, 'lib', 'index.js')); await stat(join(installedRoot, 'lib', 'client.js'))
   evidence.steps.cleanProfileInstall = {
     passed: true,
@@ -235,7 +236,7 @@ try {
   const authHost = installedWebRoutes.authenticatedWebRoutes(routeHost, () => undefined)
   assert(authHost && typeof authHost.register === 'function')
   authHost.register({ path: '/release-smoke', async handler() {} }); assert.equal(registeredRoute.path, '/release-smoke')
-  assert((await readFile(join(installedRoot, 'lib', 'client.js'), 'utf8')).includes('@nanmicoder/dsh-agent-teams'))
+  assert((await readFile(join(installedRoot, 'lib', 'client.js'), 'utf8')).includes(snapshotPackage.name))
   evidence.steps.installedSmoke = { passed: true, packageVersion: installedPackage.version, coldImport: true, projectTools: true, projectRouteProjection: true, projectRecovery: true, authenticatedRouteRegistration: true, clientBundle: true }
   console.log('PASS installed tarball cold import, project tools, project route, recovery, auth route registration, and client bundle smoke')
 

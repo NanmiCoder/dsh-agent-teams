@@ -4,11 +4,13 @@
  *
  * Members are durable continuable subagents of the captain, so a member keeps
  * its conversation across turns and across harness restarts: the captain
- * wakes it with {@link ctx.subagents.followup}, it works through its turn
- * (updating team state through the `agent_teams_*` tools), and becomes idle
- * again. Its final assistant message is not readable programmatically, so the
- * member persists its report into the captain's mailbox and the task records,
- * which the captain reads through `agent_teams_status`.
+ * wakes it through the harness subagent seam (`sendMessage` on
+ * 0.1.2-rc.1+, `followup` on 0.1.2-alpha.2, see `runtimeSend`), it works
+ * through its turn (updating team state through the `agent_teams_*` tools),
+ * and becomes idle again. Its final assistant message is not readable
+ * programmatically, so the member persists its report into the captain's
+ * mailbox and the task records, which the captain reads through
+ * `agent_teams_status`.
  * @module dsh-agent-teams/members
  */
 
@@ -17,6 +19,7 @@ import { installModelSelection, type Agent, type ModelSelection } from '@deepsee
 // Declaration merge only: makes ctx.subagents visible.
 import { foldSubagentDescriptor, SubagentError } from '@deepseek-ai/dsh-subagent'
 import { createUserMessage, LlmError, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
+import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import type { Session, SessionId } from '@deepseek-ai/dsh-session'
 import { join } from 'node:path'
 import { acknowledgeMailbox, appendMailbox, CAPTAIN_KEY, createMessage, readRetiredMemberIds, readTeamSync, readTeam, releaseMailboxDelivery, withTeamLock, writeTeam } from './state.ts'
@@ -363,6 +366,26 @@ export function installMemberSelectionRuntime(
   onFailureSettled?: (workspace: string, teamId: string, memberName: string) => Promise<void>,
 ): MemberSelectionRuntime {
   const pending = new Map<string, MemberLlmSelection>()
+  // Harness 0.1.2-rc.1 removed `registerContinuableSetup`: degrade to a
+  // no-op bridge instead of failing plugin load. Fresh members still get
+  // their route through agentOptions at spawn; cold-resumed members fall
+  // back to the durable descriptor route.
+  const registerContinuableSetup = (ctx.subagents as unknown as {
+    registerContinuableSetup?: unknown
+  }).registerContinuableSetup
+  if (typeof registerContinuableSetup !== 'function') {
+    ctx.logger.warn('agent-teams: host subagents service has no registerContinuableSetup (removed in harness 0.1.2-rc.1); member model-selection bridge disabled, members use the default route')
+    return {
+      async withPending<T>(
+        _parentSessionId: string,
+        _label: string,
+        _selection: MemberLlmSelection,
+        operation: () => Promise<T>,
+      ): Promise<T> {
+        return operation()
+      },
+    }
+  }
   ctx.subagents.registerContinuableSetup((childCtx) => {
     const child = childCtx.agent
     if (child === undefined) return () => undefined
@@ -628,6 +651,79 @@ export async function spawnMember(
 }
 
 /**
+ * Version-bridge surface over the harness `subagents` runtime.
+ *
+ * - Harness 0.1.2-alpha.2 (previous plugin target) exposed
+ *   `ctx.subagents.followup(parent, childId, content, { source, signal })`.
+ * - Harness 0.1.2-rc.1 renamed it to
+ *   `ctx.subagents.sendMessage(sender, targetId, content, { signal })`;
+ *   message provenance is derived from the live sender Agent and there is no
+ *   `source` option anymore. Calling the removed `followup` on rc.1 throws
+ *   `TypeError`, which previously made every live member delivery fail
+ *   silently: messages were only persisted to the plugin mailbox and members
+ *   never woke up.
+ *
+ * The bridge prefers `sendMessage` and falls back to `followup`, so the same
+ * build keeps working on both harness generations.
+ */
+interface SubagentRuntimeCompat {
+  sendMessage?: (
+    sender: Agent,
+    targetId: SessionId,
+    content: ContentBlock[],
+    options: { signal: AbortSignal },
+  ) => Promise<unknown>
+  followup?: (
+    parent: Agent,
+    childId: SessionId,
+    content: ContentBlock[],
+    options: { source: unknown; signal: AbortSignal },
+  ) => Promise<unknown>
+}
+
+/** Loose call signature shared by both bridge branches. */
+type CompatSendFn = (
+  parent: Agent,
+  childId: SessionId,
+  content: ContentBlock[],
+  options: { source?: unknown; signal: AbortSignal },
+) => Promise<unknown>
+
+/** Resolve whichever send API the running harness exposes (newest first). */
+function compatSendFn(runtime: SubagentRuntimeCompat): { api: 'sendMessage' | 'followup'; send: CompatSendFn } | undefined {
+  if (typeof runtime.sendMessage === 'function') {
+    return { api: 'sendMessage', send: runtime.sendMessage as unknown as CompatSendFn }
+  }
+  if (typeof runtime.followup === 'function') {
+    return { api: 'followup', send: runtime.followup as unknown as CompatSendFn }
+  }
+  return undefined
+}
+
+/**
+ * Deliver one message to a member as its next FIFO turn through whichever
+ * send API the host exposes (see {@link SubagentRuntimeCompat}).
+ */
+function runtimeSend(
+  runtime: SubagentRuntimeCompat,
+  parent: Agent,
+  childId: SessionId,
+  content: ContentBlock[],
+  signal: AbortSignal,
+): Promise<unknown> {
+  if (typeof runtime.sendMessage === 'function') {
+    return runtime.sendMessage(parent, childId, content, { signal })
+  }
+  if (typeof runtime.followup === 'function') {
+    return runtime.followup(parent, childId, content, {
+      source: { kind: 'plugin', plugin: 'dsh-agent-teams' },
+      signal,
+    })
+  }
+  throw new Error('agent-teams: subagents runtime exposes neither sendMessage (harness >= 0.1.2-rc.1) nor followup (0.1.2-alpha.2)')
+}
+
+/**
  * Deliver one message to a member as its next FIFO turn. Best effort: a
  * failure (member gone or not continuable) is logged and reported as `false`
  * so the caller can decide (mailbox delivery still happened).
@@ -652,13 +748,10 @@ export async function deliverToMember(
   signal: AbortSignal,
 ): Promise<boolean> {
   try {
-    await ctx.subagents.followup(captain, brandedSessionId(childId), [{ type: 'text', text }], {
-      source: { kind: 'plugin', plugin: 'dsh-agent-teams' },
-      signal,
-    })
+    await runtimeSend(ctx.subagents as unknown as SubagentRuntimeCompat, captain, brandedSessionId(childId), [{ type: 'text', text }], signal)
     return true
   } catch (error: unknown) {
-    ctx.logger.warn(`agent-teams: followup to member ${childId} failed: ${String(error)}`)
+    ctx.logger.warn(`agent-teams: send to member ${childId} failed: ${String(error)}`)
     return false
   }
 }
@@ -683,18 +776,28 @@ export function interruptMember(ctx: Context, captain: Agent, childId: string): 
  *
  * Upstream `interrupt()` deliberately preserves continuable sessions and the
  * upstream seam exposes no targeted forget/retire method. The durable
- * AgentTeams index therefore rejects `followup()` before it can cold-resume a
+ * AgentTeams index therefore rejects delivery before it can cold-resume a
  * retired member. Catalog rows deliberately remain discoverable: Harness rc.8
  * uses the direct-child catalog to authorize historical transcript reads and
  * `openSubagent()`, so filtering those rows would make an archived member's
  * persisted conversation inaccessible. Exact ids keep unrelated subagents
- * untouched while the followup boundary still prevents further model turns.
+ * untouched while the send boundary still prevents further model turns.
+ *
+ * The guard wraps whichever send API the host exposes (`sendMessage` on
+ * 0.1.2-rc.1+, `followup` on 0.1.2-alpha.2, see {@link SubagentRuntimeCompat}).
  */
 export function installRetiredMemberGuard(ctx: Context, stateDir: string): void {
-  const runtime = ctx.subagents
+  const runtime = ctx.subagents as unknown as SubagentRuntimeCompat
+  const resolved = compatSendFn(runtime)
+  if (resolved === undefined) return
+  const { api, send } = resolved
   ctx.effect(() => {
-    const followup = runtime.followup
-    const guardedFollowup: typeof runtime.followup = async (parent, childId, content, options) => {
+    const guardedSend = async (
+      parent: Agent,
+      childId: SessionId,
+      content: ContentBlock[],
+      options: { source?: unknown; signal: AbortSignal },
+    ): Promise<unknown> => {
       const retired = await readRetiredMemberIds(join(parent.session.header.cwd ?? process.cwd(), stateDir))
       if (retired.has(childId)) {
         throw new SubagentError(
@@ -702,12 +805,22 @@ export function installRetiredMemberGuard(ctx: Context, stateDir: string): void 
           'NOT_RESUMABLE',
         )
       }
-      return followup.call(runtime, parent, childId, content, options)
+      return send(parent, childId, content, options)
     }
 
-    runtime.followup = guardedFollowup
+    if (api === 'sendMessage') {
+      runtime.sendMessage = guardedSend as SubagentRuntimeCompat['sendMessage']
+    } else {
+      runtime.followup = guardedSend as SubagentRuntimeCompat['followup']
+    }
     return () => {
-      if (runtime.followup === guardedFollowup) runtime.followup = followup
+      if (api === 'sendMessage') {
+        if (runtime.sendMessage === (guardedSend as SubagentRuntimeCompat['sendMessage'])) {
+          runtime.sendMessage = send as SubagentRuntimeCompat['sendMessage']
+        }
+      } else if (runtime.followup === (guardedSend as SubagentRuntimeCompat['followup'])) {
+        runtime.followup = send as SubagentRuntimeCompat['followup']
+      }
     }
   }, 'agent-teams: retired member guard')
 }

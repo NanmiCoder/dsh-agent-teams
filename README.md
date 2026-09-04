@@ -55,6 +55,7 @@ The conversation card and activity panel use Harness's official locale service. 
 | Harness host | Plugin to use | Compatibility status |
 | --- | --- | --- |
 | **0.1.2-alpha.2** | **0.1.15** (`@latest`) | Recommended current pair; real API and Web UI verified on macOS arm64. |
+| **0.1.2-rc.1** | Current `main` (not yet published to npm) | Runtime API bridged: rc.1 renamed `ctx.subagents.followup` to `sendMessage` and the plugin picks whichever the host exposes; the model-selection bridge degrades gracefully when `registerContinuableSetup` is absent. |
 | **0.1.0-rc.8** | **0.1.14** | Previous dependency baseline; keep this pair if you are not upgrading Harness. |
 | Other older RC / unchanged source checkout | Pin your working plugin version; do not follow `@latest` | Do not assume every older host works with 0.1.14. |
 | Alpha.1, later Alpha versions, or other source revisions | Not verified | Match the documented host version or validate separately. |

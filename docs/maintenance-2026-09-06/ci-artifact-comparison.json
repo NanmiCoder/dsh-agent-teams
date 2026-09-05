@@ -1,0 +1,22 @@
+{
+  "localSha256": "6325e972566092bb0ec07d6065113ebd0fcf5877e475b2961dc8b049c2a2654c",
+  "ciSha256": "6eab922f9661acda53ff0e290441235cc79201954ebc7810be28cc3a61b468e8",
+  "differentFiles": [
+    "package/lib/client.js"
+  ],
+  "files": 85,
+  "clientDifferences": {
+    "cause": "Harness builder uses absolute source paths in region comments and CSS module hashes",
+    "cssModulePrefixes": [
+      [
+        "Q0fltW",
+        "OXlefG"
+      ],
+      [
+        "kPAopq",
+        "aYQbCq"
+      ]
+    ],
+    "equalAfterOnlyRootAndCssPrefixNormalization": true
+  }
+}

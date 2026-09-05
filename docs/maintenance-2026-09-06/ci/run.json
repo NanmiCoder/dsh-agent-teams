@@ -1,0 +1,44 @@
+{
+  "conclusion": "success",
+  "headSha": "51257a6a94cbdbeba7261d2e3d0be614f043c66e",
+  "jobs": [
+    {
+      "name": "Static checks (Windows)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/NanmiCoder/dsh-agent-teams/actions/runs/33980538041/job/101344847098"
+    },
+    {
+      "name": "Static checks (Ubuntu) and candidate package",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/NanmiCoder/dsh-agent-teams/actions/runs/33980538041/job/101344847216"
+    },
+    {
+      "name": "Real Harness (0.1.2-rc.1)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/NanmiCoder/dsh-agent-teams/actions/runs/33980538041/job/101345046478"
+    },
+    {
+      "name": "Real Harness (0.1.2-alpha.5)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/NanmiCoder/dsh-agent-teams/actions/runs/33980538041/job/101345046508"
+    },
+    {
+      "name": "Real Harness (0.1.2-alpha.2)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/NanmiCoder/dsh-agent-teams/actions/runs/33980538041/job/101345046509"
+    },
+    {
+      "name": "Complete compatibility gate",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/NanmiCoder/dsh-agent-teams/actions/runs/33980538041/job/101345227452"
+    }
+  ],
+  "status": "completed",
+  "url": "https://github.com/NanmiCoder/dsh-agent-teams/actions/runs/33980538041"
+}

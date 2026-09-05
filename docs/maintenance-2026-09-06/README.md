@@ -47,6 +47,10 @@
 
 真实模型可选择调用宿主原生工具，Alpha.5 还通过计算命令复核答案；这组测试证明真实用户流程，不声称隔离所有通知入口。通知边界由前述确定性场景单独验证。首轮隔离 profile 缺少 package.version，被真实插件清单扩展在 HTTP 前拒绝；补齐测试元数据后才计入成功，未关闭该扩展或把前置错误当 API 成功。
 
+[CI 最终验收](./ci/run.json)的六个检查全部成功：Ubuntu/Windows 完整构建与 verify、三个 Ubuntu 真宿主矩阵和汇总门禁。整合 PR [#135](https://github.com/NanmiCoder/dsh-agent-teams/pull/135) 已合入主线 `ae2ef8342b7b9c02fd2868847d6c7b148d394145`。
+
+CI 首轮 Ubuntu 全部检查通过；Windows 暴露归档锁测试固定 80ms 的时间竞赛，已改为在第一次真实 OS rename 拒绝后握手释放锁，再要求产品重试成功。只改测试，未调整产品重试期限。CI 构建包与本地验收包有路径相关的 CSS module hash 差异；[逐文件比较](./ci-artifact-comparison.json)确认仅 client.js 的两个 CSS 前缀和构建路径注释变化，其他 84 个文件字节一致。CI 的宿主矩阵和发布始终使用同一个 CI 产物。
+
 测试边界明确保留：确定性模型测试本身不是实际 provider API 验证；macOS CLI/Web 通过不等于任意 Windows/Desktop 壳版本通过；本次未改写真实用户历史日志，也没有将 OOM 报告或尚未实现的功能标成已修复。
 
 ## GitHub 处理

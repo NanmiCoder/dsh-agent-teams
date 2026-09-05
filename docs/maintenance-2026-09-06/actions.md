@@ -6,8 +6,8 @@
 
 ## 本批结果
 
-- PR：22 个已执行，包含 9 个合并并致谢、10 个具体的 Request changes 审核和 3 个说明原因后关闭。#119、#124、#130 的重叠贡献等待统一适配的最终验收及替代提交链接。
-- Issue：28 个已逐条回复，其中新关闭 10 个、保持开放 17 个，另为已自动关闭的 #89 补充感谢与验证边界。其余 13 个保留到最终验收后处理。
+- PR：原有 25 个均已执行，包含 9 个原 PR 合并并致谢、10 个具体的 Request changes 审核并保持开放、3 个历史方案说明原因后关闭，以及 3 个兼容 PR 在统一实现合并后说明来源并关闭。另建的整合 PR #135 已合并；CI 六项检查全部通过。
+- Issue：41 个均已逐条回复，其中新关闭 11 个、保持开放 29 个，另为已自动关闭的 #89 补充感谢与验证边界。最后 13 条已补充实际验收、固定提交及整合 PR 链接；候选未发布、需要平台/资源复现或仍有独立功能范围的 issue 继续开放。
 - “已回复”“已合并”“已发布”“已验证”分别记录。关闭问答、推广邀请或重复讨论不表示一个功能已经交付；仍需复现信息和独立功能验收的条目保持开放。
 
 ## 25 个 PR
@@ -16,9 +16,9 @@
 
 | PR | 本轮核对的 head | 已执行动作或待办 | 直接证据 |
 | --- | --- | --- | --- |
-| [#130](https://github.com/NanmiCoder/dsh-agent-teams/pull/130) fix: bridge subagent delivery API for DeepSeek Harness 0.1.2-rc.1 | `620daa33c8dd813198451fb3fdfa46bd5a3b5bd6` | Pending：统一吸收兼容思路，等待最终验收和替代提交回链 | 尚未发送最终处理评论 |
-| [#124](https://github.com/NanmiCoder/dsh-agent-teams/pull/124) fix(host): 适配 DSH 0.1.2-alpha.5 的 subagents API 重构 | `098e4e97ebc08096ca76c40c03e2e906d0fd1ef6` | Pending：统一吸收兼容思路，等待最终验收和替代提交回链 | 尚未发送最终处理评论 |
-| [#119](https://github.com/NanmiCoder/dsh-agent-teams/pull/119) fix: migrate subagent APIs to harness 0.1.2-alpha.4 | `cdb683e144e73a02ec829cb14554fb6cdd574eb6` | Pending：统一吸收兼容思路，等待最终验收和替代提交回链 | 尚未发送最终处理评论 |
+| [#130](https://github.com/NanmiCoder/dsh-agent-teams/pull/130) fix: bridge subagent delivery API for DeepSeek Harness 0.1.2-rc.1 | `620daa33c8dd813198451fb3fdfa46bd5a3b5bd6` | 已由整合 PR #135 吸收并说明来源后关闭 | [整合提交](https://github.com/NanmiCoder/dsh-agent-teams/commit/ae2ef8342b7b9c02fd2868847d6c7b148d394145) · [关闭说明](https://github.com/NanmiCoder/dsh-agent-teams/pull/130#issuecomment-5553527130) · [CI](https://github.com/NanmiCoder/dsh-agent-teams/actions/runs/33980538041) |
+| [#124](https://github.com/NanmiCoder/dsh-agent-teams/pull/124) fix(host): 适配 DSH 0.1.2-alpha.5 的 subagents API 重构 | `098e4e97ebc08096ca76c40c03e2e906d0fd1ef6` | 已由整合 PR #135 吸收并说明来源后关闭 | [整合提交](https://github.com/NanmiCoder/dsh-agent-teams/commit/ae2ef8342b7b9c02fd2868847d6c7b148d394145) · [关闭说明](https://github.com/NanmiCoder/dsh-agent-teams/pull/124#issuecomment-5553522573) · [CI](https://github.com/NanmiCoder/dsh-agent-teams/actions/runs/33980538041) |
+| [#119](https://github.com/NanmiCoder/dsh-agent-teams/pull/119) fix: migrate subagent APIs to harness 0.1.2-alpha.4 | `cdb683e144e73a02ec829cb14554fb6cdd574eb6` | 已由整合 PR #135 吸收并说明来源后关闭 | [整合提交](https://github.com/NanmiCoder/dsh-agent-teams/commit/ae2ef8342b7b9c02fd2868847d6c7b148d394145) · [关闭说明](https://github.com/NanmiCoder/dsh-agent-teams/pull/119#issuecomment-5553517172) · [CI](https://github.com/NanmiCoder/dsh-agent-teams/actions/runs/33980538041) |
 | [#118](https://github.com/NanmiCoder/dsh-agent-teams/pull/118) client: Kimi-minimal activity panel and identity marks | `c5839ed198a8f463e3c25c69c5d6d57c7d165853` | 已 Request changes，保持开放等待作者修改 | [具体审核要求](https://github.com/NanmiCoder/dsh-agent-teams/pull/118#pullrequestreview-5122031987) |
 | [#112](https://github.com/NanmiCoder/dsh-agent-teams/pull/112) Update injected services to include conversationEvents | `66ea3d4f4339331fbde12b210dad6a11822c1ce1` | 已说明原因后关闭 | [关闭说明](https://github.com/NanmiCoder/dsh-agent-teams/pull/112#issuecomment-5553175919) |
 | [#93](https://github.com/NanmiCoder/dsh-agent-teams/pull/93) fix(client): use uiConversation for card registration | `67d715975b9edf1492ea254805428148720d924b` | 已合并，并回复验收范围 | [合并提交](https://github.com/NanmiCoder/dsh-agent-teams/commit/6d1b21bdade7684a5319697383a124a5731f20a7) · [评论](https://github.com/NanmiCoder/dsh-agent-teams/pull/93#issuecomment-5553177463) |
@@ -48,25 +48,25 @@
 
 | Issue | 执行后的状态 | 处理结果或待验收事项 | 直接证据 |
 | --- | --- | --- | --- |
-| [#134](https://github.com/NanmiCoder/dsh-agent-teams/issues/134) cannot restart after install the plugin | Pending | 并入 #120/#127；关闭原因只能duplicate，不能resolved；保留Windows启动验收。 | 保留到最终验收后回复；未在本批关闭 |
+| [#134](https://github.com/NanmiCoder/dsh-agent-teams/issues/134) cannot restart after install the plugin | 已关闭 | 已按 #120/#127 的重复报告归并；保留原生 Windows 验收边界 | [实际回复](https://github.com/NanmiCoder/dsh-agent-teams/issues/134#issuecomment-5553450098) |
 | [#133](https://github.com/NanmiCoder/dsh-agent-teams/issues/133) 模块新增的预设无法删除，尽管修改了dsh的配置文件中的的预设但是每个新会话的新预设还是mathv4 | 开放 | 已请求必要版本/复现信息 | [实际回复](https://github.com/NanmiCoder/dsh-agent-teams/issues/133#issuecomment-5553219103) |
-| [#132](https://github.com/NanmiCoder/dsh-agent-teams/issues/132) Harness 0.1.2-rc.1 (public npm) fails to boot: ctx.subagents.registerContinuableSetup is not a function — no installable version works (0.1.15/0.1.14 verified, 0.1.13 source has same call) | Pending | 按 #127 验收真实rc.1产品入口、队员回合/模型/失败/恢复；不能仅skip setup。 | 保留到最终验收后回复；未在本批关闭 |
+| [#132](https://github.com/NanmiCoder/dsh-agent-teams/issues/132) Harness 0.1.2-rc.1 (public npm) fails to boot: ctx.subagents.registerContinuableSetup is not a function — no installable version works (0.1.15/0.1.14 verified, 0.1.13 source has same call) | 开放 | 已回链 rc.1 完整宿主及真实 API 验收；候选尚未 npm 发布 | [实际回复](https://github.com/NanmiCoder/dsh-agent-teams/issues/132#issuecomment-5553452320) |
 | [#131](https://github.com/NanmiCoder/dsh-agent-teams/issues/131) DeepSeek Harness 0.1.2-rc.1 兼容：ctx.subagents.followup 已改名 sendMessage，队长消息无法送达队员 | 开放 | 已说明根因和剩余修复范围 | [实际回复](https://github.com/NanmiCoder/dsh-agent-teams/issues/131#issuecomment-5553220376) |
 | [#128](https://github.com/NanmiCoder/dsh-agent-teams/issues/128) 0.1.15 breaks Deepseek-Harness-Desktop (embedded dsh 0.1.1-rc.1): pending uiConversation; auto-upgrade via package ranges makes it worse | 开放 | 已说明根因和剩余修复范围 | [实际回复](https://github.com/NanmiCoder/dsh-agent-teams/issues/128#issuecomment-5553221518) |
-| [#127](https://github.com/NanmiCoder/dsh-agent-teams/issues/127) 适配一下0.1.2-rc.1 | Pending | 精确npmtarball+闭包、启动、fresh/cold/fork、FIFO/steer、力度fallback失败收尾、UI/auth，及不支持版本诊断。 | 保留到最终验收后回复；未在本批关闭 |
+| [#127](https://github.com/NanmiCoder/dsh-agent-teams/issues/127) 适配一下0.1.2-rc.1 | 开放 | 统一实现已合入，三版宿主及真实 API 验收已回复；等待发布 | [实际回复](https://github.com/NanmiCoder/dsh-agent-teams/issues/127#issuecomment-5553453884) |
 | [#126](https://github.com/NanmiCoder/dsh-agent-teams/issues/126) 建议：npm上不要把对应dsh alpha版本的设置为latest | 开放 | 已说明根因和剩余修复范围 | [实际回复](https://github.com/NanmiCoder/dsh-agent-teams/issues/126#issuecomment-5553222990) |
-| [#125](https://github.com/NanmiCoder/dsh-agent-teams/issues/125) [Bug] captain 代成员 claim 后未唤醒，任务可停在 claimed 并产生 attempt_id 轮换 | Pending | 主任务选择禁止captain代成员claim、要求reassign；验证拒绝发生于持久化前、成员自claim可用、attempt不轮换。 | 保留到最终验收后回复；未在本批关闭 |
-| [#123](https://github.com/NanmiCoder/dsh-agent-teams/issues/123) [bug] 不兼容宿主 dsh 0.1.2-alpha.5：boot 阶段 `ctx.subagents.registerContinuableSetup is not a function`，导致整个 dsh web 插件树加载失败 | Pending | alpha5和rc1分别验证；Desktop壳/内核/profile分开记录。未有真实Desktop验收不能宣称支持2.0.5。 | 保留到最终验收后回复；未在本批关闭 |
+| [#125](https://github.com/NanmiCoder/dsh-agent-teams/issues/125) [Bug] captain 代成员 claim 后未唤醒，任务可停在 claimed 并产生 attempt_id 轮换 | 开放 | claim/reassign 修复及真实成员执行已回复；等待修复包发布 | [实际回复](https://github.com/NanmiCoder/dsh-agent-teams/issues/125#issuecomment-5553455083) |
+| [#123](https://github.com/NanmiCoder/dsh-agent-teams/issues/123) [bug] 不兼容宿主 dsh 0.1.2-alpha.5：boot 阶段 `ctx.subagents.registerContinuableSetup is not a function`，导致整个 dsh web 插件树加载失败 | 开放 | Alpha.5/rc.1 验收已回复；保留 Desktop/Windows 的独立边界 | [实际回复](https://github.com/NanmiCoder/dsh-agent-teams/issues/123#issuecomment-5553456712) |
 | [#121](https://github.com/NanmiCoder/dsh-agent-teams/issues/121) [feat] 可以把图标加个替换的功能，让客户自由替换不同角色对应的图标吗 | 开放 | 已保留独立功能及验收范围 | [实际回复](https://github.com/NanmiCoder/dsh-agent-teams/issues/121#issuecomment-5553224038) |
-| [#120](https://github.com/NanmiCoder/dsh-agent-teams/issues/120) 0.1.15 在 dsh 0.1.2-alpha.5 下无法加载：ctx.subagents.registerContinuableSetup 已不存在 | Pending | 显式alpha4/alpha5支持边界；不能无限声明alpha4+；真实公开包完整闭包，unsupported入口可诊断。 | 保留到最终验收后回复；未在本批关闭 |
-| [#117](https://github.com/NanmiCoder/dsh-agent-teams/issues/117) Describe the bug 使用多Agent团队任务后，Node进程内存只涨不跌，多次任务后触发OOM崩溃。 | Pending | 可复现多轮队伍创建执行归档，固定并发模型，heapUsed/RSS/idle后趋势，存活listeners/agents等；不能凭RSS不降认定泄漏。 | 保留到最终验收后回复；未在本批关闭 |
+| [#120](https://github.com/NanmiCoder/dsh-agent-teams/issues/120) 0.1.15 在 dsh 0.1.2-alpha.5 下无法加载：ctx.subagents.registerContinuableSetup 已不存在 | 开放 | Alpha.5 候选已验证；Windows 宿主 UI 未实测，候选尚未发布 | [实际回复](https://github.com/NanmiCoder/dsh-agent-teams/issues/120#issuecomment-5553458676) |
+| [#117](https://github.com/NanmiCoder/dsh-agent-teams/issues/117) Describe the bug 使用多Agent团队任务后，Node进程内存只涨不跌，多次任务后触发OOM崩溃。 | 开放 | 已索取长期资源复现数据；短任务 API 通过不作为 OOM 修复 | [实际回复](https://github.com/NanmiCoder/dsh-agent-teams/issues/117#issuecomment-5553461432) |
 | [#116](https://github.com/NanmiCoder/dsh-agent-teams/issues/116) Add OrcaRouter as an optional AI provider | 已关闭 | 已说明责任边界后关闭 | [实际回复](https://github.com/NanmiCoder/dsh-agent-teams/issues/116#issuecomment-5553225569) |
 | [#114](https://github.com/NanmiCoder/dsh-agent-teams/issues/114) Feature Request: Prevent long-running AgentTeams members from accumulating excessive context | 开放 | 已保留独立功能及验收范围 | [实际回复](https://github.com/NanmiCoder/dsh-agent-teams/issues/114#issuecomment-5553227936) |
-| [#113](https://github.com/NanmiCoder/dsh-agent-teams/issues/113) can't load | Pending | 旧组合安装文档与升级门禁；本轮未复测旧RC。新的rc1修复不能自动解释旧RC兼容。 | 保留到最终验收后回复；未在本批关闭 |
+| [#113](https://github.com/NanmiCoder/dsh-agent-teams/issues/113) can't load | 开放 | 已说明旧 rc.2 配套安装；新三版通过不证明旧 RC 兼容 | [实际回复](https://github.com/NanmiCoder/dsh-agent-teams/issues/113#issuecomment-5553462549) |
 | [#111](https://github.com/NanmiCoder/dsh-agent-teams/issues/111) An error message prevented deepseek-harness-desktop from starting. | 开放 | 已请求必要版本/复现信息 | [实际回复](https://github.com/NanmiCoder/dsh-agent-teams/issues/111#issuecomment-5553230093) |
-| [#107](https://github.com/NanmiCoder/dsh-agent-teams/issues/107) DSH 从 0.1.1-rc.2  更新到了 0.1.2-alpha.1，插件无法使用 | Pending | 作为历史汇总入口写矩阵链接；明确已验Alpha2/0.1.15、旧rc2/0.1.10历史边界；新版本待published。 | 保留到最终验收后回复；未在本批关闭 |
-| [#106](https://github.com/NanmiCoder/dsh-agent-teams/issues/106) [Security] Web 路由（/state /hal /plan /assets）缺少 loopback/设备校验围栏 | Pending | 主任务补halt cap与413、同源/配对/未授权/缺服务failsclosed、dispose重载，保留authgate。 | 保留到最终验收后回复；未在本批关闭 |
-| [#103](https://github.com/NanmiCoder/dsh-agent-teams/issues/103) [Bug] Scheduler regenerates attemptId for idle member owning open task, causing stale attempt errors | Pending | 新矩阵下重复kick/idle/registrydisposal/失败投递不换attempt，重启cold有一次rotation为设计；发布后报告人版本确认。 | 保留到最终验收后回复；未在本批关闭 |
+| [#107](https://github.com/NanmiCoder/dsh-agent-teams/issues/107) DSH 从 0.1.1-rc.2  更新到了 0.1.2-alpha.1，插件无法使用 | 开放 | 已按精确组合分流历史问题；旧宿主与第三方插件继续核对 | [实际回复](https://github.com/NanmiCoder/dsh-agent-teams/issues/107#issuecomment-5553464745) |
+| [#106](https://github.com/NanmiCoder/dsh-agent-teams/issues/106) [Security] Web 路由（/state /hal /plan /assets）缺少 loopback/设备校验围栏 | 开放 | 已回复鉴权和 1 MB 请求体边界的实际验证；等待发版 | [实际回复](https://github.com/NanmiCoder/dsh-agent-teams/issues/106#issuecomment-5553467610) |
+| [#103](https://github.com/NanmiCoder/dsh-agent-teams/issues/103) [Bug] Scheduler regenerates attemptId for idle member owning open task, causing stale attempt errors | 开放 | 已回复红绿回归和真实冷恢复；仍需实际安装版本与发版确认 | [实际回复](https://github.com/NanmiCoder/dsh-agent-teams/issues/103#issuecomment-5553470218) |
 | [#101](https://github.com/NanmiCoder/dsh-agent-teams/issues/101) Feature Request: Optional dsh-better-sidebar Integration for the Activity Panel | 开放 | 已保留独立功能及验收范围 | [实际回复](https://github.com/NanmiCoder/dsh-agent-teams/issues/101#issuecomment-5553231726) |
 | [#97](https://github.com/NanmiCoder/dsh-agent-teams/issues/97) 希望增加：全局并发限制 (maxConcurrentWorkers) 并支持限流后自动恢复 | 开放 | 已保留独立功能及验收范围 | [实际回复](https://github.com/NanmiCoder/dsh-agent-teams/issues/97#issuecomment-5553232977) |
 | [#96](https://github.com/NanmiCoder/dsh-agent-teams/issues/96) 太烧token，能做成Agent 预设吗？ | 开放 | 已保留独立功能及验收范围 | [实际回复](https://github.com/NanmiCoder/dsh-agent-teams/issues/96#issuecomment-5553234461) |
@@ -74,9 +74,9 @@
 | [#88](https://github.com/NanmiCoder/dsh-agent-teams/issues/88) 是否接受更多开发者参与 | 已关闭 | 已回答或处理通知后关闭 | [实际回复](https://github.com/NanmiCoder/dsh-agent-teams/issues/88#issuecomment-5553237003) |
 | [#81](https://github.com/NanmiCoder/dsh-agent-teams/issues/81) 这个是像Workbuddy里面的团队一样运作的吗？ | 已关闭 | 已回答或处理通知后关闭 | [实际回复](https://github.com/NanmiCoder/dsh-agent-teams/issues/81#issuecomment-5553238684) |
 | [#79](https://github.com/NanmiCoder/dsh-agent-teams/issues/79) 任务完成后再次打开对话，页面会自己弹出来。 | 已关闭 | 限定原报告场景已修复，已关闭 | [实际回复](https://github.com/NanmiCoder/dsh-agent-teams/issues/79#issuecomment-5553240419) |
-| [#78](https://github.com/NanmiCoder/dsh-agent-teams/issues/78) 创建了任务之后，子agent可能是长耗时任务，主agent的轮询时间间隔周期延长，不断快速轮询浪费和污染上下文 | Pending | 主任务改描述/协议一致+实际idle队长被通知唤醒，不禁用诊断status，不改UIpoll代替模型优化。 | 保留到最终验收后回复；未在本批关闭 |
+| [#78](https://github.com/NanmiCoder/dsh-agent-teams/issues/78) 创建了任务之后，子agent可能是长耗时任务，主agent的轮询时间间隔周期延长，不断快速轮询浪费和污染上下文 | 开放 | 已回复提示词、真实 idle 通知与模型执行证据；等待发版反馈 | [实际回复](https://github.com/NanmiCoder/dsh-agent-teams/issues/78#issuecomment-5553472263) |
 | [#77](https://github.com/NanmiCoder/dsh-agent-teams/issues/77) 显示bug，不应该出现无tasks的Subagent吧，而且还有白色进度条 | 已关闭 | 限定原报告场景已修复，已关闭 | [实际回复](https://github.com/NanmiCoder/dsh-agent-teams/issues/77#issuecomment-5553242365) |
-| [#76](https://github.com/NanmiCoder/dsh-agent-teams/issues/76) 子代理在额度耗尽时缺少降级 / 兜底机制，导致协作进度断裂 | Pending | 统一host保证已有fallback不被setupno-op禁用；remainingchain预算单独验收，quota非必可重试。 | 保留到最终验收后回复；未在本批关闭 |
+| [#76](https://github.com/NanmiCoder/dsh-agent-teams/issues/76) 子代理在额度耗尽时缺少降级 / 兜底机制，导致协作进度断裂 | 开放 | 已说明单跳 fallback 修复；多跳链、退避和预算需求继续开放 | [实际回复](https://github.com/NanmiCoder/dsh-agent-teams/issues/76#issuecomment-5553474595) |
 | [#71](https://github.com/NanmiCoder/dsh-agent-teams/issues/71) issue3-斜杠命令分发.md | 开放 | 已保留独立功能及验收范围 | [实际回复](https://github.com/NanmiCoder/dsh-agent-teams/issues/71#issuecomment-5553243877) |
 | [#70](https://github.com/NanmiCoder/dsh-agent-teams/issues/70) issue2-消息附件.md | 开放 | 已保留独立功能及验收范围 | [实际回复](https://github.com/NanmiCoder/dsh-agent-teams/issues/70#issuecomment-5553245615) |
 | [#68](https://github.com/NanmiCoder/dsh-agent-teams/issues/68) Design partner invitation: lifecycle gate for dsh-agent-teams | 已关闭 | 已回答或处理通知后关闭 | [实际回复](https://github.com/NanmiCoder/dsh-agent-teams/issues/68#issuecomment-5553247491) |
@@ -90,12 +90,12 @@
 | [#17](https://github.com/NanmiCoder/dsh-agent-teams/issues/17) readme文件有笔误 | 已关闭 | 限定原报告场景已修复，已关闭 | [实际回复](https://github.com/NanmiCoder/dsh-agent-teams/issues/17#issuecomment-5553260124) |
 | [#11](https://github.com/NanmiCoder/dsh-agent-teams/issues/11) Featured in awesome-deepseek-harness 🐋 | 已关闭 | 已回答或处理通知后关闭 | [实际回复](https://github.com/NanmiCoder/dsh-agent-teams/issues/11#issuecomment-5553262213) |
 
-## 最后 3 个 PR 与 13 个 Issue 的收尾条件
+## 整合结果与 Issue 后续验收
 
-- #119/#124/#130：在同一发布包完成精确宿主矩阵后，回链整合提交、验收报告以及贡献者来源；不能仅以 boot 成功宣称消息、fallback 和恢复能力完整。
-- #127/#132/#123/#120/#134：分别记录 rc.1、alpha.5 与 Windows/Desktop 报告边界。#134 可按重复关闭，不能误记为原生 Windows 已验收。
-- #113/#107：旧宿主安装指引与新 rc.1 支持分开说明，不能把新版本通过自动推广到所有旧 RC 或 Desktop 内置核心。
-- #106/#125/#78/#103：引用各自请求体边界、claim/reassign 状态、真实 idle 通知和 attempt 恢复的检查证据，并说明修复在哪个提交和发行包中。
+- #119/#124/#130：已回链 [整合 PR #135](https://github.com/NanmiCoder/dsh-agent-teams/pull/135) 和 [合并提交 ae2ef83](https://github.com/NanmiCoder/dsh-agent-teams/commit/ae2ef8342b7b9c02fd2868847d6c7b148d394145)，保留贡献来源后关闭。[CI 六项成功](https://github.com/NanmiCoder/dsh-agent-teams/actions/runs/33980538041)包含 Windows 原生 runner 的 typecheck/build/verify、Ubuntu 构建、三版本真实 Harness 场景与汇总门禁；没有据此声明 Desktop 或原生 Windows 的完整 Harness 运行已经验收。
+- #127/#132/#123/#120：已回复并回链 rc.1、alpha.5、alpha.2 与真实 API 的验收证据；发布与 Windows/Desktop 报告边界继续跟进。#134 已按重复关闭，没有声明原生 Windows 已验收。
+- #113/#107：已说明旧宿主安装指引与新 rc.1 支持的区别；旧 RC、Desktop 内置核心和第三方插件组合仍需各自确认。
+- #106/#125/#78/#103：各自请求体边界、claim/reassign 状态、真实 idle 通知和 attempt 恢复的证据已发出；修复包发布后继续更新可安装版本，缺少的报告人环境信息继续收集。
 - #117：仍需可复现的资源数据；#76 的多跳 fallback、provider 退避和预算工具仍为独立增强，不因已有单跳 fallback 通过而全部关闭。
 
-维护者完成这些收尾操作后，应在对应行补入真实评论、审核或提交链接，再更新计数。发布状态以 npm 实际版本与 dist-tag 为准；本执行记录本身不构成已发布声明。
+原有 25 个 PR 与 41 个 issue 均已完成本轮逐条处理。10 个 PR 继续等待作者按具体审核补充；29 个 issue 按发布、复现或独立功能范围继续跟进。发布状态以 npm 实际版本与 dist-tag 为准；本执行记录本身不构成已发布声明。

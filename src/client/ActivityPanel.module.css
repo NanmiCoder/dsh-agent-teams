@@ -556,7 +556,7 @@
 
 .captainState[data-busy='true'],
 .memberState[data-activity='working'] {
-  color: var(--dsw-alias-state-business-primary);
+  color: var(--dsw-alias-bg-fill-business);
 }
 
 .workGlyph rect {

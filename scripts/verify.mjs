@@ -365,6 +365,13 @@ check(
   'missing token bridges make panel fills and DAG borders transparent',
 )
 check(
+  'working member and captain states use the fallback-bearing business color bridge',
+  activityPanelSource.includes('data-activity={member.activity}')
+    && activityPanelCss.includes(".memberState[data-activity='working']")
+    && /\.memberState\[data-activity='working'\][^{]*\{[^}]*color:\s*var\(--dsw-alias-bg-fill-business\)/su.test(activityPanelCss),
+  'an unguarded host business token makes the working label and glyph fall back to tertiary gray',
+)
+check(
   'activity panel uses the shell overlay instead of a page-breaking body portal',
   clientIndexSource.includes("ctx.slots.inject('shell.overlay'")
     && !clientIndexSource.includes('createRoot')

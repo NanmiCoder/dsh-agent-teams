@@ -91,14 +91,14 @@ pnpm verify
 pnpm pack --out ./agent-teams-candidate.tgz
 ```
 
-先检查实际宿主的依赖，再在独立测试 profile 安装产物：
+准备一个已配置 Web 入口的独立测试 profile（以下为 `agent-teams-preview`），先检查实际宿主的依赖，再安装产物：
 
 ```sh
 node scripts/doctor.mjs --host-root "/实际运行的宿主包目录" --json
 dsh plugin --profile agent-teams-preview add --save-exact /完整路径/agent-teams-candidate.tgz
 node scripts/doctor.mjs --host-root "/实际运行的宿主包目录" --profile-root "/实际测试profile目录" --json
 dsh --profile agent-teams-preview --dump-config
-dsh web --profile agent-teams-preview
+dsh --profile agent-teams-preview
 ```
 
 `doctor` 检查整组 DSH 包版本、重复运行时身份以及 profile 中的插件版本。它只读文件，不读取凭据、不修改配置；检查通过不替代实际建队、任务执行和 UI 验收。源码更改后需要重新构建、打包和重启。

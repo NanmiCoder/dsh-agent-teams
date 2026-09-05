@@ -92,14 +92,14 @@ pnpm verify
 pnpm pack --out ./agent-teams-candidate.tgz
 ```
 
-Inspect the actual host, then install the artifact into a separate test profile:
+Use a separate test profile configured with the Web app (`agent-teams-preview` below). Inspect the actual host, then install the artifact:
 
 ```sh
 node scripts/doctor.mjs --host-root "/actual/host/package/directory" --json
 dsh plugin --profile agent-teams-preview add --save-exact /absolute/path/agent-teams-candidate.tgz
 node scripts/doctor.mjs --host-root "/actual/host/package/directory" --profile-root "/actual/test/profile/directory" --json
 dsh --profile agent-teams-preview --dump-config
-dsh web --profile agent-teams-preview
+dsh --profile agent-teams-preview
 ```
 
 The doctor checks the DSH dependency cohort, duplicate runtime identities and the profile's plugin version. It reads package metadata without reading credentials or changing configuration. Passing it does not replace team, task and UI acceptance. Rebuild, repack and restart after source changes.

@@ -1,0 +1,68 @@
+{
+  "version": "0.1.2-rc.1",
+  "report": "/tmp/dsh-runtime-lab-20260906/real-api-rc1-1788627620139",
+  "exit": {
+    "code": 0,
+    "signal": null
+  },
+  "timeout": false,
+  "passed": true,
+  "reason": "task-terminal-and-agents-idle",
+  "captainId": "session-f4cbd51b-6cb9-4df3-8081-b02bda5dfc32",
+  "requests": 14,
+  "cwd": "/private/tmp",
+  "provider": "deepseek-official",
+  "model": "deepseek-v4-flash",
+  "teamPath": "/tmp/dsh-runtime-lab-20260906/real-api-rc1-1788627620139/teams/real-api-rc1-1788627620139/team.json",
+  "team": {
+    "name": "real-api-rc1-1788627620139",
+    "id": "real-api-rc1-1788627620139",
+    "description": "Validate real AgentTeams API: one worker member computes the sum of squares of 1..10 and reports to captain.",
+    "captainSessionId": "session-f4cbd51b-6cb9-4df3-8081-b02bda5dfc32",
+    "createdAt": 1788627623281,
+    "members": [
+      {
+        "id": "52a82a25-f51a-4bb0-b9f7-76af7bc3ee48",
+        "name": "worker",
+        "role": "worker",
+        "provider": "deepseek-official",
+        "model": "deepseek-v4-flash",
+        "reasoningEffort": "low",
+        "executionPrompt": "Wait for your assignment. When you receive a task assignment, use agent_teams_claim_task on the assigned task id to claim it. Take the returned attempt_id and use it with agent_teams_update_task to move the task to status in_progress, and then again to move it to status completed with the result in output. Then report your answer to the captain using agent_teams_send_message.",
+        "joinedAt": 1788627626368,
+        "status": "idle"
+      }
+    ],
+    "tasks": [
+      {
+        "id": "t1",
+        "subject": "Sum of squares of integers 1 through 10",
+        "description": "Calculate the sum of the squares of the integers from 1 through 10 inclusive. Each integer n from 1 to 10 contributes n^2; the sum is 1^2 + 2^2 + 3^2 + ... + 10^2. Compute the value and place the resulting numeric sum into the completed task output.",
+        "status": "completed",
+        "assignee": "worker",
+        "dependencies": [],
+        "attempt": 1,
+        "createdAt": 1788627627549,
+        "updatedAt": 1788627632816,
+        "kind": "work",
+        "attemptId": "ded9d04f-7103-4040-81df-1b5597e6575c",
+        "reassigning": false,
+        "output": "Sum of squares of integers 1 through 10 = 385 (1²+2²+...+10² = 1+4+9+16+25+36+49+64+81+100 = 385)."
+      }
+    ],
+    "taskSeq": 1
+  },
+  "assertions": {
+    "realProviderRequests": true,
+    "memberMadeRealRequest": true,
+    "singleTeamMember": true,
+    "singleCompletedTask": true,
+    "correctOutput": true,
+    "captainConfirmed": true,
+    "onlyOneDriverPrompt": true,
+    "captainWokeAfterYield": true,
+    "memberClaimedTask": true,
+    "memberUpdatedTask": true,
+    "memberReported": true
+  }
+}

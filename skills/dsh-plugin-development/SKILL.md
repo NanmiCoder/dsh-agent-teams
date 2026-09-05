@@ -2,12 +2,14 @@
 name: dsh-plugin-development
 description: 开发、维护、分发和验证 DeepSeek Harness (DSH) 插件的执行型 Skill。覆盖 host/client 形态判断、bundle/profile 契约、Service 与函数插件、工具、HTTP、持久化、slot、Conversation Node、客户端构建、HMR、GitHub 安装和真实组合验证。
 metadata:
-  version: "3.1.0"
-  date: "2026-08-13"
+  version: "3.1.1"
+  date: "2026-09-06"
   reference: "https://github.com/NanmiCoder/dsh-agent-teams"
 ---
 
 # DSH 插件开发
+
+> 版本适用范围：本文主体保留 2026-08-13 的历史模板，不代表当前 Harness 的 API。在 AgentTeams 仓库内处理升级时，先读项目根目录 `skills/README.md`，再使用项目内 `dsh-upgrade-audit`、`plugin-upgrade` 和 `plugin-test`。独立安装此 skill 时不要求这些同伴文件，仍按 §2 取证。下文的 `dsh-client-runtime`、`conversationEvents` 等旧接口须按目标精确 tag 与 npm 产物重新核实，不能直接用于 Alpha.2 或后续版本。
 
 这是正式版导向的执行清单。先判断运行面，再选择官方模板，实现后必须从真实组合和用户安装路径验证。不要把某个项目的偶然实现当成框架契约。
 
@@ -55,14 +57,14 @@ metadata:
 
 ### 2.3 官方仓库兜底层
 
-官方仓库 `https://github.com/deepseek-ai/deepseek-harness` 是公开、MIT 许可的可引用证据源（默认分支 `master`；开发者预览阶段无 release tag，不 pin 版本）。需要兜底取证时：
+官方仓库 `https://github.com/deepseek-ai/deepseek-harness` 是公开、MIT 许可的可引用证据源。取证须明确目标版本、对应 tag/commit 和 npm 发布状态；不要把默认分支等同于用户安装版本。需要兜底取证时：
 
 1. 选临时目录：用用户或环境提供的目录，例如 `SCRATCH="$(mktemp -d)"`；不要写死本机绝对路径。
-2. 复用已有 checkout：若 `$SCRATCH/dsh-official` 已存在，且 `git remote -v` 指向官方、根目录含 `AGENTS.md` 与 `LICENSE`，直接复用；需要更新时 `git -C "$SCRATCH/dsh-official" fetch --depth 1 origin master && git -C "$SCRATCH/dsh-official" reset --hard origin/master`（或删除后重克隆）。同一任务只维护这一个目录，避免反复克隆。
-3. 浅克隆（只读取证，无需 `pnpm install`）：
+2. 复用已有 checkout：核对 remote、HEAD 和工作区状态；用 `git show <exact-tag>:<path>` 等只读方式检查目标版本，不重置已有 checkout。需要补齐版本对象时 fetch 明确 tag，并保留已有改动。
+3. 没有 checkout 时克隆到临时目录（只读取证，无需 `pnpm install`），随后通过精确 tag/commit 读取文件：
 
    ```sh
-   git clone --depth 1 https://github.com/deepseek-ai/deepseek-harness.git "$SCRATCH/dsh-official"
+   git clone --filter=blob:none https://github.com/deepseek-ai/deepseek-harness.git "$SCRATCH/dsh-official"
    ```
 
 4. 只克隆官方 `deepseek-ai/deepseek-harness`；不要访问或转述未授权的私有仓库内容。对克隆内容同样只读分析，不修改。
@@ -73,7 +75,7 @@ metadata:
 2. 再用 `packages/README.md` 的 group 表确认目标包位于哪个 `packages/<group>/<pkg>`。
 3. 按 §2.2 模板表读对应包的 `README.md` 与 `src/`；取证结论给出文件与行区间。
 
-演进兜底：官方仓库处于开发者预览、迭代极快、无兼容承诺、无 release tag，§2.2 的模板路径只是索引，一切以当前 checkout 的实际代码为准；路径或名称漂移时，用 `packages/README.md` 定位新位置并回报修正，不要凭旧文档猜。需要复现一致证据时记录 `git rev-parse HEAD`。
+演进兜底：§2.2 的历史模板路径只是索引，一切以目标版本的实际代码和发布产物为准；路径或名称漂移时，用目标版本的 `packages/README.md` 定位新位置并回报修正。记录目标 tag、解析后的 commit 和实际安装依赖版本；GitHub 有 tag 不等于 npm 已发布，也不代表本项目已通过该版本验收。
 
 ## 3. Bundle、Profile 与 package 契约
 

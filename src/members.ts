@@ -4,7 +4,7 @@
  *
  * Members are durable continuable subagents of the captain, so a member keeps
  * its conversation across turns and across harness restarts: the captain
- * wakes it with {@link ctx.subagents.followup}, it works through its turn
+ * queues its next turn through {@link deliverToMember}, it works through its turn
  * (updating team state through the `agent_teams_*` tools), and becomes idle
  * again. Its final assistant message is not readable programmatically, so the
  * member persists its report into the captain's mailbox and the task records,
@@ -15,10 +15,11 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { installModelSelection, type Agent, type ModelSelection } from '@deepseek-ai/dsh-agent'
 // Declaration merge only: makes ctx.subagents visible.
-import { foldSubagentDescriptor, SubagentError } from '@deepseek-ai/dsh-subagent'
+import { foldSubagentDescriptor } from '@deepseek-ai/dsh-subagent'
 import { createUserMessage, LlmError, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { Session, SessionId } from '@deepseek-ai/dsh-session'
 import { join } from 'node:path'
+import { guardSubagentDelivery, installContinuableMemberSetup, queueMemberPrompt, sessionOwnEvents } from './harness-compat.ts'
 import { acknowledgeMailbox, appendMailbox, CAPTAIN_KEY, createMessage, readRetiredMemberIds, readTeamSync, readTeam, releaseMailboxDelivery, withTeamLock, writeTeam } from './state.ts'
 import { appendTeamEvent, captainSessionOf } from './events.ts'
 import { TERMINAL_TASK_STATUSES, type TeamMember, type TeamState, type TeamTask } from './types.ts'
@@ -257,12 +258,14 @@ function selectionFromMember(member: TeamMember | undefined): MemberLlmSelection
   const provider = (member.activeProvider ?? member.provider).trim()
   const model = (member.activeModel ?? member.model).trim()
   if (provider === '' || model === '') return undefined
-  const reasoningEffort = member.reasoningEffort?.trim()
+  // Effort ids belong to the original model. After a fallback, its own
+  // provider default remains authoritative, including after cold recovery.
+  const reasoningEffort = member.fallbackActive === true ? undefined : member.reasoningEffort?.trim()
   return {
     provider,
     model,
     ...reasoningEffort === undefined || reasoningEffort === '' ? {} : { reasoningEffort },
-    ...member.fallback === undefined ? {} : { fallback: member.fallback },
+    ...member.fallback === undefined || member.fallbackActive === true ? {} : { fallback: member.fallback },
   }
 }
 
@@ -363,11 +366,10 @@ export function installMemberSelectionRuntime(
   onFailureSettled?: (workspace: string, teamId: string, memberName: string) => Promise<void>,
 ): MemberSelectionRuntime {
   const pending = new Map<string, MemberLlmSelection>()
-  ctx.subagents.registerContinuableSetup((childCtx) => {
+  installContinuableMemberSetup(ctx, (childCtx) => {
     const child = childCtx.agent
     if (child === undefined) return () => undefined
-    const suffix = child.session.events.slice(child.session.header.seedLength ?? 0)
-    const descriptor = foldSubagentDescriptor(suffix)
+    const descriptor = foldSubagentDescriptor(sessionOwnEvents(child.session))
     if (descriptor?.mode !== 'continuable' || !descriptor.label.startsWith(MEMBER_LABEL_PREFIX)) {
       return () => undefined
     }
@@ -451,6 +453,10 @@ export function installMemberSelectionRuntime(
       if (fallback !== undefined && transition.retry) {
         switched = transition.switched
         selectionRef.current = transition.selection
+        // Request recovery repeats buildRequest inside the current step; it
+        // does not re-run prompt assembly. Override that captured route too,
+        // otherwise the authorized retry would hit the failed primary again.
+        selectionRef.assembled = transition.selection
         await updateFallbackState(stateRoot, teamId, memberName, fallback, ctx).catch((error: unknown) => {
           ctx.logger.warn(`agent-teams: failed to persist fallback route: ${String(error)}`)
         })
@@ -618,6 +624,9 @@ export async function spawnMember(
         agentOptions: {
           provider: llmSelection.provider,
           model: llmSelection.model,
+          ...llmSelection.reasoningEffort === undefined
+            ? {}
+            : { reasoningEffort: ReasoningEffortId(llmSelection.reasoningEffort) },
         },
         ...config.maxDepth !== undefined ? { maxDepth: config.maxDepth } : {},
       },
@@ -652,13 +661,10 @@ export async function deliverToMember(
   signal: AbortSignal,
 ): Promise<boolean> {
   try {
-    await ctx.subagents.followup(captain, brandedSessionId(childId), [{ type: 'text', text }], {
-      source: { kind: 'plugin', plugin: 'dsh-agent-teams' },
-      signal,
-    })
+    await queueMemberPrompt(ctx.subagents, captain, brandedSessionId(childId), [{ type: 'text', text }], signal)
     return true
   } catch (error: unknown) {
-    ctx.logger.warn(`agent-teams: followup to member ${childId} failed: ${String(error)}`)
+    ctx.logger.warn(`agent-teams: prompt delivery to member ${childId} failed: ${String(error)}`)
     return false
   }
 }
@@ -683,33 +689,18 @@ export function interruptMember(ctx: Context, captain: Agent, childId: string): 
  *
  * Upstream `interrupt()` deliberately preserves continuable sessions and the
  * upstream seam exposes no targeted forget/retire method. The durable
- * AgentTeams index therefore rejects `followup()` before it can cold-resume a
+ * AgentTeams index therefore rejects every inbox delivery before it can cold-resume a
  * retired member. Catalog rows deliberately remain discoverable: Harness rc.8
  * uses the direct-child catalog to authorize historical transcript reads and
  * `openSubagent()`, so filtering those rows would make an archived member's
  * persisted conversation inaccessible. Exact ids keep unrelated subagents
- * untouched while the followup boundary still prevents further model turns.
+ * untouched while the delivery boundary still prevents further model turns.
  */
 export function installRetiredMemberGuard(ctx: Context, stateDir: string): void {
-  const runtime = ctx.subagents
-  ctx.effect(() => {
-    const followup = runtime.followup
-    const guardedFollowup: typeof runtime.followup = async (parent, childId, content, options) => {
-      const retired = await readRetiredMemberIds(join(parent.session.header.cwd ?? process.cwd(), stateDir))
-      if (retired.has(childId)) {
-        throw new SubagentError(
-          `AgentTeams member "${childId}" was retired and cannot be resumed`,
-          'NOT_RESUMABLE',
-        )
-      }
-      return followup.call(runtime, parent, childId, content, options)
-    }
-
-    runtime.followup = guardedFollowup
-    return () => {
-      if (runtime.followup === guardedFollowup) runtime.followup = followup
-    }
-  }, 'agent-teams: retired member guard')
+  guardSubagentDelivery(ctx, async (parent, childId) => {
+    const retired = await readRetiredMemberIds(join(parent.session.header.cwd ?? process.cwd(), stateDir))
+    return retired.has(childId)
+  })
 }
 
 /**

@@ -1,0 +1,6 @@
+# Static fixture only: profile composition plus source patch declaration (#1).
+- id: legacy-plugin
+  name: legacy-plugin
+  config: {}
+  patch:
+    - patch.yml

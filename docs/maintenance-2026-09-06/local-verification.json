@@ -1,0 +1,27 @@
+[
+  {
+    "name": "node-final",
+    "exitCode": 0,
+    "log": "node-final.log"
+  },
+  {
+    "name": "typecheck-final",
+    "exitCode": 0,
+    "log": "typecheck-final.log"
+  },
+  {
+    "name": "build-final",
+    "exitCode": 0,
+    "log": "build-final.log"
+  },
+  {
+    "name": "verify-final",
+    "exitCode": 0,
+    "log": "verify-final.log"
+  },
+  {
+    "name": "pack-final",
+    "exitCode": 0,
+    "log": "pack-final.log"
+  }
+]

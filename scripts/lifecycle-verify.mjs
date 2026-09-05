@@ -17,6 +17,9 @@ import { buildActivationDirective, invokedAgentTeamsGoal, invokedAgentTeamsInvoc
 import { readArchivedTeam, readMailbox, readTeam, readUnreadMailbox } from '../lib/state.js'
 import { collectArchivedTeamsActivity } from '../lib/snapshot.js'
 
+const modernHarness = process.argv.includes('--modern-harness')
+const hostQueue = Symbol.for('dsh.subagent.queuePrompt')
+
 const workspace = await mkdtemp(join(tmpdir(), 'dsh-agent-teams-lifecycle-'))
 const definitions = new Map()
 const liveAgents = new Map()
@@ -38,8 +41,8 @@ function check(label, condition, detail = '') {
 
 function session(parentSession) {
   return {
-    header: { cwd: workspace, parentSession, seedLength: 0 },
-    events: [],
+    header: { cwd: workspace, parentSession, ...(modernHarness ? {} : { seedLength: 0 }) },
+    ...(modernHarness ? { ownEvents() { return this._ownEvents ?? [] } } : { events: [] }),
     append() {},
     requestHeader() {
       return { config: { provider: 'fake', model: 'fake-model', reasoningEffort: 'high' } }
@@ -92,6 +95,7 @@ function childContext(child) {
   childListeners.set(child.id, registry)
   return {
     agent: child,
+    effect(setup) { return setup() },
     on(name, listener) {
       const current = registry.get(name) ?? []
       current.push(listener)
@@ -181,7 +185,7 @@ const ctx = {
       liveAgents.set(id, child)
       children.push({ id, label: spec.label, mode: 'continuable' })
       if (typeof spec.label === 'string' && spec.label.startsWith('agent-teams:')) {
-        child.session.events = [{
+        child.session[modernHarness ? '_ownEvents' : 'events'] = [{
           type: 'subagent/descriptor',
           data: {
             version: 3,
@@ -193,7 +197,12 @@ const ctx = {
           },
         }]
       }
-      for (const setup of continuableSetups) setup(childContext(child))
+      child.ctx = childContext(child)
+      if (modernHarness) {
+        for (const listener of listeners.get('agent/session-start') ?? []) listener({ agent: child, source: 'startup' })
+      } else {
+        for (const setup of continuableSetups) setup(child.ctx)
+      }
       return { childId: id, messageId: `welcome-${childSeq}` }
     },
     async listChildren(parentId) {
@@ -209,6 +218,7 @@ const ctx = {
       return this.listChildren(parentId)
     },
     async followup(_parent, childId, content) {
+      if (this !== ctx.subagents) throw new Error('native receiver was lost')
       if (failNextDelivery.delete(childId)) throw new Error('injected delivery failure')
       deliveries.push({ childId, content })
       const child = liveAgents.get(childId)
@@ -237,9 +247,28 @@ const ctx = {
   logger: { debug() {}, warn() {} },
 }
 
+// Model modern host delivery as a distinct FIFO entry. Deliberately reject
+// public sendMessage: using steer for team jobs must make this suite fail.
+if (modernHarness) {
+  const followup = ctx.subagents.followup
+  delete ctx.subagents.followup
+  delete ctx.subagents.registerContinuableSetup
+  ctx.subagents[hostQueue] = function (parent, childId, content, source, signal) {
+    return followup.call(this, parent, childId, content, { source, signal })
+  }
+  ctx.subagents.sendMessage = async function () { throw new Error('team jobs must use FIFO, not steer') }
+}
+
+function directPrompt(parent, childId, content, options) {
+  return modernHarness
+    ? ctx.subagents[hostQueue](parent, childId, content, options.source, options.signal)
+    : ctx.subagents.followup(parent, childId, content, options)
+}
+
 const agentTeamsRuntime = registerAgentTeamsTools(ctx, {
   stateDir: '.agent-teams',
   memberProvider: 'spawn',
+  fallback: { provider: 'backup', model: 'backup-model' },
   memberMaxDepth: 1,
   maxMembers: 8,
   profiles: {
@@ -787,6 +816,9 @@ try {
   const alpha = liveAgents.get(addedAlpha.member_id)
   const beta = liveAgents.get(addedBeta.member_id)
   const gamma = liveAgents.get(addedGamma.member_id)
+  check('manually added members persist the global fallback for later activations',
+    (await state())?.members.every(member => member.fallback?.provider === 'backup'
+      && member.fallback?.model === 'backup-model'))
   publishStatus(alpha, 'idle')
   publishStatus(beta, 'idle')
   publishStatus(gamma, 'idle')
@@ -796,6 +828,17 @@ try {
   check('idle assigned member is claimed and woken automatically',
     firstAttempt?.status === 'claimed' && firstAttempt.assignee === 'alpha'
       && deliveries.some(delivery => delivery.childId === alpha.id))
+  let captainClaimRejected = false
+  const beforeCaptainClaim = JSON.stringify(await task(t1.task_id))
+  const beforeCaptainClaimDeliveries = deliveries.length
+  try {
+    await call('agent_teams_claim_task', { task_id: t1.task_id, assignee: 'alpha' })
+  } catch (error) {
+    captainClaimRejected = /member|reassign_task/.test(String(error))
+  }
+  check('captain cannot mint a claim capability for a member; use reassign_task',
+    captainClaimRejected && JSON.stringify(await task(t1.task_id)) === beforeCaptainClaim
+      && deliveries.length === beforeCaptainClaimDeliveries)
   const alphaClaim = await call('agent_teams_claim_task', { task_id: t1.task_id }, alpha)
   check('member observes the scheduler attempt idempotently', alphaClaim.attempt_id === firstAttempt?.attemptId)
   await call('agent_teams_update_task', {
@@ -1036,7 +1079,7 @@ try {
   let removedFollowupRejected = false
   const deliveriesBeforeRemovedFollowup = deliveries.length
   try {
-    await ctx.subagents.followup(captain, alpha.id, [{ type: 'text', text: 'must not resume' }], {
+    await directPrompt(captain, alpha.id, [{ type: 'text', text: 'must not resume' }], {
       source: { kind: 'plugin', plugin: 'verification' }, signal: new AbortController().signal,
     })
   } catch (error) {
@@ -1236,7 +1279,7 @@ try {
   let coldFollowupRejected = false
   const deliveriesBeforeColdFollowup = deliveries.length
   try {
-    await ctx.subagents.followup(captain, gamma.id, [{ type: 'text', text: 'must stay retired' }], {
+    await directPrompt(captain, gamma.id, [{ type: 'text', text: 'must stay retired' }], {
       source: { kind: 'plugin', plugin: 'verification' }, signal: new AbortController().signal,
     })
   } catch (error) {
@@ -1247,7 +1290,7 @@ try {
   check('team shutdown leaves unrelated continuable subagents untouched',
     (await ctx.subagents.listChildren(captain.id))
       .some(child => child.id === 'foreign-session' && child.mode === 'continuable'))
-  const foreignFollowup = await ctx.subagents.followup(captain, 'foreign-session', [
+  const foreignFollowup = await directPrompt(captain, 'foreign-session', [
     { type: 'text', text: 'unrelated work still routes' },
   ], {
     source: { kind: 'plugin', plugin: 'verification' }, signal: new AbortController().signal,

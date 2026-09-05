@@ -1,0 +1,361 @@
+{
+  "artifact": "/tmp/dsh-implementation-20260906/agent-teams-final-v2.tgz",
+  "artifactSha256": "6325e972566092bb0ec07d6065113ebd0fcf5877e475b2961dc8b049c2a2654c",
+  "node": "v24.20.0",
+  "status": "passed",
+  "packagedScriptHashes": {
+    "scripts/doctor.mjs": "67e5dd4e39648ace5e2a7832ba66ecdd20d0c2517cfc69a8bf8abd2d389f1707",
+    "scripts/compatibility.mjs": "8c0dec4361c842bd5a452109f2cb96416b36c41434b468c44b21b0eb5ac48823"
+  },
+  "sourceScriptHashes": {
+    "doctor.mjs": "67e5dd4e39648ace5e2a7832ba66ecdd20d0c2517cfc69a8bf8abd2d389f1707",
+    "compatibility.mjs": "8c0dec4361c842bd5a452109f2cb96416b36c41434b468c44b21b0eb5ac48823"
+  },
+  "runs": [
+    {
+      "hostTarget": "0.1.2-alpha.2",
+      "entry": "installed-bin",
+      "argv": [
+        "/tmp/dsh-runtime-lab-20260906/0.1.2-alpha.2/node_modules/.bin/dsh-agent-teams-doctor",
+        "--host-root",
+        "/tmp/dsh-runtime-lab-20260906/0.1.2-alpha.2",
+        "--profile-root",
+        "/tmp/dsh-runtime-lab-20260906/final-v2-alpha2-node24/lifecycle/home/profiles/headless",
+        "--json"
+      ],
+      "exitCode": 0,
+      "stdoutBytes": 45929,
+      "stderr": "",
+      "ok": true,
+      "host": {
+        "version": "0.1.2-alpha.2",
+        "path": "/private/tmp/dsh-runtime-lab-20260906/0.1.2-alpha.2/node_modules/@deepseek-ai/dsh"
+      },
+      "checkedPackages": 215,
+      "problems": [],
+      "resolvedDshVersions": [
+        "0.1.2-alpha.2"
+      ],
+      "plugin": {
+        "version": "0.1.16-rc.1",
+        "path": "/private/tmp/dsh-runtime-lab-20260906/0.1.2-alpha.2/node_modules/@nanmicoder/dsh-agent-teams"
+      }
+    },
+    {
+      "hostTarget": "0.1.2-alpha.2",
+      "entry": "installed-script-host",
+      "argv": [
+        "/tmp/dsh-runtime-lab-20260906/node-v24.20.0-darwin-arm64/bin/node",
+        "/private/tmp/dsh-runtime-lab-20260906/0.1.2-alpha.2/node_modules/@nanmicoder/dsh-agent-teams/scripts/doctor.mjs",
+        "--host-root",
+        "/tmp/dsh-runtime-lab-20260906/0.1.2-alpha.2",
+        "--json"
+      ],
+      "exitCode": 0,
+      "stdoutBytes": 45773,
+      "stderr": "",
+      "ok": true,
+      "host": {
+        "version": "0.1.2-alpha.2",
+        "path": "/private/tmp/dsh-runtime-lab-20260906/0.1.2-alpha.2/node_modules/@deepseek-ai/dsh"
+      },
+      "checkedPackages": 215,
+      "problems": [],
+      "resolvedDshVersions": [
+        "0.1.2-alpha.2"
+      ]
+    },
+    {
+      "hostTarget": "0.1.2-alpha.2",
+      "entry": "installed-script-profile",
+      "argv": [
+        "/tmp/dsh-runtime-lab-20260906/node-v24.20.0-darwin-arm64/bin/node",
+        "/private/tmp/dsh-runtime-lab-20260906/0.1.2-alpha.2/node_modules/@nanmicoder/dsh-agent-teams/scripts/doctor.mjs",
+        "--host-root",
+        "/tmp/dsh-runtime-lab-20260906/0.1.2-alpha.2",
+        "--profile-root",
+        "/tmp/dsh-runtime-lab-20260906/final-v2-alpha2-node24/lifecycle/home/profiles/headless",
+        "--json"
+      ],
+      "exitCode": 0,
+      "stdoutBytes": 45929,
+      "stderr": "",
+      "ok": true,
+      "host": {
+        "version": "0.1.2-alpha.2",
+        "path": "/private/tmp/dsh-runtime-lab-20260906/0.1.2-alpha.2/node_modules/@deepseek-ai/dsh"
+      },
+      "checkedPackages": 215,
+      "problems": [],
+      "resolvedDshVersions": [
+        "0.1.2-alpha.2"
+      ],
+      "plugin": {
+        "version": "0.1.16-rc.1",
+        "path": "/private/tmp/dsh-runtime-lab-20260906/0.1.2-alpha.2/node_modules/@nanmicoder/dsh-agent-teams"
+      },
+      "installedHashesMatchArtifact": true
+    },
+    {
+      "hostTarget": "0.1.2-alpha.2",
+      "entry": "source-script-profile",
+      "argv": [
+        "/tmp/dsh-runtime-lab-20260906/node-v24.20.0-darwin-arm64/bin/node",
+        "/Users/nanmi/workspace/myself_code/dsh-agent-teams-compat/scripts/doctor.mjs",
+        "--host-root",
+        "/tmp/dsh-runtime-lab-20260906/0.1.2-alpha.2",
+        "--profile-root",
+        "/tmp/dsh-runtime-lab-20260906/final-v2-alpha2-node24/lifecycle/home/profiles/headless",
+        "--json"
+      ],
+      "exitCode": 0,
+      "stdoutBytes": 45929,
+      "stderr": "",
+      "ok": true,
+      "host": {
+        "version": "0.1.2-alpha.2",
+        "path": "/private/tmp/dsh-runtime-lab-20260906/0.1.2-alpha.2/node_modules/@deepseek-ai/dsh"
+      },
+      "checkedPackages": 215,
+      "problems": [],
+      "resolvedDshVersions": [
+        "0.1.2-alpha.2"
+      ],
+      "plugin": {
+        "version": "0.1.16-rc.1",
+        "path": "/private/tmp/dsh-runtime-lab-20260906/0.1.2-alpha.2/node_modules/@nanmicoder/dsh-agent-teams"
+      }
+    },
+    {
+      "hostTarget": "0.1.2-alpha.5",
+      "entry": "installed-bin",
+      "argv": [
+        "/tmp/dsh-runtime-lab-20260906/runtime-alpha5-v3/node_modules/.bin/dsh-agent-teams-doctor",
+        "--host-root",
+        "/tmp/dsh-runtime-lab-20260906/runtime-alpha5-v3",
+        "--profile-root",
+        "/tmp/dsh-runtime-lab-20260906/final-v2-alpha5-node24/lifecycle/home/profiles/headless",
+        "--json"
+      ],
+      "exitCode": 0,
+      "stdoutBytes": 46580,
+      "stderr": "",
+      "ok": true,
+      "host": {
+        "version": "0.1.2-alpha.5",
+        "path": "/private/tmp/dsh-runtime-lab-20260906/runtime-alpha5-v3/node_modules/@deepseek-ai/dsh"
+      },
+      "checkedPackages": 214,
+      "problems": [],
+      "resolvedDshVersions": [
+        "0.1.2-alpha.5"
+      ],
+      "plugin": {
+        "version": "0.1.16-rc.1",
+        "path": "/private/tmp/dsh-runtime-lab-20260906/runtime-alpha5-v3/node_modules/@nanmicoder/dsh-agent-teams"
+      }
+    },
+    {
+      "hostTarget": "0.1.2-alpha.5",
+      "entry": "installed-script-host",
+      "argv": [
+        "/tmp/dsh-runtime-lab-20260906/node-v24.20.0-darwin-arm64/bin/node",
+        "/private/tmp/dsh-runtime-lab-20260906/runtime-alpha5-v3/node_modules/@nanmicoder/dsh-agent-teams/scripts/doctor.mjs",
+        "--host-root",
+        "/tmp/dsh-runtime-lab-20260906/runtime-alpha5-v3",
+        "--json"
+      ],
+      "exitCode": 0,
+      "stdoutBytes": 46420,
+      "stderr": "",
+      "ok": true,
+      "host": {
+        "version": "0.1.2-alpha.5",
+        "path": "/private/tmp/dsh-runtime-lab-20260906/runtime-alpha5-v3/node_modules/@deepseek-ai/dsh"
+      },
+      "checkedPackages": 214,
+      "problems": [],
+      "resolvedDshVersions": [
+        "0.1.2-alpha.5"
+      ]
+    },
+    {
+      "hostTarget": "0.1.2-alpha.5",
+      "entry": "installed-script-profile",
+      "argv": [
+        "/tmp/dsh-runtime-lab-20260906/node-v24.20.0-darwin-arm64/bin/node",
+        "/private/tmp/dsh-runtime-lab-20260906/runtime-alpha5-v3/node_modules/@nanmicoder/dsh-agent-teams/scripts/doctor.mjs",
+        "--host-root",
+        "/tmp/dsh-runtime-lab-20260906/runtime-alpha5-v3",
+        "--profile-root",
+        "/tmp/dsh-runtime-lab-20260906/final-v2-alpha5-node24/lifecycle/home/profiles/headless",
+        "--json"
+      ],
+      "exitCode": 0,
+      "stdoutBytes": 46580,
+      "stderr": "",
+      "ok": true,
+      "host": {
+        "version": "0.1.2-alpha.5",
+        "path": "/private/tmp/dsh-runtime-lab-20260906/runtime-alpha5-v3/node_modules/@deepseek-ai/dsh"
+      },
+      "checkedPackages": 214,
+      "problems": [],
+      "resolvedDshVersions": [
+        "0.1.2-alpha.5"
+      ],
+      "plugin": {
+        "version": "0.1.16-rc.1",
+        "path": "/private/tmp/dsh-runtime-lab-20260906/runtime-alpha5-v3/node_modules/@nanmicoder/dsh-agent-teams"
+      },
+      "installedHashesMatchArtifact": true
+    },
+    {
+      "hostTarget": "0.1.2-alpha.5",
+      "entry": "source-script-profile",
+      "argv": [
+        "/tmp/dsh-runtime-lab-20260906/node-v24.20.0-darwin-arm64/bin/node",
+        "/Users/nanmi/workspace/myself_code/dsh-agent-teams-compat/scripts/doctor.mjs",
+        "--host-root",
+        "/tmp/dsh-runtime-lab-20260906/runtime-alpha5-v3",
+        "--profile-root",
+        "/tmp/dsh-runtime-lab-20260906/final-v2-alpha5-node24/lifecycle/home/profiles/headless",
+        "--json"
+      ],
+      "exitCode": 0,
+      "stdoutBytes": 46580,
+      "stderr": "",
+      "ok": true,
+      "host": {
+        "version": "0.1.2-alpha.5",
+        "path": "/private/tmp/dsh-runtime-lab-20260906/runtime-alpha5-v3/node_modules/@deepseek-ai/dsh"
+      },
+      "checkedPackages": 214,
+      "problems": [],
+      "resolvedDshVersions": [
+        "0.1.2-alpha.5"
+      ],
+      "plugin": {
+        "version": "0.1.16-rc.1",
+        "path": "/private/tmp/dsh-runtime-lab-20260906/runtime-alpha5-v3/node_modules/@nanmicoder/dsh-agent-teams"
+      }
+    },
+    {
+      "hostTarget": "0.1.2-rc.1",
+      "entry": "installed-bin",
+      "argv": [
+        "/tmp/dsh-runtime-lab-20260906/0.1.2-rc.1/node_modules/.bin/dsh-agent-teams-doctor",
+        "--host-root",
+        "/tmp/dsh-runtime-lab-20260906/0.1.2-rc.1",
+        "--profile-root",
+        "/tmp/dsh-runtime-lab-20260906/final-v2-rc1-node24/lifecycle/home/profiles/headless",
+        "--json"
+      ],
+      "exitCode": 0,
+      "stdoutBytes": 44423,
+      "stderr": "",
+      "ok": true,
+      "host": {
+        "version": "0.1.2-rc.1",
+        "path": "/private/tmp/dsh-runtime-lab-20260906/0.1.2-rc.1/node_modules/@deepseek-ai/dsh"
+      },
+      "checkedPackages": 214,
+      "problems": [],
+      "resolvedDshVersions": [
+        "0.1.2-rc.1"
+      ],
+      "plugin": {
+        "version": "0.1.16-rc.1",
+        "path": "/private/tmp/dsh-runtime-lab-20260906/0.1.2-rc.1/node_modules/@nanmicoder/dsh-agent-teams"
+      }
+    },
+    {
+      "hostTarget": "0.1.2-rc.1",
+      "entry": "installed-script-host",
+      "argv": [
+        "/tmp/dsh-runtime-lab-20260906/node-v24.20.0-darwin-arm64/bin/node",
+        "/private/tmp/dsh-runtime-lab-20260906/0.1.2-rc.1/node_modules/@nanmicoder/dsh-agent-teams/scripts/doctor.mjs",
+        "--host-root",
+        "/tmp/dsh-runtime-lab-20260906/0.1.2-rc.1",
+        "--json"
+      ],
+      "exitCode": 0,
+      "stdoutBytes": 44270,
+      "stderr": "",
+      "ok": true,
+      "host": {
+        "version": "0.1.2-rc.1",
+        "path": "/private/tmp/dsh-runtime-lab-20260906/0.1.2-rc.1/node_modules/@deepseek-ai/dsh"
+      },
+      "checkedPackages": 214,
+      "problems": [],
+      "resolvedDshVersions": [
+        "0.1.2-rc.1"
+      ]
+    },
+    {
+      "hostTarget": "0.1.2-rc.1",
+      "entry": "installed-script-profile",
+      "argv": [
+        "/tmp/dsh-runtime-lab-20260906/node-v24.20.0-darwin-arm64/bin/node",
+        "/private/tmp/dsh-runtime-lab-20260906/0.1.2-rc.1/node_modules/@nanmicoder/dsh-agent-teams/scripts/doctor.mjs",
+        "--host-root",
+        "/tmp/dsh-runtime-lab-20260906/0.1.2-rc.1",
+        "--profile-root",
+        "/tmp/dsh-runtime-lab-20260906/final-v2-rc1-node24/lifecycle/home/profiles/headless",
+        "--json"
+      ],
+      "exitCode": 0,
+      "stdoutBytes": 44423,
+      "stderr": "",
+      "ok": true,
+      "host": {
+        "version": "0.1.2-rc.1",
+        "path": "/private/tmp/dsh-runtime-lab-20260906/0.1.2-rc.1/node_modules/@deepseek-ai/dsh"
+      },
+      "checkedPackages": 214,
+      "problems": [],
+      "resolvedDshVersions": [
+        "0.1.2-rc.1"
+      ],
+      "plugin": {
+        "version": "0.1.16-rc.1",
+        "path": "/private/tmp/dsh-runtime-lab-20260906/0.1.2-rc.1/node_modules/@nanmicoder/dsh-agent-teams"
+      },
+      "installedHashesMatchArtifact": true
+    },
+    {
+      "hostTarget": "0.1.2-rc.1",
+      "entry": "source-script-profile",
+      "argv": [
+        "/tmp/dsh-runtime-lab-20260906/node-v24.20.0-darwin-arm64/bin/node",
+        "/Users/nanmi/workspace/myself_code/dsh-agent-teams-compat/scripts/doctor.mjs",
+        "--host-root",
+        "/tmp/dsh-runtime-lab-20260906/0.1.2-rc.1",
+        "--profile-root",
+        "/tmp/dsh-runtime-lab-20260906/final-v2-rc1-node24/lifecycle/home/profiles/headless",
+        "--json"
+      ],
+      "exitCode": 0,
+      "stdoutBytes": 44423,
+      "stderr": "",
+      "ok": true,
+      "host": {
+        "version": "0.1.2-rc.1",
+        "path": "/private/tmp/dsh-runtime-lab-20260906/0.1.2-rc.1/node_modules/@deepseek-ai/dsh"
+      },
+      "checkedPackages": 214,
+      "problems": [],
+      "resolvedDshVersions": [
+        "0.1.2-rc.1"
+      ],
+      "plugin": {
+        "version": "0.1.16-rc.1",
+        "path": "/private/tmp/dsh-runtime-lab-20260906/0.1.2-rc.1/node_modules/@nanmicoder/dsh-agent-teams"
+      }
+    }
+  ],
+  "limitations": [
+    "Manifest inspection only; full product behavior is separately covered by the final-v2 runtime matrix."
+  ]
+}

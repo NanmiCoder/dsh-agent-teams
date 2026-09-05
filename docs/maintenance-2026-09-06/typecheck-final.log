@@ -1,0 +1,3 @@
+
+> @nanmicoder/dsh-agent-teams@0.1.16-rc.1 typecheck <checkout>
+> tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit

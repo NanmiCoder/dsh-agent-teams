@@ -1,0 +1,68 @@
+{
+  "version": "0.1.2-alpha.5",
+  "report": "/tmp/dsh-runtime-lab-20260906/real-api-alpha5-1788627620155",
+  "exit": {
+    "code": 0,
+    "signal": null
+  },
+  "timeout": false,
+  "passed": true,
+  "reason": "task-terminal-and-agents-idle",
+  "captainId": "session-31a55a27-36cc-4673-8631-452e8902a42e",
+  "requests": 15,
+  "cwd": "/private/tmp",
+  "provider": "deepseek-official",
+  "model": "deepseek-v4-flash",
+  "teamPath": "/tmp/dsh-runtime-lab-20260906/real-api-alpha5-1788627620155/teams/real-api-alpha5-1788627620155/team.json",
+  "team": {
+    "name": "real-api-alpha5-1788627620155",
+    "id": "real-api-alpha5-1788627620155",
+    "description": "Calculate sum of squares of integers 1 through 10 and report the result.",
+    "captainSessionId": "session-31a55a27-36cc-4673-8631-452e8902a42e",
+    "createdAt": 1788627624408,
+    "members": [
+      {
+        "id": "4962b471-def1-4c56-a10e-bd5fc4ada115",
+        "name": "worker",
+        "role": "worker",
+        "provider": "deepseek-official",
+        "model": "deepseek-v4-flash",
+        "reasoningEffort": "low",
+        "executionPrompt": "Wait for your assignment, claim the assigned task, use the returned attempt_id to move the task to in_progress and then completed, and report the answer to the captain using agent_teams_send_message.",
+        "joinedAt": 1788627625688,
+        "status": "idle"
+      }
+    ],
+    "tasks": [
+      {
+        "id": "t1",
+        "subject": "Calculate the sum of the squares of the integers 1 through 10",
+        "description": "Compute 1^2 + 2^2 + 3^2 + ... + 10^2 and report the numeric sum.",
+        "status": "completed",
+        "assignee": "worker",
+        "dependencies": [],
+        "attempt": 1,
+        "createdAt": 1788627626831,
+        "updatedAt": 1788627632020,
+        "kind": "work",
+        "attemptId": "6bdc532f-248b-4c39-9cf8-c36952754a00",
+        "reassigning": false,
+        "output": "Sum of squares of integers 1 through 10 = 385 (verified: 1+4+9+16+25+36+49+64+81+100 = 385)."
+      }
+    ],
+    "taskSeq": 1
+  },
+  "assertions": {
+    "realProviderRequests": true,
+    "memberMadeRealRequest": true,
+    "singleTeamMember": true,
+    "singleCompletedTask": true,
+    "correctOutput": true,
+    "captainConfirmed": true,
+    "onlyOneDriverPrompt": true,
+    "captainWokeAfterYield": true,
+    "memberClaimedTask": true,
+    "memberUpdatedTask": true,
+    "memberReported": true
+  }
+}

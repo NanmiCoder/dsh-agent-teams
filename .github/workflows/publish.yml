@@ -13,22 +13,33 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 concurrency:
-  group: npm-publish-${{ github.ref_name }}
+  # Serialize different release tags too: otherwise an older concurrent run
+  # can pass the latest check, finish last, and move the dist-tag backwards.
+  group: npm-publish-${{ github.repository }}
   cancel-in-progress: false
 
 jobs:
+  verify:
+    if: github.repository == 'NanmiCoder/dsh-agent-teams'
+    uses: ./.github/workflows/verify.yml
+
   publish:
     if: github.repository == 'NanmiCoder/dsh-agent-teams'
+    needs: verify
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     outputs:
       version: ${{ steps.version.outputs.value }}
       prerelease: ${{ steps.version.outputs.prerelease }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
@@ -44,6 +55,38 @@ jobs:
       - name: Set up package managers
         run: npm install --global npm@11.19.0 pnpm@10.33.0
 
+      - name: Download the exact candidate that passed the full matrix
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0; reviewed download source
+        with:
+          name: ${{ needs.verify.outputs.artifact_name }}
+          path: ${{ runner.temp }}/candidate
+
+      - name: Verify candidate identity and complete host coverage
+        env:
+          EXPECTED_SHA256: ${{ needs.verify.outputs.artifact_sha256 }}
+          VERIFIED_HOSTS: ${{ needs.verify.outputs.hosts }}
+          NPM_DIST_TAG: ${{ steps.version.outputs.dist_tag }}
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict'
+          import { readFileSync } from 'node:fs'
+          import { createHash } from 'node:crypto'
+          import { join } from 'node:path'
+          import { policy, validatePackageCompatibility } from './scripts/compatibility.mjs'
+          const pkg = JSON.parse(readFileSync('package.json', 'utf8'))
+          const hosts = validatePackageCompatibility(pkg)
+          assert.deepEqual(hosts, JSON.parse(process.env.VERIFIED_HOSTS))
+          const artifact = readFileSync(join(process.env.RUNNER_TEMP, 'candidate/candidate.tgz'))
+          assert.equal(createHash('sha256').update(artifact).digest('hex'), process.env.EXPECTED_SHA256)
+          if (process.env.NPM_DIST_TAG === 'latest') {
+            assert.equal(pkg.devDependencies['@deepseek-ai/dsh'], policy.recommendedHost)
+            assert.ok(hosts.includes(policy.recommendedHost))
+            assert.ok(!/-(alpha|beta)\./.test(policy.recommendedHost))
+          } else {
+            assert.equal(process.env.NPM_DIST_TAG, policy.previewTag)
+          }
+          JS
+
       - name: Verify release version
         env:
           RELEASE_VERSION: ${{ inputs.version }}
@@ -57,19 +100,28 @@ jobs:
             test "${RELEASE_VERSION}" = "${PACKAGE_VERSION}"
           fi
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build and verify package
+      - name: Prevent an older stable release from moving latest backwards
+        if: steps.version.outputs.dist_tag == 'latest'
+        env:
+          PACKAGE_VERSION: ${{ steps.version.outputs.value }}
         run: |
-          pnpm build
-          pnpm verify
-          npm pack --dry-run --ignore-scripts
+          CURRENT_LATEST="$(npm view @nanmicoder/dsh-agent-teams dist-tags.latest)"
+          export CURRENT_LATEST
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict'
+          const current = /^(\d+)\.(\d+)\.(\d+)(?:-[0-9A-Za-z.-]+)?$/.exec(process.env.CURRENT_LATEST)
+          const candidate = /^(\d+)\.(\d+)\.(\d+)$/.exec(process.env.PACKAGE_VERSION)
+          assert.ok(current && candidate, 'Cannot compare npm latest and candidate')
+          for (let index = 1; index <= 3; index++) {
+            if (Number(candidate[index]) > Number(current[index])) break
+            assert.ok(Number(candidate[index]) >= Number(current[index]), 'Refusing to move latest backwards')
+          }
+          JS
 
       - name: Publish to npm
         env:
           NPM_DIST_TAG: ${{ steps.version.outputs.dist_tag }}
-        run: npm publish --ignore-scripts --access public --tag "$NPM_DIST_TAG"
+        run: npm publish "$RUNNER_TEMP/candidate/candidate.tgz" --ignore-scripts --access public --tag "$NPM_DIST_TAG"
 
   release:
     if: github.event_name == 'push'

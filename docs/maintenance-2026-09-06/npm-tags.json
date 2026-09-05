@@ -1,0 +1,13 @@
+{
+  "checkedAt": "2026-09-06",
+  "registry": "https://registry.npmjs.org",
+  "@deepseek-ai/dsh": {
+    "alpha": "0.1.2-alpha.5",
+    "latest": "0.1.2-rc.1",
+    "next": "0.1.2-rc.1"
+  },
+  "@nanmicoder/dsh-agent-teams": {
+    "alpha": "0.1.15-alpha.1",
+    "latest": "0.1.15"
+  }
+}

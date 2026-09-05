@@ -1,0 +1,57 @@
+{
+  "version": "0.1.2-alpha.2",
+  "passed": true,
+  "exit": {
+    "code": 0,
+    "signal": null
+  },
+  "timeout": false,
+  "requests": 12,
+  "provider": "deepseek-official",
+  "model": "deepseek-v4-flash",
+  "cwd": "/private/tmp",
+  "reason": "task-terminal-and-agents-idle",
+  "assertions": {
+    "realProviderRequests": true,
+    "memberMadeRealRequest": true,
+    "singleTeamMember": true,
+    "singleCompletedTask": true,
+    "correctOutput": true,
+    "captainConfirmed": true,
+    "onlyOneDriverPrompt": true,
+    "captainWokeAfterYield": true,
+    "memberClaimedTask": true,
+    "memberUpdatedTask": true,
+    "memberReported": true
+  },
+  "report": "/tmp/dsh-runtime-lab-20260906/real-api-alpha2-1788627620168",
+  "artifactSha256": "6325e972566092bb0ec07d6065113ebd0fcf5877e475b2961dc8b049c2a2654c",
+  "limits": {
+    "milliseconds": 180000,
+    "modelRequests": 30
+  },
+  "usage": {
+    "inputTokens": 26670,
+    "outputTokens": 1583,
+    "totalTokens": 144605,
+    "cacheReadTokens": 116352
+  },
+  "usageFrames": 12,
+  "durationMilliseconds": 12928,
+  "captainIdleAt": 1788627629875,
+  "captainWakeRequestAt": 1788627632283,
+  "firstWakeContainsAgentTeamsMemberMessage": true,
+  "memberReportInCaptainRequest": "AgentTeams message from member worker:\n\nTask t1 completed. The sum of squares of integers 1 through 10 is 385.",
+  "taskStatus": "completed",
+  "taskOutput": "Sum of squares of integers 1 through 10 = 385 (1+4+9+16+25+36+49+64+81+100 = 385).",
+  "toolCallCounts": {
+    "agent_teams_add_member": 1,
+    "agent_teams_claim_task": 1,
+    "agent_teams_create": 1,
+    "agent_teams_create_task": 1,
+    "agent_teams_send_message": 1,
+    "agent_teams_status": 2,
+    "agent_teams_update_task": 2
+  },
+  "extraModelToolCalls": []
+}

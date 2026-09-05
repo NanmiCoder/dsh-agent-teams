@@ -1,0 +1,141 @@
+{
+  "passed": true,
+  "version": "0.1.2-alpha.5",
+  "artifactSha256": "6325e972566092bb0ec07d6065113ebd0fcf5877e475b2961dc8b049c2a2654c",
+  "pluginVersion": "0.1.16-rc.1",
+  "testFiles": {
+    "harness-runtime-verify.mjs": "f65b06d5ab8d7aefd7736fb639e5be6ccda961f57aec7b91400cff3bf25e8df7",
+    "fixtures/harness-runtime-llm.mjs": "17d16379e71265f105833cc736059cf9464e3e0a9f02c3757a5c065bed0a5700",
+    "fixtures/harness-runtime-resume.mjs": "0ff88e3bf1d10788676ee0a2ad3d03bc4783fe06bddffbb707513b5c632cda0d",
+    "fixtures/harness-runtime-idle.mjs": "15e4c8f9c77d35052e7458d672fb29ba298bf6b6e0426900e4236e1e7c437a46"
+  },
+  "node": "v24.20.0",
+  "platform": "darwin",
+  "arch": "arm64",
+  "cohortCount": 214,
+  "runs": [
+    {
+      "scenario": "lifecycle",
+      "passed": true,
+      "exit": {
+        "code": 0,
+        "signal": null,
+        "timedOut": false
+      },
+      "assertions": {
+        "exit0": true,
+        "productMarker": true,
+        "pluginToolsVisible": true,
+        "memberExecuted": true,
+        "explicitReasoning": true,
+        "taskTerminal": true,
+        "secondWake": true,
+        "fifoMessageOrder": true,
+        "messagesSentWhileBusy": true
+      },
+      "requests": 24,
+      "memberRequests": 9
+    },
+    {
+      "scenario": "lifecycle-cold-restore",
+      "passed": true,
+      "assertions": {
+        "exit0": true,
+        "driverCompleted": true,
+        "sameMemberRestored": true,
+        "routeRestored": true,
+        "reasoningRestored": true
+      },
+      "exit": {
+        "code": 0,
+        "signal": null,
+        "timedOut": false
+      }
+    },
+    {
+      "scenario": "fallback",
+      "passed": true,
+      "exit": {
+        "code": 0,
+        "signal": null,
+        "timedOut": false
+      },
+      "assertions": {
+        "exit0": true,
+        "productMarker": true,
+        "pluginToolsVisible": true,
+        "memberExecuted": true,
+        "explicitReasoning": true,
+        "taskTerminal": true,
+        "secondWake": true,
+        "fallbackActivated": true,
+        "fallbackReasoningReset": true
+      },
+      "requests": 21,
+      "memberRequests": 8
+    },
+    {
+      "scenario": "fallback-cold-restore",
+      "passed": true,
+      "assertions": {
+        "exit0": true,
+        "driverCompleted": true,
+        "sameMemberRestored": true,
+        "routeRestored": true,
+        "reasoningRestored": true
+      },
+      "exit": {
+        "code": 0,
+        "signal": null,
+        "timedOut": false
+      }
+    },
+    {
+      "scenario": "failure",
+      "passed": true,
+      "exit": {
+        "code": 0,
+        "signal": null,
+        "timedOut": false
+      },
+      "assertions": {
+        "exit0": true,
+        "productMarker": true,
+        "pluginToolsVisible": true,
+        "memberExecuted": true,
+        "explicitReasoning": true,
+        "taskTerminal": true
+      },
+      "requests": 13,
+      "memberRequests": 2
+    },
+    {
+      "scenario": "captain-idle-wakeup",
+      "passed": true,
+      "exit": {
+        "code": 0,
+        "signal": null,
+        "timedOut": false
+      },
+      "assertions": {
+        "exit0": true,
+        "productMarker": true,
+        "pluginToolsVisible": true,
+        "memberExecuted": true,
+        "explicitReasoning": true,
+        "taskTerminal": true,
+        "captainActuallyYielded": true,
+        "notifiedAfterIdle": true
+      },
+      "requests": 13,
+      "memberRequests": 6
+    }
+  ],
+  "unverified": [
+    "real provider APIs and credentials",
+    "browser interaction",
+    "other operating systems",
+    "native terminal execution",
+    "live user-data migration"
+  ]
+}

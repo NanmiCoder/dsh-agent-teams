@@ -1,0 +1,103 @@
+[
+  {
+    "tag": "dsh-v0.1.2-alpha.2",
+    "commit": "0a53fb55bea101816fa226bb964ae2bed71c343b",
+    "files": {
+      "packages/subagent/subagent/src/index.ts": {
+        "exists": true,
+        "sha256": "df27b662e1aa2ae1d278673918b6967854461563086bf03b845d11a8c6a090e3"
+      },
+      "packages/subagent/subagent/src/internal.ts": {
+        "exists": false
+      },
+      "packages/subagent/subagent/src/continuation.ts": {
+        "exists": true,
+        "sha256": "97793fadf9cc48579bfc84aba45b6c41e84424ce2020a24a7a0f2ccccb3ffd9c"
+      },
+      "packages/core/agent-loop/src/index.ts": {
+        "exists": true,
+        "sha256": "032a4cdf808521a5636153e98d67c2035d0fa71aab6adc26131a4f3f980ecc68"
+      },
+      "packages/core/session/src/index.ts": {
+        "exists": true,
+        "sha256": "e785f740410189580d688f7ebae9f8ec969c8895418c0688e4afec0cf9a0c3c9"
+      },
+      "packages/core/agent/src/dispatch.ts": {
+        "exists": true,
+        "sha256": "6dc2702311305b9ecc8c8a932417bb7929f7313722fbb432a899e53d16efc6e0"
+      },
+      "packages/core/agent/src/model-selection.ts": {
+        "exists": true,
+        "sha256": "633f4e84d0ff0a1a24facf1a946ce742a8439dae0245a5194d31ee559cdbae53"
+      }
+    }
+  },
+  {
+    "tag": "dsh-v0.1.2-alpha.5",
+    "commit": "db6bdc3576c2d4e7c965e8e3ed0c2a731eed87f5",
+    "files": {
+      "packages/subagent/subagent/src/index.ts": {
+        "exists": true,
+        "sha256": "173e3e150ad24758c52156a9a3b27ec6632f780a999feeeee6f584601c5bd653"
+      },
+      "packages/subagent/subagent/src/internal.ts": {
+        "exists": true,
+        "sha256": "31b672fa58cb1dabd42314259242e9d3b7c73c19048415593ca053674e5da0ec"
+      },
+      "packages/subagent/subagent/src/continuation.ts": {
+        "exists": true,
+        "sha256": "746dd3ddd623d2f476a44c31ff11a35b33b9271f0a85b06c85f5d5c14835a5bd"
+      },
+      "packages/core/agent-loop/src/index.ts": {
+        "exists": true,
+        "sha256": "687fc29220498068ff9eccb4e37f867479f91e5292608b84bf6bdde744d8275a"
+      },
+      "packages/core/session/src/index.ts": {
+        "exists": true,
+        "sha256": "eb568db264cd2d6092240b8cdb9dfd60172a02d581960fbb09bfb7768bdc67f1"
+      },
+      "packages/core/agent/src/dispatch.ts": {
+        "exists": true,
+        "sha256": "6dc2702311305b9ecc8c8a932417bb7929f7313722fbb432a899e53d16efc6e0"
+      },
+      "packages/core/agent/src/model-selection.ts": {
+        "exists": true,
+        "sha256": "633f4e84d0ff0a1a24facf1a946ce742a8439dae0245a5194d31ee559cdbae53"
+      }
+    }
+  },
+  {
+    "tag": "dsh-v0.1.2-rc.1",
+    "commit": "a66e4702047846cdaa10c66c9d3df3951f5ea70d",
+    "files": {
+      "packages/subagent/subagent/src/index.ts": {
+        "exists": true,
+        "sha256": "173e3e150ad24758c52156a9a3b27ec6632f780a999feeeee6f584601c5bd653"
+      },
+      "packages/subagent/subagent/src/internal.ts": {
+        "exists": true,
+        "sha256": "31b672fa58cb1dabd42314259242e9d3b7c73c19048415593ca053674e5da0ec"
+      },
+      "packages/subagent/subagent/src/continuation.ts": {
+        "exists": true,
+        "sha256": "746dd3ddd623d2f476a44c31ff11a35b33b9271f0a85b06c85f5d5c14835a5bd"
+      },
+      "packages/core/agent-loop/src/index.ts": {
+        "exists": true,
+        "sha256": "687fc29220498068ff9eccb4e37f867479f91e5292608b84bf6bdde744d8275a"
+      },
+      "packages/core/session/src/index.ts": {
+        "exists": true,
+        "sha256": "eb568db264cd2d6092240b8cdb9dfd60172a02d581960fbb09bfb7768bdc67f1"
+      },
+      "packages/core/agent/src/dispatch.ts": {
+        "exists": true,
+        "sha256": "6dc2702311305b9ecc8c8a932417bb7929f7313722fbb432a899e53d16efc6e0"
+      },
+      "packages/core/agent/src/model-selection.ts": {
+        "exists": true,
+        "sha256": "633f4e84d0ff0a1a24facf1a946ce742a8439dae0245a5194d31ee559cdbae53"
+      }
+    }
+  }
+]

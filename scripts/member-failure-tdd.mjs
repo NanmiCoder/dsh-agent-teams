@@ -11,6 +11,9 @@ import { installMemberSelectionRuntime } from '../lib/members.js'
 import { installTeamScheduler } from '../lib/scheduler.js'
 import { appendMailbox, createMessage, createTeamDir, readTeam, readMailbox, readUnreadMailbox, withTeamLock, writeTeam } from '../lib/state.js'
 
+const modernHarness = process.argv.includes('--modern-harness')
+const hostQueue = Symbol.for('dsh.subagent.queuePrompt')
+
 async function eventually(predicate) {
   for (let i = 0; i < 100; i++) {
     if (await predicate()) return
@@ -62,14 +65,35 @@ async function fixture(t, { captainStatus = 'idle', fallback, captainOffline = f
     tasks: [{ id: 't1', subject: 'work', assignee: 'worker', status: 'in_progress', dependencies: [], attempt: 1, attemptId: 'a1', createdAt: 1, updatedAt: 1 }],
   })
   let setup
+  const rootListeners = new Map()
+  const disposers = []
   const ctx = {
     logger: { debug() {}, warn(message) { warnings.push(message) } },
     agents: { get(id) { return id === child.id ? child : id === captain.id && !captainOffline ? captain : undefined } },
-    on() { return () => {} },
+    on(name, listener) { rootListeners.set(name, listener); return () => rootListeners.delete(name) },
+    effect(setup) { const dispose = setup(); disposers.push(dispose); return dispose },
     subagents: {
       registerContinuableSetup(fn) { setup = fn },
       async followup(_captain, id, content) { deliveries.push({ id, content }); return 'accepted' },
     },
+  }
+  if (modernHarness) {
+    const oldEvents = child.session.events
+    delete child.session.events
+    delete child.session.header.seedLength
+    child.session.ownEvents = () => oldEvents
+    const followup = ctx.subagents.followup
+    delete ctx.subagents.followup
+    delete ctx.subagents.registerContinuableSetup
+    ctx.subagents[hostQueue] = function (parent, id, content, source, signal) {
+      return followup.call(this, parent, id, content, { source, signal })
+    }
+    ctx.subagents.sendMessage = () => { throw new Error('failure recovery must not steer a job') }
+    setup = childCtx => {
+      child.ctx = childCtx
+      rootListeners.get('agent/session-start')({ agent: child, source: 'startup' })
+      return () => { for (const dispose of disposers) dispose() }
+    }
   }
   const scheduler = installTeamScheduler(ctx, { stateDir: '.agent-teams' })
   const runtime = installMemberSelectionRuntime(ctx, '.agent-teams', (workspace, teamId, memberName) => (
@@ -79,6 +103,7 @@ async function fixture(t, { captainStatus = 'idle', fallback, captainOffline = f
     provider: 'fake', model: 'primary', ...fallback ? { fallback } : {},
   }, () => setup({
     agent: child,
+    effect(setup) { const dispose = setup(); disposers.push(dispose); return dispose },
     on(name, listener) { listeners.set(name, listener); return () => listeners.delete(name) },
   }))
   t.after(dispose)

@@ -39,7 +39,7 @@ import { findTeamByCaptain } from './state.ts'
 import { formatProfilesForPrompt, type TeamProfileConfig } from './profiles.ts'
 import { qualityPlanningPrompt } from './quality-gates.ts'
 
-import { authenticatedWebRoutes, type BrowserRequestGate, type WebRouteHost } from './web-routes.ts'
+import { authenticatedWebRoutes, readJsonRequest, RequestBodyError, type BrowserRequestGate, type WebRouteHost } from './web-routes.ts'
 
 /** Web-server service key candidates, newest first. */
 const WEB_SERVER_KEYS = ['webServer', 'httpServer'] as const
@@ -138,7 +138,7 @@ export function usageSectionText(toolNames: string, profilesText = ''): string {
 3. Analyze the goal and create the smallest useful task DAG while staged. Every agent_teams_create_task call must include a non-empty subject, including verification and review tasks. Independent work should be parallel; dependencies are only genuine prerequisites. Finish the complete roster and DAG, tell the user the Web plan is ready, then end this turn. Never call agent_teams_approve during the planning turn. The user may click Approve & Run, explicitly approve in a later user turn, return to chat to request changes, or discard the plan. The review UI injects an authoritative control message for return/discard actions: follow it exactly and never infer that a missing or paused team should be recreated. When the user returns to chat, first ask one concise clarification question without editing or recreating; after their answer, call agent_teams_edit_plan once with an ordered atomic batch, update downstream dependencies/assignees before removals, summarize the revision, and wait for review again. Never inspect or edit .agent-teams state files or plugin source code to revise a plan. Only explicit approval may call agent_teams_approve.
 4. After approval, the final member configuration is spawned atomically and the scheduler starts ready work. Lead by delegation: monitor with agent_teams_status, send guidance with agent_teams_send_message, and let idle teammates execute ready work. Do not duplicate a teammate's work merely because its turn is slow. If the user requires every member to contribute or report, create one task per required contribution (or message each member directly); never wait for an unassigned member to produce work it was never given.
 5. If the user explicitly asks to pause a running member, its open attempt remains parked after interruption; after answering the user, send that same member guidance with agent_teams_send_message so it continues the same attempt. Do not interrupt members for an ordinary user question that did not request a pause. If work must change owner, restart from scratch, or be taken over, call agent_teams_reassign_task first. Prefer another idle member or a retry with the same member. Use assignee=captain only for one ready task that you will personally drive to a terminal status in this same turn; never start a second captain takeover while one is unfinished, and never end your turn with captain-owned work open. Reassignment revokes the old attempt and waits for that member to quiesce, preventing late results from overwriting the new attempt.
-6. Tasks carry attempt_id capabilities. Members must use the current attempt_id for updates; stale-attempt errors mean ownership changed. Check status after progress notifications until every required task is terminal and every member is idle/ready; do not busy-poll or require reports from members with no assigned work.
+6. Tasks carry attempt_id capabilities. Members must use the current attempt_id for updates; stale-attempt errors mean ownership changed. After dispatch, end your turn while members work: mailbox progress deliveries will wake you. Read status after a delivery or an explicit user request until every required task is terminal and every member is idle/ready; do not busy-poll or require reports from members with no assigned work.
 7. If the user names a configured profile / template / fixed roster, pass that name as profile= to agent_teams_create. After a successful profile create, do not recreate the same members. Seed profiles provide their template tasks; captain-planning profiles provide only the roster and guardrails, so you must design their DAG while staged. Add repair or retry tasks when review/test fails, but never make a new task depend on a failed task. Do not send_message to start the next stage; the scheduler assigns ready work after approval. Watch every required task until it is terminal before deleting the team. Never perform a real deployment without explicit user confirmation.
 8. Quality kinds (requirements, implementation, verification, review, repair, integration) need a contract: non-empty objective and acceptance; implementation/repair also need inScope and verify. Review/requirements can complete only with verdict=pass; needs_revision/reject must fail with findings. The system then opens repair + next review that depend on the successful source, never the failed review. Do not approve your own implementation. create_task no longer silently resumes a halted team — call agent_teams_resume with a reason, or create_task({resume:true, resumeReason}).
 9. ${qualityPlanningPrompt()}
@@ -255,25 +255,12 @@ export function apply(ctx: Context, config: Config): void {
           res.end()
           return
         }
-        let raw = ''
+        let payload: Record<string, unknown>
         try {
-          raw = await new Promise<string>((resolve, reject) => {
-            const chunks: Buffer[] = []
-            req.on('data', (chunk) => { chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)) })
-            req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')))
-            req.on('error', reject)
-          })
-        } catch {
-          res.writeHead(400, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
-          res.end(JSON.stringify({ error: 'invalid request body' }))
-          return
-        }
-        let payload: { sessionId?: unknown; teamId?: unknown }
-        try {
-          payload = raw.trim() === '' ? {} : JSON.parse(raw) as { sessionId?: unknown; teamId?: unknown }
-        } catch {
-          res.writeHead(400, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
-          res.end(JSON.stringify({ error: 'invalid JSON' }))
+          payload = await readJsonRequest(req)
+        } catch (error: unknown) {
+          res.writeHead(error instanceof RequestBodyError ? error.status : 400, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
+          res.end(JSON.stringify({ error: error instanceof Error ? error.message : 'invalid request body' }))
           return
         }
         const sessionId = typeof payload.sessionId === 'string' ? payload.sessionId.trim() : ''
@@ -325,26 +312,9 @@ export function apply(ctx: Context, config: Config): void {
         }
         let payload: Record<string, unknown>
         try {
-          const chunks: Buffer[] = []
-          const raw = await new Promise<string>((resolve, reject) => {
-            let size = 0
-            req.on('data', (chunk) => {
-              const part = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
-              size += part.length
-              if (size > 1_000_000) {
-                reject(new Error('request body is too large'))
-                return
-              }
-              chunks.push(part)
-            })
-            req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')))
-            req.on('error', reject)
-          })
-          const parsed: unknown = raw.trim() === '' ? {} : JSON.parse(raw)
-          if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) throw new Error('body must be an object')
-          payload = parsed as Record<string, unknown>
+          payload = await readJsonRequest(req)
         } catch (error: unknown) {
-          res.writeHead(400, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
+          res.writeHead(error instanceof RequestBodyError ? error.status : 400, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
           res.end(JSON.stringify({ error: error instanceof Error ? error.message : 'invalid request body' }))
           return
         }

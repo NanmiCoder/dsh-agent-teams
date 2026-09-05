@@ -1,0 +1,71 @@
+{
+  "schema": 1,
+  "scope": "heuristic",
+  "classes": [
+    {
+      "id": 1,
+      "slug": "source-patch",
+      "name": "source patch / monkey patch",
+      "patterns": [
+        "(?<!cordis\\.)patch\\.yml|patchedDependencies|patch-package",
+        "DSH_HARNESS_SOURCE_ROOT|patch-surface|monkeypatch|monkey-patch"
+      ]
+    },
+    {
+      "id": 2,
+      "slug": "internal-events",
+      "name": "internal event names and persistent events",
+      "patterns": [
+        "SessionEvent|session/event|ctx\\.on\\(|subscribe\\(",
+        "tool/code-dispatch|tools-code-mode|connection/reset"
+      ]
+    },
+    {
+      "id": 3,
+      "slug": "internal-services",
+      "name": "internal service probes / Remote",
+      "patterns": [
+        "APIProxy|apiProxy|ctx\\.get\\(|ctx\\.remote|@Remote",
+        "@deepseek-ai/dsh-api-.+/client|/internal"
+      ]
+    },
+    {
+      "id": 4,
+      "slug": "host-filesystem",
+      "name": "direct host directory reads/writes",
+      "patterns": [
+        "DSH_HOME|\\.dsh[/\\\\]|profiles[/\\\\]|homedir\\(",
+        "readFile|writeFile|mkdir|openPath"
+      ]
+    },
+    {
+      "id": 5,
+      "slug": "internal-ui-commands",
+      "name": "internal UI / commands / tool registration",
+      "patterns": [
+        "registerCommand|registerView|contributes|ctx\\.tools|commands\\.execute",
+        "dsh-client-runtime|PropsRuntime|ctx\\.slots|useSession|useChat|/internal",
+        "__ModuleLoader__|PLUGIN_ID"
+      ]
+    },
+    {
+      "id": 6,
+      "slug": "custom-channel",
+      "name": "custom HTTP / WS / RPC / DOM / CSS channels",
+      "patterns": [
+        "createServer\\(|WebSocket|MutationObserver|insertRule",
+        "127\\.0\\.0\\.1|localhost|router\\.(get|post|put|delete)\\(|/api/",
+        "contenteditable|setSelectionRange|data-input-scroll"
+      ]
+    },
+    {
+      "id": 7,
+      "slug": "subprocess-output",
+      "name": "subprocess / stdout / stderr parsing",
+      "patterns": [
+        "node:child_process|spawn\\(|exec(File)?Sync\\(|execa|Bun\\.spawn",
+        "headless|--profile"
+      ]
+    }
+  ]
+}

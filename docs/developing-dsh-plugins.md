@@ -448,7 +448,7 @@ export const myDefinition: ConversationNodeDefinition<MyState> = {
 
 ```tsx
 // index.tsx 注册
-ctx.conversationEvents.register(myDefinition)
+ctx.uiConversation.events.register(myDefinition)
 ctx.slots.inject('conversation.chat.node', () => ctx.slots.register({
   name: 'conversation.chat.node', key: 'my-plugin',
   inject: () => ({ openSession: (id) => ctx.sessions.open(id) }),

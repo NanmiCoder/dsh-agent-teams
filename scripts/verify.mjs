@@ -208,9 +208,10 @@ check(
       === JSON.stringify(placeholders(agentTeamsEn[key]))),
 )
 check(
-  'client registers the official locale namespace on both visible slots',
+  'client uses the uiConversation event registry and registers the official locale namespace',
   AGENT_TEAMS_LOCALE_NAMESPACE === 'agentTeams'
     && clientIndexSource.includes("'uiConversation', 'slots', 'sessions', 'locale', 'modelDirectories'")
+    && clientIndexSource.includes('ctx.uiConversation.events.register(agentTeamsCardDefinition)')
     && clientIndexSource.includes('ctx.locale.register(AGENT_TEAMS_LOCALE_NAMESPACE, { zh, en })')
     && clientIndexSource.match(/locale:\s*AGENT_TEAMS_LOCALE_NAMESPACE/gu)?.length === 2,
 )

@@ -1,0 +1,83 @@
+{
+  "requestCount": 25,
+  "roles": {
+    "captain": {
+      "modelRequests": 12,
+      "conversationRequests": 11,
+      "titleRequests": 1,
+      "toolCalls": {
+        "agent_teams_add_member": 1,
+        "agent_teams_create": 1,
+        "agent_teams_create_task": 1,
+        "agent_teams_send_message": 1,
+        "agent_teams_status": 2
+      }
+    },
+    "worker": {
+      "modelRequests": 13,
+      "conversationRequests": 13,
+      "titleRequests": 0,
+      "toolCalls": {
+        "agent_teams_claim_task": 1,
+        "agent_teams_send_message": 1,
+        "agent_teams_status": 2,
+        "agent_teams_update_task": 2,
+        "bash": 2,
+        "send_message": 2
+      }
+    }
+  },
+  "statusCalls": [
+    {
+      "role": "worker",
+      "request": 5,
+      "timeOffsetMilliseconds": 4431,
+      "explanation": "Worker welcome turn queried before captain created t1; returned zero tasks and that observation became stale."
+    },
+    {
+      "role": "captain",
+      "request": 9,
+      "timeOffsetMilliseconds": 9458,
+      "explanation": "Captain checked after the worker sent a native ready message based on the earlier zero-task snapshot."
+    },
+    {
+      "role": "captain",
+      "request": 18,
+      "timeOffsetMilliseconds": 15655,
+      "explanation": "Captain checked after receiving the AgentTeams completion report."
+    },
+    {
+      "role": "worker",
+      "request": 23,
+      "timeOffsetMilliseconds": 18657,
+      "explanation": "Worker checked after completion when a previously queued captain reminder was delivered."
+    }
+  ],
+  "driverPrompts": 1,
+  "driverStatusToolInvocations": 0,
+  "wakeup": {
+    "firstObservedCaptainIdleOffsetMs": 6957,
+    "firstWakeRequest": 9,
+    "firstWakeOffsetMs": 8498,
+    "firstWakeContainsAgentTeamsMemberMessage": false,
+    "firstWakeChannel": "native send_message ready notification",
+    "agentTeamsCompletionReportOffsetMs": 14919,
+    "captainFirstConsumesAgentTeamsCompletionRequest": 18,
+    "captainConsumesAgentTeamsCompletionOffsetMs": 14936,
+    "secondIdleWasDirectlyObserved": false,
+    "independentAgentTeamsOnlyWakeupCausalityProvenByThisRun": false,
+    "interpretation": "Normal end-to-end completion and notification consumption are proven. The first observed idle/wake pair belongs to the native ready message. A later actual AgentTeams completion message was consumed, but native notifications coexist and the observer did not record a second idle transition; use the separately verified deterministic fixture for isolated notification causality."
+  },
+  "extraRequestSources": [
+    "Worker welcome-turn status snapshot preceded task creation; its later native idle/ready message used that stale zero-task observation.",
+    "Captain reacted by checking status and sending an extra task reminder while the automatic assignment was already executing.",
+    "Worker reported through both AgentTeams and native send_message.",
+    "The queued captain reminder reached the worker after task completion, producing one further status check and a no-op completion acknowledgement."
+  ],
+  "answerIndependence": {
+    "initialDriverPromptContainedExpectedAnswer": false,
+    "captainModelIncluded385InCreatedTaskAndReminder": true,
+    "workerExecutedDirectArithmeticExpression": true,
+    "interpretation": "The harness task lifecycle is validated; this run is not a blind independent-reasoning benchmark."
+  }
+}

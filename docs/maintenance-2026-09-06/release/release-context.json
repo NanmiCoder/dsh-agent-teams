@@ -1,0 +1,12 @@
+{
+  "version": "0.1.16-rc.1",
+  "npmTag": "next",
+  "gitTag": "v0.1.16-rc.1",
+  "sourceCommit": "eb09334f9a76dac890a25673449a6a51d5ceffcb",
+  "actionRun": 33981644849,
+  "actionUrl": "https://github.com/NanmiCoder/dsh-agent-teams/actions/runs/33981644849",
+  "lockfileSha256": "200372102c04e58218d025c5cdf53934bdeeb8ae512ffbb657147d627742bdc2",
+  "compatibilitySha256": "5ec5876da82eef0bc5c912861c28f19acc39852413ad39253b0ce017c5f03160",
+  "priorNpmLatest": "0.1.15",
+  "preparedAt": "2026-09-05T17:41:20.845529+00:00"
+}

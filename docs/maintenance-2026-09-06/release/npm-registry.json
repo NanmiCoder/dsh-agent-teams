@@ -1,0 +1,14 @@
+{
+  "registry": "https://registry.npmjs.org",
+  "version": "0.1.16-rc.1",
+  "distTags": {
+    "alpha": "0.1.15-alpha.1",
+    "latest": "0.1.15",
+    "next": "0.1.16-rc.1"
+  },
+  "dist": {
+    "tarball": "https://registry.npmjs.org/@nanmicoder/dsh-agent-teams/-/dsh-agent-teams-0.1.16-rc.1.tgz",
+    "integrity": "sha512-gHrlUXuFnqz4wBw55v3ury/0PhNNCZ8/1eYycXUWGUgz97sxMzOMOLGGtpBijQ2/TzOqgRkv43+i/zKFU5GIZQ==",
+    "shasum": "0ecb4214df1f8c560a29f3e9e2154cd70d159abc"
+  }
+}

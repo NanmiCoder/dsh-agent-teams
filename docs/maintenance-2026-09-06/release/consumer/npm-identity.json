@@ -1,0 +1,23 @@
+{
+  "capturedAt": "2026-09-05T17:45:14.650Z",
+  "passed": true,
+  "package": "@nanmicoder/dsh-agent-teams",
+  "version": "0.1.16-rc.1",
+  "sourceCommit": "eb09334f9a76dac890a25673449a6a51d5ceffcb",
+  "actionRun": "https://github.com/NanmiCoder/dsh-agent-teams/actions/runs/33981644849",
+  "metadataUrl": "https://registry.npmjs.org/@nanmicoder%2fdsh-agent-teams/0.1.16-rc.1",
+  "tarballUrl": "https://registry.npmjs.org/@nanmicoder/dsh-agent-teams/-/dsh-agent-teams-0.1.16-rc.1.tgz",
+  "artifact": "/tmp/dsh-runtime-lab-20260906/published-consumer-0.1.16-rc.1/npm-published.tgz",
+  "bytes": 1928322,
+  "sha256": "624bece6eabcac162d0570d487b947b93f81785ed592464ce2601f5a371d1f26",
+  "sha1": "0ecb4214df1f8c560a29f3e9e2154cd70d159abc",
+  "integrity": "sha512-gHrlUXuFnqz4wBw55v3ury/0PhNNCZ8/1eYycXUWGUgz97sxMzOMOLGGtpBijQ2/TzOqgRkv43+i/zKFU5GIZQ==",
+  "expectedActionSha256": "624bece6eabcac162d0570d487b947b93f81785ed592464ce2601f5a371d1f26",
+  "actionArtifact": "/tmp/dsh-release-20260906/action-candidate/candidate.tgz",
+  "byteIdenticalToActionCandidate": true,
+  "distTags": {
+    "alpha": "0.1.15-alpha.1",
+    "latest": "0.1.15",
+    "next": "0.1.16-rc.1"
+  }
+}

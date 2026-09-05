@@ -1,0 +1,68 @@
+{
+  "version": "0.1.2-rc.1",
+  "report": "/tmp/dsh-runtime-lab-20260906/published-api-rc1-1788630378676",
+  "exit": {
+    "code": 0,
+    "signal": null
+  },
+  "timeout": false,
+  "passed": true,
+  "reason": "task-terminal-and-agents-idle",
+  "captainId": "session-a25bebf0-db4c-497d-8e67-0d35e367a1da",
+  "requests": 25,
+  "cwd": "/private/tmp",
+  "provider": "deepseek-official",
+  "model": "deepseek-v4-flash",
+  "teamPath": "/tmp/dsh-runtime-lab-20260906/published-api-rc1-1788630378676/teams/published-api-rc1-1788630378676/team.json",
+  "team": {
+    "name": "published-api-rc1-1788630378676",
+    "id": "published-api-rc1-1788630378676",
+    "description": "Authorized API validation: worker computes sum of squares 1..10 and reports to captain.",
+    "captainSessionId": "session-a25bebf0-db4c-497d-8e67-0d35e367a1da",
+    "createdAt": 1788630382478,
+    "members": [
+      {
+        "id": "89309c41-c7d4-4d7f-a1dd-97531f950bf3",
+        "name": "worker",
+        "role": "worker",
+        "provider": "deepseek-official",
+        "model": "deepseek-v4-flash",
+        "reasoningEffort": "low",
+        "executionPrompt": "You are assigned a task. Wait for your assignment. When a task is assigned to you, claim it, then use the returned attempt_id to update the task to in_progress and then to completed. Compute the actual answer. Report the answer to the captain using agent_teams_send_message.",
+        "joinedAt": 1788630383726,
+        "status": "idle"
+      }
+    ],
+    "tasks": [
+      {
+        "id": "t1",
+        "subject": "Calculate sum of squares of integers 1 through 10",
+        "description": "Compute 1^2 + 2^2 + ... + 10^2 = 385. The completed task output must contain the sum.",
+        "status": "completed",
+        "assignee": "worker",
+        "dependencies": [],
+        "attempt": 1,
+        "createdAt": 1788630384737,
+        "updatedAt": 1788630393640,
+        "kind": "work",
+        "attemptId": "678d5a45-74ac-4e5f-9c3a-cca77be6e275",
+        "reassigning": false,
+        "output": "Sum of squares of integers 1 through 10 = 1^2 + 2^2 + ... + 10^2 = 385. Verified by direct arithmetic computation."
+      }
+    ],
+    "taskSeq": 1
+  },
+  "assertions": {
+    "realProviderRequests": true,
+    "memberMadeRealRequest": true,
+    "singleTeamMember": true,
+    "singleCompletedTask": true,
+    "correctOutput": true,
+    "captainConfirmed": true,
+    "onlyOneDriverPrompt": true,
+    "captainWokeAfterYield": true,
+    "memberClaimedTask": true,
+    "memberUpdatedTask": true,
+    "memberReported": true
+  }
+}

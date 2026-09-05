@@ -41,6 +41,43 @@ node scripts/doctor.mjs \
 
 doctor 检查给定路径解析到的包版本、混装和重复身份，不执行插件、不修改配置，也不能自动证明该路径就是正在运行的进程。它的成功结果不是模型、UI 或任务完成的证明。
 
+## 从源码安装与测试 Alpha
+
+在插件 checkout 中构建同一份待验收产物：
+
+```sh
+pnpm install --frozen-lockfile
+pnpm typecheck
+pnpm build
+pnpm verify
+pnpm pack --out ./agent-teams-candidate.tgz
+```
+
+准备一个已配置 Web 入口的独立测试 profile（以下为 `agent-teams-preview`），检查实际宿主后安装：
+
+```sh
+node scripts/doctor.mjs --host-root "/actual/host/package/directory" --json
+dsh plugin --profile agent-teams-preview add --save-exact /absolute/path/agent-teams-candidate.tgz
+node scripts/doctor.mjs --host-root "/actual/host/package/directory" --profile-root "/actual/test/profile/directory" --json
+dsh --profile agent-teams-preview --dump-config
+dsh --profile agent-teams-preview
+```
+
+源码更改后需要重新构建、打包和重启。`doctor` 通过不替代建队、任务与 UI 验收。
+
+Alpha 测试必须锁定整组宿主依赖；`^0.1.2-alpha.2` 不表示只接受 Alpha.2，精确 CLI 版本的间接依赖仍可能解析到 rc.1。本仓库使用精确开发依赖、整组 `pnpm.overrides` 和 frozen lockfile。以下命令创建独立临时安装、profile 和工作区，安装同一份 tgz 并核对解析结果：
+
+```sh
+node scripts/harness-runtime-verify.mjs \
+  --host-version 0.1.2-alpha.2 \
+  --artifact ./agent-teams-candidate.tgz \
+  --report-dir /tmp/agent-teams-alpha2-check
+```
+
+该命令会下载宿主，使用固定模型响应和真实 CLI、插件、会话、工具与子代理，不修改已有用户 profile。升级时保留已验证的锁文件；不要通过删除凭据或 `.agent-teams` 处理版本错配。
+
+历史 `0.1.0-rc.8` + 插件 `0.1.14` 组合需固定两端。历史 [Alpha.2 兼容记录](./alpha2-compatibility.md)与[验收报告](./alpha2-release-acceptance.md)只描述当时版本，不覆盖当前清单。
+
 ## CI 的可检查证据
 
 [verify.yml](../.github/workflows/verify.yml) 同时用于 PR、main 和发布前的可复用工作流：

@@ -30,7 +30,7 @@
 
 ## 版本更新
 
-[v0.1.16-rc.1](./release-notes/v0.1.16-rc.1.md) 是 npm `next` 渠道的发布候选：统一宿主兼容层、精确版本矩阵、真实宿主验收和发布门禁。发布状态与历史见 [GitHub Releases](https://github.com/NanmiCoder/dsh-agent-teams/releases)。
+[v0.1.16-rc.1](./release-notes/v0.1.16-rc.1.md) 已发布到 npm `next`，修复 Harness RC / Alpha 的启动、成员消息与任务协作兼容问题。安装版本见下方配对表。
 
 ## 为什么需要 AgentTeams？
 
@@ -48,77 +48,38 @@
 
 ## 安装与版本选择
 
-> [!IMPORTANT]
-> **0.1.16-rc.1 是 `next` 渠道的预发布版本。** 对当前支持的 0.1.2 宿主，请使用下方精确插件版本。0.1.15 面向 Alpha.2，不能把可变的 `latest` 标签当作兼容保证。请先核对实际运行的宿主和 profile，再更新两端。
+**推荐组合：DeepSeek Harness `0.1.2-rc.1` + AgentTeams `0.1.16-rc.1`。两者都仍是预发布版本。**
 
-| Harness 宿主 | 本次候选的定位 | 使用原则 |
+| 使用场景 | DeepSeek Harness | AgentTeams 插件 |
 | --- | --- | --- |
-| **0.1.2-rc.1** | 普通用户默认验收目标 | 当前没有 GA；RC 仍是预发布，但不再要求普通用户跟随 Alpha。 |
-| **0.1.2-alpha.5** | 主动选择的预览版本 | 明确指定版本，并锁定整组宿主依赖。 |
-| **0.1.2-alpha.2** | 保留兼容的旧预览版本 | 单锁 CLI 不够，间接依赖可能被解析成 rc.1。 |
-| 其他版本、源码 HEAD、Desktop 内置核心 | 不在当前支持清单中 | 保留已工作的精确组合，或单独完成验收后加入清单。 |
+| **推荐安装** | **`0.1.2-rc.1`** | **`0.1.16-rc.1`** |
+| 开发者测试 Alpha | `0.1.2-alpha.5` | `0.1.16-rc.1` |
+| 保留旧 Alpha | `0.1.2-alpha.2` | `0.1.16-rc.1` |
 
-宿主矩阵只有一个来源：[compatibility.json](./compatibility.json)。开发、PR 验证和发布门禁都读取它。插件预发布版本统一发到 `next`；无后缀版本只有在推荐宿主与完整矩阵验收通过后才可以进入 `latest`。上游 Harness 的 npm 标签由上游维护，本项目不能修改它；我们的安装说明使用精确版本。
-
-### 普通用户：固定匹配的宿主与插件
-
-推荐宿主安装目标为：
+### 1. 安装 DeepSeek Harness
 
 ```sh
 npm install --global @deepseek-ai/dsh@0.1.2-rc.1
 dsh --version
 ```
 
-确认发行版本可用后，在实际使用的 profile 中安装精确插件版本（以下以 `web` 为例）：
+已有该版本可跳过。Alpha 仅供主动测试：手动指定表中的 Alpha 版本，并按[维护指南](./docs/maintenance-workflow.md)锁定整组宿主依赖。
+
+### 2. 安装 AgentTeams 插件
+
+以下安装到 `web` profile；使用其他 profile 时，将 `web` 换成实际名称：
 
 ```sh
 dsh plugin --profile web add --save-exact @nanmicoder/dsh-agent-teams@0.1.16-rc.1
 ```
 
-宿主或插件更新后，停止并重启实际运行的 Harness，再刷新浏览器。全局 CLI 升级不会更换 Desktop 内置核心，也不会更新另一个源码工作区。尚未发布的 checkout 可使用下方源码构建方式。
+**安装后，停止并重新启动该 profile 的 Harness 进程，再刷新浏览器。**
 
-npm 的精确 CLI 版本仍可能包含宽范围间接依赖。升级时保留已验证的锁文件，对实际安装路径运行诊断；不要通过删除凭据或 `.agent-teams` 来处理版本错配。
+插件修复版 `0.1.16-rc.1` 已发布到 `next`；当前 `latest` 仍是面向 Alpha.2 的 `0.1.15`。请使用上面的精确版本命令。后续插件预发布版本继续进入 `next`，通过完整验证的正式版本才进入 `latest`。
 
-### 从源码验证本次候选
+> Desktop 用户需核对应用内置的 Harness 核心；全局 CLI 升级不会升级桌面内核。旧 `0.1.0-*` / `0.1.1-*` 或其他未列出的宿主，请先保留已工作的组合，参考[旧版本与诊断指引](./docs/maintenance-workflow.md)。
 
-在包含本次改动的插件 checkout 中：
-
-```sh
-pnpm install --frozen-lockfile
-pnpm typecheck
-pnpm build
-pnpm verify
-pnpm pack --out ./agent-teams-candidate.tgz
-```
-
-准备一个已配置 Web 入口的独立测试 profile（以下为 `agent-teams-preview`），先检查实际宿主的依赖，再安装产物：
-
-```sh
-node scripts/doctor.mjs --host-root "/实际运行的宿主包目录" --json
-dsh plugin --profile agent-teams-preview add --save-exact /完整路径/agent-teams-candidate.tgz
-node scripts/doctor.mjs --host-root "/实际运行的宿主包目录" --profile-root "/实际测试profile目录" --json
-dsh --profile agent-teams-preview --dump-config
-dsh --profile agent-teams-preview
-```
-
-`doctor` 检查整组 DSH 包版本、重复运行时身份以及 profile 中的插件版本。它只读文件，不读取凭据、不修改配置；检查通过不替代实际建队、任务执行和 UI 验收。源码更改后需要重新构建、打包和重启。
-
-### 开发者：显式测试 Alpha
-
-Alpha 需要明确指定版本，不能用一个 `^0.1.2-alpha.2` 表达“只接受 Alpha.2”。本仓库开发依赖通过精确版本、整组 `pnpm.overrides` 和 frozen lockfile 固定到 rc.1；自动验收会为 Alpha.2、Alpha.5 和 rc.1 分别创建独立安装闭包、profile 与工作区，安装同一份 tgz，并核对真实解析结果。
-
-```sh
-node scripts/harness-runtime-verify.mjs \
-  --host-version 0.1.2-alpha.2 \
-  --artifact ./agent-teams-candidate.tgz \
-  --report-dir /tmp/agent-teams-alpha2-check
-```
-
-这是会创建临时目录并下载宿主的开发验收命令，不会修改已有用户 profile。模型适配器使用固定测试响应；CLI、插件、会话、工具与子代理使用真实宿主实现。完整范围和发布流程见[维护流程](./docs/maintenance-workflow.md)。
-
-### 保留旧宿主 / 回退
-
-对于历史组合 Harness `0.1.0-rc.8` + 插件 `0.1.14`，应固定两端版本；不能据此推断所有旧 RC 都兼容。已使用其他已验证旧组合的用户先保留该组合。历史 [Alpha.2 兼容记录](./docs/alpha2-compatibility.md)和[验收报告](./docs/alpha2-release-acceptance.md)只描述当时版本，不覆盖当前清单。
+完整[兼容清单](./compatibility.json)、[源码安装与 Alpha 验证](./docs/maintenance-workflow.md)、[已验证范围与平台限制](./docs/maintenance-2026-09-06/release/README.md)。
 
 接着直接用自然语言拉团队：
 

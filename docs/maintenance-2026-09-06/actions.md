@@ -8,7 +8,7 @@
 
 - PR：原有 25 个均已执行，包含 9 个原 PR 合并并致谢、10 个具体的 Request changes 审核并保持开放、3 个历史方案说明原因后关闭，以及 3 个兼容 PR 在统一实现合并后说明来源并关闭。另建的整合 PR #135 已合并；CI 六项检查全部通过。
 - Issue：41 个均已逐条回复，最终为 17 个已关闭、24 个开放；已关闭中含本轮新关闭的 16 个和随 #90 自动关闭的 #89。发布后新增 9 条回复，其中 #127/#131/#125/#106/#78 按已发布且已验收的修复范围关闭，#132/#120/#123/#126 保留平台或默认渠道的剩余范围。此前全部回复链接继续保留。
-- 发布：[0.1.16-rc.1](https://github.com/NanmiCoder/dsh-agent-teams/releases/tag/v0.1.16-rc.1) 已发布到 npm `next`，`latest` 仍为 `0.1.15`。[发布 Action 八项成功](https://github.com/NanmiCoder/dsh-agent-teams/actions/runs/33981644849)；官方 npm 包与 CI 产物及安装后的 85 个文件一致，rc.1 消费环境的 214 个 DSH 分包版本一致、doctor 通过，真实 API 25 次请求 / 11 个断言通过。详见[固定提交下的发布与消费证据](https://github.com/NanmiCoder/dsh-agent-teams/blob/6fc479a561800cbde9dc42fc95d62b809cb878ac/docs/maintenance-2026-09-06/release/README.md)。
+- 发布：[0.1.16-rc.1](https://github.com/NanmiCoder/dsh-agent-teams/releases/tag/v0.1.16-rc.1) 已发布到 npm `next`，`latest` 仍为 `0.1.15`。[发布 Action 八项成功](https://github.com/NanmiCoder/dsh-agent-teams/actions/runs/33981644849)；官方 npm 包与 CI 产物及安装后的 85 个文件一致，rc.1 消费环境的 214 个 DSH 分包版本一致、doctor 通过，真实 API 25 次请求 / 11 个断言通过。详见[固定提交下的发布与消费证据](https://github.com/NanmiCoder/dsh-agent-teams/blob/6fc479a561800cbde9dc42fc95d62b809cb878ac/docs/maintenance-2026-09-06/release/README.md)。9 条发布后评论均已补充安装后重启实际 Harness 进程、刷新浏览器及替换实际 profile 名称的说明，并逐条回读验证。
 - “已回复”“已合并”“已发布”“已验证”分别记录。关闭问答、推广邀请或重复讨论不表示一个功能已经交付；仍需复现信息和独立功能验收的条目保持开放。
 
 ## 25 个 PR

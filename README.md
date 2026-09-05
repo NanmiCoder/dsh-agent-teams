@@ -30,7 +30,7 @@ Ask in natural language. The plugin provides the team protocol, eleven coordinat
 
 ## Releases
 
-[v0.1.16-rc.1](./release-notes/v0.1.16-rc.1.md) is the release candidate for the npm `next` channel: a shared host adapter, exact compatibility matrix, real-host acceptance and release gates. Check [GitHub Releases](https://github.com/NanmiCoder/dsh-agent-teams/releases) for release availability and history.
+[v0.1.16-rc.1](./release-notes/v0.1.16-rc.1.md) is published on npm `next`, with fixes for startup, member messaging and task collaboration across supported Harness RC / Alpha versions. Choose a version pair below.
 
 ## Why AgentTeams?
 
@@ -49,77 +49,38 @@ The conversation card and activity panel use Harness's official locale service. 
 
 ## Install and choose versions
 
-> [!IMPORTANT]
-> **0.1.16-rc.1 is a prerelease on the `next` track.** Use the exact version below for the supported 0.1.2 hosts. Plugin 0.1.15 targets Alpha.2; do not use a mutable `latest` tag as a compatibility guarantee. Check the actual running host and profile before updating either side.
+**Recommended pair: DeepSeek Harness `0.1.2-rc.1` + AgentTeams `0.1.16-rc.1`. Both are still prereleases.**
 
-| Harness host | Candidate track | Installation rule |
+| Use case | DeepSeek Harness | AgentTeams plugin |
 | --- | --- | --- |
-| **0.1.2-rc.1** | Default acceptance target | There is currently no GA host. RC is still a prerelease; ordinary users should not have to follow Alpha. |
-| **0.1.2-alpha.5** | Opt-in preview | Select the exact version and lock the entire host dependency cohort. |
-| **0.1.2-alpha.2** | Retained legacy preview | Pinning the CLI alone can still resolve rc.1 transitive dependencies. |
-| Other versions, source HEAD, embedded Desktop cores | Outside the current matrix | Keep a known working exact pair or complete acceptance before adding a target. |
+| **Recommended installation** | **`0.1.2-rc.1`** | **`0.1.16-rc.1`** |
+| Developer Alpha testing | `0.1.2-alpha.5` | `0.1.16-rc.1` |
+| Retaining an older Alpha | `0.1.2-alpha.2` | `0.1.16-rc.1` |
 
-[compatibility.json](./compatibility.json) is the single source for development, PR checks and release gates. Plugin prereleases use `next`. Unsuffixed versions may use `latest` only after the recommended host and full supported matrix pass. Harness dist-tags belong to upstream; this project cannot change them, so installation instructions use exact versions.
-
-### Ordinary users: keep a matching host and plugin
-
-The recommended host installation target is:
+### 1. Install DeepSeek Harness
 
 ```sh
 npm install --global @deepseek-ai/dsh@0.1.2-rc.1
 dsh --version
 ```
 
-Once the release is available, install the exact plugin version into the profile you actually use (`web` below):
+Skip this if you already run this version. Alpha is opt-in: select an exact Alpha version from the table and lock all host dependencies as described in the [maintenance guide](./docs/maintenance-workflow.md).
+
+### 2. Install the AgentTeams plugin
+
+This installs into the `web` profile. Replace `web` with your actual profile name if different:
 
 ```sh
 dsh plugin --profile web add --save-exact @nanmicoder/dsh-agent-teams@0.1.16-rc.1
 ```
 
-Restart the actual Harness process after changing either side and refresh the browser. Updating a global CLI does not replace an embedded Desktop core or another source checkout. For an unpublished checkout, use the source build below.
+**After installation, stop and restart Harness for that profile, then refresh the browser.**
 
-An exact npm CLI version can still contain broad transitive dependencies. Preserve a verified lockfile and inspect the actual installation. Do not delete credentials or `.agent-teams` data to address a version mismatch.
+The fixed plugin `0.1.16-rc.1` is published on `next`; `latest` still points to `0.1.15`, which targets Alpha.2. Use the exact-version command above. Future plugin prereleases use `next`; only stable plugin releases that pass the full verification matrix may use `latest`.
 
-### Build and verify this candidate
+> Desktop users must check the app's embedded Harness core; upgrading the global CLI does not upgrade it. For older `0.1.0-*` / `0.1.1-*` or unlisted hosts, keep a working pair and follow the [older-version and diagnostic guide](./docs/maintenance-workflow.md).
 
-In a checkout containing this change:
-
-```sh
-pnpm install --frozen-lockfile
-pnpm typecheck
-pnpm build
-pnpm verify
-pnpm pack --out ./agent-teams-candidate.tgz
-```
-
-Use a separate test profile configured with the Web app (`agent-teams-preview` below). Inspect the actual host, then install the artifact:
-
-```sh
-node scripts/doctor.mjs --host-root "/actual/host/package/directory" --json
-dsh plugin --profile agent-teams-preview add --save-exact /absolute/path/agent-teams-candidate.tgz
-node scripts/doctor.mjs --host-root "/actual/host/package/directory" --profile-root "/actual/test/profile/directory" --json
-dsh --profile agent-teams-preview --dump-config
-dsh --profile agent-teams-preview
-```
-
-The doctor checks the DSH dependency cohort, duplicate runtime identities and the profile's plugin version. It reads package metadata without reading credentials or changing configuration. Passing it does not replace team, task and UI acceptance. Rebuild, repack and restart after source changes.
-
-### Developers: explicitly test Alpha
-
-Choose an exact Alpha version; `^0.1.2-alpha.2` does not mean “Alpha.2 only.” Development uses exact rc.1 packages, cohort-wide `pnpm.overrides` and a frozen lockfile. The runtime runner creates separate dependency cohorts, profiles and workspaces for Alpha.2, Alpha.5 and rc.1, installs the same candidate tgz, and checks actual resolution.
-
-```sh
-node scripts/harness-runtime-verify.mjs \
-  --host-version 0.1.2-alpha.2 \
-  --artifact ./agent-teams-candidate.tgz \
-  --report-dir /tmp/agent-teams-alpha2-check
-```
-
-This developer command downloads the host into temporary directories without modifying existing user profiles. It uses deterministic model responses with the real CLI, plugin, sessions, tools and subagents. See the [maintenance workflow](./docs/maintenance-workflow.md) for coverage and release requirements.
-
-### Retaining an older host / rollback
-
-For the historical Harness `0.1.0-rc.8` + plugin `0.1.14` pair, pin both sides. This is not a compatibility claim for every older RC. Keep another already verified older pair until a complete migration is ready. Historical [Alpha.2 compatibility](./docs/alpha2-compatibility.md) and [acceptance](./docs/alpha2-release-acceptance.md) reports describe those specific releases, not the current matrix.
+See the full [compatibility matrix](./compatibility.json), [source installation and Alpha testing guide](./docs/maintenance-workflow.md), and [verification coverage and platform limits](./docs/maintenance-2026-09-06/release/README.md).
 
 Then ask for a team directly:
 

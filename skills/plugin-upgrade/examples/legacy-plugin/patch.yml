@@ -1,0 +1,6 @@
+# Static patch-surface fixture (#1).
+surface:
+  - target: src/session/view/SessionView.ts
+    replacements:
+      - find: export function renderSessionView
+        replace: export function renderSessionViewPatched

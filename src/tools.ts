@@ -1053,6 +1053,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
           provider: selection.provider,
           model: selection.model,
           reasoningEffort: selection.reasoningEffort,
+          ...selection.fallback === undefined ? {} : { fallback: selection.fallback },
           executionPrompt: trimmedOptional(args.executionPrompt),
           joinedAt: Date.now(),
           status: 'idle',
@@ -1440,10 +1441,10 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
 
   ctx.tools.register(defineTool({
     name: 'agent_teams_claim_task',
-    description: 'Claim one ready task for a member (or yourself). A member cannot own a second unfinished task. The returned attempt_id is required for that member\'s updates and becomes stale after retry/reassignment.',
+    description: 'Members claim their own ready task or read their existing attempt_id. Captains must use reassign_task to assign and wake a member; claim_task does not dispatch work. A member cannot own a second unfinished task. The returned attempt_id is required for updates and becomes stale after retry/reassignment.',
     parameters: {
       task_id: { type: 'string', required: true, description: 'The task id to claim.' },
-      assignee: { type: 'string', description: 'Member to claim for (captain only; defaults to the task\'s assignee).' },
+      assignee: { type: 'string', description: 'Deprecated: claim_task only supports a member claiming its own task. Captains must use reassign_task.' },
     },
     output: {
       schema: {
@@ -1475,9 +1476,11 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         }
         let assignee = task.assignee
         if (identity.kind === 'captain') {
-          if (args.assignee !== undefined) {
-            requireMember(fresh, args.assignee)
-            assignee = args.assignee
+          // A captain may read the capability of its already-started takeover,
+          // but must never create a member claim without dispatching it (#125).
+          if (args.assignee !== undefined || task.assignee !== CAPTAIN_KEY
+              || (task.status !== 'claimed' && task.status !== 'in_progress')) {
+            throw new Error('claim_task is for members claiming their own task; captains must use agent_teams_reassign_task to assign and wake a member')
           }
         } else {
           if (args.assignee !== undefined) {
@@ -1843,7 +1846,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
 
   ctx.tools.register(defineTool({
     name: 'agent_teams_status',
-    description: 'Team snapshot: members with live activity and tasks with status/assignee/dependencies/output. Captains also see every team mailbox; members see only their own inbox. Poll this to watch progress.',
+    description: 'Team snapshot: members with live activity and tasks with status/assignee/dependencies/output. Captains also see every team mailbox; members see only their own inbox. Use after mailbox progress deliveries or for an explicit status request. After dispatch, end your turn while members work; do not repeatedly poll.',
     parameters: {},
     output: {
       schema: { type: 'object', additionalProperties: true, properties: {} },

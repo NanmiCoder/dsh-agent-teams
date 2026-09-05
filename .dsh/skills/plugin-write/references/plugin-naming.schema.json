@@ -1,0 +1,207 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:dsh:plugin-naming:v1",
+  "title": "DSH external plugin naming declaration",
+  "description": "Community compatibility declaration for one external DSH plugin. It supplements package.json and does not reserve names globally.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "policy",
+    "plugin",
+    "names"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "minLength": 1
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "policy": {
+      "const": "dsh-plugin-naming/v1"
+    },
+    "plugin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "namespace",
+        "name",
+        "coordinate",
+        "packageName"
+      ],
+      "properties": {
+        "namespace": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+          "maxLength": 63
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "maxLength": 63
+        },
+        "coordinate": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*/[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "maxLength": 127
+        },
+        "packageName": {
+          "type": "string",
+          "pattern": "^(?:@[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*$",
+          "maxLength": 214
+        }
+      }
+    },
+    "names": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pluginNames",
+        "loaderIds",
+        "services",
+        "tools",
+        "commands",
+        "skills",
+        "skillProviders",
+        "events",
+        "settingsNamespaces",
+        "routes"
+      ],
+      "properties": {
+        "pluginNames": {
+          "$ref": "#/$defs/nonEmptyPluginNameList"
+        },
+        "loaderIds": {
+          "$ref": "#/$defs/nonEmptyLoaderIdList"
+        },
+        "services": {
+          "$ref": "#/$defs/serviceList"
+        },
+        "tools": {
+          "$ref": "#/$defs/toolList"
+        },
+        "commands": {
+          "$ref": "#/$defs/commandList"
+        },
+        "skills": {
+          "$ref": "#/$defs/skillList"
+        },
+        "skillProviders": {
+          "$ref": "#/$defs/skillProviderList"
+        },
+        "events": {
+          "$ref": "#/$defs/eventList"
+        },
+        "settingsNamespaces": {
+          "$ref": "#/$defs/settingsNamespaceList"
+        },
+        "routes": {
+          "$ref": "#/$defs/routeList"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "nonEmptyPluginNameList": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^\\S+$"
+      }
+    },
+    "nonEmptyLoaderIdList": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^\\S+$"
+      }
+    },
+    "serviceList": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^\\S+$"
+      }
+    },
+    "toolList": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9_-]+$"
+      }
+    },
+    "commandList": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_-]*$"
+      }
+    },
+    "skillList": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+      }
+    },
+    "skillProviderList": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^\\S+$"
+      }
+    },
+    "eventList": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[^/\\s]+/[^/\\s]+$"
+      }
+    },
+    "settingsNamespaceList": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]*$"
+      }
+    },
+    "routeList": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "path"
+        ],
+        "properties": {
+          "kind": {
+            "enum": [
+              "exact",
+              "prefix",
+              "upgrade"
+            ]
+          },
+          "path": {
+            "type": "string",
+            "pattern": "^/[^?#\\s]*[^/?#\\s]$"
+          }
+        }
+      }
+    }
+  }
+}

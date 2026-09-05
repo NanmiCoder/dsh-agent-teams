@@ -1637,9 +1637,9 @@ try {
       }
       // Archive moves the whole team directory with `rename(source, target)`.
       // The same Windows delete-sharing EPERM applies when a file below the
-      // directory is momentarily locked, so it retries the rename. A short
-      // (≈150 ms) lock falls inside the retry window and must not abort the
-      // archive.
+      // directory is momentarily locked, so it retries the rename. Release
+      // the real lock only after observing the first OS rename rejection;
+      // PowerShell startup/scheduling must not race a 150 ms retry budget.
       const { archiveTeamDir } = await import('../lib/state.js')
       const transientTeam = {
         name: 'Transient Lock Team',
@@ -1652,44 +1652,73 @@ try {
       }
       await createTeamDir(atomicStateRoot, transientTeam)
       const transientJson = join(atomicStateRoot, transientTeam.id, 'team.json')
+      const transientSource = join(atomicStateRoot, transientTeam.id)
       const flasher = spawn(
         'powershell.exe',
         ['-NoProfile', '-NonInteractive', '-Command',
           `$f = '${transientJson.replaceAll("'", "''")}';
            $s = [System.IO.File]::Open($f, [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::ReadWrite);
            [Console]::Out.WriteLine('HELD_T'); [Console]::Out.Flush();
-           Start-Sleep -Milliseconds 80; $s.Dispose()`],
-        { stdio: ['ignore', 'pipe', 'inherit'] },
+           [void][Console]::In.ReadLine(); $s.Dispose();
+           [Console]::Out.WriteLine('RELEASED_T'); [Console]::Out.Flush()`],
+        { stdio: ['pipe', 'pipe', 'inherit'] },
       )
-      const flashed = await new Promise((resolve, reject) => {
+      const waitForMarker = (marker, trigger = () => {}) => new Promise((resolve, reject) => {
         let buffer = ''
         const onData = (chunk) => {
           buffer += chunk.toString()
-          if (buffer.includes('HELD_T')) { cleanup(); resolve(true) }
+          if (buffer.includes(marker)) { cleanup(); resolve(true) }
         }
-        const onExit = () => { cleanup(); reject(new Error('transient holder exited before arming')) }
+        const onError = (error) => { cleanup(); reject(error) }
+        const onExit = () => { cleanup(); reject(new Error(`transient holder exited before ${marker}`)) }
         const timer = setTimeout(() => {
           cleanup()
-          reject(new Error('timed out waiting for the transient lock holder'))
+          reject(new Error(`timed out waiting for transient lock marker ${marker}`))
         }, 10_000)
         function cleanup() {
           clearTimeout(timer)
           flasher.stdout.off('data', onData)
           flasher.off('exit', onExit)
+          flasher.off('error', onError)
+          flasher.stdin.off('error', onError)
         }
         flasher.stdout.on('data', onData)
         flasher.on('exit', onExit)
+        flasher.on('error', onError)
+        flasher.stdin.on('error', onError)
+        trigger()
       })
+      const fsPromises = (await import('node:fs/promises')).default
+      const { syncBuiltinESMExports } = await import('node:module')
+      const originalRename = fsPromises.rename
+      let archiveRenameCalls = 0
+      let observedLockRejection = false
       try {
-        // The flasher releases after ~80 ms (plus process exit jitter): the
-        // lock must outlive the first rename attempt but land comfortably
-        // inside the 3x50 ms retry budget, including the PowerShell dispose
-        // jitter that previously pushed a 140 ms hold past it (issue #108).
+        const flashed = await waitForMarker('HELD_T')
+        // Delegate every attempt to the real filesystem. Only coordinate
+        // release after the first actual sharing violation, then rethrow that
+        // same error so archiveTeamDir itself must perform the retry.
+        fsPromises.rename = async (from, to) => {
+          if (from !== transientSource) return originalRename(from, to)
+          archiveRenameCalls += 1
+          try {
+            return await originalRename(from, to)
+          } catch (error) {
+            if (!observedLockRejection && ['EPERM', 'EACCES', 'EBUSY'].includes(error.code)) {
+              observedLockRejection = true
+              await waitForMarker('RELEASED_T', () => flasher.stdin.end('release\n'))
+            }
+            throw error
+          }
+        }
+        syncBuiltinESMExports()
         await archiveTeamDir(atomicStateRoot, transientTeam.id)
         const archived = await readFile(join(atomicStateRoot, 'archive', transientTeam.id, 'team.json'), 'utf8')
         check(
           'archiveTeamDir survives a transient Windows directory lock via rename retries',
-          flashed && JSON.parse(archived).id === transientTeam.id,
+          flashed && observedLockRejection && archiveRenameCalls >= 2
+            && JSON.parse(archived).id === transientTeam.id,
+          `observed real lock = ${observedLockRejection}, rename attempts = ${archiveRenameCalls}`,
         )
       } catch (error) {
         check(
@@ -1698,7 +1727,15 @@ try {
           String(error),
         )
       } finally {
+        fsPromises.rename = originalRename
+        syncBuiltinESMExports()
         flasher.kill()
+        if (flasher.exitCode === null && flasher.signalCode === null) {
+          await new Promise((resolve) => {
+            const timer = setTimeout(resolve, 5_000)
+            flasher.once('exit', () => { clearTimeout(timer); resolve() })
+          })
+        }
       }
     } finally {
       holder.kill()

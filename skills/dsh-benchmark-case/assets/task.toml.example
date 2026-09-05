@@ -1,0 +1,25 @@
+schema_version = "1.4"
+# Harbor task config: dsh plugin migration exam question M13 (repository-plugins removal, bundle conversion, in-container cold boot verification)
+[task]
+name = "dsh-plugin-upgrade/m13-repository-plugins-removal"
+version = "1.1.0"
+description = "Migrate a 0.1.1-era repository-plugin to a 0.1.2-alpha.2 bundle plugin so it installs, activates, and its browser half is recognized"
+keywords = ["dsh", "plugin-migration", "repository-plugins", "bundle", "container", "harbor"]
+
+[metadata]
+difficulty = "hard"
+category = "programming"
+tags = ["dsh", "plugin-upgrade", "repository-removal", "bundle-migration", "english-prompt"]
+execution_contract = "BENCHMARK-AUTH-v1"
+
+[agent]
+timeout_sec = 900.0
+
+[verifier]
+timeout_sec = 600.0
+
+[environment]
+network_mode = "public"
+cpus = 1
+memory_mb = 2048
+storage_mb = 4096

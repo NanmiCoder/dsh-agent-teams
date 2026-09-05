@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/oh-my-dsh/dsh-plugin-upgrade-skill/blob/main/skills/plugin-workflow/references/workflow-selection.schema.json",
+  "title": "DSH plugin workflow selection",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "workflow"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "dsh-plugin-workflow/v1"
+    },
+    "workflow": {
+      "enum": [
+        "health-check",
+        "upgrade-target",
+        "compatibility-migration",
+        "test-only",
+        "naming-registry",
+        "package-release",
+        "full-lifecycle"
+      ]
+    },
+    "include": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/capability"
+      },
+      "default": []
+    },
+    "exclude": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/capability"
+      },
+      "default": []
+    },
+    "surfaces": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "host",
+          "ordinary-plugin",
+          "web-client"
+        ]
+      },
+      "default": [
+        "ordinary-plugin"
+      ]
+    },
+    "pluginState": {
+      "enum": [
+        "existing",
+        "new"
+      ],
+      "default": "existing"
+    }
+  },
+  "$defs": {
+    "capability": {
+      "enum": [
+        "dsh-audit",
+        "touchpoint-scan",
+        "static-tests",
+        "docker-smoke",
+        "functional-probe",
+        "browser-check",
+        "naming-local",
+        "registry-query",
+        "registry-register",
+        "rollback",
+        "package-artifact",
+        "release"
+      ]
+    }
+  }
+}

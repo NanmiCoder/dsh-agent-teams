@@ -1,0 +1,103 @@
+// <TASK-ID> grading: <one-line of what this task measures>.
+//   Gate     — fixture unchanged → flat 0 (read-only task) / fixture unchanged → 0
+//              (mutable task, "really did touch it").
+//   Static   — <n> pts: <check> (<x>); <check> (<y>); …
+//   Runtime  — <n> pts: `dsh plugin add` (<x>); cold boot no pending (<y>);
+//              <boot-graph / HTTP / headless signal> (<z>).
+// Boundary: <what is NOT graded — e.g. no browser in the container, so client.js
+// runtime behavior is not executed; only the host-announced anchor is judged>.
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import {
+  addPlugin,
+  bootWebAndFetchIndex,
+  cleanupProfile,
+  createProfile,
+  dshAvailable,
+  emit,
+  FIXTURE_DIR,
+  fixtureChanges,
+  NEGATIVE_SIGNAL,
+} from './judge-utils.mjs'
+
+const TASK = '<TASK-ID>'
+const PKG = '<pkg-name>'
+
+main().catch((error) => emit(0, [`judge error: ${error.message}`]))
+
+async function main() {
+  const reasons = []
+
+  const gate = await fixtureChanges('fixture')
+  if (gate.changed !== true) {
+    emit(0, [`fixture unchanged (${gate.detail}), graded as 0`])
+  }
+  reasons.push('fixture was modified by the agent')
+
+  // 1. Static manifest checks.
+  let pkg
+  try {
+    pkg = JSON.parse(readFileSync(join(FIXTURE_DIR, 'package.json'), 'utf8'))
+  } catch (error) {
+    emit(0, [...reasons, `failed to parse package.json: ${error.message}`])
+  }
+  let score = 0
+
+  // <check 1> — e.g. dsh.bundle.patch resolves to a real file
+  // <check 2> — e.g. exports["./client"] resolves to a real client entry
+  // <check 3> — e.g. dsh.client declares platform web
+  // <check 4> — e.g. Node entry resolves to a real file
+  // <check 5> — e.g. cordis.patch.yml contains an insert row
+  // <legacy check> — e.g. legacy loading path removed from the Node half
+
+  if (!(await dshAvailable())) {
+    emit(score, [...reasons, 'dsh unavailable; runtime verification treated as failed'])
+  }
+
+  // 2. Runtime: add + cold boot (+ boot graph / HTTP anchors).
+  const profile = 'bench-<task-id>'
+  const tmp = '/tmp/bench-<task-id>'
+  try {
+    const created = await createProfile(profile, ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app'])
+    if (!created.ok) reasons.push(created.detail)
+    else {
+      const added = await addPlugin(profile, FIXTURE_DIR)
+      if (!added.ok) reasons.push(`dsh plugin add failed: ${added.detail}`)
+      else {
+        reasons.push('dsh plugin add succeeded')
+        score += 10
+        reasons.push('plugin installed successfully (+10)')
+
+        const boot = await bootWebAndFetchIndex(profile, PKG)
+        if (NEGATIVE_SIGNAL.test(boot.output)) {
+          reasons.push(`web cold boot shows a negative signal: ${boot.output.match(/pending \(waiting for service: [^)]+\)|plugin tree failed|ClientPackageCompositionError/)?.[0] ?? 'unknown'}`)
+        } else {
+          score += 10
+          reasons.push('web cold boot: host half has no pending (+10)')
+        }
+
+        if (boot.html && boot.html.includes(`${PKG}/client.js`)) {
+          score += 20
+          reasons.push('__DSH_BOOT__.entries contains this plugin — the browser half is recognized (+20)')
+        } else if (boot.html) {
+          reasons.push('__DSH_BOOT__.entries does not contain this plugin — client-modules did not recognize the client entry (+0)')
+        } else {
+          reasons.push(`could not obtain the boot graph page${boot.fetchError ? `: ${boot.fetchError}` : ''} (+0)`)
+        }
+      }
+    }
+  } finally {
+    await cleanupProfile(profile, tmp)
+  }
+
+  emit(score, reasons)
+}
+
+function exists(relative) {
+  try {
+    readFileSync(join(FIXTURE_DIR, relative))
+    return true
+  } catch {
+    return false
+  }
+}

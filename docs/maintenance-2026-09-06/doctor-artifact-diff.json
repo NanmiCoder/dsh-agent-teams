@@ -1,0 +1,10 @@
+{
+  "previousArtifact": "/tmp/dsh-implementation-20260906/agent-teams-final.tgz",
+  "previousSha256": "fae519c4423d6e7f49299ce66a78cc76f8e428efd37250878c185e4681103e7b",
+  "artifact": "/tmp/dsh-implementation-20260906/agent-teams-final-v2.tgz",
+  "artifactSha256": "6325e972566092bb0ec07d6065113ebd0fcf5877e475b2961dc8b049c2a2654c",
+  "changedFiles": [
+    "package/scripts/doctor.mjs"
+  ],
+  "runtimeAndAssetsUnchanged": true
+}

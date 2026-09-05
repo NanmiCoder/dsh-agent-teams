@@ -1,0 +1,25 @@
+
+> @nanmicoder/dsh-agent-teams@0.1.16-rc.1 verify:compatibility <checkout>
+> node scripts/compatibility.mjs && node --test scripts/compatibility.test.mjs && node scripts/doctor.mjs
+
+Compatibility targets: 0.1.2-rc.1, 0.1.2-alpha.5, 0.1.2-alpha.2
+✔ doctor runs through an installed bin symlink and reports success or failure (64.794417ms)
+✔ policy rejects floating targets, duplicates, and alpha recommendation (0.356292ms)
+✔ doctor detects transitive cohort mixing even with an exact CLI version (2.821291ms)
+✔ doctor follows profile peers and rejects duplicate runtime identities (2.396917ms)
+✔ policy rejects missing or mixed development overrides (0.419875ms)
+✔ policy rejects removed host peers and range-qualified or conditional DSH overrides (1.64325ms)
+✔ doctor reports missing nonoptional Cordis peers and required plugin imports even with optional metadata (2.949791ms)
+✔ doctor detects peer-only drift and a mismatched installed plugin (3.107375ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 124.773083
+Harness: 0.1.2-rc.1 (<checkout>/node_modules/.pnpm/@deepseek-ai+dsh@0.1.2-rc.1_edaa42246475b67e334363481a205a53/node_modules/@deepseek-ai/dsh)
+DSH package identities checked: 214
+Dependency inspection passed.
+Checks files resolved from the supplied roots; does not identify the running process or prove plugin behavior.

@@ -1,0 +1,16 @@
+✔ doctor runs through an installed bin symlink and reports success or failure (72.23725ms)
+✔ policy rejects floating targets, duplicates, and alpha recommendation (0.348125ms)
+✔ doctor detects transitive cohort mixing even with an exact CLI version (2.7775ms)
+✔ doctor follows profile peers and rejects duplicate runtime identities (2.474875ms)
+✔ policy rejects missing or mixed development overrides (0.460333ms)
+✔ policy rejects removed host peers and range-qualified or conditional DSH overrides (1.831209ms)
+✔ doctor reports missing nonoptional Cordis peers and required plugin imports even with optional metadata (2.296375ms)
+✔ doctor detects peer-only drift and a mismatched installed plugin (3.236083ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 125.40975

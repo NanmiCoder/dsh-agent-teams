@@ -1,0 +1,29 @@
+{
+  "skill_name": "dsh-upgrade-audit",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Check whether dsh-v0.1.1-rc.1 -> dsh-v0.1.1-rc.2 has more changes or reverts than rc.1 in terms of external compatibility. If so, produce a report in ./tmp/0.1.1rc1-to-0.1.1rc2/ (run inside the deepseek-harness source checkout).",
+      "expected_output": "Detect that tmp/0.1.1rc1-to-0.1.1rc2/ already exists (a hand-made report predating the skill); ask first instead of overwriting; the 31-commit range runs inline in a single pass (no full fan-out); merge-base purity passes; rc.1..rc.2 contains exactly one Revert commit (in the form of a projection registration) that must be reported directionally as a revert.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Compare dsh-v0.1.0-rc.8 and dsh-v0.1.1-rc.1; I mainly care about external compatibility in the SDK/protocol and session-data areas. Generate an upgrade report directory.",
+      "expected_output": "Scale to the 2 recon surfaces matching the user's focus (SDK & wire protocol, session data) instead of all six, but still produce the full artifact set (including the boundary signature table); read the two format guards' values from both trees and report them; report directory tmp/0.1.0rc8-to-0.1.1rc1/.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "I have not cloned the deepseek-harness source — compare the two npm versions 0.1.2-alpha.1 and 0.1.2-alpha.2 directly inside this plugin repository and produce a compatibility report.",
+      "expected_output": "The npm-mode trap: 0.1.2-alpha.1 was never published to npm — the correct behavior is that after the materialization script exits 1, show the user the published list and dist-tags, explain the gap, and confirm a replacement pair (e.g. rc.2 → alpha.2); never silently substitute a version pair and continue the audit. If the user confirms a replacement pair, materialize-npm produces the a/ and b/ trees, manifest-diff.txt, and GitHub-enriched commits.txt/reverts.txt, and the report header records Mode: npm packages and version provenance.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "Audit the breaking changes and reverts between dsh-v0.1.0-rc.7 and dsh-v0.1.0-rc.8, output a report directory, and compare the break density with the previous interval.",
+      "expected_output": "Full fan-out across all six recon surfaces for the 337-commit range + merge-base purity check + revert sweep + report directory tmp/0.1.0rc7-to-0.1.0rc8/. The density-comparison trap: rc.7→rc.8 is the chronologically earliest audited pair — the correct behavior is to point out that no comparable previous pair's report exists, not to grab the newest directory in tmp/ (which covers a later interval) or fabricate a comparison.",
+      "files": []
+    }
+  ]
+}

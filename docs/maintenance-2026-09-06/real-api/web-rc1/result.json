@@ -1,0 +1,69 @@
+{
+  "capturedAt": "2026-09-05T17:10:20.452745+00:00",
+  "passed": true,
+  "hostVersion": "0.1.2-rc.1",
+  "artifact": "/tmp/dsh-implementation-20260906/agent-teams-final-v2.tgz",
+  "artifactSha256": "6325e972566092bb0ec07d6065113ebd0fcf5877e475b2961dc8b049c2a2654c",
+  "node": "v24.20.0",
+  "platform": "darwin-arm64",
+  "workspace": "/tmp",
+  "teamName": "real-api-web-rc1",
+  "provider": "deepseek-official",
+  "model": "deepseek-v4-flash",
+  "requests": 18,
+  "usageFrames": 18,
+  "usage": {
+    "inputTokens": 27682,
+    "outputTokens": 3970,
+    "totalTokens": 236836,
+    "cacheReadTokens": 205184
+  },
+  "durationMilliseconds": 25255,
+  "limits": {
+    "requests": 30,
+    "millisecondsAfterFirstModelRequest": 180000
+  },
+  "assertions": {
+    "actualDeepSeekProvider": true,
+    "actualUsage": true,
+    "memberRequestedModel": true,
+    "memberClaimedTask": true,
+    "memberUpdatedTask": true,
+    "memberReported": true,
+    "taskCompleted": true,
+    "correctOutput": true,
+    "captainConfirmed": true,
+    "singleMember": true,
+    "noApiErrors": true,
+    "requestLimit": true,
+    "timeLimit": true
+  },
+  "taskOutput": "计算 1²+2²+…+10²：各平方为 [1,4,9,16,25,36,49,64,81,100]，累加和与公式 n(n+1)(2n+1)/6 (n=10) 两种方法均得 385。已独立完成并通过 AgentTeams 向 captain 报告。",
+  "entry": "Parent sent one initial prompt through Ego Lite in the actual Web UI; no prompt was injected by the driver. Workspace registration used the real workspaceRegistry API.",
+  "uiAcceptance": "Parent confirmed actual /tmp workspace, real model badge, delivered worker, 1/1 completed, captain confirmation of 385 and notification; screenshot was saved and visually inspected.",
+  "screenshot": "/Users/nanmi/workspace/myself_code/dsh-agent-teams-compat/docs/maintenance-2026-09-06/web-real-api-rc1.png",
+  "extraModelToolCalls": [
+    {
+      "name": "bash",
+      "arguments": "{\"command\": \"python3 -c \\\"print(sum(i*i for i in range(1,11)))\\\"\", \"description\": \"Compute sum of squares 1 to 10\"}"
+    },
+    {
+      "name": "bash",
+      "arguments": "{\"command\": \"echo \\\"Iterative:\\\"; python3 -c \\\"print(sum(i*i for i in range(1,11)))\\\"; echo \\\"Formula n(n+1)(2n+1)/6:\\\"; python3 -c \\\"n=10; print(n*(n+1)*(2*n+1)//6)\\\"; echo \\\"Squares:\\\"; python3 -c \\\"print([i*i for i in range(1,11)])\\\"\", \"description\": \"Verify sum with two methods\"}"
+    },
+    {
+      "name": "send_message",
+      "arguments": "{\"agent_id\": \"session-ce0dfdac-d3b3-448b-810a-34ba803ae7f4\", \"message\": \"worker 结果：任务 t1（计算 1²+2²+…+10²）已完成并通过 AgentTeams 上报 captain。结果与=385。验证：逐项累加 [1,4,9,16,25,36,49,64,81,100] 及求和公式 n(n+1)(2n+1)/6 (n=10) 两法均得 385。流程：claim_task (attempt_id fce5fbfb-6e5f-424a-b2e3-b02f9d1b84aa) → in_progress → completed，随后 send_message 已投递给 captain。\"}"
+    }
+  ],
+  "notes": [
+    "Only a request observer and workspace registration were added; real adapter stream passed through next() unchanged, no fake provider response or team state.",
+    "Model naturally used two pure arithmetic bash commands and native send_message in addition to AgentTeams tools.",
+    "Evidence excludes web.log, authentication URL, credentials, full environment and profile/provider configuration."
+  ],
+  "cleanup": {
+    "pid": 53354,
+    "wasRunning": true,
+    "stopped": true
+  }
+}

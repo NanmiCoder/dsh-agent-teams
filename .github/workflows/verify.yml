@@ -1,0 +1,212 @@
+name: Verify
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  workflow_call:
+    outputs:
+      artifact_name:
+        description: Immutable candidate artifact verified by every host
+        value: ${{ jobs.build.outputs.artifact_name }}
+      artifact_sha256:
+        description: SHA-256 of candidate.tgz
+        value: ${{ jobs.build.outputs.artifact_sha256 }}
+      hosts:
+        description: Exact host versions required by compatibility.json
+        value: ${{ jobs.build.outputs.hosts }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Static checks (Ubuntu) and candidate package
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      hosts: ${{ steps.policy.outputs.hosts }}
+      artifact_name: agent-teams-candidate
+      artifact_sha256: ${{ steps.artifact.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Install pinned package manager and locked dependencies
+        run: |
+          npm install --global pnpm@10.33.0
+          pnpm install --frozen-lockfile
+      - name: Validate the single compatibility policy
+        id: policy
+        run: node scripts/compatibility.mjs --github-output >> "$GITHUB_OUTPUT"
+      - name: Typecheck, build, and verify
+        run: |
+          pnpm typecheck
+          pnpm build
+          pnpm verify
+      - name: Pack the actual candidate once
+        id: artifact
+        run: |
+          pnpm pack --out "$RUNNER_TEMP/candidate.tgz"
+          tar --list --file "$RUNNER_TEMP/candidate.tgz"
+          node --input-type=module <<'JS'
+          import { appendFileSync, readFileSync } from 'node:fs'
+          import { createHash } from 'node:crypto'
+          import { join } from 'node:path'
+          const sha = createHash('sha256').update(readFileSync(join(process.env.RUNNER_TEMP, 'candidate.tgz'))).digest('hex')
+          appendFileSync(process.env.GITHUB_OUTPUT, `sha256=${sha}\n`)
+          JS
+      - name: Preserve the candidate for all consumers
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2; reviewed upload source
+        with:
+          name: agent-teams-candidate
+          path: ${{ runner.temp }}/candidate.tgz
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+  windows:
+    name: Static checks (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Install pinned package manager and locked dependencies
+        run: |
+          npm install --global pnpm@10.33.0
+          pnpm install --frozen-lockfile
+      - name: Typecheck, build, and verify
+        run: |
+          pnpm typecheck
+          pnpm build
+          pnpm verify
+
+  harness:
+    name: Real Harness (${{ matrix.host }})
+    needs: [build, windows]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        host: ${{ fromJSON(needs.build.outputs.hosts) }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Set up pinned pnpm for the real CLI profile
+        run: npm install --global pnpm@10.33.0
+      - name: Download the candidate from this run
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0; reviewed download source
+        with:
+          name: agent-teams-candidate
+          path: ${{ runner.temp }}/candidate
+      - name: Require the exact candidate digest
+        env:
+          EXPECTED_SHA256: ${{ needs.build.outputs.artifact_sha256 }}
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict'
+          import { readFileSync } from 'node:fs'
+          import { createHash } from 'node:crypto'
+          import { join } from 'node:path'
+          const sha = createHash('sha256').update(readFileSync(join(process.env.RUNNER_TEMP, 'candidate/candidate.tgz'))).digest('hex')
+          assert.equal(sha, process.env.EXPECTED_SHA256, 'Candidate digest changed')
+          JS
+      - name: Install an exact host cohort and exercise the published entry
+        env:
+          HOST_VERSION: ${{ matrix.host }}
+        run: |
+          node scripts/harness-runtime-verify.mjs \
+            --host-version "$HOST_VERSION" \
+            --artifact "$RUNNER_TEMP/candidate/candidate.tgz" \
+            --report-dir "$RUNNER_TEMP/harness-$HOST_VERSION"
+      - name: Preserve bounded runtime evidence, including failures
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: harness-${{ matrix.host }}
+          if-no-files-found: warn
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/harness-${{ matrix.host }}/result.json
+            ${{ runner.temp }}/harness-${{ matrix.host }}/cohort.json
+            ${{ runner.temp }}/harness-${{ matrix.host }}/registry-cohort.json
+            ${{ runner.temp }}/harness-${{ matrix.host }}/*.stdout.log
+            ${{ runner.temp }}/harness-${{ matrix.host }}/*.stderr.log
+            ${{ runner.temp }}/harness-${{ matrix.host }}/*/trace.jsonl
+            ${{ runner.temp }}/harness-${{ matrix.host }}/*/cold-trace.jsonl
+            ${{ runner.temp }}/harness-${{ matrix.host }}/*/team-evidence.json
+
+  verified:
+    name: Complete compatibility gate
+    if: always()
+    needs: [build, windows, harness]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every job to succeed
+        env:
+          BUILD_RESULT: ${{ needs.build.result }}
+          WINDOWS_RESULT: ${{ needs.windows.result }}
+          HARNESS_RESULT: ${{ needs.harness.result }}
+        run: |
+          test "$BUILD_RESULT" = success
+          test "$WINDOWS_RESULT" = success
+          test "$HARNESS_RESULT" = success
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Collect every host report
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: harness-*
+          path: ${{ runner.temp }}/host-reports
+      - name: Bind every successful report to the same source and package
+        env:
+          EXPECTED_HOSTS: ${{ needs.build.outputs.hosts }}
+          EXPECTED_SHA256: ${{ needs.build.outputs.artifact_sha256 }}
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict'
+          import { readFileSync } from 'node:fs'
+          import { join } from 'node:path'
+          import { validatePackageCompatibility } from './scripts/compatibility.mjs'
+          const pkg = JSON.parse(readFileSync('package.json', 'utf8'))
+          const hosts = validatePackageCompatibility(pkg)
+          assert.deepEqual(hosts, JSON.parse(process.env.EXPECTED_HOSTS))
+          for (const version of hosts) {
+            const report = JSON.parse(readFileSync(join(process.env.RUNNER_TEMP, 'host-reports', `harness-${version}`, 'result.json'), 'utf8'))
+            assert.equal(report.passed, true, `Host ${version} did not pass`)
+            assert.equal(report.version, version)
+            assert.equal(report.pluginVersion, pkg.version)
+            assert.equal(report.artifactSha256, process.env.EXPECTED_SHA256)
+            assert.ok(report.runs.length > 0 && report.runs.every(run => run.passed), `Host ${version} lacks successful functional evidence`)
+            for (const scenario of ['lifecycle', 'lifecycle-cold-restore', 'fallback', 'fallback-cold-restore', 'failure', 'captain-idle-wakeup']) {
+              assert.ok(report.runs.some(run => run.scenario === scenario && run.passed), `Host ${version} did not exercise ${scenario}`)
+            }
+          }
+          console.log(`Verified one package against ${hosts.join(', ')}`)
+          JS

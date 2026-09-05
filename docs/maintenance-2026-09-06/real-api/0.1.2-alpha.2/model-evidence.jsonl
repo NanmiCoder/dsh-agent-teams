@@ -1,0 +1,55 @@
+{"event": "captain-created", "sessionId": "session-493ec12a-26f8-4123-8958-91f9df9d8bf9", "time": 1788627622609}
+{"event": "request", "request": 1, "sessionId": "session-493ec12a-26f8-4123-8958-91f9df9d8bf9", "provider": "deepseek-official", "model": "deepseek-v4-flash", "reasoningEffort": "low", "member": false, "time": 1788627622640}
+{"event": "request", "request": 2, "sessionId": "session-493ec12a-26f8-4123-8958-91f9df9d8bf9", "purpose": "session-title", "provider": "deepseek-official", "model": "deepseek-v4-flash", "member": false, "time": 1788627622641}
+{"event": "text", "request": 2, "sessionId": "session-493ec12a-26f8-4123-8958-91f9df9d8bf9", "text": "Setup and verify real API agent team.", "time": 1788627623361}
+{"event": "usage", "request": 2, "usage": {"inputTokens": 357, "outputTokens": 8, "totalTokens": 365, "cacheReadTokens": 0}, "time": 1788627623362}
+{"event": "finish", "request": 2, "reason": {"kind": "stop"}, "time": 1788627623362}
+{"event": "text", "request": 1, "sessionId": "session-493ec12a-26f8-4123-8958-91f9df9d8bf9", "text": "I'll set up the team per the validation requirements.", "time": 1788627624722}
+{"event": "tool-call", "request": 1, "sessionId": "session-493ec12a-26f8-4123-8958-91f9df9d8bf9", "name": "agent_teams_create", "arguments": "{\"name\": \"real-api-alpha2-1788627620168\", \"description\": \"Compute sum of squares of integers 1 through 10 and report via message.\", \"approval\": \"automatic\"}", "time": 1788627624722}
+{"event": "usage", "request": 1, "usage": {"inputTokens": 12761, "outputTokens": 183, "totalTokens": 12944, "cacheReadTokens": 0, "reasoningTokens": 69}, "time": 1788627624722}
+{"event": "finish", "request": 1, "reason": {"kind": "tool-calls"}, "time": 1788627624723}
+{"event": "request", "request": 3, "sessionId": "session-493ec12a-26f8-4123-8958-91f9df9d8bf9", "provider": "deepseek-official", "model": "deepseek-v4-flash", "reasoningEffort": "low", "member": false, "time": 1788627624743}
+{"event": "text", "request": 3, "sessionId": "session-493ec12a-26f8-4123-8958-91f9df9d8bf9", "text": "I'll add the single member with the specified provider/model and execution prompt, then create the task.", "time": 1788627626830}
+{"event": "tool-call", "request": 3, "sessionId": "session-493ec12a-26f8-4123-8958-91f9df9d8bf9", "name": "agent_teams_add_member", "arguments": "{\"name\": \"worker\", \"role\": \"worker\", \"provider\": \"deepseek-official\", \"model\": \"deepseek-v4-flash\", \"executionPrompt\": \"Wait for your assignment. Once a task is assigned to you, claim it, use the returned attempt_id to move the task to in_progress and then to completed, and report the answer to the captain using agent_teams_send_message.\"}", "time": 1788627626830}
+{"event": "tool-call", "request": 3, "sessionId": "session-493ec12a-26f8-4123-8958-91f9df9d8bf9", "name": "agent_teams_create_task", "arguments": "{\"subject\": \"Sum of squares 1..10\", \"description\": \"Compute the sum of the squares of the integers 1 through 10. Report the numeric sum.\", \"assignee\": \"worker\"}", "time": 1788627626831}
+{"event": "usage", "request": 3, "usage": {"inputTokens": 97, "outputTokens": 281, "totalTokens": 13306, "cacheReadTokens": 12928, "reasoningTokens": 0}, "time": 1788627626831}
+{"event": "finish", "request": 3, "reason": {"kind": "tool-calls"}, "time": 1788627626831}
+{"event": "request", "request": 4, "sessionId": "session-493ec12a-26f8-4123-8958-91f9df9d8bf9", "provider": "deepseek-official", "model": "deepseek-v4-flash", "reasoningEffort": "low", "member": false, "time": 1788627626864}
+{"event": "request", "request": 5, "sessionId": "2feaea19-9617-4796-8d96-57d2d386d513", "provider": "deepseek-official", "model": "deepseek-v4-flash", "reasoningEffort": "low", "member": true, "time": 1788627626877}
+{"event": "tool-call", "request": 5, "sessionId": "2feaea19-9617-4796-8d96-57d2d386d513", "name": "agent_teams_status", "arguments": "{}", "time": 1788627628015}
+{"event": "usage", "request": 5, "usage": {"inputTokens": 11991, "outputTokens": 44, "totalTokens": 12035, "cacheReadTokens": 0, "reasoningTokens": 13}, "time": 1788627628016}
+{"event": "finish", "request": 5, "reason": {"kind": "tool-calls"}, "time": 1788627628016}
+{"event": "request", "request": 6, "sessionId": "2feaea19-9617-4796-8d96-57d2d386d513", "provider": "deepseek-official", "model": "deepseek-v4-flash", "reasoningEffort": "low", "member": true, "time": 1788627628033}
+{"event": "tool-call", "request": 6, "sessionId": "2feaea19-9617-4796-8d96-57d2d386d513", "name": "agent_teams_claim_task", "arguments": "{\"task_id\": \"t1\"}", "time": 1788627629000}
+{"event": "usage", "request": 6, "usage": {"inputTokens": 267, "outputTokens": 66, "totalTokens": 12237, "cacheReadTokens": 11904, "reasoningTokens": 15}, "time": 1788627629001}
+{"event": "finish", "request": 6, "reason": {"kind": "tool-calls"}, "time": 1788627629001}
+{"event": "request", "request": 7, "sessionId": "2feaea19-9617-4796-8d96-57d2d386d513", "provider": "deepseek-official", "model": "deepseek-v4-flash", "reasoningEffort": "low", "member": true, "time": 1788627629018}
+{"event": "text", "request": 4, "sessionId": "session-493ec12a-26f8-4123-8958-91f9df9d8bf9", "text": "Team and task are set up with automatic approval. The worker member (deepseek-official/deepseek-v4-flash) has been spawned with the task t1 assigned to it. I'll yield now and wait for the member's completion report to wake me.", "time": 1788627629788}
+{"event": "usage", "request": 4, "usage": {"inputTokens": 215, "outputTokens": 279, "totalTokens": 13678, "cacheReadTokens": 13184, "reasoningTokens": 224}, "time": 1788627629788}
+{"event": "finish", "request": 4, "reason": {"kind": "stop"}, "time": 1788627629788}
+{"event": "captain-idle-observed", "sessionId": "session-493ec12a-26f8-4123-8958-91f9df9d8bf9", "time": 1788627629875}
+{"event": "tool-call", "request": 7, "sessionId": "2feaea19-9617-4796-8d96-57d2d386d513", "name": "agent_teams_update_task", "arguments": "{\"task_id\": \"t1\", \"attempt_id\": \"13e469f1-a0df-4977-b2c4-b06a40ddb70a\", \"status\": \"in_progress\"}", "time": 1788627630097}
+{"event": "usage", "request": 7, "usage": {"inputTokens": 130, "outputTokens": 107, "totalTokens": 12397, "cacheReadTokens": 12160, "reasoningTokens": 0}, "time": 1788627630098}
+{"event": "finish", "request": 7, "reason": {"kind": "tool-calls"}, "time": 1788627630098}
+{"event": "request", "request": 8, "sessionId": "2feaea19-9617-4796-8d96-57d2d386d513", "provider": "deepseek-official", "model": "deepseek-v4-flash", "reasoningEffort": "low", "member": true, "time": 1788627630117}
+{"event": "text", "request": 8, "sessionId": "2feaea19-9617-4796-8d96-57d2d386d513", "text": "The sum of squares of integers 1 through 10 = 1²+2²+...+10² = 385 (formula n(n+1)(2n+1)/6 = 10·11·21/6 = 385).", "time": 1788627632259}
+{"event": "tool-call", "request": 8, "sessionId": "2feaea19-9617-4796-8d96-57d2d386d513", "name": "agent_teams_update_task", "arguments": "{\"attempt_id\": \"13e469f1-a0df-4977-b2c4-b06a40ddb70a\", \"status\": \"completed\", \"task_id\": \"t1\", \"output\": \"Sum of squares of integers 1 through 10 = 385 (1+4+9+16+25+36+49+64+81+100 = 385).\"}", "time": 1788627632259}
+{"event": "tool-call", "request": 8, "sessionId": "2feaea19-9617-4796-8d96-57d2d386d513", "name": "agent_teams_send_message", "arguments": "{\"to\": \"captain\", \"content\": \"Task t1 completed. The sum of squares of integers 1 through 10 is 385.\"}", "time": 1788627632259}
+{"event": "usage", "request": 8, "usage": {"inputTokens": 131, "outputTokens": 359, "totalTokens": 12778, "cacheReadTokens": 12288, "reasoningTokens": 81}, "time": 1788627632260}
+{"event": "finish", "request": 8, "reason": {"kind": "tool-calls"}, "time": 1788627632260}
+{"event": "request", "request": 9, "sessionId": "session-493ec12a-26f8-4123-8958-91f9df9d8bf9", "provider": "deepseek-official", "model": "deepseek-v4-flash", "reasoningEffort": "low", "member": false, "time": 1788627632283}
+{"event": "request", "request": 10, "sessionId": "2feaea19-9617-4796-8d96-57d2d386d513", "provider": "deepseek-official", "model": "deepseek-v4-flash", "reasoningEffort": "low", "member": true, "time": 1788627632287}
+{"event": "tool-call", "request": 9, "sessionId": "session-493ec12a-26f8-4123-8958-91f9df9d8bf9", "name": "agent_teams_status", "arguments": "{}", "time": 1788627633186}
+{"event": "usage", "request": 9, "usage": {"inputTokens": 141, "outputTokens": 48, "totalTokens": 13757, "cacheReadTokens": 13568, "reasoningTokens": 17}, "time": 1788627633187}
+{"event": "finish", "request": 9, "reason": {"kind": "tool-calls"}, "time": 1788627633187}
+{"event": "request", "request": 11, "sessionId": "session-493ec12a-26f8-4123-8958-91f9df9d8bf9", "provider": "deepseek-official", "model": "deepseek-v4-flash", "reasoningEffort": "low", "member": false, "time": 1788627633207}
+{"event": "text", "request": 10, "sessionId": "2feaea19-9617-4796-8d96-57d2d386d513", "text": "I completed task t1. The sum of squares of integers 1 through 10 is **385**. I reported the result to the captain and am now idle.", "time": 1788627633359}
+{"event": "usage", "request": 10, "usage": {"inputTokens": 203, "outputTokens": 34, "totalTokens": 12909, "cacheReadTokens": 12672, "reasoningTokens": 0}, "time": 1788627633360}
+{"event": "finish", "request": 10, "reason": {"kind": "stop"}, "time": 1788627633361}
+{"event": "text", "request": 11, "sessionId": "session-493ec12a-26f8-4123-8958-91f9df9d8bf9", "text": "The member computed and reported the result, and the task t1 is confirmed completed with output containing the sum.\n\n**REAL_API_TEAM_OK 385**\n\nThe team `real-api-alpha2-1788627620168` with its single member `worker` and completed task `t1` (Sum of squares 1..10 = 385) is left intact for inspection.", "time": 1788627634408}
+{"event": "usage", "request": 11, "usage": {"inputTokens": 237, "outputTokens": 80, "totalTokens": 14013, "cacheReadTokens": 13696, "reasoningTokens": 0}, "time": 1788627634408}
+{"event": "finish", "request": 11, "reason": {"kind": "stop"}, "time": 1788627634408}
+{"event": "request", "request": 12, "sessionId": "session-493ec12a-26f8-4123-8958-91f9df9d8bf9", "provider": "deepseek-official", "model": "deepseek-v4-flash", "reasoningEffort": "low", "member": false, "time": 1788627634418}
+{"event": "text", "request": 12, "sessionId": "session-493ec12a-26f8-4123-8958-91f9df9d8bf9", "text": "The worker finished cleanly and is now idle. Task t1 is completed with the correct result, and the team `real-api-alpha2-1788627620168` remains intact for inspection.\n\nFinal result: **REAL_API_TEAM_OK 385**", "time": 1788627635537}
+{"event": "usage", "request": 12, "usage": {"inputTokens": 140, "outputTokens": 94, "totalTokens": 14186, "cacheReadTokens": 13952, "reasoningTokens": 39}, "time": 1788627635537}
+{"event": "finish", "request": 12, "reason": {"kind": "stop"}, "time": 1788627635537}

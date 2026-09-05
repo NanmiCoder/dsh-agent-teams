@@ -30,7 +30,7 @@ Ask in natural language. The plugin provides the team protocol, eleven coordinat
 
 ## Releases
 
-The [latest release](https://github.com/NanmiCoder/dsh-agent-teams/releases/latest), [v0.1.15](https://github.com/NanmiCoder/dsh-agent-teams/releases/tag/v0.1.15), supports Harness **0.1.2-alpha.2**. Older hosts must use a pinned compatible plugin version. Browse the [complete release history](https://github.com/NanmiCoder/dsh-agent-teams/releases); the same notes ship in the npm package under `release-notes/`.
+This checkout prepares [v0.1.16-rc.1](./release-notes/v0.1.16-rc.1.md): a shared host adapter, exact compatibility matrix, real-host acceptance and release gates. The candidate is not published. See [GitHub Releases](https://github.com/NanmiCoder/dsh-agent-teams/releases) for published history.
 
 ## Why AgentTeams?
 
@@ -47,64 +47,73 @@ The [latest release](https://github.com/NanmiCoder/dsh-agent-teams/releases/late
 
 The conversation card and activity panel use Harness's official locale service. They follow live language changes between English and Simplified Chinese—including status labels, dynamic summaries, controls, archive markers, and accessibility text—without a page reload or a separate plugin setting.
 
-## Install
+## Install and choose versions
 
 > [!IMPORTANT]
-> **Plugin 0.1.15 (`@latest`) requires DeepSeek Harness 0.1.2-alpha.2.** Updating this plugin does not update Harness. This release has no adapter for the old RC host APIs. Check the version of the instance you actually launch with `dsh --version` before installing.
+> This branch prepares **0.1.16-rc.1**, an unpublished candidate. At the 2026-09-06 registry check, plugin `latest` was still 0.1.15, which explicitly targets Alpha.2. Check the actual running host and profile before updating either side.
 
-| Harness host | Plugin to use | Compatibility status |
+| Harness host | Candidate track | Installation rule |
 | --- | --- | --- |
-| **0.1.2-alpha.2** | **0.1.15** (`@latest`) | Recommended current pair; real API and Web UI verified on macOS arm64. |
-| **0.1.0-rc.8** | **0.1.14** | Previous dependency baseline; keep this pair if you are not upgrading Harness. |
-| Other older RC / unchanged source checkout | Pin your working plugin version; do not follow `@latest` | Do not assume every older host works with 0.1.14. |
-| Alpha.1, later Alpha versions, or other source revisions | Not verified | Match the documented host version or validate separately. |
+| **0.1.2-rc.1** | Default acceptance target | There is currently no GA host. RC is still a prerelease; ordinary users should not have to follow Alpha. |
+| **0.1.2-alpha.5** | Opt-in preview | Select the exact version and lock the entire host dependency cohort. |
+| **0.1.2-alpha.2** | Retained legacy preview | Pinning the CLI alone can still resolve rc.1 transitive dependencies. |
+| Other versions, source HEAD, embedded Desktop cores | Outside the current matrix | Keep a known working exact pair or complete acceptance before adding a target. |
 
-**The default plugin release follows the current supported Harness developer preview: `latest=0.1.15`, for Harness Alpha.2.** The host's Alpha version does not require a separate Alpha plugin channel. Users staying on an older host must install an explicit compatible plugin version instead of `@latest`. Optional peer dependencies are not a runtime version check: a successful install on an incompatible host does not mean the plugin can activate.
+[compatibility.json](./compatibility.json) is the single source for development, PR checks and release gates. Plugin prereleases use `next`. Unsuffixed versions may use `latest` only after the recommended host and full supported matrix pass. Harness dist-tags belong to upstream; this project cannot change them, so installation instructions use exact versions.
 
-See the [compatibility details](./docs/alpha2-compatibility.md) and [real business / UI acceptance report](./docs/alpha2-release-acceptance.md).
+### Ordinary users: keep a matching host and plugin
 
-### npm: Harness Alpha.2
-
-If you install Harness through npm, upgrade the host first, then install the matching plugin:
+The recommended host installation target is:
 
 ```sh
-npm install --global @deepseek-ai/dsh@0.1.2-alpha.2
+npm install --global @deepseek-ai/dsh@0.1.2-rc.1
 dsh --version
-dsh plugin --profile web add @nanmicoder/dsh-agent-teams@latest
 ```
 
-To pin this release, replace `@latest` with `@0.1.15`. Check the required host version in the release notes when updating. These examples target the `web` profile; use your actual profile if different. Stop and restart the running Harness process after changing either host or plugin, then refresh the browser.
+**Until this candidate is published, do not install the existing plugin `@latest` expecting rc.1 compatibility.** Build from this checkout as below, or install the exact candidate version with `--save-exact` once its release is available. Restart the actual Harness process after changing either side and refresh the browser. Updating a global CLI does not replace an embedded Desktop core or another source checkout.
 
-### Staying on an older host / rolling back
+An exact npm CLI version can still contain broad transitive dependencies. Preserve a verified lockfile and inspect the actual installation. Do not delete credentials or `.agent-teams` data to address a version mismatch.
 
-If you are keeping the previous RC host, **do not install the plugin's `@latest`**. For Harness 0.1.0-rc.8, keep or reinstall the pinned 0.1.14 plugin:
+### Build and verify this candidate
 
-```sh
-dsh plugin --profile web add @nanmicoder/dsh-agent-teams@0.1.14
-```
-
-Restart the old host and refresh the browser. If you also upgraded Harness, restore the matching older host before using 0.1.14; rolling back only the plugin is not a supported Alpha.2 configuration. Do not delete credentials or `.agent-teams` data to fix a version mismatch.
-
-**Harness built from source:** updating this plugin repository, rebuilding it, or installing a global CLI does not upgrade a separately launched Harness checkout. Preserve your local changes, update the actual host checkout to [dsh-v0.1.2-alpha.2](https://github.com/deepseek-ai/deepseek-harness/tree/dsh-v0.1.2-alpha.2), follow its build instructions, and restart that host. If its source must stay old, keep the old plugin too; for a source-linked plugin use tag `v0.1.14` and its matching dependencies/build, not the current `main` branch.
-
-### Build the Alpha.2 plugin from source
+In a checkout containing this change:
 
 ```sh
-git clone --branch v0.1.15 https://github.com/NanmiCoder/dsh-agent-teams.git
-cd dsh-agent-teams
 pnpm install --frozen-lockfile
+pnpm typecheck
 pnpm build
-dsh plugin --profile web add .
+pnpm verify
+pnpm pack --out ./agent-teams-candidate.tgz
 ```
 
-This requires the Alpha.2 host above. Run `pnpm build` again after changing the source. The local plugin install remains linked to this checkout; pulling source alone does not rebuild that linked plugin.
-
-Validate the composed profile, restart DSH, and refresh the Web UI:
+Inspect the actual host, then install the artifact into a separate test profile:
 
 ```sh
-dsh --profile web --dump-config
-dsh web
+node scripts/doctor.mjs --host-root "/actual/host/package/directory" --json
+dsh plugin --profile agent-teams-preview add --save-exact /absolute/path/agent-teams-candidate.tgz
+node scripts/doctor.mjs --host-root "/actual/host/package/directory" --profile-root "/actual/test/profile/directory" --json
+dsh --profile agent-teams-preview --dump-config
+dsh web --profile agent-teams-preview
 ```
+
+The doctor checks the DSH dependency cohort, duplicate runtime identities and the profile's plugin version. It reads package metadata without reading credentials or changing configuration. Passing it does not replace team, task and UI acceptance. Rebuild, repack and restart after source changes.
+
+### Developers: explicitly test Alpha
+
+Choose an exact Alpha version; `^0.1.2-alpha.2` does not mean “Alpha.2 only.” Development uses exact rc.1 packages, cohort-wide `pnpm.overrides` and a frozen lockfile. The runtime runner creates separate dependency cohorts, profiles and workspaces for Alpha.2, Alpha.5 and rc.1, installs the same candidate tgz, and checks actual resolution.
+
+```sh
+node scripts/harness-runtime-verify.mjs \
+  --host-version 0.1.2-alpha.2 \
+  --artifact ./agent-teams-candidate.tgz \
+  --report-dir /tmp/agent-teams-alpha2-check
+```
+
+This developer command downloads the host into temporary directories without modifying existing user profiles. It uses deterministic model responses with the real CLI, plugin, sessions, tools and subagents. See the [maintenance workflow](./docs/maintenance-workflow.md) for coverage and release requirements.
+
+### Retaining an older host / rollback
+
+For the historical Harness `0.1.0-rc.8` + plugin `0.1.14` pair, pin both sides. This is not a compatibility claim for every older RC. Keep another already verified older pair until a complete migration is ready. Historical [Alpha.2 compatibility](./docs/alpha2-compatibility.md) and [acceptance](./docs/alpha2-release-acceptance.md) reports describe those specific releases, not the current matrix.
 
 Then ask for a team directly:
 
@@ -173,6 +182,8 @@ Defaults work without extra setup. A trusted profile can override member behavio
 See [docs/usage.md](./docs/usage.md) for the full tool reference, state model, Web UI behavior, configuration, and known limits.
 
 ## Plugin development Skill
+
+Community upgrade, audit, benchmark, testing and release skills are vendored with a pinned source revision. See [skills/README.md](./skills/README.md) for local rules and [CONTRIBUTING.md](./CONTRIBUTING.md) for the contribution workflow.
 
 The repository also ships the open Agent Skills package [`dsh-plugin-development`](./skills/dsh-plugin-development/SKILL.md):
 

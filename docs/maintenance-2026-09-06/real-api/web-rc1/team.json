@@ -1,0 +1,37 @@
+{
+  "name": "real-api-web-rc1",
+  "id": "real-api-web-rc1",
+  "description": "验收测试：worker 独立计算 1²+2²+…+10²，领取任务、标记进行中、完成后通过 AgentTeams 消息向 captain 报告；captain 等待消息核对后中文汇报。",
+  "captainSessionId": "session-ce0dfdac-d3b3-448b-810a-34ba803ae7f4",
+  "createdAt": 1788628096406,
+  "members": [
+    {
+      "id": "8aeee1d2-838e-4b60-8103-bba6f49fda35",
+      "name": "worker",
+      "role": "worker",
+      "provider": "deepseek-official",
+      "model": "deepseek-v4-flash",
+      "reasoningEffort": "low",
+      "joinedAt": 1788628097749,
+      "status": "idle"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "t1",
+      "subject": "计算 1²+2²+…+10² 的和并向 captain 报告",
+      "description": "独立计算从 1 到 10 每个整数的平方之和（即 1*1 + 2*2 + … + 10*10）。领取该任务后先标记为进行中，独立完成计算，然后把任务标记为已完成，并通过 AgentTeams 消息向 captain 报告你得到的最终数字。请务必独立完成，不要在报告前向任何人询问结果。",
+      "status": "completed",
+      "assignee": "worker",
+      "dependencies": [],
+      "attempt": 1,
+      "createdAt": 1788628099482,
+      "updatedAt": 1788628107077,
+      "kind": "work",
+      "attemptId": "fce5fbfb-6e5f-424a-b2e3-b02f9d1b84aa",
+      "reassigning": false,
+      "output": "计算 1²+2²+…+10²：各平方为 [1,4,9,16,25,36,49,64,81,100]，累加和与公式 n(n+1)(2n+1)/6 (n=10) 两种方法均得 385。已独立完成并通过 AgentTeams 向 captain 报告。"
+    }
+  ],
+  "taskSeq": 1
+}

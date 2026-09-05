@@ -1,0 +1,4 @@
+interface:
+  display_name: "DSH Plugin Workflow"
+  short_description: "Plan and coordinate the DSH plugin lifecycle"
+  default_prompt: "Use $plugin-workflow to inspect this DSH plugin and let me choose upgrade, testing, naming, and release stages."

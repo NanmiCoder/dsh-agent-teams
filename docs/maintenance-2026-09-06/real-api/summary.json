@@ -1,0 +1,216 @@
+{
+  "capturedAt": "2026-09-05T17:02:50.039769+00:00",
+  "passed": true,
+  "artifact": "/tmp/dsh-implementation-20260906/agent-teams-final-v2.tgz",
+  "artifactSha256": "6325e972566092bb0ec07d6065113ebd0fcf5877e475b2961dc8b049c2a2654c",
+  "node": "v24.20.0",
+  "platform": "darwin-arm64",
+  "actualProvider": "deepseek-official",
+  "actualModel": "deepseek-v4-flash",
+  "scenario": "One driver prompt; real LLM creates one team/member/task, member independently computes sum of squares 1..10, claims/updates/completes/reports, captain wakes after yielding and confirms.",
+  "independentExpectedValue": 385,
+  "requestCount": 41,
+  "assertionCount": 33,
+  "hosts": [
+    {
+      "version": "0.1.2-alpha.2",
+      "passed": true,
+      "exit": {
+        "code": 0,
+        "signal": null
+      },
+      "timeout": false,
+      "requests": 12,
+      "provider": "deepseek-official",
+      "model": "deepseek-v4-flash",
+      "cwd": "/private/tmp",
+      "reason": "task-terminal-and-agents-idle",
+      "assertions": {
+        "realProviderRequests": true,
+        "memberMadeRealRequest": true,
+        "singleTeamMember": true,
+        "singleCompletedTask": true,
+        "correctOutput": true,
+        "captainConfirmed": true,
+        "onlyOneDriverPrompt": true,
+        "captainWokeAfterYield": true,
+        "memberClaimedTask": true,
+        "memberUpdatedTask": true,
+        "memberReported": true
+      },
+      "report": "/tmp/dsh-runtime-lab-20260906/real-api-alpha2-1788627620168",
+      "artifactSha256": "6325e972566092bb0ec07d6065113ebd0fcf5877e475b2961dc8b049c2a2654c",
+      "limits": {
+        "milliseconds": 180000,
+        "modelRequests": 30
+      },
+      "usage": {
+        "inputTokens": 26670,
+        "outputTokens": 1583,
+        "totalTokens": 144605,
+        "cacheReadTokens": 116352
+      },
+      "usageFrames": 12,
+      "durationMilliseconds": 12928,
+      "captainIdleAt": 1788627629875,
+      "captainWakeRequestAt": 1788627632283,
+      "firstWakeContainsAgentTeamsMemberMessage": true,
+      "memberReportInCaptainRequest": "AgentTeams message from member worker:\n\nTask t1 completed. The sum of squares of integers 1 through 10 is 385.",
+      "taskStatus": "completed",
+      "taskOutput": "Sum of squares of integers 1 through 10 = 385 (1+4+9+16+25+36+49+64+81+100 = 385).",
+      "toolCallCounts": {
+        "agent_teams_add_member": 1,
+        "agent_teams_claim_task": 1,
+        "agent_teams_create": 1,
+        "agent_teams_create_task": 1,
+        "agent_teams_send_message": 1,
+        "agent_teams_status": 2,
+        "agent_teams_update_task": 2
+      },
+      "extraModelToolCalls": []
+    },
+    {
+      "version": "0.1.2-alpha.5",
+      "passed": true,
+      "exit": {
+        "code": 0,
+        "signal": null
+      },
+      "timeout": false,
+      "requests": 15,
+      "provider": "deepseek-official",
+      "model": "deepseek-v4-flash",
+      "cwd": "/private/tmp",
+      "reason": "task-terminal-and-agents-idle",
+      "assertions": {
+        "realProviderRequests": true,
+        "memberMadeRealRequest": true,
+        "singleTeamMember": true,
+        "singleCompletedTask": true,
+        "correctOutput": true,
+        "captainConfirmed": true,
+        "onlyOneDriverPrompt": true,
+        "captainWokeAfterYield": true,
+        "memberClaimedTask": true,
+        "memberUpdatedTask": true,
+        "memberReported": true
+      },
+      "report": "/tmp/dsh-runtime-lab-20260906/real-api-alpha5-1788627620155",
+      "artifactSha256": "6325e972566092bb0ec07d6065113ebd0fcf5877e475b2961dc8b049c2a2654c",
+      "limits": {
+        "milliseconds": 180000,
+        "modelRequests": 30
+      },
+      "usage": {
+        "inputTokens": 20115,
+        "outputTokens": 1724,
+        "totalTokens": 185935,
+        "cacheReadTokens": 164096
+      },
+      "usageFrames": 15,
+      "durationMilliseconds": 13804,
+      "captainIdleAt": 1788627628764,
+      "captainWakeRequestAt": 1788627633748,
+      "firstWakeContainsAgentTeamsMemberMessage": true,
+      "memberReportInCaptainRequest": "AgentTeams message from member worker:\n\nTask t1 completed: Sum of squares of integers 1 through 10 = 385 (verified computationally: 1+4+9+16+25+36+49+64+81+100 = 385).",
+      "taskStatus": "completed",
+      "taskOutput": "Sum of squares of integers 1 through 10 = 385 (verified: 1+4+9+16+25+36+49+64+81+100 = 385).",
+      "toolCallCounts": {
+        "agent_teams_add_member": 1,
+        "agent_teams_claim_task": 1,
+        "agent_teams_create": 1,
+        "agent_teams_create_task": 1,
+        "agent_teams_send_message": 1,
+        "agent_teams_status": 2,
+        "agent_teams_update_task": 2,
+        "bash": 1,
+        "send_message": 1
+      },
+      "extraModelToolCalls": [
+        {
+          "name": "bash",
+          "arguments": "{\"command\": \"python3 -c \\\"print(sum(i*i for i in range(1,11)))\\\"\", \"description\": \"Compute sum of squares 1..10\"}",
+          "sessionId": "4962b471-def1-4c56-a10e-bd5fc4ada115",
+          "time": 1788627630621
+        },
+        {
+          "name": "send_message",
+          "arguments": "{\"agent_id\": \"session-31a55a27-36cc-4673-8631-452e8902a42e\", \"message\": \"Worker task complete: The sum of the squares of the integers 1 through 10 is 385 (1+4+9+16+25+36+49+64+81+100). Result reported to captain and task t1 marked completed.\"}",
+          "sessionId": "4962b471-def1-4c56-a10e-bd5fc4ada115",
+          "time": 1788627633730
+        }
+      ]
+    },
+    {
+      "version": "0.1.2-rc.1",
+      "passed": true,
+      "exit": {
+        "code": 0,
+        "signal": null
+      },
+      "timeout": false,
+      "requests": 14,
+      "provider": "deepseek-official",
+      "model": "deepseek-v4-flash",
+      "cwd": "/private/tmp",
+      "reason": "task-terminal-and-agents-idle",
+      "assertions": {
+        "realProviderRequests": true,
+        "memberMadeRealRequest": true,
+        "singleTeamMember": true,
+        "singleCompletedTask": true,
+        "correctOutput": true,
+        "captainConfirmed": true,
+        "onlyOneDriverPrompt": true,
+        "captainWokeAfterYield": true,
+        "memberClaimedTask": true,
+        "memberUpdatedTask": true,
+        "memberReported": true
+      },
+      "report": "/tmp/dsh-runtime-lab-20260906/real-api-rc1-1788627620139",
+      "artifactSha256": "6325e972566092bb0ec07d6065113ebd0fcf5877e475b2961dc8b049c2a2654c",
+      "limits": {
+        "milliseconds": 180000,
+        "modelRequests": 30
+      },
+      "usage": {
+        "inputTokens": 27472,
+        "outputTokens": 2412,
+        "totalTokens": 176828,
+        "cacheReadTokens": 146944
+      },
+      "usageFrames": 14,
+      "durationMilliseconds": 18107,
+      "captainIdleAt": 1788627629408,
+      "captainWakeRequestAt": 1788627635122,
+      "firstWakeContainsAgentTeamsMemberMessage": true,
+      "memberReportInCaptainRequest": "AgentTeams message from member worker:\n\nTask t1 completed. Sum of squares of integers 1 through 10 = 385.",
+      "taskStatus": "completed",
+      "taskOutput": "Sum of squares of integers 1 through 10 = 385 (1\u00b2+2\u00b2+...+10\u00b2 = 1+4+9+16+25+36+49+64+81+100 = 385).",
+      "toolCallCounts": {
+        "agent_teams_add_member": 1,
+        "agent_teams_claim_task": 1,
+        "agent_teams_create": 1,
+        "agent_teams_create_task": 1,
+        "agent_teams_send_message": 1,
+        "agent_teams_status": 2,
+        "agent_teams_update_task": 2,
+        "send_message": 1
+      },
+      "extraModelToolCalls": [
+        {
+          "name": "send_message",
+          "arguments": "{\"agent_id\": \"session-f4cbd51b-6cb9-4df3-8081-b02bda5dfc32\", \"message\": \"Worker task complete. I computed the sum of squares of integers 1 through 10 on the real AgentTeams API: sum = 385. I claimed task t1 (attempt id ded9d04f-7103-4040-81df-1b5597e6575c), set it in_progress, computed 1\u00b2+2\u00b2+...+10\u00b2 = 1+4+9+16+25+36+49+64+81+100 = 385, marked the task completed with that output, and messaged the captain via agent_teams_send_message. The full claim\u2192in_progress\u2192completed lifecycle worked end-to-end.\"}",
+          "sessionId": "52a82a25-f51a-4bb0-b9f7-76af7bc3ee48",
+          "time": 1788627635093
+        }
+      ]
+    }
+  ],
+  "notes": [
+    "Earlier 178862738* runs failed before HTTP dispatch: the generated test profile package.json omitted version and the official package-inventory request extension rejected it. This was a test-profile defect, corrected with version 0.0.0; no product source or extension bypass.",
+    "The real API observer calls next() unchanged; it supplies no model responses, invokes no AgentTeams tool directly, and never writes team state.",
+    "Alpha5 used one pure arithmetic bash command. Alpha5 and rc1 also used native send_message. Their first captain request after idle contained the AgentTeams member message; the deterministic matrix separately verifies the isolated plugin wakeup path.",
+    "No credentials, complete environment, provider headers, profile configuration or user data are included in this evidence directory."
+  ]
+}

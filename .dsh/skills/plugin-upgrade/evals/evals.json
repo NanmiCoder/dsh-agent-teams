@@ -1,0 +1,29 @@
+{
+  "skill_name": "plugin-upgrade",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Scan the examples/legacy-plugin/ fixture in read-only mode and output the seven-touchpoint inspection table and the version cards that hit.",
+      "expected_output": "All seven touchpoints hit (source patches, internal events, services/Remote, host directories, UI/commands, custom HTTP channels, subprocess output); the corresponding cards map to A1-01/A1-02/A1-03/A1-04/A1-08 (including the A2-01 revert pair) and others; the output includes the \"no-hit notes\" and \"must verify\" checklist; no files are modified throughout.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "On rc.2 the plugin emits third-party informational persistent events (with ignorable: true) and now needs to migrate to 0.1.2-alpha.2. Give the migration steps for this touchpoint.",
+      "expected_output": "First read the full corridor-folding net state: alpha.1 removes ignorable, alpha.2 restores it (A1-02 → A2-01), so do not \"delete and re-add\"; when the final target is alpha.2, keep/restore the producer marker and remove the alpha.1-era defensive deletion; point out the capability gap that the public Session.append has no ignorable parameter — do not cast to pretend a public entry point exists; give the verification steps for reload and for fail-closed handling of unknown events.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "The plugin registers a custom channel with connection.rpc.handle('/x', handler, { authority: 'loopback' }), its devDependencies point at npm 0.1.1-rc.2, and the host will be upgraded to 0.1.2-alpha.2. What needs to change?",
+      "expected_output": "Recognize the signature drift: from alpha.1 on, handle() drops the third parameter and ignores extra arguments at runtime; because the declared devDependencies baseline is rc.2, use the dual-compatibility pattern to keep the third parameter (typecheck passes against rc.2, alpha runtime behavior unchanged) and note the reason; also point out that a custom channel must be registered through connection to get unified authentication (A1-08) — do not bypass the token; verification includes a real cold boot and an unauthenticated 401.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "I am a plugin author. My Host + Web Client plugin is at version 0.6.4, depends on DSH 0.1.0-rc.6, and uses dsh-client-runtime, useSession(snapshot.nodes), and ctx.commands.execute(agent, line, signal). Give me a source upgrade plan to DSH 0.1.2-alpha.2.",
+      "expected_output": "Enter author-migrate rather than installed-plugin update; record the plugin's own SemVer and the DSH cohort separately, and note that 0.1.0-rc.6→rc.2 is an unsupported gap. Remove dsh-client-runtime and migrate ClientContext/SessionId/ConversationNode/CommandRowProps per owning package; switch useSession transcript to useChat and read the keyed store by order + nodes.get; Host execute passes [] when there is no graph. Check dsh.client.inject, directly declared dependencies, and type-only augmentation; temporarily set skipLibCheck to false to guard against implicit any; the lockfile must not mix cohorts. Decide the plugin's own version last, then verify test/build, pack filename/manifest, isolated-profile install, token→Cookie, boot entry, and advertised bundle load/mount/remove.",
+      "files": []
+    }
+  ]
+}

@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-/** Exercise raw plugin routes through alpha.2's real browser-auth service. */
+/** Exercise raw plugin routes through the installed host's browser-auth service. */
 import assert from 'node:assert/strict'
 import { createServer, request } from 'node:http'
 import { once } from 'node:events'
 import { Context } from '@deepseek-ai/cordis'
 import { apply as installConnection } from '@deepseek-ai/dsh-client-connection'
-import { authenticatedWebRoutes } from '../lib/web-routes.js'
+import { authenticatedWebRoutes, readJsonRequest, RequestBodyError } from '../lib/web-routes.js'
 
 const ctx = new Context()
 const routes = new Map()
@@ -47,7 +47,16 @@ const routePlugin = {
     for (const path of paths) {
       owner.effect(() => protectedRoutes.register({
         kind: 'exact', path,
-        async handler(_req, res) {
+        async handler(req, res) {
+          if (req.method === 'POST') {
+            try {
+              await readJsonRequest(req, 64)
+            } catch (error) {
+              res.writeHead(error instanceof RequestBodyError ? error.status : 500)
+              res.end()
+              return
+            }
+          }
           calls += 1
           res.writeHead(200, { 'content-type': 'application/json' })
           res.end(JSON.stringify({ ok: true }))
@@ -85,6 +94,15 @@ try {
     assert.deepEqual(await response.json(), { ok: true })
   }
   assert.equal(calls, 2)
+  const unauthenticatedUpload = await fetch(base + paths[1], { method: 'POST', body: 'x'.repeat(65) })
+  assert.equal(unauthenticatedUpload.status, 401, 'authentication runs before parsing request bodies')
+  await unauthenticatedUpload.arrayBuffer()
+  const oversized = await fetch(base + paths[1], {
+    method: 'POST', headers: { cookie, origin: base }, body: 'x'.repeat(65),
+  })
+  assert.equal(oversized.status, 413, 'authorized oversized requests fail before mutating team state')
+  await oversized.arrayBuffer()
+  assert.equal(calls, 2)
   for (const headers of [
     { cookie, origin: 'https://untrusted.invalid' },
     { cookie, 'sec-fetch-site': 'cross-site' },
@@ -116,7 +134,7 @@ try {
   await reloaded.inertia
   assert(paths.every(path => routes.has(path)), 'reload restores exactly one registration')
   await reloaded.dispose()
-  console.log('PASS Web routes: real alpha.2 authentication, trusted origins, fail-closed startup, disposal and reload')
+  console.log('PASS Web routes: real host authentication, bounded bodies, trusted origins, fail-closed startup, disposal and reload')
 } finally {
   await ctx.fiber.dispose()
   server.closeAllConnections()

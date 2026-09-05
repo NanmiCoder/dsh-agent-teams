@@ -1,0 +1,126 @@
+{
+  "kind": "dsh-plugin-naming-policy",
+  "id": "dsh-plugin-naming/v1",
+  "schemaVersion": 1,
+  "status": "community-compatibility-profile",
+  "manifestFile": "dsh-plugin.naming.json",
+  "appliesTo": "external-community-plugin",
+  "officialBaseline": {
+    "repository": "https://github.com/deepseek-ai/deepseek-harness",
+    "ref": "dsh-v0.1.2-alpha.2",
+    "commit": "0a53fb55bea101816fa226bb964ae2bed71c343b",
+    "verifiedAt": "2026-08-31"
+  },
+  "centralRegistry": {
+    "repository": "https://github.com/oh-my-dsh/dsh-plugin-registry",
+    "contract": "dsh-plugin-registry/v2",
+    "defaultIndexUrl": "https://raw.githubusercontent.com/oh-my-dsh/dsh-plugin-registry/main/registry/index.json"
+  },
+  "reservedNamespacePrefixes": [
+    "core",
+    "deepseek",
+    "dsh",
+    "internal",
+    "official",
+    "runtime",
+    "system"
+  ],
+  "reservedExactNames": {
+    "skillProviders": [
+      "runtime"
+    ]
+  },
+  "knownBuiltInExactNames": {
+    "tools": [
+      "run_code"
+    ]
+  },
+  "collisionSemantics": {
+    "pluginNames": "module-metadata-not-a-global-registry",
+    "loaderIds": "composition-key-later-layers-may-override",
+    "services": "context-key-isolatable-by-cordis-realm",
+    "tools": "same-scope-reject-nearer-agent-scope-may-shadow",
+    "commands": "same-scope-reject-nearer-agent-scope-may-shadow",
+    "skills": "scope-rank-and-provider-order-select-a-winner",
+    "skillProviders": "same-scope-reject-runtime-is-reserved",
+    "events": "shared-channel-not-an-exclusive-registration",
+    "settingsNamespaces": "duplicate-registration-rejects",
+    "routes": "same-kind-and-path-rejects"
+  },
+  "surfaces": {
+    "namespace": {
+      "style": "community-coordinate-segment",
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+      "maxLength": 63
+    },
+    "pluginName": {
+      "style": "kebab-case",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "maxLength": 63
+    },
+    "packageName": {
+      "style": "npm-package-name",
+      "pattern": "^(?:@[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*$",
+      "maxLength": 214,
+      "recommendedPattern": "^(?:dsh-[a-z0-9]+(?:-[a-z0-9]+)*|@[a-z0-9]+(?:-[a-z0-9]+)*/dsh-[a-z0-9]+(?:-[a-z0-9]+)*)$"
+    },
+    "pluginNames": {
+      "style": "non-whitespace-module-name",
+      "pattern": "^\\S+$",
+      "recommendedPattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "recommendedMaxLength": 128
+    },
+    "loaderIds": {
+      "style": "non-whitespace-composition-key",
+      "pattern": "^\\S+$",
+      "recommendedPattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+      "recommendedMaxLength": 128
+    },
+    "services": {
+      "style": "non-whitespace-context-key",
+      "pattern": "^\\S+$",
+      "recommendedPattern": "^[a-z][A-Za-z0-9]*$",
+      "recommendedMaxLength": 128
+    },
+    "tools": {
+      "style": "model-tool-compatible-name",
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "recommendedPattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$",
+      "recommendedMaxLength": 128
+    },
+    "commands": {
+      "style": "official-lowercase-command-grammar",
+      "pattern": "^[a-z][a-z0-9_-]*$",
+      "recommendedPattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+      "recommendedMaxLength": 128
+    },
+    "skills": {
+      "style": "official-kebab-case-skill-grammar",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "skillProviders": {
+      "style": "non-whitespace-provider-name",
+      "pattern": "^\\S+$",
+      "recommendedPattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "recommendedMaxLength": 128
+    },
+    "events": {
+      "style": "official-namespace/action-convention",
+      "pattern": "^[^/\\s]+/[^/\\s]+$",
+      "recommendedPattern": "^[a-z0-9]+(?:-[a-z0-9]+)*/[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+      "recommendedMaxLength": 192
+    },
+    "settingsNamespaces": {
+      "style": "official-lowercase-hyphenated-grammar",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "recommendedPattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+      "recommendedMaxLength": 128
+    },
+    "routes": {
+      "style": "official-absolute-path-without-trailing-slash",
+      "pattern": "^/[^?#\\s]*[^/?#\\s]$",
+      "recommendedPattern": "^/(?:[A-Za-z0-9._~:@%+-]+/)*[A-Za-z0-9._~:@%+-]+$",
+      "recommendedMaxLength": 256
+    }
+  }
+}

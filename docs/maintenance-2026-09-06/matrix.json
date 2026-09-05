@@ -1,0 +1,167 @@
+{
+  "capturedAt": "2026-09-05T17:04:00.295942+00:00",
+  "passed": true,
+  "artifact": "/tmp/dsh-implementation-20260906/agent-teams-final-v2.tgz",
+  "artifactSha256": "6325e972566092bb0ec07d6065113ebd0fcf5877e475b2961dc8b049c2a2654c",
+  "scenarioCount": 18,
+  "assertionCount": 126,
+  "currentRepositoryScriptsMatch": true,
+  "hosts": [
+    {
+      "version": "0.1.2-alpha.2",
+      "node": "v24.20.0",
+      "platform": "darwin",
+      "arch": "arm64",
+      "passed": true,
+      "artifactSha256": "6325e972566092bb0ec07d6065113ebd0fcf5877e475b2961dc8b049c2a2654c",
+      "testFiles": {
+        "harness-runtime-verify.mjs": "f65b06d5ab8d7aefd7736fb639e5be6ccda961f57aec7b91400cff3bf25e8df7",
+        "fixtures/harness-runtime-llm.mjs": "17d16379e71265f105833cc736059cf9464e3e0a9f02c3757a5c065bed0a5700",
+        "fixtures/harness-runtime-resume.mjs": "0ff88e3bf1d10788676ee0a2ad3d03bc4783fe06bddffbb707513b5c632cda0d",
+        "fixtures/harness-runtime-idle.mjs": "15e4c8f9c77d35052e7458d672fb29ba298bf6b6e0426900e4236e1e7c437a46"
+      },
+      "cohortCount": 215,
+      "cohortLockSha256": "8ddc6ab55cd1ecc70c871e4879de2c5b9730034f1542000b2c9e0c82bb088f3e",
+      "scenarioCount": 6,
+      "assertionCount": 42,
+      "scenarios": [
+        {
+          "scenario": "lifecycle",
+          "passed": true
+        },
+        {
+          "scenario": "lifecycle-cold-restore",
+          "passed": true
+        },
+        {
+          "scenario": "fallback",
+          "passed": true
+        },
+        {
+          "scenario": "fallback-cold-restore",
+          "passed": true
+        },
+        {
+          "scenario": "failure",
+          "passed": true
+        },
+        {
+          "scenario": "captain-idle-wakeup",
+          "passed": true
+        }
+      ],
+      "report": "/tmp/dsh-runtime-lab-20260906/final-v3-alpha2-node24",
+      "unverified": [
+        "real provider APIs and credentials",
+        "browser interaction",
+        "other operating systems",
+        "native terminal execution",
+        "live user-data migration"
+      ]
+    },
+    {
+      "version": "0.1.2-alpha.5",
+      "node": "v24.20.0",
+      "platform": "darwin",
+      "arch": "arm64",
+      "passed": true,
+      "artifactSha256": "6325e972566092bb0ec07d6065113ebd0fcf5877e475b2961dc8b049c2a2654c",
+      "testFiles": {
+        "harness-runtime-verify.mjs": "f65b06d5ab8d7aefd7736fb639e5be6ccda961f57aec7b91400cff3bf25e8df7",
+        "fixtures/harness-runtime-llm.mjs": "17d16379e71265f105833cc736059cf9464e3e0a9f02c3757a5c065bed0a5700",
+        "fixtures/harness-runtime-resume.mjs": "0ff88e3bf1d10788676ee0a2ad3d03bc4783fe06bddffbb707513b5c632cda0d",
+        "fixtures/harness-runtime-idle.mjs": "15e4c8f9c77d35052e7458d672fb29ba298bf6b6e0426900e4236e1e7c437a46"
+      },
+      "cohortCount": 214,
+      "cohortLockSha256": "f6dfd2ce7a56ecea06fb5637eece39d8f06d50b83701c9bf26bb442af10fc507",
+      "scenarioCount": 6,
+      "assertionCount": 42,
+      "scenarios": [
+        {
+          "scenario": "lifecycle",
+          "passed": true
+        },
+        {
+          "scenario": "lifecycle-cold-restore",
+          "passed": true
+        },
+        {
+          "scenario": "fallback",
+          "passed": true
+        },
+        {
+          "scenario": "fallback-cold-restore",
+          "passed": true
+        },
+        {
+          "scenario": "failure",
+          "passed": true
+        },
+        {
+          "scenario": "captain-idle-wakeup",
+          "passed": true
+        }
+      ],
+      "report": "/tmp/dsh-runtime-lab-20260906/final-v3-alpha5-node24",
+      "unverified": [
+        "real provider APIs and credentials",
+        "browser interaction",
+        "other operating systems",
+        "native terminal execution",
+        "live user-data migration"
+      ]
+    },
+    {
+      "version": "0.1.2-rc.1",
+      "node": "v24.20.0",
+      "platform": "darwin",
+      "arch": "arm64",
+      "passed": true,
+      "artifactSha256": "6325e972566092bb0ec07d6065113ebd0fcf5877e475b2961dc8b049c2a2654c",
+      "testFiles": {
+        "harness-runtime-verify.mjs": "f65b06d5ab8d7aefd7736fb639e5be6ccda961f57aec7b91400cff3bf25e8df7",
+        "fixtures/harness-runtime-llm.mjs": "17d16379e71265f105833cc736059cf9464e3e0a9f02c3757a5c065bed0a5700",
+        "fixtures/harness-runtime-resume.mjs": "0ff88e3bf1d10788676ee0a2ad3d03bc4783fe06bddffbb707513b5c632cda0d",
+        "fixtures/harness-runtime-idle.mjs": "15e4c8f9c77d35052e7458d672fb29ba298bf6b6e0426900e4236e1e7c437a46"
+      },
+      "cohortCount": 214,
+      "cohortLockSha256": "22f45c7f6e728eb468dd042f05088ed955b29f1b0dc7379188f2ff5d2597bb84",
+      "scenarioCount": 6,
+      "assertionCount": 42,
+      "scenarios": [
+        {
+          "scenario": "lifecycle",
+          "passed": true
+        },
+        {
+          "scenario": "lifecycle-cold-restore",
+          "passed": true
+        },
+        {
+          "scenario": "fallback",
+          "passed": true
+        },
+        {
+          "scenario": "fallback-cold-restore",
+          "passed": true
+        },
+        {
+          "scenario": "failure",
+          "passed": true
+        },
+        {
+          "scenario": "captain-idle-wakeup",
+          "passed": true
+        }
+      ],
+      "report": "/tmp/dsh-runtime-lab-20260906/final-v3-rc1-node24",
+      "unverified": [
+        "real provider APIs and credentials",
+        "browser interaction",
+        "other operating systems",
+        "native terminal execution",
+        "live user-data migration"
+      ]
+    }
+  ]
+}

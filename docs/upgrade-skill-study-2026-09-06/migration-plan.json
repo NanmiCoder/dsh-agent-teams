@@ -1,0 +1,386 @@
+{
+  "schema": 1,
+  "readOnly": true,
+  "from": "dsh-v0.1.2-alpha.2",
+  "to": "dsh-v0.1.2-rc.1",
+  "scan": {
+    "root": "/tmp/dsh-skill-study.PvGjEI/source",
+    "scannedFiles": 44,
+    "skippedLargeFiles": [],
+    "skippedDatalessFiles": [],
+    "touchpoints": [
+      {
+        "id": 1,
+        "slug": "source-patch",
+        "name": "source patch / monkey patch",
+        "detected": false,
+        "manual": false,
+        "totalHits": 0,
+        "hits": []
+      },
+      {
+        "id": 2,
+        "slug": "internal-events",
+        "name": "internal event names and persistent events",
+        "detected": true,
+        "manual": false,
+        "totalHits": 5,
+        "hits": [
+          {
+            "file": "src/command.ts",
+            "line": 124,
+            "pattern": 1
+          },
+          {
+            "file": "src/event-types.ts",
+            "line": 6,
+            "pattern": 1
+          },
+          {
+            "file": "src/events.ts",
+            "line": 11,
+            "pattern": 1
+          },
+          {
+            "file": "src/index.ts",
+            "line": 507,
+            "pattern": 1
+          },
+          {
+            "file": "src/scheduler.ts",
+            "line": 488,
+            "pattern": 1
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "slug": "internal-services",
+        "name": "internal service probes / Remote",
+        "detected": true,
+        "manual": false,
+        "totalHits": 4,
+        "hits": [
+          {
+            "file": "src/client/ActivityPanel.tsx",
+            "line": 32,
+            "pattern": 2
+          },
+          {
+            "file": "src/client/index.tsx",
+            "line": 5,
+            "pattern": 2
+          },
+          {
+            "file": "src/index.ts",
+            "line": 218,
+            "pattern": 1
+          },
+          {
+            "file": "pnpm-lock.yaml",
+            "line": 2630,
+            "pattern": 2
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "slug": "host-filesystem",
+        "name": "direct host directory reads/writes",
+        "detected": true,
+        "manual": false,
+        "totalHits": 8,
+        "hits": [
+          {
+            "file": "src/index.ts",
+            "line": 34,
+            "pattern": 2
+          },
+          {
+            "file": "src/state.ts",
+            "line": 17,
+            "pattern": 2
+          },
+          {
+            "file": "scripts/release-metadata.mjs",
+            "line": 1,
+            "pattern": 2
+          },
+          {
+            "file": "scripts/release-metadata.test.mjs",
+            "line": 2,
+            "pattern": 2
+          },
+          {
+            "file": "scripts/sync-skill.mjs",
+            "line": 8,
+            "pattern": 1
+          },
+          {
+            "file": "scripts/verify-package.mjs",
+            "line": 3,
+            "pattern": 2
+          },
+          {
+            "file": "scripts/verify.mjs",
+            "line": 14,
+            "pattern": 2
+          },
+          {
+            "file": "tsdown.config.ts",
+            "line": 15,
+            "pattern": 2
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "slug": "internal-ui-commands",
+        "name": "internal UI / commands / tool registration",
+        "detected": true,
+        "manual": false,
+        "totalHits": 7,
+        "hits": [
+          {
+            "file": "src/client/AgentTeamsCard.tsx",
+            "line": 14,
+            "pattern": 2
+          },
+          {
+            "file": "src/client/index.tsx",
+            "line": 16,
+            "pattern": 2
+          },
+          {
+            "file": "src/tools.ts",
+            "line": 676,
+            "pattern": 1
+          },
+          {
+            "file": "scripts/verify-package.mjs",
+            "line": 61,
+            "pattern": 3
+          },
+          {
+            "file": "scripts/verify.mjs",
+            "line": 697,
+            "pattern": 1
+          },
+          {
+            "file": "tsdown.config.ts",
+            "line": 5,
+            "pattern": 3
+          },
+          {
+            "file": "pnpm-lock.yaml",
+            "line": 2630,
+            "pattern": 2
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "slug": "custom-channel",
+        "name": "custom HTTP / WS / RPC / DOM / CSS channels",
+        "detected": true,
+        "manual": false,
+        "totalHits": 1,
+        "hits": [
+          {
+            "file": "scripts/web-routes-verify.mjs",
+            "line": 12,
+            "pattern": 1
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "slug": "subprocess-output",
+        "name": "subprocess / stdout / stderr parsing",
+        "detected": true,
+        "manual": false,
+        "totalHits": 7,
+        "hits": [
+          {
+            "file": "src/command.ts",
+            "line": 92,
+            "pattern": 2
+          },
+          {
+            "file": "src/index.ts",
+            "line": 12,
+            "pattern": 2
+          },
+          {
+            "file": "src/profiles.ts",
+            "line": 7,
+            "pattern": 2
+          },
+          {
+            "file": "scripts/lifecycle-verify.mjs",
+            "line": 375,
+            "pattern": 2
+          },
+          {
+            "file": "scripts/verify.mjs",
+            "line": 1522,
+            "pattern": 1
+          },
+          {
+            "file": "cordis.patch.yml",
+            "line": 7,
+            "pattern": 2
+          },
+          {
+            "file": "pnpm-lock.yaml",
+            "line": 1036,
+            "pattern": 2
+          }
+        ]
+      }
+    ]
+  },
+  "corridor": [
+    {
+      "file": "v0.1.2-alpha.3.md",
+      "from": "dsh-v0.1.2-alpha.2",
+      "to": "dsh-v0.1.2-alpha.3",
+      "coverage": "curated"
+    },
+    {
+      "file": "v0.1.2-alpha.4.md",
+      "from": "dsh-v0.1.2-alpha.3",
+      "to": "dsh-v0.1.2-alpha.4",
+      "coverage": "curated"
+    },
+    {
+      "file": "v0.1.2-alpha.5.md",
+      "from": "dsh-v0.1.2-alpha.4",
+      "to": "dsh-v0.1.2-alpha.5",
+      "coverage": "curated"
+    },
+    {
+      "file": "v0.1.2-rc.1.md",
+      "from": "dsh-v0.1.2-alpha.5",
+      "to": "dsh-v0.1.2-rc.1",
+      "coverage": "curated"
+    }
+  ],
+  "gaps": [],
+  "cards": {
+    "applicable": [
+      {
+        "id": "DSH-0.1.2-A3-01",
+        "title": "New capability: plugin settings card via `settings.plugin.item` keyed slot",
+        "type": "capability",
+        "action": "optional",
+        "impact": "#3, #5",
+        "touchpoints": [
+          3,
+          5
+        ],
+        "sourceFile": "v0.1.2-alpha.3.md"
+      },
+      {
+        "id": "DSH-0.1.2-A4-01",
+        "title": "The `report` subagent tool package is gone; `send_message` replaces it",
+        "type": "breaking",
+        "action": "required-if-hit",
+        "impact": "#5",
+        "touchpoints": [
+          5
+        ],
+        "sourceFile": "v0.1.2-alpha.4.md"
+      },
+      {
+        "id": "DSH-0.1.2-A4-03",
+        "title": "`Session.events` is removed; read the log through `seq` / `eventAt()` / `snapshotEvents()` / `ownEvents()`",
+        "type": "breaking",
+        "action": "required-if-hit",
+        "impact": "#2 (persistent events), #3 (Remote `history` requests)",
+        "touchpoints": [
+          2,
+          3
+        ],
+        "sourceFile": "v0.1.2-alpha.4.md"
+      },
+      {
+        "id": "DSH-0.1.2-A4-04",
+        "title": "`SessionSeq` / `SessionLogOffset` become branded numbers; `seedLength` becomes `isSeeded` + `inheritedEventCount`",
+        "type": "breaking",
+        "action": "required-if-hit",
+        "impact": "#2, #5",
+        "touchpoints": [
+          2,
+          5
+        ],
+        "sourceFile": "v0.1.2-alpha.4.md"
+      },
+      {
+        "id": "DSH-0.1.2-A4-05",
+        "title": "The `ptc` preset no longer publishes the general `workflow` tool",
+        "type": "behavior",
+        "action": "conditional",
+        "impact": "#5",
+        "touchpoints": [
+          5
+        ],
+        "sourceFile": "v0.1.2-alpha.4.md"
+      },
+      {
+        "id": "DSH-0.1.2-A4-06",
+        "title": "The base bundle enables `web_fetch` by default",
+        "type": "behavior",
+        "action": "conditional",
+        "impact": "#5",
+        "touchpoints": [
+          5
+        ],
+        "sourceFile": "v0.1.2-alpha.4.md"
+      },
+      {
+        "id": "DSH-0.1.2-A5-01",
+        "title": "`DomainSpec.compatibleVersions`: per-record reads and the legacy bootstrap accept vouched-for older versions",
+        "type": "capability",
+        "action": "optional",
+        "impact": "#4",
+        "touchpoints": [
+          4
+        ],
+        "sourceFile": "v0.1.2-alpha.5.md"
+      },
+      {
+        "id": "DSH-0.1.2-A5-02",
+        "title": "`invalidRecords: 'backup-and-skip'` + optional `KvUnit.backupRecord`: salvage a schema-failing record instead of refusing the whole domain open",
+        "type": "capability",
+        "action": "optional",
+        "impact": "#4",
+        "touchpoints": [
+          4
+        ],
+        "sourceFile": "v0.1.2-alpha.5.md"
+      }
+    ],
+    "review": [
+      {
+        "id": "DSH-0.1.2-A4-02",
+        "title": "`@deepseek-ai/dsh-code-runtime-python` is renamed to `@deepseek-ai/dsh-experimental-code-runtime-python`",
+        "type": "breaking",
+        "action": "required-if-hit",
+        "impact": "none (packaging surface)",
+        "touchpoints": [],
+        "sourceFile": "v0.1.2-alpha.4.md"
+      },
+      {
+        "id": "DSH-0.1.2-A5-03",
+        "title": "Host fix: upgrading a 0.1.1-rc.2 / 0.1.2-alpha.3 home to alpha.4 could refuse the boot or drop session titles; alpha.5 reads all three `session_projcache` generations",
+        "type": "fix",
+        "action": "informational",
+        "impact": "none (host persistence surface)",
+        "touchpoints": [],
+        "sourceFile": "v0.1.2-alpha.5.md"
+      }
+    ],
+    "skipped": []
+  }
+}

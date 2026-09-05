@@ -1,0 +1,641 @@
+
+> @nanmicoder/dsh-agent-teams@0.1.16-rc.1 verify <checkout>
+> node scripts/verify.mjs && node scripts/fallback-tdd.mjs && node scripts/member-failure-tdd.mjs && node scripts/quality-gates-tdd.mjs && node scripts/lifecycle-verify.mjs && node scripts/stress-verify.mjs && pnpm verify:web-routes && pnpm verify:release && pnpm verify:skill && pnpm verify:harness-contract && pnpm verify:http-body && pnpm verify:compatibility
+
+dsh-agent-teams offline verification
+  PASS  profile keys trim and assignees canonicalize
+  PASS  profile tasks are stable topological order
+  PASS  profile invocation supports --profile=
+  PASS  profile invocation leaves mid-goal profile text untouched
+  PASS  profile prompt omits empty config and truncates protocol
+  PASS  seed planning remains the default
+  PASS  captain planning keeps the roster and drops seed tasks
+  PASS  profile prompt marks captain planning instead of unused seed counts
+  PASS  member persona includes completed/failed and claimed transition rules
+  PASS  member welcome reports assigned pending count
+  PASS  dependency outputs truncate and keep the newest seed id
+  PASS  recursive dependency collection stops on cycles
+  PASS  persona protocol is truncated
+  PASS  execution prompt is injected into persona and assignment
+1/8 packaging contract
+  PASS  cordis.patch.yml name matches the published package name
+  PASS  files[] ships the bundle patch and lib
+  PASS  scoped package publishes publicly
+  PASS  shared runtime peers are optional for standalone profile installs
+  PASS  client bundle registers under the package name
+  PASS  AgentTeams locale dictionaries have identical keys and template placeholders
+  PASS  client uses the uiConversation event registry and registers the official locale namespace
+  PASS  slash command transcript hides the duplicate pre-message result row
+  PASS  stop-team control lives in the team panel and requires confirmation
+  PASS  clean builds do not package the removed composer stop banner
+  PASS  staged member routes use the official directory and primitive Menu instead of native route selects
+  PASS  staged plan review offers continue, discard, and approve outcomes
+  PASS  review decisions control the Captain turn instead of relying on front-end state alone
+  PASS  continued planning uses a model-facing atomic staged-plan tool instead of state-file edits
+  PASS  discarded and stopped teams render terminal semantics instead of pending execution copy
+  PASS  artwork directory contains exactly the V2 captain, eight members, and six actions
+  PASS  all V2 artwork is 256x256 8-bit RGBA PNG
+  PASS  client mapping and host allowlist reference every V2 artwork asset
+  PASS  canonical eight-member roster resolves to eight distinct role images
+  PASS  whale portraits use transparent cutouts instead of dark circular plates
+  PASS  activity panel bridges the reference palette to current Harness tokens
+  PASS  working member and captain states use the fallback-bearing business color bridge
+  PASS  activity panel uses the shell overlay instead of a page-breaking body portal
+  PASS  panel exposes drag, resize, dock, and fold interaction probes
+  PASS  staged plan editor keeps long plans compact and guards consequential actions
+  PASS  running DAG tasks reuse the animated work glyph without losing focus context
+  PASS  running tasks surface the assignee model on the activity card
+  PASS  member model badge renders compact text inline with full-route metadata
+  PASS  the old separate third-line member model span and locale key are removed
+  PASS  member model badge is a compact neutral inline pill that truncates without overflowing
+  PASS  activity polling combines card demand with current-session cold discovery
+2/8 pure rules
+  PASS  sanitizeKey('My Team!') -> 'my-team'
+  PASS  CJK names survive folding
+  PASS  distinct non-Latin names stay distinct
+  PASS  names with no letters or digits get distinct keys, not a shared constant
+  PASS  folding is deterministic
+  PASS  long names stay inside the filesystem name limit
+  PASS  long names sharing a prefix stay distinct
+  PASS  keys stay a single safe path segment
+  PASS  pending -> claimed allowed
+  PASS  pending -> in_progress denied
+  PASS  in_progress -> completed allowed
+  PASS  completed -> in_progress denied
+  PASS  same status is a no-op
+3/8 dependency gating
+  PASS  all-done deps satisfied
+  PASS  pending dep blocks
+  PASS  failed dep blocks too
+4/8 on-disk team flow (temp dir)
+  PASS  team.json round-trips
+  PASS  team.json accepts a UTF-8 BOM
+  PASS  cold-resume ignores dirty optional profile and seed id
+  PASS  cold-resume recovers blank optional quality fields (#105)
+  PASS  cold-resume keeps non-blank optional quality fields (#105)
+  PASS  cold-resume rejects non-string acceptance items
+  PASS  cold-resume rejects non-string outOfScope items
+  PASS  cold-resume rejects non-string sourceFindingIds items
+  PASS  findTeamByCaptain finds the team
+  PASS  findTeamByCaptain ignores other captains
+  PASS  findTeamByParticipant finds the captain
+  PASS  findTeamByParticipant finds an active member
+  PASS  findTeamByParticipant rejects a removed member
+  PASS  mailbox append/read preserves backslashes
+  PASS  mailbox accepts BOM-prefixed JSONL records
+  PASS  mailbox skips malformed JSON and malformed shapes
+  PASS  missing mailbox reads empty
+  PASS  multiple teams for one captain fail as ambiguous
+  PASS  multiple teams for one member fail as ambiguous
+  PASS  invalid team.json shape is rejected at the durable boundary
+  PASS  removeTeamDir removes the team
+  PASS  archive moves the team out of live scan
+  PASS  archive keeps team.json readable
+  PASS  archive lists the team id
+  PASS  archive dir skips live readTeam
+5/8 host visual-state functions (activity panel)
+  PASS  completed -> completed visual state
+  PASS  failed -> failed visual state
+  PASS  cancelled -> cancelled visual state
+  PASS  in_progress -> running visual state
+  PASS  pending with completed dep -> open
+  PASS  pending with open dep -> blocked
+  PASS  missing dependency is ignored (not blocked)
+  PASS  t1 depth 0
+  PASS  t2 depth 1 (longest path)
+  PASS  t3 depth 2
+  PASS  missing dep contributes no depth
+6/8 client relationship projections
+  PASS  task stages sort by depth
+  PASS  task stages sort ids naturally
+  PASS  non-finite depth falls back to stage 0
+  PASS  relationship chain includes upstream dependency
+  PASS  relationship chain includes focused task
+  PASS  relationship chain includes downstream dependent
+  PASS  relationship chain excludes sibling branch
+  PASS  pinned dependency chain wins over keyboard and hover previews
+  PASS  keyboard dependency chain wins over delayed hover preview
+  PASS  hover dependency chain is used without a pinned or keyboard task
+  PASS  relationship traversal is cycle-safe
+  PASS  edge-free tasks switch to the fill-width parallel grid
+  PASS  live captain team is selected only for the current session
+  PASS  halted captain team is hidden from the composer banner
+  PASS  active team with working members stays visible
+  PASS  planning roster with no tasks still shows the banner
+  PASS  halted team is not active
+  PASS  staged team is not presented as actively executing
+  PASS  settled failed/completed team is not waiting to be scheduled
+  PASS  progress summary prefers running task titles
+  PASS  a real dependency keeps the layered DAG layout
+  PASS  compact DAG lays dependency depths out left-to-right
+  PASS  compact DAG keeps stable rows and reference node geometry
+  PASS  compact DAG emits one curved SVG edge per valid dependency
+  PASS  task model labels prefer the snapshot field and fall back to the assignee route
+  PASS  existing member route helpers retain expanded fallback regression coverage
+  PASS  docked panel follows the shell anchor and retains an available-height ceiling
+  PASS  floating panel movement clamps every edge inside the shell
+  PASS  docked left-edge resize preserves the right anchor
+  PASS  floating left-edge resize preserves the opposite edge at minimum width
+  PASS  floating corner resize preserves its top-left anchor at shell limits
+  PASS  floating bottom resize preserves its top edge at the shell limit
+  PASS  dock toggle preserves width while restoring shell alignment and content-fit height
+  PASS  compact shell disables free geometry and uses a balanced inset
+  PASS  persisted panel state rejects corrupt or partial values
+  PASS  persisted panel height migrates to auto but preserves explicit manual sizing
+  PASS  expanded activity panel belongs only to its current session
+  PASS  restored live activity stays collapsed when a conversation is reopened
+  PASS  archived-only conversation restore never auto-expands the activity panel
+  PASS  a new live team appearing after restore still auto-expands once
+  PASS  activity monitor coalesces duplicate cards into one shared target
+  PASS  one card cleanup keeps another card monitoring
+  PASS  archived targets retire from polling
+  PASS  activity monitor publishes lifecycle changes without duplicate-card churn
+  PASS  no monitor targets create no request and no timer
+  PASS  a cardless cold session restores live and archive once, then probes at the discovery cadence
+  PASS  a cardless session keeps probing at the discovery cadence after an empty first pass
+  PASS  a team created after the discovery pass is picked up without a reload and upgrades to the live cadence
+  PASS  explicit card targets poll at the live cadence from the start
+  PASS  a slow state request never overlaps the next interval
+  PASS  stopping activity polling clears its timer and aborts the in-flight request
+  PASS  a late response after stop cannot publish snapshots
+  PASS  a live miss checks archive once and retires even an orphaned legacy card
+  PASS  rc.8 member navigation refreshes the parent catalog and opens an addressed continuable child
+  PASS  pre-rc.8 member navigation keeps the ordinary session fallback
+  PASS  agent team cards derive a stable id from the standard create tool call
+  PASS  malformed create tool arguments do not create a card
+  PASS  member report delivery calls the live captain steer API
+  PASS  failed live captain delivery falls back to the durable mailbox
+7/8 member model selection and continuation restore
+  PASS  ordinary member snapshots the captain current route and effort
+  PASS  cross-provider route uses the target model default instead of captain effort
+  PASS  plugin memberModel route uses that target model default effort
+  PASS  explicit member effort overrides cross-provider target default
+  PASS  default sentinel opts out of same-route captain effort inheritance
+  PASS  explicit provider without model is rejected
+  PASS  empty explicit reasoning effort is rejected
+  PASS  approval model preflight caches one catalog lookup per provider
+  PASS  approval model preflight rejects an unlisted typo before spawn
+  PASS  #20: spawn receives the resolved per-member provider and model
+  PASS  fresh child request receives the resolved reasoning effort
+  PASS  cold-resumed child restores provider, model, and reasoning from team.json
+8/8 state-file atomic write hardening (Windows EPERM fallback)
+  PASS  persistent EPERM exhausts the rename retries (1 initial + 3 retries)
+  PASS  persistent EPERM falls back to a direct overwrite of the target
+  PASS  the temp file is removed after the fallback write
+  PASS  a transient EPERM recovers via rename retries without the fallback
+  PASS  failure of both the atomic and the direct path raises AggregateError
+  PASS  the temp file is removed even after a dual failure
+  PASS  real Windows lock integration skipped on this platform
+
+all checks passed
+  PASS  member fallback config is normalized
+  PASS  profile fallback config is normalized
+  PASS  member prompt config is normalized
+  PASS  fallback requires provider
+  PASS  fallback requires model
+  PASS  prompt is present in assignment
+  PASS  prompt is present in persona
+  PASS  assignment does not require process disclosure
+  PASS  fallback whitelist includes QUOTA
+  PASS  fallback whitelist includes RATE_LIMIT
+  PASS  fallback whitelist includes AUTH
+  PASS  fallback whitelist includes MISSING_CREDENTIAL
+  PASS  fallback whitelist includes NO_ADAPTER
+  PASS  fallback whitelist excludes CONTEXT_WINDOW_EXCEEDED
+  PASS  fallback whitelist excludes INVALID_CREDENTIAL
+  PASS  fallback whitelist excludes INVALID_ARGS
+  PASS  fallback whitelist excludes TASK_FAILED
+  PASS  eligible failure switches and retries
+  PASS  fallback switches at most once
+  PASS  non-eligible failure keeps primary route
+fallback TDD checks passed
+✔ always retry keeps the owned task open and sends no false failure report (7.16925ms)
+✔ request handler delegates recovery and leaves exhausted requests open until final error (3.116583ms)
+✔ fallback recovers once and exhausted fallback still delegates without failing the task (1.791458ms)
+✔ aborted request does not fail a task or consume its fallback route (1.61675ms)
+✔ final failure notifies idle captain once and flushes without an idle event (15.7315ms)
+✔ final failure notifies running captain once and flushes without an idle event (13.918209ms)
+✔ report a final error immediately but do not dispatch while the driver is still running (26.903208ms)
+✔ unavailable captain keeps failure notification readable: {"captainOffline":true} (14.346416ms)
+✔ unavailable captain keeps failure notification readable: {"rejectDelivery":true} (15.313583ms)
+✔ a queued error cannot fail a newer attempt created before it gets the team lock (2.126ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 104.978541
+quality-gates TDD — A. create contract
+  PASS  tdd.create.work-kind-remains-compatible
+quality-gates TDD — A2. blank optional normalization (#99/#105)
+  PASS  tdd.normalize.blank-optional-fields-to-omitted
+  PASS  tdd.normalize.non-blank-values-untouched
+  PASS  tdd.normalize.retains-invalid-list-item.123
+  PASS  tdd.normalize.retains-invalid-list-item.null
+  PASS  tdd.normalize.retains-invalid-list-item.{"path":"src/private/"}
+  PASS  tdd.create.implementation-requires-objective
+  PASS  tdd.create.implementation-requires-acceptance
+  PASS  tdd.create.implementation-requires-inscope-and-verify
+  PASS  tdd.create.review-requires-reviewed-task
+  PASS  tdd.create.repair-requires-source-and-findings
+  PASS  tdd.create.repair-must-not-depend-on-failed-review
+  PASS  tdd.create.overlapping-inscope-rejects-parallel-ready-tasks
+  PASS  tdd.create.overlapping-inscope-allowed-when-serialized
+  PASS  tdd.create.implementation-blocked-until-requirements-pass
+  PASS  tdd.create.staged-implementation-can-follow-pending-requirements
+  PASS  tdd.create.staged-implementation-must-depend-on-requirements
+quality-gates TDD — B. completion gates
+  PASS  tdd.complete.review-without-verdict-rejected
+  PASS  tdd.complete.review-needs-revision-cannot-complete
+  PASS  tdd.complete.review-pass-requires-no-open-high-findings
+  PASS  tdd.complete.implementation-requires-acceptance-results
+  PASS  tdd.complete.implementation-requires-all-verify-commands
+  PASS  tdd.complete.out-of-scope-path-cannot-complete
+  PASS  tdd.complete.undeclared-path-cannot-complete
+  PASS  tdd.complete.verify-failure-must-fail-task
+  PASS  tdd.complete.claimed-still-cannot-jump-to-completed
+  PASS  tdd.complete.work-kind-keeps-legacy-output-only-complete
+  PASS  tdd.complete.ordered-evidence-tolerates-model-paraphrase
+quality-gates TDD — C. path rules
+  PASS  tdd.scope.file-match
+  PASS  tdd.scope.directory-prefix-match
+  PASS  tdd.scope.out-of-scope-wins
+  PASS  tdd.scope.rejects-parent-escape
+  PASS  tdd.scope.rejects-absolute-path
+  PASS  tdd.scope.default-excludes-env-and-git
+quality-gates TDD — D. auto loop
+  PASS  tdd.loop.needs-revision-creates-repair-and-next-review
+  PASS  tdd.loop.repair-depends-on-source-not-failed-review
+  PASS  tdd.loop.next-review-assigned-to-original-reviewer
+  PASS  tdd.loop.next-review-cannot-be-implementer
+  PASS  tdd.loop.round-increments
+  PASS  tdd.loop.next-review-contract-is-not-a-gate-test
+  PASS  tdd.loop.stops-at-max-review-rounds
+  PASS  tdd.loop.reject-does-not-autoresume
+  PASS  tdd.loop.requirements-needs-revision-opens-next-requirements-round
+  PASS  tdd.loop.repair-skips-captain-assignee
+  PASS  tdd.loop.same-failed-review-does-not-duplicate-follow-up
+  PASS  tdd.plan.default-quality-graph-order
+  PASS  tdd.plan.prompt-explains-staged-full-dag-and-review-rewire
+  PASS  tdd.loop.pending-downstream-rewired-to-new-review-gate
+  PASS  tdd.plan.review-contract-strips-gate-tests
+  PASS  tdd.status.escalated-is-not-halted
+quality-gates TDD — E. halt / resume
+  PASS  tdd.resume.create-task-does-not-unhalt
+  PASS  tdd.resume.explicit-resume-clears-halt
+  PASS  tdd.resume.create-with-resume-reason-unhalts
+  PASS  tdd.resume.cancelled-tasks-stay-cancelled
+  PASS  tdd.resume.missing-reason-rejected
+quality-gates TDD — F. coverage / delivery
+  PASS  tdd.coverage.missing-item-blocks-delivery
+  PASS  tdd.coverage.passed-item-requires-completed-task
+  PASS  tdd.delivery.ok-only-when-all-gates-pass
+  PASS  tdd.delivery.failed-review-without-repair-blocks
+quality-gates TDD — G. persistence / prompts
+  PASS  tdd.state.old-team-json-without-new-fields-still-loads
+  PASS  tdd.state.invalid-verdict-rejected-at-durable-boundary
+  PASS  tdd.prompt.assignment-includes-kind-scope-acceptance
+  PASS  tdd.usage.mentions-explicit-resume-and-verdict
+quality-gates TDD — tool-level closed loop
+  PASS  tdd.create.work-kind-remains-compatible.tool
+  PASS  tdd.create.blank-optional-fields-normalized.tool
+  PASS  tdd.create.team-still-loadable-after-blank-optional.tool
+  PASS  tdd.create.review-blank-reviewedTaskId-rejected.tool
+  PASS  tdd.create.blank-profile-treated-as-omitted.tool
+  PASS  tdd.create.implementation-requires-objective.tool
+  PASS  tdd.resume.create-task-does-not-unhalt.tool
+  PASS  tdd.resume.explicit-resume-clears-halt.tool-exists
+  PASS  tdd.resume.explicit-resume-clears-halt.tool
+quality-gates TDD checks passed
+dsh-agent-teams lifecycle verification
+  PASS  slash command registers as /agent-teams
+  PASS  slash command advertises an input hint for the menu placeholder
+  PASS  configured profile registers a concise dedicated slash command
+  PASS  unsafe profile names do not generate ambiguous commands
+  PASS  bare /agent-teams reports usage instead of activating
+  PASS  argued /agent-teams queues one visible user turn
+  PASS  slash command preserves the exact submitted line as user-authored chat
+  PASS  preserved slash command still activates through the gesture boundary
+  PASS  activation directive names the protocol
+  PASS  profile command queues a visible profile-specific user turn
+  PASS  gesture recognizes a leading /agent-teams token
+  PASS  profile command gesture selects its configured profile and goal
+  PASS  bare profile command gesture asks for the goal
+  PASS  unknown profile command stays ordinary prose
+  PASS  bare gesture yields an empty goal
+  PASS  mid-sentence mention stays ordinary prose
+  PASS  non-user sources cannot forge the gesture
+  PASS  latest user gesture wins in a batch
+  PASS  slash --profile without a goal still activates
+  PASS  profile-only activation asks for the goal
+  PASS  captain-planning activation requires a staged user-reviewed graph
+  PASS  unknown slash profile reports error and does not followup
+  PASS  leading ordinary token is never treated as a profile
+  PASS  command getter sees HMR profile names
+  PASS  create(profile) returns profile members tasks and seed ids
+  PASS  create(profile) persists snapshot members and mapped dependencies
+  PASS  first-stage seed is assigned only to the configured member
+  PASS  first assignment includes team goal and protocol
+  PASS  failed upstream does not unlock the next configured stage
+  PASS  completed upstream dispatches the configured downstream assignee
+  PASS  downstream assignment includes dependency output and seed id
+  PASS  unread mailbox prevents a same-kick new assignment
+  PASS  status exposes profile snapshot and task seed ids
+  PASS  discarding a staged plan archives it without spawning or dispatching
+  PASS  discard aborts the active Captain turn and parks an authoritative no-recreate context
+  PASS  captain-planning create stages only the configured roster
+  PASS  staged roster and DAG are editable without spawning or dispatching
+  PASS  invalid staged plan batches fail atomically without a partial write
+  PASS  return-to-chat cancels the planning turn and asks one question without recreating the team
+  PASS  return-to-chat is idempotent while feedback is already pending
+  PASS  captain can revise the staged DAG and roster through one model-facing atomic tool
+  PASS  approval atomically spawns the final roster before dispatch
+  PASS  approved plan dispatches only after a spawned member becomes idle
+  PASS  captain halt cancels the approved graph and keeps the team
+  PASS  team halt cancels the captain turn while preserving queued user input
+  PASS  captain halt interrupts and drains graph members
+  PASS  halted team does not redispatch cancelled graph
+  PASS  halted create_task does not silently resume
+  PASS  explicit resume clears halt and keeps cancelled tasks cancelled
+  PASS  shutdown preserves cancelled task history in the archive
+  PASS  quality implementation without contract is rejected
+  PASS  illegal completed without acceptance evidence is rejected
+  PASS  review needs_revision cannot complete
+  PASS  needs_revision opens repair and next review
+  PASS  manually added members persist the global fallback for later activations
+  PASS  idle assigned member is claimed and woken automatically
+  PASS  captain cannot mint a claim capability for a member; use reassign_task
+  PASS  member observes the scheduler attempt idempotently
+  PASS  dependency gate stays pending before both branches complete
+  PASS  rate-limited idle owner does not enter an unbounded retry loop (#66)
+  PASS  disposed settled owner keeps its parked attempt across repeated scheduler kicks
+  PASS  idle assigned gamma is claimed for the recovery-failure fixture
+  PASS  failed unobserved recovery restores the original capability and later kicks do not recast it
+  PASS  restored capability remains usable after a failed recovery delivery
+  PASS  unobserved missing owner recovers once and repeated kicks do not rotate it again
+  PASS  captain message resumes a parked owner without rotating its attempt
+  PASS  captain cannot bypass the safe takeover protocol
+  PASS  reassignment quiesces recovered owner and creates a new attempt
+  PASS  old member cannot publish a late takeover result
+  PASS  resumed recovered member completes with its throttled capability
+  PASS  completing dependencies dispatches the downstream task
+  PASS  previously interrupted member is reused in a later round
+  PASS  a member cannot claim a second unfinished task
+  PASS  removing a member revokes and redispatches its unfinished task
+  PASS  removing a member preserves its catalog entry for transcript history
+  PASS  removing a member blocks direct followup before resume
+  PASS  removed member loses participant authorization
+  PASS  failed live message remains one unread durable fallback
+  PASS  status kick redelivers and acknowledges fallback exactly once
+  PASS  concurrent claims serialize to exactly one owner
+  PASS  terminal output is immutable against late overwrite
+  PASS  captain takeover owns a fresh attempt and rejects the old member
+  PASS  parallel captain takeovers allow exactly one active captain task
+  PASS  unfinished captain takeover returns to a member when the captain becomes idle
+  PASS  activity refines residency through the live Agent registry
+  PASS  team shutdown archives the complete durable record
+  PASS  archived activity keeps every member after shutdown
+  PASS  archived activity projects each member model onto assigned tasks
+  PASS  team shutdown keeps retired members catalog-visible for historical transcripts
+  PASS  team shutdown blocks storage-only member cold resume
+  PASS  team shutdown leaves unrelated continuable subagents untouched
+  PASS  team shutdown leaves unrelated continuable followup untouched
+  PASS  invalid roster approval rejects before any member session is created
+  PASS  same-name team can be recreated and archived again
+  PASS  request failure alone leaves the attempt open for Harness recovery
+  PASS  turn failure fails the open attempt, releases the member, and owns no retry
+  PASS  turn failure notifies the captain mailbox with the error code
+  PASS  settled member flushes the question without idle events or manual scheduler kicks
+
+all lifecycle checks passed
+dsh-agent-teams complex stress verification
+  PASS  first wave assigns all eight roots to eight distinct members
+  PASS  captain takeover and member removal serialize without losing either mutation
+  PASS  50 stale/removed-owner writes are rejected during continued scheduling
+  PASS  interrupted alpha is reused while the 31-node DAG keeps advancing
+  PASS  second independent takeover advances exactly one execution attempt
+  PASS  cold runtime restart redelivers every durable open task with a fresh attempt
+  PASS  all pre-restart attempt writes are rejected after cold recovery
+  PASS  second interrupted owner is reused after takeover
+  PASS  entire fan-out/fan-in graph reaches completion after restart
+  PASS  seven-way thundering herd produces exactly one owner
+  PASS  40 conflicting terminal writes cannot change the canonical result
+  PASS  message burst contains both injected fallbacks and live deliveries
+  PASS  all failed message fallbacks are redelivered and acknowledged exactly once
+  PASS  final state has no duplicate current capability ids
+  PASS  removed beta owns no unfinished or future task
+  PASS  no task is lost, duplicated, or left nonterminal
+  PASS  shutdown archives all 38 completed tasks after fault recovery
+  PASS  shutdown keeps all eight retired members catalog-visible for history
+
+all complex stress checks passed
+
+> @nanmicoder/dsh-agent-teams@0.1.16-rc.1 verify:web-routes <checkout>
+> node scripts/web-routes-verify.mjs
+
+PASS Web routes: real host authentication, bounded bodies, trusted origins, fail-closed startup, disposal and reload
+
+> @nanmicoder/dsh-agent-teams@0.1.16-rc.1 verify:release <checkout>
+> node --test scripts/release-metadata.test.mjs
+
+✔ stable latest requires the recommended host and bounded compatibility (1.971542ms)
+✔ alpha candidates use next and never replace latest (0.840417ms)
+✔ beta candidates use next and never replace latest (0.883416ms)
+✔ rc candidates use next and never replace latest (0.541959ms)
+✔ reject unsupported versions and unbounded peers (0.60925ms)
+✔ checked-in candidate has consistent dependency and release metadata (0.190917ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 45.655875
+
+> @nanmicoder/dsh-agent-teams@0.1.16-rc.1 verify:skill <checkout>
+> node scripts/sync-skill.mjs --check
+
+DSH skill mirrors are up to date: 10 skills, 116 files.
+
+> @nanmicoder/dsh-agent-teams@0.1.16-rc.1 verify:harness-contract <checkout>
+> node scripts/harness-compat-tdd.mjs && node scripts/lifecycle-verify.mjs --modern-harness && node scripts/member-failure-tdd.mjs --modern-harness
+
+✔ native SubagentRuntime keeps its receiver through FIFO delivery and retirement guard (2.939292ms)
+✔ modern queue and public messaging are both guarded, including nested HMR disposal (0.191375ms)
+✔ unsupported queue-only or send-only contract fails explicitly (0.170167ms)
+✔ legacy session history excludes its inherited prefix; modern uses ownEvents receiver (0.071459ms)
+✔ synchronous modern setup selects the first request, deduplicates events, and disposes for HMR (0.540834ms)
+✔ child disposal releases lifecycle contributions and permits a same-id resumed Agent (0.094083ms)
+✔ setup exception blocks request instead of being swallowed by session-start dispatch (0.148958ms)
+✔ a child inheriting another member descriptor does not acquire member selection or failure hooks (0.075417ms)
+✔ cold resume restores route and effort coherently (fallbackActive=false) (3.7835ms)
+✔ cold resume restores route and effort coherently (fallbackActive=true) (1.406917ms)
+✔ spawn explicitly passes reasoning effort, preserving persona and tool filters (0.328541ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 12.718916
+dsh-agent-teams lifecycle verification
+  PASS  slash command registers as /agent-teams
+  PASS  slash command advertises an input hint for the menu placeholder
+  PASS  configured profile registers a concise dedicated slash command
+  PASS  unsafe profile names do not generate ambiguous commands
+  PASS  bare /agent-teams reports usage instead of activating
+  PASS  argued /agent-teams queues one visible user turn
+  PASS  slash command preserves the exact submitted line as user-authored chat
+  PASS  preserved slash command still activates through the gesture boundary
+  PASS  activation directive names the protocol
+  PASS  profile command queues a visible profile-specific user turn
+  PASS  gesture recognizes a leading /agent-teams token
+  PASS  profile command gesture selects its configured profile and goal
+  PASS  bare profile command gesture asks for the goal
+  PASS  unknown profile command stays ordinary prose
+  PASS  bare gesture yields an empty goal
+  PASS  mid-sentence mention stays ordinary prose
+  PASS  non-user sources cannot forge the gesture
+  PASS  latest user gesture wins in a batch
+  PASS  slash --profile without a goal still activates
+  PASS  profile-only activation asks for the goal
+  PASS  captain-planning activation requires a staged user-reviewed graph
+  PASS  unknown slash profile reports error and does not followup
+  PASS  leading ordinary token is never treated as a profile
+  PASS  command getter sees HMR profile names
+  PASS  create(profile) returns profile members tasks and seed ids
+  PASS  create(profile) persists snapshot members and mapped dependencies
+  PASS  first-stage seed is assigned only to the configured member
+  PASS  first assignment includes team goal and protocol
+  PASS  failed upstream does not unlock the next configured stage
+  PASS  completed upstream dispatches the configured downstream assignee
+  PASS  downstream assignment includes dependency output and seed id
+  PASS  unread mailbox prevents a same-kick new assignment
+  PASS  status exposes profile snapshot and task seed ids
+  PASS  discarding a staged plan archives it without spawning or dispatching
+  PASS  discard aborts the active Captain turn and parks an authoritative no-recreate context
+  PASS  captain-planning create stages only the configured roster
+  PASS  staged roster and DAG are editable without spawning or dispatching
+  PASS  invalid staged plan batches fail atomically without a partial write
+  PASS  return-to-chat cancels the planning turn and asks one question without recreating the team
+  PASS  return-to-chat is idempotent while feedback is already pending
+  PASS  captain can revise the staged DAG and roster through one model-facing atomic tool
+  PASS  approval atomically spawns the final roster before dispatch
+  PASS  approved plan dispatches only after a spawned member becomes idle
+  PASS  captain halt cancels the approved graph and keeps the team
+  PASS  team halt cancels the captain turn while preserving queued user input
+  PASS  captain halt interrupts and drains graph members
+  PASS  halted team does not redispatch cancelled graph
+  PASS  halted create_task does not silently resume
+  PASS  explicit resume clears halt and keeps cancelled tasks cancelled
+  PASS  shutdown preserves cancelled task history in the archive
+  PASS  quality implementation without contract is rejected
+  PASS  illegal completed without acceptance evidence is rejected
+  PASS  review needs_revision cannot complete
+  PASS  needs_revision opens repair and next review
+  PASS  manually added members persist the global fallback for later activations
+  PASS  idle assigned member is claimed and woken automatically
+  PASS  captain cannot mint a claim capability for a member; use reassign_task
+  PASS  member observes the scheduler attempt idempotently
+  PASS  dependency gate stays pending before both branches complete
+  PASS  rate-limited idle owner does not enter an unbounded retry loop (#66)
+  PASS  disposed settled owner keeps its parked attempt across repeated scheduler kicks
+  PASS  idle assigned gamma is claimed for the recovery-failure fixture
+  PASS  failed unobserved recovery restores the original capability and later kicks do not recast it
+  PASS  restored capability remains usable after a failed recovery delivery
+  PASS  unobserved missing owner recovers once and repeated kicks do not rotate it again
+  PASS  captain message resumes a parked owner without rotating its attempt
+  PASS  captain cannot bypass the safe takeover protocol
+  PASS  reassignment quiesces recovered owner and creates a new attempt
+  PASS  old member cannot publish a late takeover result
+  PASS  resumed recovered member completes with its throttled capability
+  PASS  completing dependencies dispatches the downstream task
+  PASS  previously interrupted member is reused in a later round
+  PASS  a member cannot claim a second unfinished task
+  PASS  removing a member revokes and redispatches its unfinished task
+  PASS  removing a member preserves its catalog entry for transcript history
+  PASS  removing a member blocks direct followup before resume
+  PASS  removed member loses participant authorization
+  PASS  failed live message remains one unread durable fallback
+  PASS  status kick redelivers and acknowledges fallback exactly once
+  PASS  concurrent claims serialize to exactly one owner
+  PASS  terminal output is immutable against late overwrite
+  PASS  captain takeover owns a fresh attempt and rejects the old member
+  PASS  parallel captain takeovers allow exactly one active captain task
+  PASS  unfinished captain takeover returns to a member when the captain becomes idle
+  PASS  activity refines residency through the live Agent registry
+  PASS  team shutdown archives the complete durable record
+  PASS  archived activity keeps every member after shutdown
+  PASS  archived activity projects each member model onto assigned tasks
+  PASS  team shutdown keeps retired members catalog-visible for historical transcripts
+  PASS  team shutdown blocks storage-only member cold resume
+  PASS  team shutdown leaves unrelated continuable subagents untouched
+  PASS  team shutdown leaves unrelated continuable followup untouched
+  PASS  invalid roster approval rejects before any member session is created
+  PASS  same-name team can be recreated and archived again
+  PASS  request failure alone leaves the attempt open for Harness recovery
+  PASS  turn failure fails the open attempt, releases the member, and owns no retry
+  PASS  turn failure notifies the captain mailbox with the error code
+  PASS  settled member flushes the question without idle events or manual scheduler kicks
+
+all lifecycle checks passed
+✔ always retry keeps the owned task open and sends no false failure report (7.780375ms)
+✔ request handler delegates recovery and leaves exhausted requests open until final error (3.2185ms)
+✔ fallback recovers once and exhausted fallback still delegates without failing the task (2.072083ms)
+✔ aborted request does not fail a task or consume its fallback route (2.011625ms)
+✔ final failure notifies idle captain once and flushes without an idle event (15.868542ms)
+✔ final failure notifies running captain once and flushes without an idle event (14.101292ms)
+✔ report a final error immediately but do not dispatch while the driver is still running (26.909292ms)
+✔ unavailable captain keeps failure notification readable: {"captainOffline":true} (11.299667ms)
+✔ unavailable captain keeps failure notification readable: {"rejectDelivery":true} (13.973084ms)
+✔ a queued error cannot fail a newer attempt created before it gets the team lock (2.265833ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 102.448917
+
+> @nanmicoder/dsh-agent-teams@0.1.16-rc.1 verify:http-body <checkout>
+> node --test scripts/http-body.test.mjs
+
+✔ HTTP body reader returns 413 without losing the response or buffering the rest (31.173667ms)
+✔ aborted body rejects and removes its buffering listeners (0.44075ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 79.342208
+
+> @nanmicoder/dsh-agent-teams@0.1.16-rc.1 verify:compatibility <checkout>
+> node scripts/compatibility.mjs && node --test scripts/compatibility.test.mjs && node scripts/doctor.mjs
+
+Compatibility targets: 0.1.2-rc.1, 0.1.2-alpha.5, 0.1.2-alpha.2
+✔ policy rejects floating targets, duplicates, and alpha recommendation (0.571708ms)
+✔ doctor detects transitive cohort mixing even with an exact CLI version (2.464708ms)
+✔ doctor follows profile peers and rejects duplicate runtime identities (3.005917ms)
+✔ policy rejects missing or mixed development overrides (0.462208ms)
+✔ policy rejects removed host peers and range-qualified or conditional DSH overrides (1.412125ms)
+✔ doctor reports missing nonoptional Cordis peers and required plugin imports even with optional metadata (1.974042ms)
+✔ doctor detects peer-only drift and a mismatched installed plugin (2.771417ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 50.637792
+Harness: 0.1.2-rc.1 (<checkout>/node_modules/.pnpm/@deepseek-ai+dsh@0.1.2-rc.1_edaa42246475b67e334363481a205a53/node_modules/@deepseek-ai/dsh)
+DSH package identities checked: 214
+Dependency inspection passed.
+Checks files resolved from the supplied roots; does not identify the running process or prove plugin behavior.

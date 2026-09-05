@@ -1,0 +1,11 @@
+#!/bin/bash
+# Oracle solution: copy the reference plugin files over the matching relative paths under /app/fixture/.
+set -e
+cp "$(dirname "$0")/plugin/package.json" /app/fixture/package.json
+cp "$(dirname "$0")/plugin/cordis.patch.yml" /app/fixture/cordis.patch.yml
+cp "$(dirname "$0")/plugin/.dsh-plugin/index.js" /app/fixture/.dsh-plugin/index.js
+cp "$(dirname "$0")/plugin/.dsh-plugin/client.js" /app/fixture/.dsh-plugin/client.js
+# If the migration requires dropping legacy layout files, delete them here explicitly.
+# Leftover files that still look loadable to the host are a classic silent-failure trap;
+# which files must go is task-specific and documented in that task's SOLUTION.md.
+# rm -f /app/fixture/<legacy-file-that-must-go>

@@ -530,13 +530,36 @@
   white-space: nowrap;
 }
 
-.memberModel,
 .taskDetailModel {
   overflow: hidden;
   color: var(--dsw-alias-label-tertiary);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 9.5px;
   line-height: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Inline member model badge: compact neutral pill inside memberLine. Bounded
+   shrinkable width keeps long routes ellipsized in place, so the pill never
+   forces horizontal overflow in the normal 388px panel or compact viewport. */
+.memberModel {
+  display: inline-flex;
+  flex: 0 1 auto;
+  align-items: center;
+  min-width: 0;
+  max-width: 132px;
+  padding: 0 6px;
+  overflow: hidden;
+  box-sizing: border-box;
+  border: 1px solid var(--dsw-alias-line-normal);
+  border-radius: 999px;
+  background: var(--dsw-alias-bg-fill-neutral);
+  color: var(--dsw-alias-label-tertiary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 15px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }

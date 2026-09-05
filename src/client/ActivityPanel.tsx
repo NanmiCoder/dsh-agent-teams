@@ -640,6 +640,14 @@ function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscarded, on
                     <span className={css.memberLine}>
                       <span className={css.memberName}>{member.name}</span>
                       {member.role !== '' && <span className={css.memberRole}>{member.role}</span>}
+                      {/* Inline member model badge: compact visible label, full route in
+                          title/aria-label (accessible tooltip) and the data-member-model
+                          DOM probe; noninteractive span, no tab stop. */}
+                      {memberModel !== '' && (
+                        <span className={css.memberModel} role="img" data-member-model={memberModel} title={memberModel} aria-label={memberModel}>
+                          {compactModelLabel(memberModel)}
+                        </span>
+                      )}
                       <span className={css.memberState} data-activity={member.activity}>
                         <WorkGlyph active={member.activity === 'working'} />
                         {discarded
@@ -662,11 +670,6 @@ function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscarded, on
                       ))
                         ? t('member.status.settled')
                       : memberStatusText(member, team.tasks, t)}</span>
-                    {memberModel !== '' && (
-                      <span className={css.memberModel} data-member-model={memberModel}>
-                        {t('member.model', { model: memberModel })}
-                      </span>
-                    )}
                   </span>
                   <span className={css.memberCount}>{member.done}/{member.total}</span>
                 </button>

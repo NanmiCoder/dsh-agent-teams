@@ -432,6 +432,51 @@ check(
     && activityPanelCss.includes('.memberModel'),
   'the right-side card must show which model a running subtask is using',
 )
+// Member model badge contract (inline compact pill): the render path derives
+// one full member route and shows only its last segment visibly, while the
+// noninteractive span keeps the full route in title, aria-label, and the
+// data-member-model DOM probe. The badge must sit inside memberLine after the
+// role and before the member state; the old standalone third-line row is gone.
+const memberMapStart = activityPanelSource.indexOf('team.members.map((member) => {')
+const memberBadgeSection = activityPanelSource.slice(
+  memberMapStart,
+  activityPanelSource.indexOf('css.assignmentLine', memberMapStart),
+)
+check(
+  'member model badge renders compact text inline with full-route metadata',
+  memberBadgeSection.includes('compactModelLabel(memberModel)')
+    && memberBadgeSection.includes('<span className={css.memberModel}')
+    && memberBadgeSection.includes('data-member-model={memberModel}')
+    && memberBadgeSection.includes('title={memberModel}')
+    && memberBadgeSection.includes('aria-label={memberModel}')
+    && memberBadgeSection.includes('role="img"')
+    && memberBadgeSection.indexOf('css.memberRole') < memberBadgeSection.indexOf('css.memberModel')
+    && memberBadgeSection.indexOf('css.memberModel') < memberBadgeSection.indexOf('css.memberState'),
+  'the badge must be a noninteractive role=img span inside memberLine after role and before member state, carrying the full route in title/aria-label/data-member-model',
+)
+check(
+  'the old separate third-line member model span and locale key are removed',
+  !activityPanelSource.includes("t('member.model'")
+    && !localesSource.includes("'member.model'"),
+  'the previous standalone model row and its orphaned locale key must not remain',
+)
+const memberModelCssStart = activityPanelCss.indexOf('.memberModel {')
+const memberModelCssBlock = activityPanelCss.slice(
+  memberModelCssStart,
+  activityPanelCss.indexOf('}', memberModelCssStart) + 1,
+)
+check(
+  'member model badge is a compact neutral inline pill that truncates without overflowing',
+  memberModelCssBlock.includes('display: inline-flex')
+    && memberModelCssBlock.includes('border-radius: 999px')
+    && memberModelCssBlock.includes('background: var(--dsw-alias-bg-fill-neutral)')
+    && memberModelCssBlock.includes('max-width: 132px')
+    && memberModelCssBlock.includes('min-width: 0')
+    && memberModelCssBlock.includes('overflow: hidden')
+    && memberModelCssBlock.includes('text-overflow: ellipsis')
+    && memberModelCssBlock.includes('white-space: nowrap'),
+  'the .memberModel pill needs bounded shrinkable width, ellipsis, and neutral fill so long routes never overflow the panel',
+)
 check(
   'activity polling combines card demand with current-session cold discovery',
   activityPanelSource.includes('if (current === undefined) return')
@@ -790,6 +835,22 @@ check(
     && taskModelLabel({ assignee: 'analyst', model: 'openai/gpt-5.6-sol' }, []) === 'openai/gpt-5.6-sol'
     && taskModelLabel({ assignee: 'analyst' }, [{ name: 'analyst', provider: 'grok', model: 'grok-4.5' }]) === 'grok/grok-4.5'
     && taskModelLabel({ assignee: 'analyst' }, []) === '',
+)
+check(
+  'existing member route helpers retain expanded fallback regression coverage',
+  memberRouteLabel({ provider: 'openai', model: 'gpt-5.6-sol' }) === 'openai/gpt-5.6-sol'
+    && compactModelLabel('openai/gpt-5.6-sol') === 'gpt-5.6-sol'
+    && memberRouteLabel({ model: 'grok-4.6' }) === 'grok-4.6'
+    && compactModelLabel('grok-4.6') === 'grok-4.6'
+    && memberRouteLabel({}) === ''
+    && memberRouteLabel(undefined) === ''
+    && compactModelLabel('') === ''
+    && compactModelLabel('   ') === ''
+    && memberRouteLabel({ provider: ' openai ', model: ' gpt-5.6-sol ' }) === 'openai/gpt-5.6-sol'
+    && memberRouteLabel({ provider: ' ', model: ' gpt-5.6-sol ' }) === 'gpt-5.6-sol'
+    && compactModelLabel(' openai/gpt-5.6-sol ') === 'gpt-5.6-sol'
+    && memberRouteLabel({ provider: 'openai/org', model: 'gpt-5.6-sol' }) === 'openai/org/gpt-5.6-sol'
+    && compactModelLabel('openai/org/gpt-5.6-sol') === 'gpt-5.6-sol',
 )
 const panelBounds = { width: 1440, height: 900, anchorRight: 1440 }
 const dockedPanel = resolvePanelGeometry(DEFAULT_PANEL_LAYOUT, panelBounds)

@@ -30,7 +30,7 @@ Ask in natural language. The plugin provides the team protocol, eleven coordinat
 
 ## Releases
 
-This checkout prepares [v0.1.16-rc.1](./release-notes/v0.1.16-rc.1.md): a shared host adapter, exact compatibility matrix, real-host acceptance and release gates. The candidate is not published. See [GitHub Releases](https://github.com/NanmiCoder/dsh-agent-teams/releases) for published history.
+[v0.1.16-rc.1](./release-notes/v0.1.16-rc.1.md) is the release candidate for the npm `next` channel: a shared host adapter, exact compatibility matrix, real-host acceptance and release gates. Check [GitHub Releases](https://github.com/NanmiCoder/dsh-agent-teams/releases) for release availability and history.
 
 ## Why AgentTeams?
 
@@ -50,7 +50,7 @@ The conversation card and activity panel use Harness's official locale service. 
 ## Install and choose versions
 
 > [!IMPORTANT]
-> This branch prepares **0.1.16-rc.1**, an unpublished candidate. At the 2026-09-06 registry check, plugin `latest` was still 0.1.15, which explicitly targets Alpha.2. Check the actual running host and profile before updating either side.
+> **0.1.16-rc.1 is a prerelease on the `next` track.** Use the exact version below for the supported 0.1.2 hosts. Plugin 0.1.15 targets Alpha.2; do not use a mutable `latest` tag as a compatibility guarantee. Check the actual running host and profile before updating either side.
 
 | Harness host | Candidate track | Installation rule |
 | --- | --- | --- |
@@ -70,7 +70,13 @@ npm install --global @deepseek-ai/dsh@0.1.2-rc.1
 dsh --version
 ```
 
-**Until this candidate is published, do not install the existing plugin `@latest` expecting rc.1 compatibility.** Build from this checkout as below, or install the exact candidate version with `--save-exact` once its release is available. Restart the actual Harness process after changing either side and refresh the browser. Updating a global CLI does not replace an embedded Desktop core or another source checkout.
+Once the release is available, install the exact plugin version into the profile you actually use (`web` below):
+
+```sh
+dsh plugin --profile web add --save-exact @nanmicoder/dsh-agent-teams@0.1.16-rc.1
+```
+
+Restart the actual Harness process after changing either side and refresh the browser. Updating a global CLI does not replace an embedded Desktop core or another source checkout. For an unpublished checkout, use the source build below.
 
 An exact npm CLI version can still contain broad transitive dependencies. Preserve a verified lockfile and inspect the actual installation. Do not delete credentials or `.agent-teams` data to address a version mismatch.
 

@@ -30,7 +30,7 @@
 
 ## 版本更新
 
-本次准备 [v0.1.16-rc.1](./release-notes/v0.1.16-rc.1.md)：统一宿主兼容层、精确版本矩阵、真实宿主验收和发布门禁。候选尚未发布；已发布历史见 [GitHub Releases](https://github.com/NanmiCoder/dsh-agent-teams/releases)。
+[v0.1.16-rc.1](./release-notes/v0.1.16-rc.1.md) 是 npm `next` 渠道的发布候选：统一宿主兼容层、精确版本矩阵、真实宿主验收和发布门禁。发布状态与历史见 [GitHub Releases](https://github.com/NanmiCoder/dsh-agent-teams/releases)。
 
 ## 为什么需要 AgentTeams？
 
@@ -49,7 +49,7 @@
 ## 安装与版本选择
 
 > [!IMPORTANT]
-> 本分支准备的是 **0.1.16-rc.1 候选版**，不是已经发布的 npm 版本。2026-09-06 核验时，npm 的插件 `latest` 仍为 0.1.15，它只明确适配 Alpha.2。请先核对实际运行的宿主和 profile，不要只更新插件。
+> **0.1.16-rc.1 是 `next` 渠道的预发布版本。** 对当前支持的 0.1.2 宿主，请使用下方精确插件版本。0.1.15 面向 Alpha.2，不能把可变的 `latest` 标签当作兼容保证。请先核对实际运行的宿主和 profile，再更新两端。
 
 | Harness 宿主 | 本次候选的定位 | 使用原则 |
 | --- | --- | --- |
@@ -69,7 +69,13 @@ npm install --global @deepseek-ai/dsh@0.1.2-rc.1
 dsh --version
 ```
 
-**候选插件尚未发布时，不要把现有 `@latest` 当成 rc.1 兼容包安装。** 可以使用下方源码构建方式；待候选发布后，按其发布说明安装精确插件版本（并使用 `--save-exact`）。宿主或插件更新后，停止并重启实际运行的 Harness，再刷新浏览器。全局 CLI 升级不会更换 Desktop 内置核心，也不会更新另一个源码工作区。
+确认发行版本可用后，在实际使用的 profile 中安装精确插件版本（以下以 `web` 为例）：
+
+```sh
+dsh plugin --profile web add --save-exact @nanmicoder/dsh-agent-teams@0.1.16-rc.1
+```
+
+宿主或插件更新后，停止并重启实际运行的 Harness，再刷新浏览器。全局 CLI 升级不会更换 Desktop 内置核心，也不会更新另一个源码工作区。尚未发布的 checkout 可使用下方源码构建方式。
 
 npm 的精确 CLI 版本仍可能包含宽范围间接依赖。升级时保留已验证的锁文件，对实际安装路径运行诊断；不要通过删除凭据或 `.agent-teams` 来处理版本错配。
 

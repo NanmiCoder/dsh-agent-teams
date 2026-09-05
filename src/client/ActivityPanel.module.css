@@ -210,44 +210,81 @@
 
 .resizeHandle {
   position: absolute;
-  z-index: 1;
+  z-index: 5;
   touch-action: none;
+  pointer-events: auto;
 }
 
 .resizeHandle[data-resize-edge='left'] {
   top: 44px;
-  bottom: 8px;
+  bottom: 14px;
   left: 0;
-  width: 8px;
+  width: 14px;
   cursor: ew-resize;
 }
 
+.resizeHandle[data-resize-edge='left']::after {
+  position: absolute;
+  top: 50%;
+  left: 4px;
+  width: 3px;
+  height: 48px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--dsw-alias-label-tertiary) 42%, transparent);
+  content: '';
+  opacity: 0.45;
+  transform: translateY(-50%);
+  transition: background-color 120ms ease, opacity 120ms ease;
+}
+
 .resizeHandle[data-resize-edge='bottom'] {
-  right: 12px;
+  right: 20px;
   bottom: 0;
-  left: 12px;
-  height: 8px;
+  left: 20px;
+  height: 14px;
   cursor: ns-resize;
+}
+
+.resizeHandle[data-resize-edge='bottom']::after {
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  width: 48px;
+  height: 3px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--dsw-alias-label-tertiary) 42%, transparent);
+  content: '';
+  opacity: 0.45;
+  transform: translateX(-50%);
+  transition: background-color 120ms ease, opacity 120ms ease;
 }
 
 .resizeHandle[data-resize-edge='corner'] {
   right: 0;
   bottom: 0;
-  width: 18px;
-  height: 18px;
+  width: 28px;
+  height: 28px;
   cursor: nwse-resize;
 }
 
 .resizeHandle[data-resize-edge='corner']::after {
   position: absolute;
-  right: 4px;
-  bottom: 4px;
-  width: 7px;
-  height: 7px;
-  border-right: 1px solid var(--dsw-alias-label-tertiary);
-  border-bottom: 1px solid var(--dsw-alias-label-tertiary);
+  right: 6px;
+  bottom: 6px;
+  width: 10px;
+  height: 10px;
+  border-right: 2px solid var(--dsw-alias-label-tertiary);
+  border-bottom: 2px solid var(--dsw-alias-label-tertiary);
   content: '';
-  opacity: 0.52;
+  opacity: 0.58;
+  transition: border-color 120ms ease, opacity 120ms ease;
+}
+
+.resizeHandle:hover::after,
+.panel[data-resizing] .resizeHandle::after {
+  background-color: var(--dsw-alias-bg-fill-business);
+  border-color: var(--dsw-alias-bg-fill-business);
+  opacity: 0.95;
 }
 
 .teams {

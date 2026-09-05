@@ -390,6 +390,12 @@ check(
     && activityPanelSource.includes('data-height-mode=')
     && activityPanelSource.includes("height: autoHeight ? 'auto'")
     && activityPanelCss.includes('.resizeHandle')
+    && activityPanelCss.includes(".resizeHandle[data-resize-edge='left']::after")
+    && activityPanelCss.includes(".resizeHandle[data-resize-edge='bottom']::after")
+    && activityPanelCss.includes('.resizeHandle:hover::after')
+    && activityPanelCss.includes('pointer-events: auto')
+    && activityPanelCss.includes('width: 28px')
+    && activityPanelCss.includes('height: 28px')
     && activityPanelCss.includes('scrollbar-width: thin')
     && !activityPanelCss.includes('scrollbar-width: none'),
   'interactive panel controls must stay visible to browser verification',

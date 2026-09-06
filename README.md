@@ -30,7 +30,7 @@ Ask in natural language. The plugin provides the team protocol, eleven coordinat
 
 ## Releases
 
-[v0.1.16-rc.1](./release-notes/v0.1.16-rc.1.md) is published on npm `next`, with fixes for startup, member messaging and task collaboration across supported Harness RC / Alpha versions. Choose a version pair below.
+This checkout prepares [v0.1.16-rc.2](./release-notes/v0.1.16-rc.2.md) for npm `next`. It adds the public, read-only AgentTeams Bridge used by companion research and orchestration plugins. Check [GitHub Releases](https://github.com/NanmiCoder/dsh-agent-teams/releases) before installing it.
 
 ## Why AgentTeams?
 
@@ -49,13 +49,13 @@ The conversation card and activity panel use Harness's official locale service. 
 
 ## Install and choose versions
 
-**Recommended pair: DeepSeek Harness `0.1.2-rc.1` + AgentTeams `0.1.16-rc.1`. Both are still prereleases.**
+**Candidate pair: DeepSeek Harness `0.1.2-rc.1` + AgentTeams `0.1.16-rc.2`. Both are still prereleases.**
 
 | Use case | DeepSeek Harness | AgentTeams plugin |
 | --- | --- | --- |
-| **Recommended installation** | **`0.1.2-rc.1`** | **`0.1.16-rc.1`** |
-| Developer Alpha testing | `0.1.2-alpha.5` | `0.1.16-rc.1` |
-| Retaining an older Alpha | `0.1.2-alpha.2` | `0.1.16-rc.1` |
+| **Release candidate** | **`0.1.2-rc.1`** | **`0.1.16-rc.2`** |
+| Developer Alpha testing | `0.1.2-alpha.5` | `0.1.16-rc.2` |
+| Retaining an older Alpha | `0.1.2-alpha.2` | `0.1.16-rc.2` |
 
 ### 1. Install DeepSeek Harness
 
@@ -71,12 +71,12 @@ Skip this if you already run this version. Alpha is opt-in: select an exact Alph
 This installs into the `web` profile. Replace `web` with your actual profile name if different:
 
 ```sh
-dsh plugin --profile web add --save-exact @nanmicoder/dsh-agent-teams@0.1.16-rc.1
+dsh plugin --profile web add --save-exact @nanmicoder/dsh-agent-teams@0.1.16-rc.2
 ```
 
 **After installation, stop and restart Harness for that profile, then refresh the browser.**
 
-The fixed plugin `0.1.16-rc.1` is published on `next`; `latest` still points to `0.1.15`, which targets Alpha.2. Use the exact-version command above. Future plugin prereleases use `next`; only stable plugin releases that pass the full verification matrix may use `latest`.
+Until `0.1.16-rc.2` appears in GitHub Releases and npm, use this checkout rather than the exact-version command above. Plugin prereleases use `next`; `latest` remains on the stable plugin line and is not a compatibility guarantee for this candidate.
 
 > Desktop users must check the app's embedded Harness core; upgrading the global CLI does not upgrade it. For older `0.1.0-*` / `0.1.1-*` or unlisted hosts, keep a working pair and follow the [older-version and diagnostic guide](./docs/maintenance-workflow.md).
 

@@ -30,7 +30,7 @@
 
 ## 版本更新
 
-[v0.1.16-rc.1](./release-notes/v0.1.16-rc.1.md) 已发布到 npm `next`，修复 Harness RC / Alpha 的启动、成员消息与任务协作兼容问题。安装版本见下方配对表。
+本 checkout 正在准备发布到 npm `next` 的 [v0.1.16-rc.2](./release-notes/v0.1.16-rc.2.md)。该版本新增供研究与编排插件使用的公开只读 AgentTeams Bridge；安装前请先检查 [GitHub Releases](https://github.com/NanmiCoder/dsh-agent-teams/releases)。
 
 ## 为什么需要 AgentTeams？
 
@@ -48,13 +48,13 @@
 
 ## 安装与版本选择
 
-**推荐组合：DeepSeek Harness `0.1.2-rc.1` + AgentTeams `0.1.16-rc.1`。两者都仍是预发布版本。**
+**候选组合：DeepSeek Harness `0.1.2-rc.1` + AgentTeams `0.1.16-rc.2`。两者都仍是预发布版本。**
 
 | 使用场景 | DeepSeek Harness | AgentTeams 插件 |
 | --- | --- | --- |
-| **推荐安装** | **`0.1.2-rc.1`** | **`0.1.16-rc.1`** |
-| 开发者测试 Alpha | `0.1.2-alpha.5` | `0.1.16-rc.1` |
-| 保留旧 Alpha | `0.1.2-alpha.2` | `0.1.16-rc.1` |
+| **发布候选** | **`0.1.2-rc.1`** | **`0.1.16-rc.2`** |
+| 开发者测试 Alpha | `0.1.2-alpha.5` | `0.1.16-rc.2` |
+| 保留旧 Alpha | `0.1.2-alpha.2` | `0.1.16-rc.2` |
 
 ### 1. 安装 DeepSeek Harness
 
@@ -70,12 +70,12 @@ dsh --version
 以下安装到 `web` profile；使用其他 profile 时，将 `web` 换成实际名称：
 
 ```sh
-dsh plugin --profile web add --save-exact @nanmicoder/dsh-agent-teams@0.1.16-rc.1
+dsh plugin --profile web add --save-exact @nanmicoder/dsh-agent-teams@0.1.16-rc.2
 ```
 
 **安装后，停止并重新启动该 profile 的 Harness 进程，再刷新浏览器。**
 
-插件修复版 `0.1.16-rc.1` 已发布到 `next`；当前 `latest` 仍是面向 Alpha.2 的 `0.1.15`。请使用上面的精确版本命令。后续插件预发布版本继续进入 `next`，通过完整验证的正式版本才进入 `latest`。
+在 GitHub Releases 和 npm 出现 `0.1.16-rc.2` 之前，请使用当前 checkout，不要执行上面的精确版本安装命令。插件预发布版本进入 `next`；`latest` 保持正式插件渠道，也不能作为本候选的兼容保证。
 
 > Desktop 用户需核对应用内置的 Harness 核心；全局 CLI 升级不会升级桌面内核。旧 `0.1.0-*` / `0.1.1-*` 或其他未列出的宿主，请先保留已工作的组合，参考[旧版本与诊断指引](./docs/maintenance-workflow.md)。
 

@@ -19,7 +19,8 @@ import {
   subscribeActivitySnapshots,
 } from './activity-monitor.ts'
 import type { AgentTeamsCardData } from './agent-teams-card-definition.ts'
-import { LEAD_ART, memberArtUrl } from './artwork.ts'
+import { captainArtCandidates, memberArtCandidates } from './artwork.ts'
+import { ArtworkImage } from './ArtworkImage.tsx'
 import css from './AgentTeamsCard.module.css'
 
 /** Window event name the floater listens for to open itself. */
@@ -56,7 +57,7 @@ export function AgentTeamsCard({ node, openMember, sessionId, t }: AgentTeamsCar
   // `conversation.chat.node` is session-scoped, so its framework-owned id is
   // a stable owner even while another conversation becomes current.
   const owner = data.captainSessionId || sessionId
-  const { teams, archivedTeams } = useSyncExternalStore(
+  const { teams, archivedTeams, artwork } = useSyncExternalStore(
     subscribeActivitySnapshots,
     getActivitySnapshotsSnapshot,
   )
@@ -69,12 +70,21 @@ export function AgentTeamsCard({ node, openMember, sessionId, t }: AgentTeamsCar
     ...data,
     captainSessionId: snapshot?.captainSessionId ?? owner,
     teamName: snapshot?.name ?? data.teamName,
-    members: snapshot?.members.map((member) => ({ id: member.id, name: member.name, role: member.role })) ?? data.members,
+    ...snapshot?.captainAvatarUrl === undefined ? {} : { captainAvatarUrl: snapshot.captainAvatarUrl },
+    members: snapshot?.members.map((member) => ({
+      id: member.id,
+      name: member.name,
+      role: member.role,
+      ...member.avatarUrl === undefined ? {} : { avatarUrl: member.avatarUrl },
+    })) ?? data.members,
   }), [data, owner, snapshot])
   return (
     <section className={css.root} data-agent-teams-card data-team-id={resolved.teamId}>
       <header className={css.head}>
-        <img className={css.leadAvatar} src={LEAD_ART} alt="" aria-hidden />
+        <ArtworkImage
+          className={css.leadAvatar}
+          sources={captainArtCandidates(resolved.captainAvatarUrl, artwork.captainAvatarUrl)}
+        />
         <span className={css.teamName} title={resolved.teamName}>{resolved.teamName}</span>
         <span className={css.memberCount}>{t('card.memberCount', { count: resolved.members.length })}</span>
         <button
@@ -99,11 +109,11 @@ export function AgentTeamsCard({ node, openMember, sessionId, t }: AgentTeamsCar
               }}
               title={member.role === '' ? member.name : `${member.name} · ${member.role}`}
             >
-              {memberArtUrl(member.name, member.role) !== null ? (
-                <img className={css.memberArt} src={memberArtUrl(member.name, member.role) ?? ''} alt="" aria-hidden />
-              ) : (
-                <span className={css.memberInitial}>{member.name.trim().slice(0, 1).toUpperCase() || '?'}</span>
-              )}
+              <ArtworkImage
+                className={css.memberArt}
+                sources={memberArtCandidates(member.name, member.role, member.avatarUrl, artwork.roleAvatars)}
+                fallback={<span className={css.memberInitial}>{member.name.trim().slice(0, 1).toUpperCase() || '?'}</span>}
+              />
               <span className={css.memberName}>{member.name}</span>
             </button>
           ))}

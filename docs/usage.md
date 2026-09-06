@@ -80,9 +80,16 @@
     fallback:                     # 主模型不可用时的第二选择
       provider: openai
       model: gpt-5.5
+    captainAvatar: ''             # 默认队长头像；空值保留内置鲸鱼
+    roleAvatars:                  # 可选：角色分类 -> 图片 URL
+      researcher: https://example.com/researcher.webp
+      engineer: https://example.com/engineer.png
+    avatarMaxBytes: 2097152       # 上传/外链代理限制，最大 2 MiB
 ```
 
 最终优先级为：成员显式 `provider` + `model` / `model` → `memberModel` → 队长当前路由。成员沿用队长当前 provider/model 时继承队长的思考强度；provider 或 model 任一改变时自动使用目标模型的默认档。显式 `reasoning_effort`（目标模型支持的档位 id，或 `"default"`）优先，并在目标 provider/model 上创建前校验；不兼容时成员创建会明确失败。最终生效的 provider/model/思考强度会写入 `team.json`，供状态查询和成员冷恢复使用。
+
+头像优先级为：队长/成员的会话级自定义头像 → `roleAvatars` 分类覆盖 → 内置角色鲸鱼 → 首字母圆形。活动面板团队标题旁的“头像”入口可选择队长或成员，使用 HTTP(S) URL、上传 PNG/JPEG/WebP，或恢复默认。上传文件写入 `<stateDir>/<teamId>/avatars/`，`team.json` 只保存 URL 或 `managed:` 短引用；Host 会校验大小、MIME、文件签名和文件名，并通过同源代理输出远程图片以兼容 Electron CSP。
 
 ## 使用协议
 
@@ -154,6 +161,6 @@ profiles:
 
 ## 验证
 
-- 离线与生命周期：`pnpm build && pnpm typecheck && pnpm verify`。除基础检查外，还包含 8 成员、31 节点多层 DAG（运行中扩展至 38 任务）的故障矩阵：并发接管/移除、50 次迟到写入、4 个开放任务冷重启、7 路认领竞争、40 次终态覆盖、42 条消息突发和最终归档；组合验证 `dsh --profile agent-teams-check --dump-config`
+- 离线与生命周期：`pnpm build && pnpm typecheck && pnpm verify`。除基础检查外，还包含头像 MIME/签名/大小/路径穿越/CSRF/旧状态兼容测试，以及 8 成员、31 节点多层 DAG（运行中扩展至 38 任务）的故障矩阵：并发接管/移除、50 次迟到写入、4 个开放任务冷重启、7 路认领竞争、40 次终态覆盖、42 条消息突发和最终归档；组合验证 `dsh --profile agent-teams-check --dump-config`
 - 真实 e2e：`dsh plugin --profile headless add <path>` 后 `dsh --profile headless "用 AgentTeams …"`，核对 `.agent-teams/` 状态文件与会话日志事件流
 - GUI：独立实例 + ego-browser（详见 `verification-guide.md`）

@@ -670,6 +670,7 @@ function isTeamMember(value: unknown): value is TeamMember {
     && typeof value['name'] === 'string'
     && value['name'].trim() !== ''
     && isOptionalString(value['role'])
+    && isOptionalString(value['avatar'])
     && isOptionalString(value['provider'])
     && isOptionalString(value['model'])
     && isOptionalString(value['reasoningEffort'])
@@ -784,6 +785,7 @@ function isTeamState(value: unknown, expectedId: string): value is TeamState {
     && (value['profile'] === undefined || isTeamProfileSnapshot(value['profile']))
     && typeof value['captainSessionId'] === 'string'
     && value['captainSessionId'] !== ''
+    && isOptionalString(value['captainAvatar'])
     && isFiniteNumber(value['createdAt'])
     && Array.isArray(value['members'])
     && value['members'].every(isTeamMember)

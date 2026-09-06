@@ -38,6 +38,7 @@ import { collectArchivedTeamsActivity, collectTeamsActivity } from './snapshot.t
 import { findTeamByCaptain } from './state.ts'
 import { formatProfilesForPrompt, type TeamProfileConfig } from './profiles.ts'
 import { qualityPlanningPrompt } from './quality-gates.ts'
+import { createAvatarService, DEFAULT_AVATAR_MAX_BYTES } from './avatar.ts'
 
 import { authenticatedWebRoutes, readJsonRequest, RequestBodyError, type BrowserRequestGate, type WebRouteHost } from './web-routes.ts'
 
@@ -78,6 +79,12 @@ export interface Config {
    * Disable to keep the natural-language trigger as the only entry point.
    */
   slashCommand?: boolean
+  /** Default captain avatar URL. A per-team selection from the panel overrides it. */
+  captainAvatar?: string
+  /** Role/category keys to custom avatar URLs (for example `researcher`). */
+  roleAvatars?: Record<string, string>
+  /** Upload/proxy byte limit; may be reduced but never exceed 2 MiB. */
+  avatarMaxBytes?: number
 }
 
 // `z.object()` has an implicit `{}` default in Schemastery.  Fallback routes
@@ -128,6 +135,9 @@ export const Config: z<Config> = z.object({
   maxMembers: z.natural().min(1).default(8),
   promptSectionOrder: z.natural().default(117),
   slashCommand: z.boolean().default(true),
+  captainAvatar: z.string().default(''),
+  roleAvatars: z.dict(z.string()).default({}),
+  avatarMaxBytes: z.natural().min(1024).max(DEFAULT_AVATAR_MAX_BYTES).default(DEFAULT_AVATAR_MAX_BYTES),
 })
 
 /** The model-facing usage policy: when and how to drive AgentTeams. */
@@ -221,6 +231,13 @@ export function apply(ctx: Context, config: Config): void {
     const webServer = authenticatedWebRoutes(rawWebServer, () => ctx.get('connection') as BrowserRequestGate | undefined)
     webRegistered = true
 
+    const avatarService = createAvatarService(ctx, workspaceRegistry, {
+      stateDir: resolved.stateDir,
+      captainAvatar: config.captainAvatar ?? '',
+      roleAvatars: config.roleAvatars ?? {},
+      maxUploadBytes: config.avatarMaxBytes ?? DEFAULT_AVATAR_MAX_BYTES,
+    })
+
     // Activity panel data route: the browser floater polls this for team
     // snapshots (disk truth + live subagent activity). Mirrors the Claude
     // Code desktop watcher's server-side snapshot pattern.
@@ -235,9 +252,12 @@ export function apply(ctx: Context, config: Config): void {
       }))
       // ?archived=1 serves teams moved to archive/ (post-delete review).
       const snapshots = url.searchParams.get('archived') === '1'
-        ? await collectArchivedTeamsActivity(ctx, roots)
-        : await collectTeamsActivity(ctx, roots)
-      const body = JSON.stringify({ teams: snapshots })
+        ? await collectArchivedTeamsActivity(ctx, roots, { avatarUrl: avatarService.publicUrl })
+        : await collectTeamsActivity(ctx, roots, {
+            avatarUrl: avatarService.publicUrl,
+            avatarEditToken: avatarService.editToken,
+          })
+      const body = JSON.stringify({ teams: snapshots, artwork: avatarService.artwork })
       res.writeHead(200, {
         'content-type': 'application/json; charset=utf-8',
         'cache-control': 'no-store',
@@ -471,6 +491,15 @@ export function apply(ctx: Context, config: Config): void {
       }
       },
     }), 'agent-teams: artwork route')
+
+    // Custom avatars use separate exact routes: one CSRF-protected mutation
+    // endpoint, one allowlisted managed-file reader, and one bounded remote
+    // proxy for Electron CSP. The packaged ART_ALLOWLIST route above remains
+    // unchanged and cannot be bypassed by these dynamic sources.
+    ctx.effect(() => {
+      const disposers = avatarService.register(webServer)
+      return () => { for (const dispose of disposers.reverse()) dispose() }
+    }, 'agent-teams: custom avatar routes')
   }
 
   registerWebSurface()

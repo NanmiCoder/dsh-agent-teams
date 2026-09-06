@@ -22,11 +22,13 @@ import z from '@deepseek-ai/schemastery'
 // Declaration merge only: makes ctx.llm, ctx.subagents and ctx.systemPrompt visible.
 import type {} from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-subagent'
+import type { IncomingMessage } from 'node:http'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import type { WorkspaceRegistry } from '@deepseek-ai/dsh-workspace'
 import {
   haltTeamWork,
   registerAgentTeamsTools,
+  waitForMemberIdle,
   type StagedPlanMutation,
   type ToolsConfig,
 } from './tools.ts'
@@ -34,12 +36,44 @@ import { installAgentTeamsGestureBoundary, registerAgentTeamsCommand } from './c
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { collectArchivedTeamsActivity, collectTeamsActivity } from './snapshot.ts'
-import { findTeamByCaptain } from './state.ts'
+import { randomBytes, timingSafeEqual } from 'node:crypto'
+import { collectArchivedTeamsActivity, collectPurgedTeams, collectTeamsActivity } from './snapshot.ts'
+import {
+  archiveTeamDir, clearPurgedTeam, findTeamByCaptain, invalidateTaskAttempt, listArchivedTeamIds, readArchivedTeam, readTeam, recordPurgedTeam,
+  readRetiredMemberIds, recordRetiredMemberIds, removeTeamDir, unrecordRetiredMemberIds, withTeamLock, writeTeam,
+} from './state.ts'
 import { formatProfilesForPrompt, type TeamProfileConfig } from './profiles.ts'
 import { qualityPlanningPrompt } from './quality-gates.ts'
+import { interruptMember } from './members.ts'
 
 import { authenticatedWebRoutes, readJsonRequest, RequestBodyError, type BrowserRequestGate, type WebRouteHost } from './web-routes.ts'
+
+function teamLockKey(stateRoot: string, teamId: string): string {
+  return `team:${stateRoot}:${teamId}`
+}
+
+async function readJsonBody(req: IncomingMessage): Promise<Record<string, unknown>> {
+  const chunks: Buffer[] = []
+  let size = 0
+  for await (const chunk of req) {
+    const data = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
+    size += data.length
+    if (size > 16_384) throw new Error('request body is too large')
+    chunks.push(data)
+  }
+  const parsed: unknown = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}')
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) throw new Error('invalid JSON body')
+  return parsed as Record<string, unknown>
+}
+
+function safeTokenEqual(actual: string, expected: string): boolean {
+  const left = Buffer.from(actual); const right = Buffer.from(expected)
+  return left.length === right.length && timingSafeEqual(left, right)
+}
+
+function isLoopback(address: string | undefined): boolean {
+  return address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1'
+}
 
 /** Web-server service key candidates, newest first. */
 const WEB_SERVER_KEYS = ['webServer', 'httpServer'] as const
@@ -220,6 +254,7 @@ export function apply(ctx: Context, config: Config): void {
     if (rawWebServer === undefined || workspaceRegistry === undefined) return
     const webServer = authenticatedWebRoutes(rawWebServer, () => ctx.get('connection') as BrowserRequestGate | undefined)
     webRegistered = true
+    const actionToken = randomBytes(32).toString('base64url')
 
     // Activity panel data route: the browser floater polls this for team
     // snapshots (disk truth + live subagent activity). Mirrors the Claude
@@ -237,7 +272,7 @@ export function apply(ctx: Context, config: Config): void {
       const snapshots = url.searchParams.get('archived') === '1'
         ? await collectArchivedTeamsActivity(ctx, roots)
         : await collectTeamsActivity(ctx, roots)
-      const body = JSON.stringify({ teams: snapshots })
+      const body = JSON.stringify({ teams: snapshots, purgedTeams: await collectPurgedTeams(roots), actionToken })
       res.writeHead(200, {
         'content-type': 'application/json; charset=utf-8',
         'cache-control': 'no-store',
@@ -424,6 +459,82 @@ export function apply(ctx: Context, config: Config): void {
         }
       },
     }), 'agent-teams: plan route')
+
+    ctx.effect(() => webServer.register({
+      kind: 'exact',
+      path: '/plugins/dsh-agent-teams/team-action',
+      handler: async (req, res) => {
+        try {
+          if (req.method !== 'POST') { res.writeHead(405, { allow: 'POST' }); res.end(); return }
+          if (!isLoopback(req.socket.remoteAddress)) throw new Error('team actions are restricted to loopback clients')
+          const origin = req.headers.origin
+          const host = req.headers.host
+          if (typeof origin !== 'string' || typeof host !== 'string' || new URL(origin).host !== host) throw new Error('same-origin request required')
+          if (!(req.headers['content-type'] ?? '').toLowerCase().startsWith('application/json')) throw new Error('application/json is required')
+          const suppliedToken = req.headers['x-agent-teams-action-token']
+          if (typeof suppliedToken !== 'string' || !safeTokenEqual(suppliedToken, actionToken)) throw new Error('invalid action capability')
+          const body = await readJsonBody(req)
+          const { action, teamId, generationId, captainSessionId, workspace: workspacePath } = body
+          if (typeof action !== 'string' || typeof teamId !== 'string' || typeof generationId !== 'string'
+            || typeof captainSessionId !== 'string' || typeof workspacePath !== 'string') {
+            throw new Error('action, workspace, captainSessionId, teamId and generationId are required')
+          }
+          const candidates = workspaceRegistry.list().filter((entry) => entry.title === workspacePath)
+          if (candidates.length !== 1) throw new Error('workspace is not uniquely registered')
+          const workspace = candidates[0]!
+          const stateRoot = join(workspace.path, resolved.stateDir)
+          await withTeamLock(teamLockKey(stateRoot, teamId), async () => {
+            if (action === 'archive') {
+              const team = await readTeam(stateRoot, teamId)
+              if (team === undefined) throw new Error('active team was not found')
+              if (team.captainSessionId !== captainSessionId || String(team.createdAt) !== generationId) throw new Error('team ownership or generation mismatch')
+              const captain = ctx.agents.get(captainSessionId as import('@deepseek-ai/dsh-session').SessionId)
+              if (captain === undefined) throw new Error('captain session is not currently active')
+              const memberIds = team.members.map((member) => member.id).filter(Boolean)
+              const alreadyRetired = await readRetiredMemberIds(stateRoot)
+              const newlyRetired = memberIds.filter((id) => !alreadyRetired.has(id))
+              const original = structuredClone(team)
+              for (const member of team.members) {
+                member.status = 'removed'
+                for (const task of team.tasks) {
+                  if (task.assignee === member.name && task.status !== 'completed') invalidateTaskAttempt(task)
+                }
+              }
+              await writeTeam(stateRoot, team)
+              try { await recordRetiredMemberIds(stateRoot, newlyRetired) } catch (error) {
+                await writeTeam(stateRoot, original)
+                throw error
+              }
+              try { await archiveTeamDir(stateRoot, teamId) } catch (error) {
+                await unrecordRetiredMemberIds(stateRoot, newlyRetired)
+                await writeTeam(stateRoot, original)
+                throw error
+              }
+              for (const id of memberIds) interruptMember(ctx, captain, id)
+              await Promise.allSettled(team.members.map((member) => waitForMemberIdle(ctx, member, AbortSignal.timeout(15_000))))
+            } else if (action === 'purge') {
+              if (await readTeam(stateRoot, teamId) !== undefined) throw new Error('active teams cannot be purged')
+              const archivedIds = await listArchivedTeamIds(stateRoot)
+              if (!archivedIds.includes(teamId)) throw new Error('archived team was not found in directory listing')
+              const team = await readArchivedTeam(stateRoot, teamId)
+              if (team === undefined) throw new Error('archived team was not found')
+              if (team.captainSessionId !== captainSessionId || String(team.createdAt) !== generationId) throw new Error('team ownership or generation mismatch')
+              const identity = { captainSessionId, teamId, generationId }
+              await recordPurgedTeam(stateRoot, identity)
+              try { await removeTeamDir(join(stateRoot, 'archive'), teamId) } catch (error) {
+                await clearPurgedTeam(stateRoot, identity)
+                throw error
+              }
+            } else throw new Error('unsupported team action')
+          })
+          res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
+          res.end(JSON.stringify({ ok: true }))
+        } catch (error: unknown) {
+          res.writeHead(400, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
+          res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }))
+        }
+      },
+    }), 'agent-teams: team action route')
 
   // Whale mascot artwork: serve the packaged V2 role/action images to the
   // activity panel. An explicit allowlist guards the route (no path

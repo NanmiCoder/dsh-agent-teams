@@ -292,7 +292,7 @@ function captainOpenTask(team: TeamState, exceptTaskId?: string): TeamTask | und
     && !TERMINAL_TASK_STATUSES.includes(task.status))
 }
 
-async function waitForMemberIdle(ctx: Context, member: TeamMember, signal: AbortSignal): Promise<void> {
+export async function waitForMemberIdle(ctx: Context, member: TeamMember, signal: AbortSignal): Promise<void> {
   if (member.id === '') return
   const live = ctx.agents.get(member.id as SessionId)
   if (live === undefined) return
@@ -693,6 +693,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         properties: {
           team_id: { type: 'string', required: true },
           team_name: { type: 'string', required: true },
+          generation_id: { type: 'string', required: true },
           state_dir: { type: 'string', required: true },
           phase: { type: 'string', required: true },
           profile: { type: 'string' },
@@ -704,8 +705,8 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
       render: (args, value) => [{
         type: 'text',
         text: value.phase === 'staged'
-          ? `Team "${value.team_name}" plan created under ${value.state_dir}. It is staged: finish the roster and DAG, then wait for the user to edit and approve it. Do not start or approve it yourself.`
-          : `Team "${value.team_name}" created (id ${value.team_id}) under ${value.state_dir}. You are the captain.`,
+          ? `Team "${value.team_name}" plan created (id ${value.team_id}, generation ${value.generation_id}) under ${value.state_dir}. It is staged: finish the roster and DAG, then wait for the user to edit and approve it. Do not start or approve it yourself.`
+          : `Team "${value.team_name}" created (id ${value.team_id}, generation ${value.generation_id}) under ${value.state_dir}. You are the captain.`,
       }],
     },
     async execute(args, exec) {
@@ -804,6 +805,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         return {
           team_id: snapshot.id,
           team_name: snapshot.name,
+          generation_id: String(snapshot.createdAt),
           state_dir: join(stateRoot, snapshot.id),
           phase: snapshot.phase ?? 'running',
         }
@@ -811,6 +813,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
       return {
         team_id: snapshot.id,
         team_name: snapshot.name,
+        generation_id: String(snapshot.createdAt),
         state_dir: join(stateRoot, snapshot.id),
         phase: snapshot.phase ?? 'running',
         profile: snapshot.profile.name,

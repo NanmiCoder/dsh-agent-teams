@@ -13,9 +13,10 @@ import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { memberActivity } from './members.ts'
 import {
-  CAPTAIN_KEY, listArchivedTeamIds, readArchivedTeam, readUnreadMailbox, readTeam,
+  CAPTAIN_KEY, listArchivedTeamIds, readArchivedTeam, readPurgedTeams, readUnreadMailbox, readTeam,
   taskDepthsById, taskVisualState,
 } from './state.ts'
+import type { PurgedTeamIdentity } from './state.ts'
 import type { MemberStatus, TeamState, TeamTask } from './types.ts'
 
 /** Visual task state for the activity panel. */
@@ -65,6 +66,7 @@ export interface TeamActivityMessage {
 export interface TeamActivitySnapshot {
   readonly workspace: string
   readonly teamId: string
+  readonly generationId: string
   readonly name: string
   readonly description?: string
   readonly captainSessionId: string
@@ -166,6 +168,7 @@ export async function assembleTeamSnapshot(
   return {
     workspace,
     teamId: state.id,
+    generationId: String(state.createdAt),
     name: state.name,
     ...state.description !== undefined ? { description: state.description } : {},
     captainSessionId: state.captainSessionId,
@@ -264,4 +267,12 @@ export async function collectArchivedTeamsActivity(
     }
   }
   return snapshots
+}
+
+export async function collectPurgedTeams(
+  roots: readonly { workspace: string; stateRoot: string }[],
+): Promise<PurgedTeamIdentity[]> {
+  const result: PurgedTeamIdentity[] = []
+  for (const root of roots) result.push(...await readPurgedTeams(root.stateRoot))
+  return result
 }

@@ -493,6 +493,23 @@ check(
     && !agentTeamsCardSource.includes('fetch('),
   'the global panel must recover cardless sessions without duplicate card pollers',
 )
+check(
+  'activity panel exposes archive, hide, restore, and purge controls',
+  activityPanelSource.includes("t('team.archive')")
+    && activityPanelSource.includes("t('archive.hide')")
+    && activityPanelSource.includes("t('archive.restore')")
+    && activityPanelSource.includes("t('archive.purge')")
+    && hostSource.includes("path: '/plugins/dsh-agent-teams/team-action'")
+    && hostSource.includes("action === 'archive'")
+    && hostSource.includes("action === 'purge'"),
+)
+check(
+  'historic controls wrap below the summary without horizontal panel overflow',
+  activityPanelSource.includes('className={css.teamSummary}')
+    && activityPanelSource.includes('className={css.teamActionRow}')
+    && activityPanelCss.includes('.teamActions { display: flex; flex-wrap: wrap;')
+    && activityPanelCss.includes('overflow-x: hidden'),
+)
 
 console.log('2/8 pure rules')
 check("sanitizeKey('My Team!') -> 'my-team'", sanitizeKey('My Team!') === 'my-team')
@@ -730,6 +747,52 @@ try {
   check('archive keeps team.json readable', (await readArchivedTeam(stateRoot, archiveTeam.id))?.id === archiveTeam.id)
   check('archive lists the team id', (await listArchivedTeamIds(stateRoot)).includes(archiveTeam.id))
   check('archive dir skips live readTeam', await readTeam(stateRoot, 'archive') === undefined)
+
+  // Verification of archive rollback & retired member ids rollback
+  const rollbackTeam = {
+    ...team,
+    id: sanitizeKey('Rollback Team'),
+    members: [{ id: 'subagent-rollback-1', name: 'worker', status: 'idle', role: 'test', provider: 'p', model: 'm', joinedAt: Date.now() }],
+  }
+  await createTeamDir(stateRoot, rollbackTeam)
+  const { readRetiredMemberIds, recordRetiredMemberIds, unrecordRetiredMemberIds } = await import('../lib/state.js')
+  const initialRetired = await readRetiredMemberIds(stateRoot)
+  const newlyRetired = ['subagent-rollback-1']
+  await recordRetiredMemberIds(stateRoot, newlyRetired)
+  check('newly retired members recorded before archive', (await readRetiredMemberIds(stateRoot)).has('subagent-rollback-1'))
+  // Simulate an archive failure and exercise rollback compensation
+  await unrecordRetiredMemberIds(stateRoot, newlyRetired)
+  const rolledBackRetired = await readRetiredMemberIds(stateRoot)
+  check('archive failure rollback unrecords retired members', !rolledBackRetired.has('subagent-rollback-1') && rolledBackRetired.size === initialRetired.size)
+  await removeTeamDir(stateRoot, rollbackTeam.id)
+
+  // Verification of generation isolation for same-name teams
+  const genTeam1 = { ...team, id: sanitizeKey('Gen Team'), createdAt: 1000 }
+  const genTeam2 = { ...team, id: sanitizeKey('Gen Team'), createdAt: 2000 }
+  await createTeamDir(stateRoot, genTeam1)
+  const { assembleTeamSnapshot } = await import('../lib/snapshot.js')
+  const dummyCtx = { agents: new Map(), logger: { warn: () => {} } }
+  const genSnapshot1 = await assembleTeamSnapshot(dummyCtx, stateRoot, '/workspace', genTeam1, { historic: true })
+  await archiveTeamDir(stateRoot, genTeam1.id)
+  await createTeamDir(stateRoot, genTeam2)
+  const genSnapshot2 = await assembleTeamSnapshot(dummyCtx, stateRoot, '/workspace', genTeam2, { historic: true })
+  check('same-name different generation teams have isolated generationId snapshots',
+    genSnapshot1.generationId === '1000'
+      && genSnapshot2.generationId === '2000'
+      && genSnapshot1.generationId !== genSnapshot2.generationId)
+  await removeTeamDir(stateRoot, genTeam2.id)
+
+  // Verification of purge restart persistence
+  const { recordPurgedTeam, readPurgedTeams, clearPurgedTeam } = await import('../lib/state.js')
+  const purgeIdentity = { captainSessionId: 'sess-captain', teamId: 'purged-target', generationId: '9999' }
+  await recordPurgedTeam(stateRoot, purgeIdentity)
+  const purgedBefore = await readPurgedTeams(stateRoot)
+  check('purge records persistent identity', purgedBefore.some(e => e.teamId === 'purged-target' && e.generationId === '9999'))
+  // Read back anew (simulating service restart reading from disk)
+  const purgedAfterRestart = await readPurgedTeams(stateRoot)
+  check('purge identity survives restart read from disk', purgedAfterRestart.some(e => e.teamId === 'purged-target' && e.generationId === '9999'))
+  await clearPurgedTeam(stateRoot, purgeIdentity)
+  check('purge identity can be cleared', (await readPurgedTeams(stateRoot)).every(e => e.teamId !== 'purged-target'))
 } finally {
   await rm(stateRoot, { recursive: true, force: true })
 }

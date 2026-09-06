@@ -25,6 +25,7 @@ import type {} from '@deepseek-ai/dsh-session/types'
 /** Final keyed Chat payload for the team summary card. */
 export interface AgentTeamsCardData {
   readonly teamId: string
+  readonly generationId: string
   /** The captain session that owns this team (panel follows it). */
   readonly captainSessionId: string
   readonly teamName: string
@@ -47,6 +48,7 @@ export interface AgentTeamsNodeState {
   readonly teamId: string
   readonly name: string
   readonly accepted: boolean
+  readonly generationId: string
 }
 
 /** Parse the only create-call fields the historic card owns. */
@@ -86,14 +88,20 @@ export const agentTeamsCardDefinition: ConversationNodeDefinition<AgentTeamsNode
     }
     const parsed = parseAgentTeamsCreateArgs(match.event.data.arguments)
     if (parsed === undefined) throw new Error('agent-teams card start requires valid create arguments')
-    return { ...parsed, accepted: false }
+    return { ...parsed, accepted: false, generationId: '' }
   },
   update: (context, match) => {
     if (match.event.type !== 'tool/result') return context.state
     const failed = match.event.data.error !== undefined
       || match.event.data.message.content.some((block) => block.type === 'tool-result' && block.isError === true)
     if (failed) return context.state
-    return { ...context.state, accepted: true }
+    // Extract generation id materialized by agent_teams_create render text.
+    // Note: The format is coupled with render output in src/tools.ts (`generation ${value.generation_id}`).
+    const text = match.event.data.message.content
+      .flatMap((block) => block.type === 'tool-result' ? block.content : [])
+      .find((block) => block.type === 'text')?.text ?? ''
+    const generationId = text.match(/\bgeneration ([^)\s]+)/u)?.[1] ?? ''
+    return { ...context.state, accepted: true, generationId }
   },
   buildViewNode: (context): ChatConversationViewNode | null => {
     if (context.start === undefined) return null
@@ -109,6 +117,7 @@ export const agentTeamsCardDefinition: ConversationNodeDefinition<AgentTeamsNode
       visibility: 'visible',
       data: {
         teamId: state.teamId,
+        generationId: state.generationId,
         captainSessionId: '',
         teamName: state.name,
         members: [],

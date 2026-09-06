@@ -110,17 +110,30 @@ export type AvatarPinnedRequester = (
   pinned: { readonly address: string; readonly family: 4 | 6 },
 ) => Promise<IncomingMessage>
 
-const PRIVATE_ADDRESSES = new BlockList()
+const NON_PUBLIC_ADDRESSES = new BlockList()
 for (const [network, prefix] of [
   ['0.0.0.0', 8], ['10.0.0.0', 8], ['100.64.0.0', 10], ['127.0.0.0', 8],
   ['169.254.0.0', 16], ['172.16.0.0', 12], ['192.0.0.0', 24], ['192.0.2.0', 24],
+  ['192.88.99.0', 24],
   ['192.168.0.0', 16], ['198.18.0.0', 15], ['198.51.100.0', 24], ['203.0.113.0', 24],
   ['224.0.0.0', 4], ['240.0.0.0', 4],
-] as const) PRIVATE_ADDRESSES.addSubnet(network, prefix, 'ipv4')
+] as const) NON_PUBLIC_ADDRESSES.addSubnet(network, prefix, 'ipv4')
 for (const [network, prefix] of [
-  ['::', 128], ['::1', 128], ['fc00::', 7], ['fe80::', 10], ['ff00::', 8],
-  ['2001:db8::', 32],
-] as const) PRIVATE_ADDRESSES.addSubnet(network, prefix, 'ipv6')
+  // IANA IPv6 Special-Purpose ranges that are not globally reachable. The
+  // broad 2001::/23 reservation has explicit public exceptions below.
+  ['::', 96], ['64:ff9b:1::', 48], ['100::', 64], ['100:0:0:1::', 64],
+  ['2001::', 23], ['2001:db8::', 32], ['2002::', 16], ['3fff::', 20], ['5f00::', 16],
+  ['fc00::', 7], ['fec0::', 10], ['fe80::', 10], ['ff00::', 8],
+] as const) NON_PUBLIC_ADDRESSES.addSubnet(network, prefix, 'ipv6')
+
+const PUBLIC_SPECIAL_ADDRESSES = new BlockList()
+for (const address of ['192.0.0.9', '192.0.0.10'] as const) {
+  PUBLIC_SPECIAL_ADDRESSES.addAddress(address, 'ipv4')
+}
+for (const [network, prefix] of [
+  ['2001:1::1', 128], ['2001:1::2', 128], ['2001:1::3', 128],
+  ['2001:3::', 32], ['2001:4:112::', 48], ['2001:20::', 28], ['2001:30::', 28],
+] as const) PUBLIC_SPECIAL_ADDRESSES.addSubnet(network, prefix, 'ipv6')
 
 /** Parse and canonicalize one user-provided remote avatar URL. */
 export function normalizeRemoteAvatarUrl(input: string): string {
@@ -282,14 +295,35 @@ function contentTypeForFilename(filename: string): string {
   return 'image/webp'
 }
 
-/** Reject non-IP and non-public IPv4/IPv6 destinations, including mapped IPv4. */
+function isNonPublicIpv4(address: string): boolean {
+  return !PUBLIC_SPECIAL_ADDRESSES.check(address, 'ipv4')
+    && NON_PUBLIC_ADDRESSES.check(address, 'ipv4')
+}
+
+/** Return the IPv4 payload of the globally routed well-known NAT64 prefix. */
+function wellKnownNat64Ipv4(address: string): string | undefined {
+  const prefix = '64:ff9b::'
+  if (!address.startsWith(prefix)) return undefined
+  const suffix = address.slice(prefix.length)
+  const words = suffix === '' ? [] : suffix.split(':')
+  if (words.length > 2 || words.some((word) => !/^[0-9a-f]{1,4}$/u.test(word))) return undefined
+  const high = Number.parseInt(words.length === 2 ? words[0]! : '0', 16)
+  const low = Number.parseInt(words.at(-1) ?? '0', 16)
+  return `${high >>> 8}.${high & 0xff}.${low >>> 8}.${low & 0xff}`
+}
+
+/** Reject non-IP and non-public IPv4/IPv6 destinations, including embedded IPv4. */
 export function isPrivateAddress(address: string): boolean {
   const family = isIP(address)
-  if (family === 4) return PRIVATE_ADDRESSES.check(address, 'ipv4')
+  if (family === 4) return isNonPublicIpv4(address)
   if (family === 6) {
     const normalized = SocketAddress.parse(`[${address}]:0`)?.address.toLowerCase() ?? address.toLowerCase()
     const mapped = normalized.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/u)?.[1]
-    return mapped !== undefined ? PRIVATE_ADDRESSES.check(mapped, 'ipv4') : PRIVATE_ADDRESSES.check(address, 'ipv6')
+    if (mapped !== undefined) return isNonPublicIpv4(mapped)
+    const translated = wellKnownNat64Ipv4(normalized)
+    if (translated !== undefined) return isNonPublicIpv4(translated)
+    return !PUBLIC_SPECIAL_ADDRESSES.check(normalized, 'ipv6')
+      && NON_PUBLIC_ADDRESSES.check(normalized, 'ipv6')
   }
   return true
 }

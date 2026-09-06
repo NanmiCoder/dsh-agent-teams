@@ -85,15 +85,26 @@ check('credential-bearing URL is rejected', rejectsAvatar(() => normalizeRemoteA
 
 check('private IPv4 ranges are rejected', [
   '0.0.0.0', '10.0.0.1', '100.64.0.1', '127.0.0.1', '169.254.1.1', '172.16.0.1', '192.168.1.1',
+  '192.88.99.1',
 ].every(isPrivateAddress))
-check('public IPv4 addresses remain eligible', !isPrivateAddress('93.184.216.34'))
+check('public IPv4 addresses and IANA anycast exceptions remain eligible', [
+  '93.184.216.34', '192.0.0.9', '192.0.0.10',
+].every((address) => !isPrivateAddress(address)))
 check('private IPv6 ranges are rejected', [
-  '::', '::1', 'fc00::1', 'fe80::1', 'ff02::1', '2001:db8::1',
+  '::', '::1', '::192.168.1.1', '64:ff9b:1::7f00:1', '100::1', '100:0:0:1::1',
+  '2001:2::1', '2001:10::1', '2001:db8::1', '2002::1', '3fff::1', '5f00::1',
+  'fc00::1', 'fec0::1', 'fe80::1', 'ff02::1',
 ].every(isPrivateAddress))
 check('IPv4-mapped IPv6 cannot bypass private IPv4 validation', [
   '::ffff:127.0.0.1', '::ffff:7f00:1', '0:0:0:0:0:ffff:7f00:1',
 ].every(isPrivateAddress))
-check('public IPv6 addresses remain eligible', !isPrivateAddress('2606:4700:4700::1111'))
+check('well-known NAT64 cannot translate to a private IPv4 destination', [
+  '64:ff9b::127.0.0.1', '64:ff9b::7f00:1', '64:ff9b::192.168.1.1',
+].every(isPrivateAddress))
+check('public IPv6 and IANA special-purpose exceptions remain eligible', [
+  '2606:4700:4700::1111', '64:ff9b::5db8:d822', '2001:1::1', '2001:3::1',
+  '2001:4:112::1', '2001:20::1', '2001:30::1',
+].every((address) => !isPrivateAddress(address)))
 
 let literalDnsCalls = 0
 const rejectUnexpectedDns = async () => {
@@ -108,6 +119,19 @@ check('private IPv6 literals are rejected before any request', await rejectsAvat
   () => resolvePublicRemote(new URL('https://[::1]/a.png'), rejectUnexpectedDns),
   403,
 ))
+const specialIpv6 = ['fec0::1', '64:ff9b:1::7f00:1', '100::1', '2001:2::1']
+check('non-public special-purpose IPv6 literals are rejected before any request', (await Promise.all(
+  specialIpv6.map((address) => rejectsAvatarAsync(
+    () => resolvePublicRemote(new URL(`https://[${address}]/a.png`), rejectUnexpectedDns),
+    403,
+  )),
+)).every(Boolean))
+check('non-public special-purpose IPv6 DNS answers reject the entire hostname', (await Promise.all(
+  specialIpv6.map((address) => rejectsAvatarAsync(
+    () => resolvePublicRemote(new URL('https://special.example/a.png'), async () => [{ address, family: 6 }]),
+    403,
+  )),
+)).every(Boolean))
 check('mixed public/private DNS answers reject the entire hostname', await rejectsAvatarAsync(
   () => resolvePublicRemote(new URL('https://mixed.example/a.png'), async () => [
     { address: '93.184.216.34', family: 4 },
@@ -158,6 +182,21 @@ const privateRedirectRejected = await rejectsAvatarAsync(() => fetchRemoteAvatar
 ), 403)
 check('redirects to a private DNS result are rejected before the next request',
   privateRedirectRejected && privateRedirectRequests === 1)
+
+let specialIpv6RedirectRequests = 0
+const specialIpv6RedirectRejected = await rejectsAvatarAsync(() => fetchRemoteAvatar(
+  'https://redirect.example/avatar',
+  DEFAULT_AVATAR_MAX_BYTES,
+  async (hostname) => hostname === 'redirect.example'
+    ? [{ address: '93.184.216.34', family: 4 }]
+    : [{ address: '64:ff9b:1::7f00:1', family: 6 }],
+  async () => {
+    specialIpv6RedirectRequests += 1
+    return remoteResponse(302, { location: 'https://special.example/avatar.png' })
+  },
+), 403)
+check('redirects to a non-public special-purpose IPv6 result are rejected before the next request',
+  specialIpv6RedirectRejected && specialIpv6RedirectRequests === 1)
 
 let redirectLimitRequests = 0
 const redirectLimitRejected = await rejectsAvatarAsync(() => fetchRemoteAvatar(

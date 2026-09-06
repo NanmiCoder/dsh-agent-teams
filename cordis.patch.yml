@@ -19,3 +19,9 @@
         stateDir: .agent-teams
         # Provider used to spawn member subagents ('spawn' or 'fork').
         memberProvider: spawn
+        # Optional default captain image. Empty keeps the packaged lead whale.
+        captainAvatar: ''
+        # Optional role/category -> HTTP(S) or same-origin image URL overrides.
+        roleAvatars: {}
+        # Upload and remote-proxy limit (default and hard maximum: 2 MiB).
+        avatarMaxBytes: 2097152

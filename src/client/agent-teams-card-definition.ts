@@ -28,10 +28,12 @@ export interface AgentTeamsCardData {
   /** The captain session that owns this team (panel follows it). */
   readonly captainSessionId: string
   readonly teamName: string
+  readonly captainAvatarUrl?: string
   readonly members: readonly {
     readonly id: string
     readonly name: string
     readonly role: string
+    readonly avatarUrl?: string
   }[]
 }
 

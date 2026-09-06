@@ -9,6 +9,7 @@ export interface ActivityMember {
   readonly model?: string
   readonly reasoningEffort?: string
   readonly executionPrompt?: string
+  readonly avatarUrl?: string
   readonly status?: 'idle' | 'working' | 'removed'
   readonly activity: 'working' | 'idle' | 'unknown'
   readonly progress: number
@@ -50,10 +51,19 @@ export interface ActivityTeam {
   readonly phase: 'staged' | 'running'
   readonly planReviewState?: 'awaiting_review' | 'awaiting_feedback'
   readonly halted?: boolean
+  readonly captainAvatarUrl?: string
+  readonly avatarEditToken?: string
   readonly members: readonly ActivityMember[]
   readonly tasks: readonly ActivityTask[]
   readonly messageCount: number
   readonly captainInbox: readonly ActivityMessage[]
+}
+
+/** Host-projected plugin defaults shared by the panel and conversation card. */
+export interface ActivityArtwork {
+  readonly captainAvatarUrl?: string
+  readonly roleAvatars: Readonly<Record<string, string>>
+  readonly maxUploadBytes: number
 }
 
 /** A successfully-created conversation card that currently needs updates. */
@@ -67,6 +77,7 @@ export interface ActivityMonitorTarget {
 export interface ActivitySnapshots {
   readonly teams: readonly ActivityTeam[]
   readonly archivedTeams: readonly ActivityTeam[]
+  readonly artwork: ActivityArtwork
 }
 
 interface RegisteredTarget extends ActivityMonitorTarget {
@@ -78,7 +89,11 @@ const targets = new Map<string, RegisteredTarget>()
 const targetListeners = new Set<() => void>()
 const snapshotListeners = new Set<() => void>()
 let targetSnapshot: readonly ActivityMonitorTarget[] = []
-let activitySnapshots: ActivitySnapshots = { teams: [], archivedTeams: [] }
+let activitySnapshots: ActivitySnapshots = {
+  teams: [],
+  archivedTeams: [],
+  artwork: { roleAvatars: {}, maxUploadBytes: 2 * 1024 * 1024 },
+}
 
 function targetKey(sessionId: string, teamId: string): string {
   return `${sessionId}\u0000${teamId}`
@@ -166,8 +181,11 @@ export function updateActivitySnapshots(update: Partial<ActivitySnapshots>): voi
   const next = {
     teams: update.teams ?? activitySnapshots.teams,
     archivedTeams: update.archivedTeams ?? activitySnapshots.archivedTeams,
+    artwork: update.artwork ?? activitySnapshots.artwork,
   }
-  if (next.teams === activitySnapshots.teams && next.archivedTeams === activitySnapshots.archivedTeams) return
+  if (next.teams === activitySnapshots.teams
+    && next.archivedTeams === activitySnapshots.archivedTeams
+    && next.artwork === activitySnapshots.artwork) return
   activitySnapshots = next
   for (const listener of snapshotListeners) listener()
 }
@@ -188,6 +206,18 @@ export const ACTIVITY_HALT_URL = '/plugins/dsh-agent-teams/halt'
 interface ActivityFetchResponse {
   readonly ok: boolean
   json(): Promise<unknown>
+}
+
+function isActivityArtwork(value: unknown): value is ActivityArtwork {
+  if (typeof value !== 'object' || value === null) return false
+  const candidate = value as Partial<ActivityArtwork>
+  return (candidate.captainAvatarUrl === undefined || typeof candidate.captainAvatarUrl === 'string')
+    && typeof candidate.roleAvatars === 'object'
+    && candidate.roleAvatars !== null
+    && Object.values(candidate.roleAvatars).every((url) => typeof url === 'string')
+    && typeof candidate.maxUploadBytes === 'number'
+    && Number.isSafeInteger(candidate.maxUploadBytes)
+    && candidate.maxUploadBytes > 0
 }
 
 /** Injectable browser primitives used by the poll controller and its tests. */
@@ -269,10 +299,11 @@ export function startActivityPolling(
         signal: controller.signal,
       })
       if (!liveResponse.ok) return
-      const body = (await liveResponse.json()) as { teams?: unknown }
+      const body = (await liveResponse.json()) as { teams?: unknown; artwork?: unknown }
       if (cancelled || !Array.isArray(body.teams)) return
       const liveTeams = body.teams as readonly ActivityTeam[]
-      publishSnapshots({ teams: liveTeams })
+      const artwork = isActivityArtwork(body.artwork) ? body.artwork : undefined
+      publishSnapshots({ teams: liveTeams, ...artwork === undefined ? {} : { artwork } })
       const previousDiscoveredKeys = discoveredLiveKeys
       discoveredLiveKeys = new Set(discoverySessionId === undefined || discoverySessionId === ''
         ? []

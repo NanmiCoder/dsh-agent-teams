@@ -66,6 +66,7 @@ import {
   type MemberRuntimeConfig,
 } from './members.ts'
 import { TERMINAL_TASK_STATUSES, type TeamMember, type TeamState, type TeamTask } from './types.ts'
+import { normalizeRemoteAvatarUrl } from './avatar.ts'
 import { installTeamScheduler } from './scheduler.ts'
 import { resolveTeamProfile } from './profiles.ts'
 
@@ -685,6 +686,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         enum: ['required', 'automatic'],
         description: 'required stages the plan for explicit user review; automatic starts immediately. Defaults to automatic for API compatibility.',
       },
+      avatar_url: { type: 'string', description: 'Optional HTTP(S) avatar URL for the captain. The activity panel can also upload one later.' },
     },
     output: {
       schema: {
@@ -722,6 +724,9 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
       const profileName = args.profile !== undefined && args.profile.trim() !== ''
         ? args.profile.trim()
         : undefined
+      const captainAvatar = args.avatar_url === undefined
+        ? undefined
+        : normalizeRemoteAvatarUrl(args.avatar_url)
       const created = await withTeamLock(captainLockKey(stateRoot, captain.id), async () => {
         const current = await findTeamByParticipant(stateRoot, captain.id)
         if (current !== undefined) {
@@ -739,6 +744,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
               id: teamId,
               description: args.description,
               captainSessionId: captain.id,
+              ...captainAvatar === undefined ? {} : { captainAvatar },
               createdAt: Date.now(),
               members: [],
               tasks: [],
@@ -759,6 +765,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
             teamId,
             profileName,
             description: args.description,
+            captainAvatar,
             staged,
           })
         })
@@ -998,6 +1005,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
       model: { type: 'string', description: 'Optional model override. Omit for the captain\'s current model (or the configured memberModel default).' },
       reasoning_effort: { type: 'string', description: 'Optional reasoning effort override: one of the target model\'s supported effort ids, or "default" to force its default. When omitted, the captain\'s effort is inherited only for the same provider/model; a changed route uses the target default.' },
       executionPrompt: { type: 'string', description: 'Optional member-specific execution prompt. It remains editable while staged.' },
+      avatar_url: { type: 'string', description: 'Optional HTTP(S) avatar URL for this member. It takes priority over role artwork.' },
     },
     output: {
       schema: {
@@ -1050,6 +1058,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
           id: '',
           name: memberName,
           role: args.role,
+          ...args.avatar_url === undefined ? {} : { avatar: normalizeRemoteAvatarUrl(args.avatar_url) },
           provider: selection.provider,
           model: selection.model,
           reasoningEffort: selection.reasoningEffort,
@@ -2105,6 +2114,7 @@ async function initializeProfileTeam(input: {
   teamId: string
   profileName: string
   description?: string
+  captainAvatar?: string
   staged: boolean
 }): Promise<{ committed: true; state: TeamState }> {
   const profile = resolveTeamProfile(input.config.profiles, input.profileName, input.config.maxMembers)
@@ -2136,6 +2146,7 @@ async function initializeProfileTeam(input: {
     },
     ...profile.reviewPolicy === undefined ? {} : { reviewPolicy: profile.reviewPolicy },
     captainSessionId: input.captain.id,
+    ...input.captainAvatar === undefined ? {} : { captainAvatar: input.captainAvatar },
     createdAt: now,
     ...input.staged ? { phase: 'staged' as const, planReviewState: 'awaiting_review' as const } : {},
     members: profile.members.map((template, index) => {

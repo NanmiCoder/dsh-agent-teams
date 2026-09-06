@@ -89,7 +89,7 @@
     "sync:skill": "node scripts/sync-skill.mjs",
     "verify:skill": "node scripts/sync-skill.mjs --check",
     "verify": "node scripts/verify.mjs && node scripts/fallback-tdd.mjs && node scripts/member-failure-tdd.mjs && node scripts/quality-gates-tdd.mjs && node scripts/lifecycle-verify.mjs && node scripts/stress-verify.mjs && pnpm verify:bridge && pnpm verify:web-routes && pnpm verify:release && pnpm verify:skill && pnpm verify:harness-contract && pnpm verify:http-body && pnpm verify:compatibility",
-    "verify:bridge": "node --test scripts/bridge.test.mjs",
+    "verify:bridge": "tsc -p tsconfig.bridge-test.json && node --test scripts/bridge.test.mjs",
     "prepublishOnly": "pnpm build && pnpm verify",
     "verify:web-routes": "node scripts/web-routes-verify.mjs",
     "verify:release": "node --test scripts/release-metadata.test.mjs",

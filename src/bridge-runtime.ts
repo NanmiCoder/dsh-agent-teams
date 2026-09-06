@@ -14,10 +14,13 @@ import { findTeamByCaptain, readArchivedTeam, readTeam } from './state.ts'
 import type { TeamState, TeamTask } from './types.ts'
 
 export type ActiveBridgeEventType = Exclude<TeamLifecycleEvent['type'], 'team-archived'>
+export type ActiveBridgeEventArgs =
+  | readonly [type: 'task-updated', stateRoot: string, teamId: string, taskId: string]
+  | readonly [type: Exclude<ActiveBridgeEventType, 'task-updated'>, stateRoot: string, teamId: string]
 
 /** Internal write-side of the event bus; never installed on the Cordis context. */
 export interface AgentTeamsBridgeEventPublisher {
-  publishActive(type: ActiveBridgeEventType, stateRoot: string, teamId: string, taskId?: string): Promise<void>
+  publishActive(...args: ActiveBridgeEventArgs): Promise<void>
   publishArchived(stateRoot: string, teamId: string): Promise<void>
 }
 
@@ -26,6 +29,9 @@ interface BridgeConfig {
 }
 
 type Listener = (event: TeamLifecycleEvent) => void
+interface ListenerRegistration {
+  readonly listener: Listener
+}
 
 function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
   return (typeof value === 'object' && value !== null) || typeof value === 'function'
@@ -80,7 +86,7 @@ export function projectTeam(team: TeamState): TeamProjection {
 
 /** Register the public service and return its private event write-side. */
 export function installAgentTeamsBridge(ctx: Context, config: BridgeConfig): AgentTeamsBridgeEventPublisher {
-  const listenersByCaptain = new Map<string, Set<Listener>>()
+  const listenersByCaptain = new Map<string, Set<ListenerRegistration>>()
   const publish = (type: TeamLifecycleEvent['type'], state: TeamState, taskId?: string): void => {
     const team = projectTeam(state)
     let event: TeamLifecycleEvent
@@ -104,9 +110,9 @@ export function installAgentTeamsBridge(ctx: Context, config: BridgeConfig): Age
         team,
       }) as TeamLifecycleEvent
     }
-    for (const listener of [...(listenersByCaptain.get(team.captainSessionId) ?? [])]) {
+    for (const registration of [...(listenersByCaptain.get(team.captainSessionId) ?? [])]) {
       try {
-        const result = (listener as (value: TeamLifecycleEvent) => unknown)(event)
+        const result = (registration.listener as (value: TeamLifecycleEvent) => unknown)(event)
         if (isPromiseLike(result)) {
           void Promise.resolve(result).catch((error: unknown) => {
             ctx.logger.warn(`agent-teams bridge listener failed after ${type}: ${String(error)}`)
@@ -128,14 +134,15 @@ export function installAgentTeamsBridge(ctx: Context, config: BridgeConfig): Age
       return team === undefined ? null : projectTeam(team)
     },
     subscribeTeamEvents(captainSessionId: string, listener: Listener): () => void {
-      const listeners = listenersByCaptain.get(captainSessionId) ?? new Set<Listener>()
-      listeners.add(listener)
+      const listeners = listenersByCaptain.get(captainSessionId) ?? new Set<ListenerRegistration>()
+      const registration = { listener }
+      listeners.add(registration)
       listenersByCaptain.set(captainSessionId, listeners)
       let disposed = false
       return () => {
         if (disposed) return
         disposed = true
-        listeners.delete(listener)
+        listeners.delete(registration)
         if (listeners.size === 0) listenersByCaptain.delete(captainSessionId)
       }
     },
@@ -143,7 +150,8 @@ export function installAgentTeamsBridge(ctx: Context, config: BridgeConfig): Age
   ctx.provide('agentTeamsBridge', bridge)
 
   return {
-    publishActive: async (type, stateRoot, teamId, taskId) => {
+    publishActive: async (...args) => {
+      const [type, stateRoot, teamId, taskId] = args
       try {
         const team = await readTeam(stateRoot, teamId)
         if (team === undefined) return

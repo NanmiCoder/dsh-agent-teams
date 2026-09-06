@@ -116,6 +116,25 @@ test('subscriptions filter captains, isolate listener failures, and dispose idem
   assert.deepEqual(observed, ['team-staged'])
 })
 
+test('duplicate listener subscriptions are independent registrations', async (t) => {
+  const { stateRoot, bridge, publisher } = await fixture(t)
+  await createTeamDir(stateRoot, team())
+  const observed = []
+  const listener = event => observed.push(event.type)
+  const disposeFirst = bridge.subscribeTeamEvents('captain-a', listener)
+  const disposeSecond = bridge.subscribeTeamEvents('captain-a', listener)
+
+  await publisher.publishActive('team-staged', stateRoot, 'bridge-team')
+  assert.deepEqual(observed, ['team-staged', 'team-staged'])
+  disposeFirst()
+  await publisher.publishActive('team-staged', stateRoot, 'bridge-team')
+  assert.deepEqual(observed, ['team-staged', 'team-staged', 'team-staged'])
+  disposeFirst()
+  disposeSecond()
+  await publisher.publishActive('team-staged', stateRoot, 'bridge-team')
+  assert.deepEqual(observed, ['team-staged', 'team-staged', 'team-staged'])
+})
+
 test('publisher emits all lifecycle variants from durable active or archived truth', async (t) => {
   const { stateRoot, bridge, publisher } = await fixture(t)
   const durable = team()
@@ -179,6 +198,10 @@ test('projection read failures are observational and cannot reject the team muta
   await mkdir(join(stateRoot, 'broken-team'), { recursive: true })
   await writeFile(join(stateRoot, 'broken-team', 'team.json'), '{broken json')
   await assert.doesNotReject(publisher.publishActive('team-halted', stateRoot, 'broken-team'))
-  await assert.doesNotReject(publisher.publishArchived(stateRoot, 'broken-team'))
-  assert.match(warnings.join('\n'), /bridge.*projection.*failed/i)
+  assert.match(warnings.at(-1), /bridge.*projection.*failed.*team-halted/i)
+
+  await mkdir(join(stateRoot, 'archive', 'broken-archive'), { recursive: true })
+  await writeFile(join(stateRoot, 'archive', 'broken-archive', 'team.json'), '{broken archive json')
+  await assert.doesNotReject(publisher.publishArchived(stateRoot, 'broken-archive'))
+  assert.match(warnings.at(-1), /bridge.*projection.*failed.*team-archived/i)
 })

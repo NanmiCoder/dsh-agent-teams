@@ -137,6 +137,32 @@ dsh plugin --profile web add --save-exact @nanmicoder/dsh-agent-teams@0.1.16-rc.
 
 完整工具列表、状态模型、Web UI 行为、配置与已知限制见 [docs/usage.md](./docs/usage.md)。
 
+## 只读 Host Bridge
+
+其他 Host 插件可通过公开子路径消费稳定的 Cordis service，无需导入内部
+AgentTeams runtime：
+
+```ts
+import type {} from '@nanmicoder/dsh-agent-teams/bridge'
+
+export const inject = ['agentTeamsBridge']
+
+export function apply(ctx: import('@deepseek-ai/cordis').Context): void {
+  ctx.effect(() => ctx.agentTeamsBridge.subscribeTeamEvents(
+    'captain-session-id',
+    (event) => {
+      // event.type 是稳定的判别字段，例如 "team-approved"。
+    },
+  ))
+}
+```
+
+`ctx.agentTeamsBridge` 只暴露 `getTeamForCaptain()` 与
+`subscribeTeamEvents()`。返回值是从持久化状态生成的独立、深度冻结投影；队长
+不在线或无法定位其工作区时返回 `null`，不会猜测工作区。生命周期事件仅在当前
+进程内分发，并按队长 session 过滤。`team-approved` 会在 running 状态及全部成员
+child session id 均已持久化后同步调用 listener，且一定早于 scheduler kick。
+
 ## 插件开发 Skill
 
 仓库已引入社区升级、审计、测试和发布 skills，来源与本项目规则见 [skills/README.md](./skills/README.md)，贡献入口见 [CONTRIBUTING.md](./CONTRIBUTING.md)。

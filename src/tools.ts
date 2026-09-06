@@ -68,6 +68,7 @@ import {
 import { TERMINAL_TASK_STATUSES, type TeamMember, type TeamState, type TeamTask } from './types.ts'
 import { installTeamScheduler } from './scheduler.ts'
 import { resolveTeamProfile } from './profiles.ts'
+import type { AgentTeamsBridgeEventPublisher } from './bridge-runtime.ts'
 
 export { steerCaptainReport } from './members.ts'
 
@@ -89,6 +90,8 @@ export interface ToolsConfig {
   maxMembers: number
   /** Named team profiles from the active DSH profile. */
   profiles: Record<string, import('./profiles.ts').TeamProfileConfig>
+  /** Private write-side of the public read-only Bridge event bus. */
+  bridgeEvents?: AgentTeamsBridgeEventPublisher
 }
 
 /** Browser/UI mutations allowed while a plan is waiting for approval. */
@@ -357,6 +360,7 @@ export async function haltTeamWork(input: {
   teamId: string
   captain: Agent
   signal?: AbortSignal
+  bridgeEvents?: AgentTeamsBridgeEventPublisher
 }): Promise<{ teamName: string; cancelledTasks: number; alreadyHalted: boolean }> {
   const halted = await withTeamLock(teamLockKey(input.stateRoot, input.teamId), async () => {
     const fresh = await requireFreshCaptainTeam(input.stateRoot, input.teamId, input.captain.id)
@@ -382,6 +386,7 @@ export async function haltTeamWork(input: {
     fresh.halted = true
     fresh.haltedAt = now
     await writeTeam(input.stateRoot, fresh)
+    await input.bridgeEvents?.publishActive('team-halted', input.stateRoot, fresh.id)
     appendTeamEvent(input.ctx, captainSessionOf(input.ctx, fresh.captainSessionId, input.captain.session), 'agent-teams/team-halted', {
       teamId: fresh.id,
       cancelledTasks,
@@ -438,10 +443,14 @@ export function stagedPlanFeedbackContext(teamName: string): string {
  */
 export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): AgentTeamsRuntime {
   installRetiredMemberGuard(ctx, config.stateDir)
-  const scheduler = installTeamScheduler(ctx, { stateDir: config.stateDir, executionPrompt: config.executionPrompt })
+  const scheduler = installTeamScheduler(ctx, {
+    stateDir: config.stateDir,
+    executionPrompt: config.executionPrompt,
+    bridgeEvents: config.bridgeEvents,
+  })
   const memberSelections = installMemberSelectionRuntime(ctx, config.stateDir, (workspace, teamId, memberName) => (
     scheduler.kickMember(workspace, teamId, memberName)
-  ))
+  ), config.bridgeEvents)
 
   const updateStagedPlanBatch: AgentTeamsRuntime['updateStagedPlanBatch'] = async (captain, teamId, mutations, signal) => {
     if (mutations.length === 0) throw new Error('at least one staged plan operation is required')
@@ -514,6 +523,11 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
       validateStagedGraph(fresh, false)
       fresh.planReviewState = 'awaiting_review'
       await writeTeam(stateRoot, fresh)
+      for (const mutation of mutations) {
+        if (mutation.action === 'update_task') {
+          await config.bridgeEvents?.publishActive('task-updated', stateRoot, fresh.id, mutation.taskId)
+        }
+      }
       return fresh
     })
   }
@@ -573,6 +587,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         delete fresh.planReviewState
         fresh.approvedAt = Date.now()
         await writeTeam(stateRoot, fresh)
+        await config.bridgeEvents?.publishActive('team-approved', stateRoot, fresh.id)
         return { teamId: fresh.id, members: fresh.members.length, tasks: fresh.tasks.length }
       } catch (error: unknown) {
         await recordRetiredMemberIds(stateRoot, spawned.map((member) => member.id)).catch(() => undefined)
@@ -645,6 +660,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
       // A staged plan owns no child sessions. Archiving releases the captain
       // immediately while retaining the rejected graph for later inspection.
       await archiveTeamDir(stateRoot, fresh.id)
+      await config.bridgeEvents?.publishArchived(stateRoot, fresh.id)
       return { teamId: fresh.id, teamName: fresh.name }
     })
     // Preserve this control fact for the next genuine user turn, then abort the
@@ -743,7 +759,8 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
               members: [],
               tasks: [],
               taskSeq: 0,
-              ...staged ? { phase: 'staged' as const, planReviewState: 'awaiting_review' as const } : {},
+              phase: staged ? 'staged' as const : 'running' as const,
+              ...staged ? { planReviewState: 'awaiting_review' as const } : {},
             }
             await createTeamDir(stateRoot, state)
             return { committed: true as const, state }
@@ -764,6 +781,11 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         })
       })
       if (created.committed) {
+        await config.bridgeEvents?.publishActive(
+          created.state.phase === 'staged' ? 'team-staged' : 'team-approved',
+          stateRoot,
+          created.state.id,
+        )
         try {
           await scheduler.kickTeam(workspace, created.state.id, captain)
         } catch (error: unknown) {
@@ -1145,6 +1167,9 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         }
         member.status = 'removed'
         await writeTeam(stateRoot, fresh)
+        for (const taskId of requeued) {
+          await config.bridgeEvents?.publishActive('task-updated', stateRoot, fresh.id, taskId)
+        }
         appendTeamEvent(ctx, captainSessionOf(ctx, fresh.captainSessionId, captain.session), 'agent-teams/member-removed', {
           teamId: fresh.id,
           memberId: member.id,
@@ -1247,6 +1272,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
           resumeReason: input.resumeReason,
         })
         if (!gate.ok) throw new Error(gate.error ?? 'create_task rejected by quality gates')
+        let didResume = false
         if (fresh.halted === true) {
           const resumed = resumeTeamState(fresh, args.resumeReason ?? '')
           if (resumed.status !== 'resumed' || resumed.team === undefined) {
@@ -1254,6 +1280,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
           }
           fresh.halted = false
           fresh.haltedAt = undefined
+          didResume = true
           appendTeamEvent(ctx, captainSessionOf(ctx, fresh.captainSessionId, captain.session), 'agent-teams/team-resumed', {
             teamId: fresh.id,
             reason: args.resumeReason ?? '',
@@ -1300,6 +1327,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         fresh.taskSeq += 1
         fresh.tasks.push(task)
         await writeTeam(stateRoot, fresh)
+        if (didResume) await config.bridgeEvents?.publishActive('team-resumed', stateRoot, fresh.id)
         appendTeamEvent(ctx, captainSessionOf(ctx, fresh.captainSessionId, captain.session), 'agent-teams/task-created', {
           teamId: fresh.id,
           taskId: task.id,
@@ -1415,6 +1443,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
           task.updatedAt = Date.now()
         }
         await writeTeam(stateRoot, fresh)
+        await config.bridgeEvents?.publishActive('task-updated', stateRoot, fresh.id, task.id)
         appendTeamEvent(ctx, captain.session, 'agent-teams/task-updated', {
           teamId: fresh.id,
           taskId: task.id,
@@ -1520,6 +1549,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         }
         const attemptId = beginTaskAttempt(task, assignee)
         await writeTeam(stateRoot, fresh)
+        await config.bridgeEvents?.publishActive('task-updated', stateRoot, fresh.id, task.id)
         appendTeamEvent(ctx, captainSessionOf(ctx, fresh.captainSessionId, caller.session), 'agent-teams/task-updated', {
           teamId: fresh.id,
           taskId: task.id,
@@ -1696,6 +1726,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
           ))
         }
         await writeTeam(stateRoot, fresh)
+        await config.bridgeEvents?.publishActive('task-updated', stateRoot, fresh.id, task.id)
         appendTeamEvent(ctx, captainSessionOf(ctx, fresh.captainSessionId, caller.session), 'agent-teams/task-updated', {
           teamId: fresh.id,
           taskId: task.id,
@@ -2014,6 +2045,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
           fresh.halted = false
           fresh.haltedAt = undefined
           await writeTeam(stateRoot, fresh)
+          await config.bridgeEvents?.publishActive('team-resumed', stateRoot, fresh.id)
           appendTeamEvent(ctx, captainSessionOf(ctx, fresh.captainSessionId, captain.session), 'agent-teams/team-resumed', {
             teamId: fresh.id,
             reason: args.reason,
@@ -2087,6 +2119,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         // Archive, not delete: tasks (with their dependency graph) and the
         // mailboxes stay on disk for later review and dependency rebuilds.
         await archiveTeamDir(stateRoot, fresh.id)
+        await config.bridgeEvents?.publishArchived(stateRoot, fresh.id)
       })
       return { deleted: true, team_name: team.name }
     },
@@ -2137,7 +2170,8 @@ async function initializeProfileTeam(input: {
     ...profile.reviewPolicy === undefined ? {} : { reviewPolicy: profile.reviewPolicy },
     captainSessionId: input.captain.id,
     createdAt: now,
-    ...input.staged ? { phase: 'staged' as const, planReviewState: 'awaiting_review' as const } : {},
+    phase: input.staged ? 'staged' as const : 'running' as const,
+    ...input.staged ? { planReviewState: 'awaiting_review' as const } : {},
     members: profile.members.map((template, index) => {
       const selection = selections[index]!
       return {

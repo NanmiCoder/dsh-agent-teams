@@ -148,6 +148,34 @@ Defaults work without extra setup. A trusted profile can override member behavio
 
 See [docs/usage.md](./docs/usage.md) for the full tool reference, state model, Web UI behavior, configuration, and known limits.
 
+## Read-only host Bridge
+
+Host plugins can consume the stable Cordis service without importing the
+internal AgentTeams runtime:
+
+```ts
+import type {} from '@nanmicoder/dsh-agent-teams/bridge'
+
+export const inject = ['agentTeamsBridge']
+
+export function apply(ctx: import('@deepseek-ai/cordis').Context): void {
+  ctx.effect(() => ctx.agentTeamsBridge.subscribeTeamEvents(
+    'captain-session-id',
+    (event) => {
+      // event.type is a stable discriminant such as "team-approved".
+    },
+  ))
+}
+```
+
+`ctx.agentTeamsBridge` exposes only `getTeamForCaptain()` and
+`subscribeTeamEvents()`. Snapshots are detached, deeply frozen views of the
+persisted state. Lookup returns `null` when the captain is offline or its
+workspace cannot be located; it never guesses a workspace. Lifecycle events
+are process-local and filtered by captain session. In particular,
+`team-approved` is delivered synchronously after the running state and every
+member child session id are durable, and before the scheduler is kicked.
+
 ## Plugin development Skill
 
 Community upgrade, audit, benchmark, testing and release skills are vendored with a pinned source revision. See [skills/README.md](./skills/README.md) for local rules and [CONTRIBUTING.md](./CONTRIBUTING.md) for the contribution workflow.

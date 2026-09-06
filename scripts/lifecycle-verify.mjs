@@ -30,6 +30,22 @@ const childListeners = new Map()
 const continuableSetups = []
 const failNextDelivery = new Set()
 const failures = []
+const bridgeEvents = []
+const bridgePublisher = {
+  async publishActive(type, eventStateRoot, eventTeamId, taskId) {
+    bridgeEvents.push({
+      type,
+      team: structuredClone(await readTeam(eventStateRoot, eventTeamId)),
+      taskId,
+    })
+  },
+  async publishArchived(eventStateRoot, eventTeamId) {
+    bridgeEvents.push({
+      type: 'team-archived',
+      team: structuredClone(await readArchivedTeam(eventStateRoot, eventTeamId)),
+    })
+  },
+}
 let childSeq = 0
 let messageSeq = 0
 
@@ -271,6 +287,7 @@ const agentTeamsRuntime = registerAgentTeamsTools(ctx, {
   fallback: { provider: 'backup', model: 'backup-model' },
   memberMaxDepth: 1,
   maxMembers: 8,
+  bridgeEvents: bridgePublisher,
   profiles: {
     'demo-delivery': {
       description: 'tiny delivery team',
@@ -435,6 +452,11 @@ try {
     profile: 'demo-delivery',
   })
   const profileTeam = await readTeam(stateRoot, 'profile-demo')
+  check('automatic create emits running semantics from durable state',
+    bridgeEvents.some(event => event.type === 'team-approved'
+      && event.team?.id === 'profile-demo'
+      && event.team.phase === 'running'
+      && event.team.members.every(member => member.id !== '')))
   check('create(profile) returns profile members tasks and seed ids',
     createdProfile.profile === 'demo-delivery'
       && createdProfile.members?.length === 2
@@ -457,6 +479,11 @@ try {
     firstSeed?.status === 'claimed' && firstSeed.assignee === 'analyst'
       && deliveries.some(delivery => delivery.childId === analyst.id)
       && !deliveries.some(delivery => delivery.childId === implementer.id && String(delivery.content?.[0]?.text ?? '').includes('Implement')))
+  check('scheduler claim emits a durable task-updated bridge event',
+    bridgeEvents.some(event => event.type === 'task-updated'
+      && event.team?.id === 'profile-demo'
+      && event.taskId === firstSeed?.id
+      && event.team.tasks.find(task => task.id === firstSeed?.id)?.status === 'claimed'))
   const firstAssignment = deliveries.find(delivery => delivery.childId === analyst.id)
   const assignmentText = Array.isArray(firstAssignment?.content)
     ? firstAssignment.content.map(block => block.text ?? '').join('\n')
@@ -509,6 +536,11 @@ try {
     profileStatus.profile?.name === 'demo-delivery'
       && profileStatus.tasks.some(item => item.seed_id === 'requirements')
       && profileStatus.tasks.some(item => item.seed_id === 'implement'))
+  check('task transitions publish their durable task projection',
+    bridgeEvents.some(event => event.type === 'task-updated'
+      && event.team?.id === 'profile-demo'
+      && event.taskId === firstSeed.id
+      && event.team.tasks.find(task => task.id === firstSeed.id)?.status === 'completed'))
   await call('agent_teams_delete', {})
 
   const deliveriesBeforeDiscard = deliveries.length
@@ -530,6 +562,9 @@ try {
       && discardedArchive.members.every(member => member.id === '')
       && discardedArchive.tasks.every(task => task.status === 'pending')
       && deliveries.length === deliveriesBeforeDiscard)
+  check('staged create and discard emit staged then archived lifecycle events',
+    bridgeEvents.some(event => event.type === 'team-staged' && event.team?.id === 'rejected-demo')
+      && bridgeEvents.some(event => event.type === 'team-archived' && event.team?.id === 'rejected-demo'))
   const discardControlText = captain.injections.at(-1)?.content?.map(block => block.text ?? '').join('\n') ?? ''
   check('discard aborts the active Captain turn and parks an authoritative no-recreate context',
     (captain.cancelCount ?? 0) === captainCancelsBeforeDiscard + 1
@@ -657,6 +692,7 @@ try {
       && deliveries.length === deliveriesBeforePlan)
   const approvedDynamic = await call('agent_teams_approve', { confirmation: 'user clicked Approve & Run' })
   const dynamicTeam = await readTeam(stateRoot, 'dynamic-demo')
+  const approvedBridgeEvent = bridgeEvents.find(event => event.type === 'team-approved' && event.team?.id === 'dynamic-demo')
   check('approval atomically spawns the final roster before dispatch',
     approvedDynamic.status === 'running'
       && dynamicTeam?.phase === 'running'
@@ -664,6 +700,11 @@ try {
       && dynamicTeam.members.every(member => member.id !== '')
       && dynamicTeam.tasks[0]?.status === 'pending'
       && dynamicTeam.tasks[1]?.status === 'pending')
+  check('approved bridge event observes the committed running roster before later scheduler work',
+    approvedBridgeEvent?.team?.phase === 'running'
+      && typeof approvedBridgeEvent.team.approvedAt === 'number'
+      && approvedBridgeEvent.team.members.every(member => member.id !== '')
+      && approvedBridgeEvent.team.tasks.every(task => task.status === 'pending'))
   for (const member of dynamicTeam.members) publishStatus(liveAgents.get(member.id), 'idle')
   await call('agent_teams_status', {})
   const dispatchedDynamic = await readTeam(stateRoot, 'dynamic-demo')
@@ -680,6 +721,7 @@ try {
     teamId: 'dynamic-demo',
     captain,
     signal: new AbortController().signal,
+    bridgeEvents: bridgePublisher,
   })
   const haltedTeam = await readTeam(stateRoot, 'dynamic-demo')
   check('captain halt cancels the approved graph and keeps the team',
@@ -687,6 +729,11 @@ try {
       && halt.cancelledTasks === 2
       && haltedTeam?.halted === true
       && haltedTeam.tasks.every(item => item.status === 'cancelled'))
+  check('halt publishes the durable cancelled projection',
+    bridgeEvents.some(event => event.type === 'team-halted'
+      && event.team?.id === 'dynamic-demo'
+      && event.team.halted === true
+      && event.team.tasks.every(task => task.status === 'cancelled')))
   check('team halt cancels the captain turn while preserving queued user input',
     captain.cancelCount === captainCancelsBeforeHalt + 2
       && captain.lastCancel?.cause?.kind === 'user'
@@ -717,11 +764,17 @@ try {
     resume.status === 'resumed'
       && (await readTeam(stateRoot, 'dynamic-demo'))?.halted !== true
       && (await readTeam(stateRoot, 'dynamic-demo'))?.tasks.every(item => item.status === 'cancelled'))
+  check('resume publishes the durable unhalted projection',
+    bridgeEvents.some(event => event.type === 'team-resumed'
+      && event.team?.id === 'dynamic-demo'
+      && event.team.halted !== true))
   await call('agent_teams_delete', {})
   const haltedArchive = await readArchivedTeam(stateRoot, 'dynamic-demo')
   check('shutdown preserves cancelled task history in the archive',
     haltedArchive?.tasks.length === 2
       && haltedArchive.tasks.every(item => item.status === 'cancelled'))
+  check('delete publishes the archived durable projection',
+    bridgeEvents.some(event => event.type === 'team-archived' && event.team?.id === 'dynamic-demo'))
 
   await call('agent_teams_create', { name: 'Quality Loop', description: 'review loop' })
   await call('agent_teams_add_member', { name: 'builder', role: 'implementer' })

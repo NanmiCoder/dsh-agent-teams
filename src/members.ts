@@ -23,6 +23,7 @@ import { guardSubagentDelivery, installContinuableMemberSetup, queueMemberPrompt
 import { acknowledgeMailbox, appendMailbox, CAPTAIN_KEY, createMessage, readRetiredMemberIds, readTeamSync, readTeam, releaseMailboxDelivery, withTeamLock, writeTeam } from './state.ts'
 import { appendTeamEvent, captainSessionOf } from './events.ts'
 import { TERMINAL_TASK_STATUSES, type TeamMember, type TeamState, type TeamTask } from './types.ts'
+import type { AgentTeamsBridgeEventPublisher } from './bridge-runtime.ts'
 
 /** Persona snapshot of a profile protocol; the full text lives on team.json. */
 export const PERSONA_PROTOCOL_MAX_CHARS = 400
@@ -173,6 +174,7 @@ export async function failMemberOpenAttempt(
   failure: { readonly code: string; readonly message: string },
   fallbackSession: Session,
   observed: FailedMemberAttempt,
+  bridgeEvents?: AgentTeamsBridgeEventPublisher,
 ): Promise<boolean> {
   const summary = `${failure.message} (code ${failure.code})`
   const lockKey = `team:${stateRoot}:${teamId}`
@@ -202,6 +204,7 @@ export async function failMemberOpenAttempt(
       deliveryClaimedAt: Date.now(),
     }
     await writeTeam(stateRoot, team)
+    if (task !== undefined) await bridgeEvents?.publishActive('task-updated', stateRoot, team.id, task.id)
     await appendMailbox(stateRoot, team.id, CAPTAIN_KEY, message)
     if (task !== undefined) {
       appendTeamEvent(ctx, captainSessionOf(ctx, team.captainSessionId, fallbackSession), 'agent-teams/task-updated', {
@@ -364,6 +367,7 @@ export function installMemberSelectionRuntime(
   ctx: Context,
   stateDir: string,
   onFailureSettled?: (workspace: string, teamId: string, memberName: string) => Promise<void>,
+  bridgeEvents?: AgentTeamsBridgeEventPublisher,
 ): MemberSelectionRuntime {
   const pending = new Map<string, MemberLlmSelection>()
   installContinuableMemberSetup(ctx, (childCtx) => {
@@ -419,7 +423,7 @@ export function installMemberSelectionRuntime(
         }
         const recorded = await failMemberOpenAttempt(ctx, stateRoot, teamId, memberName, failure, child.session, {
           captainSessionId: parentSessionId, memberId: child.id, task,
-        })
+        }, bridgeEvents)
         if (!recorded) return
         // The final-error event precedes driver quiescence. Observe the real
         // lifecycle and kick explicitly even if its idle event was missed.

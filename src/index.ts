@@ -38,6 +38,7 @@ import { collectArchivedTeamsActivity, collectTeamsActivity } from './snapshot.t
 import { findTeamByCaptain } from './state.ts'
 import { formatProfilesForPrompt, type TeamProfileConfig } from './profiles.ts'
 import { qualityPlanningPrompt } from './quality-gates.ts'
+import { installAgentTeamsBridge } from './bridge-runtime.ts'
 
 import { authenticatedWebRoutes, readJsonRequest, RequestBodyError, type BrowserRequestGate, type WebRouteHost } from './web-routes.ts'
 
@@ -158,6 +159,9 @@ export function apply(ctx: Context, config: Config): void {
     maxMembers: config.maxMembers ?? 8,
     profiles: config.profiles ?? {},
   }
+
+  const bridgeEvents = installAgentTeamsBridge(ctx, { stateDir: resolved.stateDir })
+  resolved.bridgeEvents = bridgeEvents
 
   // Provider registration is a sibling plugin's effect (`subagent-spawn` /
   // `subagent-fork` rows), which can land after this mount under the Loader's
@@ -290,6 +294,7 @@ export function apply(ctx: Context, config: Config): void {
             stateRoot,
             teamId,
             captain,
+            bridgeEvents,
           })
           res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
           res.end(JSON.stringify(result))

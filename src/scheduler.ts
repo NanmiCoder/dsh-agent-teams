@@ -32,6 +32,7 @@ import {
   writeTeam,
 } from './state.ts'
 import type { TeamMember, TeamState, TeamTask } from './types.ts'
+import type { AgentTeamsBridgeEventPublisher } from './bridge-runtime.ts'
 
 /** Per-dependency output cap in the assignment prompt. */
 export const DEPENDENCY_OUTPUT_MAX_CHARS = 2_000
@@ -41,6 +42,7 @@ export const DEPENDENCY_OUTPUTS_TOTAL_MAX_CHARS = 12_000
 export interface SchedulerConfig {
   readonly stateDir: string
   readonly executionPrompt?: string
+  readonly bridgeEvents?: AgentTeamsBridgeEventPublisher
 }
 
 export interface TeamScheduler {
@@ -375,6 +377,7 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
           else parkedAttempts.delete(currentMember.id)
           currentMember.status = 'working'
           await writeTeam(stateRoot, fresh)
+          await config.bridgeEvents?.publishActive('task-updated', stateRoot, fresh.id, task.id)
           const profileSeedId = taskProfileSeedId(task)
           const protocol = teamProfileProtocol(fresh)
           return {
@@ -450,6 +453,7 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
           const currentMember = fresh.members.find(candidate => candidate.name === ticket.memberName)
           if (currentMember !== undefined && currentMember.status !== 'removed') currentMember.status = 'idle'
           await writeTeam(stateRoot, fresh)
+          await config.bridgeEvents?.publishActive('task-updated', stateRoot, fresh.id, task.id)
         })
       })
     },
@@ -472,6 +476,7 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
       // interrupted, or the user switches conversations.
       if (status === 'running') return
       let requeued = false
+      const requeuedTaskIds: string[] = []
       await withTeamLock(teamLockKey(stateRoot, located.id), async () => {
         const fresh = await readTeam(stateRoot, located.id)
         if (fresh === undefined || fresh.captainSessionId !== agent.id) return
@@ -483,8 +488,14 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
           invalidateTaskAttempt(task)
           task.reassigning = false
           requeued = true
+          requeuedTaskIds.push(task.id)
         }
-        if (requeued) await writeTeam(stateRoot, fresh)
+        if (requeued) {
+          await writeTeam(stateRoot, fresh)
+          for (const taskId of requeuedTaskIds) {
+            await config.bridgeEvents?.publishActive('task-updated', stateRoot, fresh.id, taskId)
+          }
+        }
       })
       if (requeued) await runtime.kickTeam(workspace, located.id, agent)
       return

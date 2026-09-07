@@ -93,6 +93,14 @@ export interface ToolsConfig {
   maxMembers: number
   /** Named team profiles from the active DSH profile. */
   profiles: Record<string, import('./profiles.ts').TeamProfileConfig>
+  /**
+   * Live Parallel Emission switch, read from the `agent-teams` settings
+   * namespace. A getter, not a snapshot: member personas read it once per
+   * spawn and assignment prompts read it per dispatch, so flipping the
+   * settings checkbox takes effect without a plugin restart. Absent (direct
+   * tool-registry consumers without the settings wiring) means `false`.
+   */
+  parallelToolCalls?: () => boolean
 }
 
 /** Browser/UI mutations allowed while a plan is waiting for approval. */
@@ -428,7 +436,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
   installRetiredMemberGuard(ctx, config.stateDir)
   installMemberDelegationGuard(ctx, config.stateDir, config.memberMaxDepth ?? 0)
   installMailboxAdmission(ctx, config.stateDir)
-  const scheduler = installTeamScheduler(ctx, { stateDir: config.stateDir, executionPrompt: config.executionPrompt, dispatch: dispatchMember })
+  const scheduler = installTeamScheduler(ctx, { stateDir: config.stateDir, executionPrompt: config.executionPrompt, dispatch: dispatchMember, parallelToolCalls: config.parallelToolCalls })
   const memberSelections = installMemberSelectionRuntime(ctx, config.stateDir, (workspace, teamId, memberName) => (
     scheduler.kickMember(workspace, teamId, memberName)
   ))
@@ -2439,6 +2447,9 @@ function memberRuntime(config: ToolsConfig): MemberRuntimeConfig {
     maxDepth: config.memberMaxDepth,
     executionPrompt: config.executionPrompt,
     fallback: config.fallback,
+    // Evaluated once per spawn: a member persona keeps the switch value from
+    // its spawn moment and is never rewritten mid-life.
+    parallelToolCalls: config.parallelToolCalls?.() ?? false,
   }
 }
 

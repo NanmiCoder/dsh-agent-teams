@@ -125,6 +125,7 @@ npm 默认标签 `latest` 现指向 `0.1.17-rc.1`，因此新 profile 使用 `ds
     memberModel: deepseek-v4
     memberMaxDepth: 1
     maxMembers: 8
+    maxConcurrentWorkers: 0       # 单团队同时派工的成员并发上限（0 = 不限）
 ```
 
 这里的 `memberProvider` 指子 Agent 的运行后端（`spawn` / `fork`），不是 LLM provider。跨 LLM provider 由 `agent_teams_add_member` 的可选 `provider` + `model` 参数表达；`memberModel` 只是所有成员的模型默认覆盖。成员沿用队长当前 provider/model 时会继承队长的思考强度；provider 或 model 任一改变时会自动使用目标模型的默认档。需要指定特定强度时，可传入可选的 `reasoning_effort` 参数（目标模型支持的档位 id，或 `"default"` 表示强制使用模型自身默认档）。

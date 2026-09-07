@@ -193,6 +193,9 @@ export const zh = {
   'assignment.empty': '暂无任务',
   'archive.label': '已结束 · 历史归档',
   'archive.discardedLabel': '计划已放弃 · 历史归档',
+  'settings.parallel.label': '支持工具并行',
+  'settings.parallel.hint': '即 Parallel Emission（并行发射）：开启后允许在同一条回复中发出多个 AgentTeams 工具调用。Agent Loop 的并行上限是独立设置，此处不会修改它。即使并行上限为 1，同一回复内的独占工具仍会按顺序逐个执行。',
+  'settings.parallel.readOnly': '当前连接的设置文档为只读，无法修改此项。',
 } satisfies Record<string, string>
 
 /** AgentTeams namespace key union. */
@@ -388,6 +391,9 @@ export const en = {
   'assignment.empty': 'No tasks',
   'archive.label': 'Ended · Archived history',
   'archive.discardedLabel': 'Plan discarded · Archived history',
+  'settings.parallel.label': 'Parallel tool calls',
+  'settings.parallel.hint': 'This is Parallel Emission: when on, several AgentTeams tool calls may be emitted in one response. The Agent Loop parallel cap is a separate setting and is not changed here. Even with a parallel cap of 1, exclusive tools in one response still run one by one in order.',
+  'settings.parallel.readOnly': 'The settings document is read-only on this connection.',
 } satisfies Record<AgentTeamsLocaleKey, string>
 
 /** Translation function consumed by pure view helpers. */

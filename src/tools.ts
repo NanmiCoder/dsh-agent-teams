@@ -87,6 +87,8 @@ export interface ToolsConfig {
   memberMaxDepth?: number
   /** Team size cap (members). */
   maxMembers: number
+  /** Per-team cap of concurrently dispatched member workers (`0` = unlimited). */
+  maxConcurrentWorkers?: number
   /** Named team profiles from the active DSH profile. */
   profiles: Record<string, import('./profiles.ts').TeamProfileConfig>
 }
@@ -449,7 +451,11 @@ export function stagedPlanFeedbackContext(teamName: string): string {
  */
 export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): AgentTeamsRuntime {
   installRetiredMemberGuard(ctx, config.stateDir)
-  const scheduler = installTeamScheduler(ctx, { stateDir: config.stateDir, executionPrompt: config.executionPrompt })
+  const scheduler = installTeamScheduler(ctx, {
+    stateDir: config.stateDir,
+    executionPrompt: config.executionPrompt,
+    maxConcurrentWorkers: config.maxConcurrentWorkers,
+  })
   const memberSelections = installMemberSelectionRuntime(ctx, config.stateDir, (workspace, teamId, memberName) => (
     scheduler.kickMember(workspace, teamId, memberName)
   ))

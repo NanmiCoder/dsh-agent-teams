@@ -74,6 +74,7 @@
     memberModel: deepseek-v4      # 可选：成员模型覆盖
     memberMaxDepth: 1             # 成员再委派深度上限（0 = 禁止）
     maxMembers: 8                 # 团队人数上限
+    maxConcurrentWorkers: 0       # 单团队同时派工的成员并发上限（0 = 不限）
     executionPrompt: |            # 注入成员 persona 与每次任务派工
       The document does not need to record the process; it should only record facts, unless I explicitly request the process to be recorded.
       The product interface should present the intended outcome, not reveal the reasoning process.

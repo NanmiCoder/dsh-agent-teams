@@ -86,6 +86,7 @@
     "update:skills": "node scripts/update-skills.mjs",
     "test:skills-updater": "node --test scripts/update-skills.test.mjs",
     "verify:skill": "node scripts/sync-skill.mjs --check",
+    "verify:events": "node scripts/verify-events.mjs",
     "verify": "node scripts/verify.mjs && node scripts/fallback-tdd.mjs && node scripts/member-failure-tdd.mjs && node scripts/quality-gates-tdd.mjs && node scripts/lifecycle-verify.mjs && node scripts/stress-verify.mjs && pnpm verify:web-routes && pnpm verify:release && pnpm verify:skill && pnpm verify:harness-contract && pnpm verify:http-body && pnpm verify:compatibility && pnpm verify:capabilities",
     "prepublishOnly": "pnpm build && pnpm verify",
     "verify:web-routes": "node scripts/web-routes-verify.mjs",

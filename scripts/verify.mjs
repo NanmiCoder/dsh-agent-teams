@@ -26,6 +26,7 @@ import {
   readTeam,
   removeTeamDir,
   sanitizeKey,
+  teamLockQueueKeys,
   transitionError,
   unsatisfiedDependencies,
   withTeamLock,
@@ -683,6 +684,38 @@ try {
   check('mailbox accepts BOM-prefixed JSONL records', inbox[1]?.content === second.content)
   check('mailbox skips malformed JSON and malformed shapes', inbox.length === 2 && malformedLines.join(',') === '3,4')
   check('missing mailbox reads empty', (await readMailbox(stateRoot, team.id, 'nobody')).length === 0)
+
+  // The per-team lock queue must stay serial, hand off to later waiters, and
+  // must not leak one resolved promise chain per key after the last waiter.
+  const serialKey = 'lock-cleanup:serial'
+  const order = []
+  let inside = 0
+  let maxInside = 0
+  await Promise.all(Array.from({ length: 25 }, (_, index) => withTeamLock(serialKey, async () => {
+    inside += 1
+    maxInside = Math.max(maxInside, inside)
+    order.push(index)
+    await new Promise((resolve) => setTimeout(resolve, index % 3 === 0 ? 5 : 1))
+    inside -= 1
+  })))
+  check('withTeamLock keeps same-key workers strictly serial and ordered',
+    maxInside === 1 && order.join(',') === Array.from({ length: 25 }, (_, index) => index).join(','))
+  check('withTeamLock queue entry drains after the last waiter settles',
+    !teamLockQueueKeys().includes(serialKey))
+
+  const handoffKey = 'lock-cleanup:handoff'
+  let releaseHold
+  const heldGate = new Promise((resolve) => { releaseHold = resolve })
+  let successorEntered = false
+  const hold = withTeamLock(handoffKey, async () => { await heldGate })
+  const successor = withTeamLock(handoffKey, async () => { successorEntered = true })
+  await new Promise((resolve) => setTimeout(resolve, 20))
+  check('withTeamLock keeps its queue entry while the lock is held or handed off',
+    teamLockQueueKeys().includes(handoffKey))
+  releaseHold()
+  await Promise.all([hold, successor])
+  check('withTeamLock wakes the queued successor and drops the key afterwards',
+    successorEntered && !teamLockQueueKeys().includes(handoffKey))
 
   const duplicateCaptain = { ...team, id: 'duplicate-captain', members: [] }
   await createTeamDir(stateRoot, duplicateCaptain)

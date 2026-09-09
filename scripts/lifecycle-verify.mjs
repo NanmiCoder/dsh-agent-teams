@@ -32,6 +32,7 @@ const failNextDelivery = new Set()
 const failures = []
 let childSeq = 0
 let messageSeq = 0
+let deliveryDelayMs = 0
 
 function check(label, condition, detail = '') {
   const status = condition ? 'PASS' : 'FAIL'
@@ -220,6 +221,7 @@ const ctx = {
     async followup(_parent, childId, content) {
       if (this !== ctx.subagents) throw new Error('native receiver was lost')
       if (failNextDelivery.delete(childId)) throw new Error('injected delivery failure')
+      if (deliveryDelayMs > 0) await new Promise(resolve => setTimeout(resolve, deliveryDelayMs))
       deliveries.push({ childId, content })
       const child = liveAgents.get(childId)
       if (child) child.status = 'running'
@@ -1035,11 +1037,28 @@ try {
   check('resumed recovered member completes with its throttled capability',
     (await task(t2.task_id))?.status === 'completed'
       && (await task(t2.task_id))?.attemptId === recoveredBetaClaim.attempt_id)
+  const deliveriesBeforeGate = deliveries.length
+  // A member can start its tool calls only after delivery. The scheduler's
+  // async disk writes and wakeup are not guaranteed to finish within 20 ms.
+  // Delay the fake host deliberately so this test exercises that boundary.
+  deliveryDelayMs = 100
   publishStatus(beta, 'idle')
   publishStatus(gamma, 'idle')
-  await new Promise(resolve => setTimeout(resolve, 20))
-  const gate = await task(t3.task_id)
-  check('completing dependencies dispatches the downstream task', gate?.status === 'claimed' && gate.assignee === 'gamma')
+  let gate
+  let gateDelivered = false
+  const gateDeadline = Date.now() + 2000
+  while (Date.now() < gateDeadline) {
+    gate = await task(t3.task_id)
+    gateDelivered = gate?.status === 'claimed' && gate.assignee === 'gamma'
+      && gamma.status === 'running'
+      && deliveries.slice(deliveriesBeforeGate).some(delivery => delivery.childId === gamma.id
+        && JSON.stringify(delivery.content).includes(`Task: ${t3.task_id} `))
+    if (gateDelivered) break
+    await new Promise(resolve => setTimeout(resolve, 20))
+  }
+  deliveryDelayMs = 0
+  check('completing dependencies dispatches the downstream task before member execution', gateDelivered)
+  if (!gateDelivered) throw new Error('Timed out waiting for the downstream task to reach gamma')
   const gateClaim = await call('agent_teams_claim_task', { task_id: t3.task_id }, gamma)
   await call('agent_teams_update_task', {
     task_id: t3.task_id, status: 'in_progress', attempt_id: gateClaim.attempt_id,

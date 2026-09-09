@@ -1,0 +1,995 @@
+{
+  "recordedAt": "2026-09-09T10:28:39.101Z",
+  "scope": "Remove agent_teams_open; retain the original 13 business tools, concise fixed core instructions, existing-team reuse guidance and approval wakeups.",
+  "sourceParentCommit": "68d2c77a2ffe0afc888d86747e87dbb490f64c57",
+  "sourceFiles": {
+    "src/capabilities.ts": "f701c6b6bc505bbb476343744c5feacb237adf1af919b4050671622880dfdef1",
+    "src/command.ts": "e6e3155c39dbbd0b1459e597bebfc389b792773ef06eee99ee4b0c0431d6fe47",
+    "src/index.ts": "3c83424c7cf181f1b3bfc76ece67e490c778384456dcac10e7d7e3ed53603221",
+    "src/profiles.ts": "d085921924ded4a91e33abb6bfb316df1afe765aa76d4d54ac645dabde4780cf",
+    "src/tool-names.ts": "e5e38e4cb24a9dba08c64ea3afffe8ed6244b9b0209d02606459d118016f9796",
+    "src/tools.ts": "7f20260ef82eb394e7873c4f10fcf936e6a675802117c304c564c94bd5b978e9"
+  },
+  "artifact": {
+    "path": "/tmp/dsh-no-open-artifacts/nanmicoder-dsh-agent-teams-0.1.16-rc.1.tgz",
+    "sha256": "3b03096455bf2d97bf8272756eebd4715d251ea9798e103bb98d641c19ca5a18",
+    "pluginVersion": "0.1.16-rc.1",
+    "published": false
+  },
+  "localChecks": {
+    "build": true,
+    "repositoryVerify": true,
+    "capabilityTests": {
+      "tests": 18,
+      "fail": 0
+    },
+    "benchmarkJudgeRegression": {
+      "tests": 3,
+      "fail": 0
+    },
+    "diffCheck": true
+  },
+  "exposure": {
+    "captain": {
+      "toolCount": 13,
+      "defaultUsageBytes": 4235,
+      "schemaBytes": 13414
+    },
+    "member": {
+      "toolCount": 4,
+      "usageBytes": 443,
+      "schemaBytes": 4364
+    },
+    "units": "UTF-8 bytes of plugin-only fixed usage and serialized real Harness native team tool definitions; excludes host instructions, history and member persona. No token or cost conversion."
+  },
+  "runtimeMatrix": [
+    {
+      "version": "0.1.2-rc.1",
+      "cohortCount": 214,
+      "artifactSha256": "3b03096455bf2d97bf8272756eebd4715d251ea9798e103bb98d641c19ca5a18",
+      "resultPath": "/tmp/dsh-no-open-matrix-rc1/result.json",
+      "resultSha256": "5af6dc59f7d6da99990aa32613abd55072603360d87d3cea6a319a18cbaefe9d",
+      "testFiles": {
+        "harness-runtime-verify.mjs": "a2074670e07b50bbb81ef0bab10b82d8fcdf9671fe99ab3d8b468f2fff257269",
+        "fixtures/harness-runtime-llm.mjs": "f8bebbeaa24e77093f67945e1735edccf18651338e201ca0cd09aab5ce816b0b",
+        "fixtures/harness-runtime-resume.mjs": "0ff88e3bf1d10788676ee0a2ad3d03bc4783fe06bddffbb707513b5c632cda0d",
+        "fixtures/harness-runtime-idle.mjs": "15e4c8f9c77d35052e7458d672fb29ba298bf6b6e0426900e4236e1e7c437a46",
+        "fixtures/harness-runtime-entry.mjs": "924f01c56456ee85514858688c8100c658b71d45621666ca270205c16c1b5263",
+        "fixtures/harness-runtime-web-approval.mjs": "6378e6a6076d64844ef74e9d38c02a730b633ebe021610753ee701b759fd61eb",
+        "fixtures/harness-runtime-protocol.mjs": "b50bca8121817a7d70e7499db9f2647b4a6ecf659db5f78dcf69b95c2f296c31"
+      },
+      "runs": [
+        {
+          "scenario": "lifecycle",
+          "passed": true,
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          },
+          "assertions": {
+            "exit0": true,
+            "productMarker": true,
+            "pluginToolsVisible": true,
+            "memberExecuted": true,
+            "explicitReasoning": true,
+            "taskTerminal": true,
+            "secondWake": true,
+            "fifoMessageOrder": true,
+            "messagesSentWhileBusy": true
+          },
+          "requests": 24,
+          "memberRequests": 9
+        },
+        {
+          "scenario": "lifecycle-cold-restore",
+          "passed": true,
+          "assertions": {
+            "exit0": true,
+            "driverCompleted": true,
+            "sameMemberRestored": true,
+            "routeRestored": true,
+            "reasoningRestored": true
+          },
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          }
+        },
+        {
+          "scenario": "fallback",
+          "passed": true,
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          },
+          "assertions": {
+            "exit0": true,
+            "productMarker": true,
+            "pluginToolsVisible": true,
+            "memberExecuted": true,
+            "explicitReasoning": true,
+            "taskTerminal": true,
+            "secondWake": true,
+            "fallbackActivated": true,
+            "fallbackReasoningReset": true
+          },
+          "requests": 21,
+          "memberRequests": 8
+        },
+        {
+          "scenario": "fallback-cold-restore",
+          "passed": true,
+          "assertions": {
+            "exit0": true,
+            "driverCompleted": true,
+            "sameMemberRestored": true,
+            "routeRestored": true,
+            "reasoningRestored": true
+          },
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          }
+        },
+        {
+          "scenario": "failure",
+          "passed": true,
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          },
+          "assertions": {
+            "exit0": true,
+            "productMarker": true,
+            "pluginToolsVisible": true,
+            "memberExecuted": true,
+            "explicitReasoning": true,
+            "taskTerminal": true
+          },
+          "requests": 11,
+          "memberRequests": 2
+        },
+        {
+          "scenario": "captain-idle-wakeup",
+          "passed": true,
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          },
+          "assertions": {
+            "exit0": true,
+            "productMarker": true,
+            "pluginToolsVisible": true,
+            "memberExecuted": true,
+            "explicitReasoning": true,
+            "taskTerminal": true,
+            "captainActuallyYielded": true,
+            "notifiedAfterIdle": true
+          },
+          "requests": 12,
+          "memberRequests": 6
+        },
+        {
+          "scenario": "progressive-entry",
+          "passed": true,
+          "assertions": {
+            "exit0": true,
+            "productMarker": true,
+            "allEntries": true,
+            "stablePrefixes": true,
+            "thirtyOrdinaryTurns": true
+          },
+          "cases": [
+            "natural",
+            "natural-zh",
+            "raw-slash",
+            "command",
+            "profile-command",
+            "profile-raw"
+          ],
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          }
+        },
+        {
+          "scenario": "web-approval",
+          "passed": true,
+          "assertions": {
+            "exit0": true,
+            "productMarker": true,
+            "driverCompleted": true,
+            "stagedBeforeApproval": true,
+            "independentApprovalWake": true,
+            "reportWakeAfterYield": true,
+            "noPollingOrDuplicateApproval": true,
+            "oneUserMessageAndHttpApproval": true,
+            "invalidTeamRejected": true,
+            "repeatApprovalRejected": true,
+            "stableCaptainHeaders": true,
+            "memberFourTools": true,
+            "taskCompleted": true
+          },
+          "evidence": {
+            "event": "web-approval-passed",
+            "sessionId": "session-6db04924-9d97-4667-b840-ad8aafeac077",
+            "teamId": "runtime-lab",
+            "memberId": "aa218e19-3956-473a-9bfd-40832d63396a",
+            "taskStatus": "completed",
+            "captainRequests": 7,
+            "order": 32,
+            "time": 1788949434106
+          },
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          }
+        },
+        {
+          "scenario": "protocol-compatibility",
+          "passed": true,
+          "assertions": {
+            "exit0": true,
+            "productMarker": true,
+            "legacyAllowlistAndColdRestore": true,
+            "legacyProfileDirectory": true,
+            "actualPtcDiscard": true,
+            "actualPruning": true,
+            "actualCompaction": true,
+            "existingPlanRevised": true,
+            "lifecycleArchived": true
+          },
+          "cases": [
+            {
+              "event": "protocol-case-passed",
+              "label": "legacy-allowlist-cold-compact",
+              "requests": 7,
+              "compactedHistory": true,
+              "persistedSubject": "Recovered task",
+              "archived": true,
+              "profile": "north"
+            },
+            {
+              "event": "protocol-case-passed",
+              "label": "ptc-discard-and-compact",
+              "requests": 9,
+              "compactedHistory": true,
+              "persistedSubject": "Recovered task",
+              "archived": true
+            }
+          ],
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          }
+        }
+      ]
+    },
+    {
+      "version": "0.1.2-alpha.5",
+      "cohortCount": 214,
+      "artifactSha256": "3b03096455bf2d97bf8272756eebd4715d251ea9798e103bb98d641c19ca5a18",
+      "resultPath": "/tmp/dsh-no-open-matrix-alpha5/result.json",
+      "resultSha256": "62d643f9a7245c229da8df16201b8f6e782ead8bd8f3897645fb98eae6442179",
+      "testFiles": {
+        "harness-runtime-verify.mjs": "a2074670e07b50bbb81ef0bab10b82d8fcdf9671fe99ab3d8b468f2fff257269",
+        "fixtures/harness-runtime-llm.mjs": "f8bebbeaa24e77093f67945e1735edccf18651338e201ca0cd09aab5ce816b0b",
+        "fixtures/harness-runtime-resume.mjs": "0ff88e3bf1d10788676ee0a2ad3d03bc4783fe06bddffbb707513b5c632cda0d",
+        "fixtures/harness-runtime-idle.mjs": "15e4c8f9c77d35052e7458d672fb29ba298bf6b6e0426900e4236e1e7c437a46",
+        "fixtures/harness-runtime-entry.mjs": "924f01c56456ee85514858688c8100c658b71d45621666ca270205c16c1b5263",
+        "fixtures/harness-runtime-web-approval.mjs": "6378e6a6076d64844ef74e9d38c02a730b633ebe021610753ee701b759fd61eb",
+        "fixtures/harness-runtime-protocol.mjs": "b50bca8121817a7d70e7499db9f2647b4a6ecf659db5f78dcf69b95c2f296c31"
+      },
+      "runs": [
+        {
+          "scenario": "lifecycle",
+          "passed": true,
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          },
+          "assertions": {
+            "exit0": true,
+            "productMarker": true,
+            "pluginToolsVisible": true,
+            "memberExecuted": true,
+            "explicitReasoning": true,
+            "taskTerminal": true,
+            "secondWake": true,
+            "fifoMessageOrder": true,
+            "messagesSentWhileBusy": true
+          },
+          "requests": 24,
+          "memberRequests": 9
+        },
+        {
+          "scenario": "lifecycle-cold-restore",
+          "passed": true,
+          "assertions": {
+            "exit0": true,
+            "driverCompleted": true,
+            "sameMemberRestored": true,
+            "routeRestored": true,
+            "reasoningRestored": true
+          },
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          }
+        },
+        {
+          "scenario": "fallback",
+          "passed": true,
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          },
+          "assertions": {
+            "exit0": true,
+            "productMarker": true,
+            "pluginToolsVisible": true,
+            "memberExecuted": true,
+            "explicitReasoning": true,
+            "taskTerminal": true,
+            "secondWake": true,
+            "fallbackActivated": true,
+            "fallbackReasoningReset": true
+          },
+          "requests": 21,
+          "memberRequests": 8
+        },
+        {
+          "scenario": "fallback-cold-restore",
+          "passed": true,
+          "assertions": {
+            "exit0": true,
+            "driverCompleted": true,
+            "sameMemberRestored": true,
+            "routeRestored": true,
+            "reasoningRestored": true
+          },
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          }
+        },
+        {
+          "scenario": "failure",
+          "passed": true,
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          },
+          "assertions": {
+            "exit0": true,
+            "productMarker": true,
+            "pluginToolsVisible": true,
+            "memberExecuted": true,
+            "explicitReasoning": true,
+            "taskTerminal": true
+          },
+          "requests": 12,
+          "memberRequests": 2
+        },
+        {
+          "scenario": "captain-idle-wakeup",
+          "passed": true,
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          },
+          "assertions": {
+            "exit0": true,
+            "productMarker": true,
+            "pluginToolsVisible": true,
+            "memberExecuted": true,
+            "explicitReasoning": true,
+            "taskTerminal": true,
+            "captainActuallyYielded": true,
+            "notifiedAfterIdle": true
+          },
+          "requests": 12,
+          "memberRequests": 6
+        },
+        {
+          "scenario": "progressive-entry",
+          "passed": true,
+          "assertions": {
+            "exit0": true,
+            "productMarker": true,
+            "allEntries": true,
+            "stablePrefixes": true,
+            "thirtyOrdinaryTurns": true
+          },
+          "cases": [
+            "natural",
+            "natural-zh",
+            "raw-slash",
+            "command",
+            "profile-command",
+            "profile-raw"
+          ],
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          }
+        },
+        {
+          "scenario": "web-approval",
+          "passed": true,
+          "assertions": {
+            "exit0": true,
+            "productMarker": true,
+            "driverCompleted": true,
+            "stagedBeforeApproval": true,
+            "independentApprovalWake": true,
+            "reportWakeAfterYield": true,
+            "noPollingOrDuplicateApproval": true,
+            "oneUserMessageAndHttpApproval": true,
+            "invalidTeamRejected": true,
+            "repeatApprovalRejected": true,
+            "stableCaptainHeaders": true,
+            "memberFourTools": true,
+            "taskCompleted": true
+          },
+          "evidence": {
+            "event": "web-approval-passed",
+            "sessionId": "session-67841b36-7b01-483c-bb79-85ad7cb1af43",
+            "teamId": "runtime-lab",
+            "memberId": "6ad522f6-9263-4dfd-8814-ef11f235e9f7",
+            "taskStatus": "completed",
+            "captainRequests": 7,
+            "order": 32,
+            "time": 1788949429515
+          },
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          }
+        },
+        {
+          "scenario": "protocol-compatibility",
+          "passed": true,
+          "assertions": {
+            "exit0": true,
+            "productMarker": true,
+            "legacyAllowlistAndColdRestore": true,
+            "legacyProfileDirectory": true,
+            "actualPtcDiscard": true,
+            "actualPruning": true,
+            "actualCompaction": true,
+            "existingPlanRevised": true,
+            "lifecycleArchived": true
+          },
+          "cases": [
+            {
+              "event": "protocol-case-passed",
+              "label": "legacy-allowlist-cold-compact",
+              "requests": 7,
+              "compactedHistory": true,
+              "persistedSubject": "Recovered task",
+              "archived": true,
+              "profile": "north"
+            },
+            {
+              "event": "protocol-case-passed",
+              "label": "ptc-discard-and-compact",
+              "requests": 9,
+              "compactedHistory": true,
+              "persistedSubject": "Recovered task",
+              "archived": true
+            }
+          ],
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          }
+        }
+      ]
+    },
+    {
+      "version": "0.1.2-alpha.2",
+      "cohortCount": 215,
+      "artifactSha256": "3b03096455bf2d97bf8272756eebd4715d251ea9798e103bb98d641c19ca5a18",
+      "resultPath": "/tmp/dsh-no-open-matrix-alpha2/result.json",
+      "resultSha256": "22596971d62d65987c8f9bb3ce04dab6e59720cbf6472d94a4a2d64012023ca0",
+      "testFiles": {
+        "harness-runtime-verify.mjs": "a2074670e07b50bbb81ef0bab10b82d8fcdf9671fe99ab3d8b468f2fff257269",
+        "fixtures/harness-runtime-llm.mjs": "f8bebbeaa24e77093f67945e1735edccf18651338e201ca0cd09aab5ce816b0b",
+        "fixtures/harness-runtime-resume.mjs": "0ff88e3bf1d10788676ee0a2ad3d03bc4783fe06bddffbb707513b5c632cda0d",
+        "fixtures/harness-runtime-idle.mjs": "15e4c8f9c77d35052e7458d672fb29ba298bf6b6e0426900e4236e1e7c437a46",
+        "fixtures/harness-runtime-entry.mjs": "924f01c56456ee85514858688c8100c658b71d45621666ca270205c16c1b5263",
+        "fixtures/harness-runtime-web-approval.mjs": "6378e6a6076d64844ef74e9d38c02a730b633ebe021610753ee701b759fd61eb",
+        "fixtures/harness-runtime-protocol.mjs": "b50bca8121817a7d70e7499db9f2647b4a6ecf659db5f78dcf69b95c2f296c31"
+      },
+      "runs": [
+        {
+          "scenario": "lifecycle",
+          "passed": true,
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          },
+          "assertions": {
+            "exit0": true,
+            "productMarker": true,
+            "pluginToolsVisible": true,
+            "memberExecuted": true,
+            "explicitReasoning": true,
+            "taskTerminal": true,
+            "secondWake": true,
+            "fifoMessageOrder": true,
+            "messagesSentWhileBusy": true
+          },
+          "requests": 24,
+          "memberRequests": 9
+        },
+        {
+          "scenario": "lifecycle-cold-restore",
+          "passed": true,
+          "assertions": {
+            "exit0": true,
+            "driverCompleted": true,
+            "sameMemberRestored": true,
+            "routeRestored": true,
+            "reasoningRestored": true
+          },
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          }
+        },
+        {
+          "scenario": "fallback",
+          "passed": true,
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          },
+          "assertions": {
+            "exit0": true,
+            "productMarker": true,
+            "pluginToolsVisible": true,
+            "memberExecuted": true,
+            "explicitReasoning": true,
+            "taskTerminal": true,
+            "secondWake": true,
+            "fallbackActivated": true,
+            "fallbackReasoningReset": true
+          },
+          "requests": 20,
+          "memberRequests": 8
+        },
+        {
+          "scenario": "fallback-cold-restore",
+          "passed": true,
+          "assertions": {
+            "exit0": true,
+            "driverCompleted": true,
+            "sameMemberRestored": true,
+            "routeRestored": true,
+            "reasoningRestored": true
+          },
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          }
+        },
+        {
+          "scenario": "failure",
+          "passed": true,
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          },
+          "assertions": {
+            "exit0": true,
+            "productMarker": true,
+            "pluginToolsVisible": true,
+            "memberExecuted": true,
+            "explicitReasoning": true,
+            "taskTerminal": true
+          },
+          "requests": 12,
+          "memberRequests": 2
+        },
+        {
+          "scenario": "captain-idle-wakeup",
+          "passed": true,
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          },
+          "assertions": {
+            "exit0": true,
+            "productMarker": true,
+            "pluginToolsVisible": true,
+            "memberExecuted": true,
+            "explicitReasoning": true,
+            "taskTerminal": true,
+            "captainActuallyYielded": true,
+            "notifiedAfterIdle": true
+          },
+          "requests": 12,
+          "memberRequests": 6
+        },
+        {
+          "scenario": "progressive-entry",
+          "passed": true,
+          "assertions": {
+            "exit0": true,
+            "productMarker": true,
+            "allEntries": true,
+            "stablePrefixes": true,
+            "thirtyOrdinaryTurns": true
+          },
+          "cases": [
+            "natural",
+            "natural-zh",
+            "raw-slash",
+            "command",
+            "profile-command",
+            "profile-raw"
+          ],
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          }
+        },
+        {
+          "scenario": "web-approval",
+          "passed": true,
+          "assertions": {
+            "exit0": true,
+            "productMarker": true,
+            "driverCompleted": true,
+            "stagedBeforeApproval": true,
+            "independentApprovalWake": true,
+            "reportWakeAfterYield": true,
+            "noPollingOrDuplicateApproval": true,
+            "oneUserMessageAndHttpApproval": true,
+            "invalidTeamRejected": true,
+            "repeatApprovalRejected": true,
+            "stableCaptainHeaders": true,
+            "memberFourTools": true,
+            "taskCompleted": true
+          },
+          "evidence": {
+            "event": "web-approval-passed",
+            "sessionId": "session-2066ad4c-8495-452f-b6a7-de959f6ca077",
+            "teamId": "runtime-lab",
+            "memberId": "7a5136c4-d0c3-45d9-87b2-af644569ae8e",
+            "taskStatus": "completed",
+            "captainRequests": 7,
+            "order": 32,
+            "time": 1788949420376
+          },
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          }
+        },
+        {
+          "scenario": "protocol-compatibility",
+          "passed": true,
+          "assertions": {
+            "exit0": true,
+            "productMarker": true,
+            "legacyAllowlistAndColdRestore": true,
+            "legacyProfileDirectory": true,
+            "actualPtcDiscard": true,
+            "actualPruning": true,
+            "actualCompaction": true,
+            "existingPlanRevised": true,
+            "lifecycleArchived": true
+          },
+          "cases": [
+            {
+              "event": "protocol-case-passed",
+              "label": "legacy-allowlist-cold-compact",
+              "requests": 7,
+              "compactedHistory": true,
+              "persistedSubject": "Recovered task",
+              "archived": true,
+              "profile": "north"
+            },
+            {
+              "event": "protocol-case-passed",
+              "label": "ptc-discard-and-compact",
+              "requests": 9,
+              "compactedHistory": true,
+              "persistedSubject": "Recovered task",
+              "archived": true
+            }
+          ],
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          }
+        }
+      ]
+    }
+  ],
+  "realModel": {
+    "fresh": {
+      "resultPath": "/tmp/dsh-no-open-real-model/candidate/run.json",
+      "resultSha256": "9f5c5de64ab2a159ca2e50d06695e50adb989e7518f9fdec13d82251a106c267",
+      "tracePath": "/tmp/dsh-no-open-real-model/candidate/trace.jsonl",
+      "traceSha256": "7cb7c8c886fb601f12614ab2018780380ce0bbffea430be10a72fd41a5402e82",
+      "artifactSha256": "3b03096455bf2d97bf8272756eebd4715d251ea9798e103bb98d641c19ca5a18",
+      "passed": true,
+      "provider": "deepseek-official",
+      "model": "deepseek-v4.1-flash-expires-on-0910",
+      "reasoningEffort": "max",
+      "requests": 79,
+      "elapsedMs": 118525,
+      "checks": {
+        "source:app/orders.mjs": true,
+        "source:app/comments.mjs": true,
+        "source:app/signup.mjs": true,
+        "oneCurrentTeam": true,
+        "exactRoster": true,
+        "running": true,
+        "groundedReport:performance": true,
+        "memberWroteReport:performance": true,
+        "taskCompleted:performance": true,
+        "groundedReport:security": true,
+        "memberWroteReport:security": true,
+        "taskCompleted:security": true,
+        "groundedReport:interaction": true,
+        "memberWroteReport:interaction": true,
+        "taskCompleted:interaction": true,
+        "summary": true,
+        "captainSummarizedAfterCompletion": true,
+        "exactTaskCount": true
+      },
+      "external": {
+        "sourceUnchanged": true,
+        "hashes": {
+          "app/orders.mjs": "437ebb9e258f51ae043c84aed195e5d7ce53a89b56c487a002a018bf97f3a8a6",
+          "app/comments.mjs": "7f5cec1d0b7eec9248c43fbdb8f1151cf6ae52ee37a0e649a39579a289a2c198",
+          "app/signup.mjs": "f28019ae6905f30beae40491a3d73298c853b370aea6740cdbd81679262207b8"
+        },
+        "repeatedProductScans": true,
+        "productIdReads": 20100,
+        "unsafeHtmlEcho": true,
+        "validInputStillDisabled": true
+      },
+      "metrics": {
+        "sessionHeaders": [
+          {
+            "sessionId": "session-952e5344-c0eb-4b77-9234-09f9f186f69a",
+            "role": "captain",
+            "requests": 23,
+            "systemHashes": [
+              "92512c5fb29e43b142315568db1cf253c40e233245df9a13b0a26ab068a12379"
+            ],
+            "toolsHashes": [
+              "3b50d106e00c4744a9a6d03c0e912a3f67af3ba6961954aced142c311b1aa7c5"
+            ]
+          },
+          {
+            "sessionId": "9ff4429f-1536-4adf-8df1-2dd4ad9cede2",
+            "role": "member",
+            "requests": 19,
+            "systemHashes": [
+              "90f3e0c255764f1b29a24385359c6fe89fb786c8c2ac8095a5172996a5284a4f"
+            ],
+            "toolsHashes": [
+              "487ed0ad33d0a1016a2eec288570d2a3eed96f094402cc6f0afa52423cf3f34a"
+            ]
+          },
+          {
+            "sessionId": "34055670-d98b-4b1c-9fc5-3fdb05605ac5",
+            "role": "member",
+            "requests": 21,
+            "systemHashes": [
+              "7ca9a813be4261f51cb8663ece486d3450c46e7f0931ab5e3670950e0cff5534"
+            ],
+            "toolsHashes": [
+              "487ed0ad33d0a1016a2eec288570d2a3eed96f094402cc6f0afa52423cf3f34a"
+            ]
+          },
+          {
+            "sessionId": "ef4d8c60-bea2-4616-b4e1-b015bfa33a33",
+            "role": "member",
+            "requests": 16,
+            "systemHashes": [
+              "21115df812464f5fbe804c099a1751b0c3c6da978f16bf670be3c0812ed52748"
+            ],
+            "toolsHashes": [
+              "487ed0ad33d0a1016a2eec288570d2a3eed96f094402cc6f0afa52423cf3f34a"
+            ]
+          }
+        ],
+        "stableSessionHeaders": true,
+        "openCalls": 0,
+        "usageRequests": 77,
+        "requestsWithoutUsage": [
+          19,
+          20
+        ],
+        "usage": {
+          "uncachedInputTokens": 82353,
+          "cacheReadTokens": 1598720,
+          "cacheWriteTokens": null,
+          "outputTokens": 63515,
+          "reasoningTokens": 35279
+        },
+        "usageSemantics": "Harness Usage counts inputTokens as uncached input; cacheRead/cacheWrite are separate. Last usage per request; unavailable fields remain null. Requests without usage are listed and excluded from sums. No price inference."
+      },
+      "callCounts": {
+        "agent_teams_status": 12,
+        "agent_teams_create": 1,
+        "agent_teams_add_member": 3,
+        "agent_teams_create_task": 3,
+        "agent_teams_claim_task": 4,
+        "agent_teams_update_task": 7,
+        "agent_teams_reassign_task": 3,
+        "agent_teams_send_message": 5
+      },
+      "removedToolNeverExposedOrCalled": true,
+      "fixtureHashes": {
+        "driver": "4010e82dfe1c6ed39f83ee86166f6536023219883d0e7651d41ac8bcd8d2ef5d",
+        "case": "5036cc52b5b6bae997a400828c4bc341068c0c9e261b73aafe728a8463faeb4e"
+      }
+    },
+    "upgrade": {
+      "resultPath": "/tmp/dsh-no-open-old-session/upgrade/run.json",
+      "resultSha256": "282f775157b544aa3dadf377311522c8527bad600460fe7a794af586a72b14a2",
+      "tracePath": "/tmp/dsh-no-open-old-session/upgrade/trace.jsonl",
+      "traceSha256": "690e6ff7f1b43bc69ed42c0e113db80b9bce97c4836a30bc8ac314f693830f72",
+      "artifactSha256": "3b03096455bf2d97bf8272756eebd4715d251ea9798e103bb98d641c19ca5a18",
+      "passed": true,
+      "provider": "deepseek-official",
+      "model": "deepseek-v4.1-flash-expires-on-0910",
+      "reasoningEffort": "max",
+      "requests": 18,
+      "elapsedMs": 35380,
+      "checks": {
+        "source:app/orders.mjs": true,
+        "source:app/comments.mjs": true,
+        "source:app/signup.mjs": true,
+        "oneCurrentTeam": true,
+        "exactRoster": true,
+        "running": true,
+        "groundedReport:security": true,
+        "memberWroteReport:security": true,
+        "taskCompleted:security": true,
+        "summary": true,
+        "captainSummarizedAfterCompletion": true,
+        "sameTeam": true,
+        "sameMembers": true,
+        "exactlyOneNewTask": true
+      },
+      "external": {
+        "sourceUnchanged": true,
+        "hashes": {
+          "app/orders.mjs": "437ebb9e258f51ae043c84aed195e5d7ce53a89b56c487a002a018bf97f3a8a6",
+          "app/comments.mjs": "7f5cec1d0b7eec9248c43fbdb8f1151cf6ae52ee37a0e649a39579a289a2c198",
+          "app/signup.mjs": "f28019ae6905f30beae40491a3d73298c853b370aea6740cdbd81679262207b8"
+        },
+        "repeatedProductScans": true,
+        "productIdReads": 20100,
+        "unsafeHtmlEcho": true,
+        "validInputStillDisabled": true
+      },
+      "metrics": {
+        "sessionHeaders": [
+          {
+            "sessionId": "session-6bbfce73-bae4-4cad-b33f-fb812dd7d235",
+            "role": "captain",
+            "requests": 9,
+            "systemHashes": [
+              "08817a2e10dae234aa512b658dac36ead5b2be5ec9bb6ed7d693ea6be79bdf13"
+            ],
+            "toolsHashes": [
+              "3b50d106e00c4744a9a6d03c0e912a3f67af3ba6961954aced142c311b1aa7c5"
+            ]
+          },
+          {
+            "sessionId": "a3c29c71-dd5d-4a44-9f91-cca7af3e2a0a",
+            "role": "member",
+            "requests": 1,
+            "systemHashes": [
+              "3b494e280b22411f54ee8adc43e5984c85a7780c1d8e876c9505e0caf45db5e7"
+            ],
+            "toolsHashes": [
+              "487ed0ad33d0a1016a2eec288570d2a3eed96f094402cc6f0afa52423cf3f34a"
+            ]
+          },
+          {
+            "sessionId": "74cc36e5-a545-4e3d-a4f2-9db8adb81149",
+            "role": "member",
+            "requests": 8,
+            "systemHashes": [
+              "f6fc0c2d27659813b66d0486e69c353b2c8887a45c3001754bcedc2619c19595"
+            ],
+            "toolsHashes": [
+              "487ed0ad33d0a1016a2eec288570d2a3eed96f094402cc6f0afa52423cf3f34a"
+            ]
+          }
+        ],
+        "stableSessionHeaders": true,
+        "openCalls": 0,
+        "usageRequests": 17,
+        "requestsWithoutUsage": [
+          2
+        ],
+        "usage": {
+          "uncachedInputTokens": 44695,
+          "cacheReadTokens": 572544,
+          "cacheWriteTokens": null,
+          "outputTokens": 7611,
+          "reasoningTokens": 2325
+        },
+        "usageSemantics": "Harness Usage counts inputTokens as uncached input; cacheRead/cacheWrite are separate. Last usage per request; unavailable fields remain null. Requests without usage are listed and excluded from sums. No price inference."
+      },
+      "callCounts": {
+        "agent_teams_create_task": 1,
+        "agent_teams_reassign_task": 1,
+        "agent_teams_claim_task": 1,
+        "agent_teams_status": 2,
+        "agent_teams_update_task": 2,
+        "agent_teams_send_message": 1
+      },
+      "removedToolNeverExposedOrCalled": true,
+      "fixtureHashes": {
+        "driver": "4010e82dfe1c6ed39f83ee86166f6536023219883d0e7651d41ac8bcd8d2ef5d",
+        "case": "5036cc52b5b6bae997a400828c4bc341068c0c9e261b73aafe728a8463faeb4e"
+      }
+    },
+    "upgradeSeed": {
+      "source": "/tmp/dsh-model-real-final-20260909/candidate",
+      "artifactSha256": "67258d3a30b523d53b7fe61a1a68da9a7462a332ee27f176721228824dd2df0e",
+      "sessionStorage": "Copied unchanged; same captain/member IDs and historical tool calls",
+      "workspace": "/tmp/dsh-model-real-final-20260909/candidate/workspace",
+      "snapshot": "/tmp/dsh-no-open-old-session/baseline/workspace-before-upgrade",
+      "scope": "Continue the isolated previous benchmark workspace; no user workspace or active profile is used",
+      "sourceCommit": "68d2c77",
+      "historicalOpenCalls": 1,
+      "originalSessionFilesCopiedUnchanged": true
+    }
+  },
+  "observations": [
+    "Fresh workflow completed all external business assertions, but made three unnecessary reassign_task calls to dispatch already assigned work and twelve status calls. Completion does not imply optimal model behavior or lower cost.",
+    "Fresh workflow made 79 requests (118.5 seconds); prior original baseline made 72 requests (119.2 seconds). This is a single new trial, not statistical equivalence or a cost reduction claim.",
+    "Upgrade of the previous 14-tool session used the unchanged copied session logs in an isolated benchmark profile. It retained the same team and member IDs, added exactly one task, and did not call the removed tool.",
+    "System/tools hashes stayed stable within each tested session on the new version. Installing a new version can itself change the prefix."
+  ],
+  "unverified": [
+    "Statistical success-rate equivalence across repeated trials",
+    "Other providers and models",
+    "New real-model quality repair-loop, pause and takeover trials (existing deterministic regression remains)",
+    "Real browser clicks and rendering (approval exercised through actual authenticated HTTP routes)",
+    "Provider cache guarantees or reduced total cost",
+    "Production release"
+  ]
+}

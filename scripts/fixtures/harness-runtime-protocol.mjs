@@ -3,7 +3,7 @@
  * This proves request content and persisted effects, not real-model reasoning.
  */
 import assert from 'node:assert/strict';
-import { appendFileSync, readFileSync, mkdirSync } from 'node:fs';
+import { appendFileSync, readFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { createUserMessage, LlmAdapter, ToolCallId } from '@deepseek-ai/dsh-llm';
@@ -44,6 +44,8 @@ class ProtocolAdapter extends LlmAdapter {
         const scenario = cases.get(options.sessionId);
         assert.ok(scenario, 'Unexpected live agent request');
         assertProtocol(options.system);
+        assert.doesNotMatch(options.system ?? '', /agent_teams_open/);
+        assert.ok(!(options.tools ?? []).some(tool => tool.name === 'agent_teams_open'));
         const blocks = options.messages.flatMap(message => message.content ?? []);
         const failed = blocks.find(block => block.type === 'tool-result' && block.isError);
         assert.equal(failed, undefined, JSON.stringify(failed));
@@ -53,36 +55,40 @@ class ProtocolAdapter extends LlmAdapter {
         if (!scenario.ptc && scenario.phase === 'plan' && scenario.step === 0) {
             // Anonymous names cannot convey their purpose by themselves. The
             // original thirteen-tool allowlist must still see the configured
-            // directory in its FIRST request, before any helper or error result.
+            // directory in its FIRST request, before any business or error result.
             const north = options.system.split('\n').find(line => line.startsWith('- north '));
             const south = options.system.split('\n').find(line => line.startsWith('- south '));
             assert.match(north ?? '', /1 member, captain planning/);
             assert.match(north ?? '', /Investigate an existing codebase and design a goal-specific task DAG/);
             assert.match(south ?? '', /1 member, 1 task/);
             assert.match(south ?? '', /Apply a fixed release-readiness checklist to a prepared release/);
-            const openAvailable = options.tools.some(tool => tool.name === 'agent_teams_open');
-            assert.equal(openAvailable, false);
-            record({ event: 'protocol-legacy-profile-directory', sessionId: options.sessionId, openAvailable, northPurposeVisible: true, southPurposeVisible: true, north, south });
+            assert.deepEqual(options.tools.map(tool => tool.name).sort(), [...businessNames].sort());
+            record({ event: 'protocol-legacy-profile-directory', sessionId: options.sessionId, onlyOriginalTools: true, northPurposeVisible: true, southPurposeVisible: true, north, south });
         }
         if (scenario.phase === 'revise') {
-            assert.ok(!blocks.some(block => block.type === 'tool-call' && block.name === 'agent_teams_open'), 'Recovery must not depend on a historical open');
             if (scenario.step++ === 0) {
                 const args = { operations: [{ action: 'update_task', task_id: 't1', subject: 'Recovered task' }] };
                 yield* scenario.ptc ? call('run_code', { code: `return await tools.agent_teams_edit_plan(${JSON.stringify(args)});`, description: 'Revise the existing staged task after history compaction' }) : call('agent_teams_edit_plan', args);
             } else yield* textChunks('EXISTING_PLAN_REVISED');
             return;
         }
-        if (scenario.ptc && scenario.step === 0) {
-            scenario.step++;
-            yield* call('run_code', { code: 'await tools.agent_teams_open({}); return "OPEN_OUTPUT_DISCARDED\\n" + "historical-output ".repeat(1000);', description: 'Inspect optional team context, retaining only a receipt' });
+        if (scenario.phase === 'archive') {
+            if (scenario.step++ === 0) yield* scenario.ptc ? call('run_code', { code: 'return await tools.agent_teams_delete({});', description: 'Archive the team at the user request' }) : call('agent_teams_delete', {});
+            else yield* textChunks('TEAM_ARCHIVED');
             return;
         }
         if (scenario.ptc && scenario.step === 1) {
-            assert.match(resultText, /OPEN_OUTPUT_DISCARDED/);
-            assert.doesNotMatch(resultText, /AgentTeams captain protocol|Tasks carry attempt_id/);
-            record({ event: 'protocol-ptc-output-discarded', sessionId: options.sessionId, systemRulesPresent: true });
+            scenario.step++;
+            yield* call('run_code', { code: 'await tools.agent_teams_status({}); return "STATUS_OUTPUT_DISCARDED\\n" + "historical-output ".repeat(1000);', description: 'Inspect current team status, retaining only a receipt' });
+            return;
         }
-        const step = scenario.step++ - (scenario.ptc ? 1 : 0);
+        if (scenario.ptc && scenario.step === 2) {
+            assert.match(resultText, /STATUS_OUTPUT_DISCARDED/);
+            assert.doesNotMatch(resultText, /AgentTeams captain protocol|Tasks carry attempt_id/);
+            record({ event: 'protocol-ptc-output-discarded', tool: 'agent_teams_status', sessionId: options.sessionId, systemRulesPresent: true });
+        }
+        const rawStep = scenario.step++;
+        const step = rawStep - (scenario.ptc && rawStep > 1 ? 1 : 0);
         const actions = [
             ['agent_teams_create', { name: 'protocol-team', description: goal, approval: 'required', ...scenario.ptc ? {} : { profile: 'north' } }],
             ...scenario.ptc ? [['agent_teams_add_member', { name: 'worker', role: 'Implement the assigned task', executionPrompt: 'Complete assigned work and report.' }]] : [],
@@ -132,12 +138,11 @@ export function apply(ctx) {
             assert.ok(!state().members[0].id, 'Staging must not spawn a member');
             assert.equal(await usage(agent), beforeUsage);
             if (ptc) {
-                assert.ok(sessionEvents(agent.session).some(event => event.type === 'tool/code-dispatch' && event.data.name === 'agent_teams_open'));
+                assert.ok(sessionEvents(agent.session).some(event => event.type === 'tool/code-dispatch' && event.data.name === 'agent_teams_status'));
                 const pruned = ctx.toolResultPruner.pruneSession(agent.session);
                 assert.ok(sessionEvents(agent.session).some(event => event.type === 'compaction/prune'), 'Oversized PTC receipt must actually be pruned');
                 record({ event: 'protocol-pruned', label, result: pruned });
             } else {
-                assert.ok(!requests.filter(request => request.sessionId === agent.id).some(request => request.messages.some(message => message.content.some(block => block.type === 'tool-call' && block.name === 'agent_teams_open'))));
                 const id = agent.id;
                 await ctx.sessions.flush(agent.session); restore(); await handle.dispose();
                 handle = await ctx.agents.resume({ resumeSessionId: id, agentOptions: { provider: 'runtime-lab', model: 'fixture-model' } });
@@ -156,10 +161,16 @@ export function apply(ctx) {
             assert.equal(state().tasks[0].subject, 'Recovered task');
             assert.equal(state().tasks.length, 1); assert.equal(state().members.length, 1); assert.equal(state().phase, 'staged');
             assert.equal(await usage(agent), beforeUsage);
+            const finalState = state();
+            scenario.phase = 'archive'; scenario.step = 0;
+            await send(agent, 'End and archive this team and its unfinished staged task.');
+            assert.equal(existsSync(file), false, 'Archived team must leave active state');
+            assert.equal(existsSync(join(cwd, '.agent-teams/archive/protocol-team/team.json')), true);
+            assert.equal(await usage(agent), beforeUsage);
             const captured = requests.filter(request => request.sessionId === agent.id);
             assert.equal(new Set(captured.map(request => request.systemSha256)).size, 1, 'System prefix changed across planning, restore or compaction');
             assert.equal(new Set(captured.map(request => request.toolsSha256)).size, 1, 'Tools prefix changed across planning, restore or compaction');
-            record({ event: 'protocol-case-passed', label, requests: captured.length, compactedHistory: true, persistedSubject: state().tasks[0].subject, ...state().profile ? { profile: state().profile.name } : {} });
+            record({ event: 'protocol-case-passed', label, requests: captured.length, compactedHistory: true, persistedSubject: finalState.tasks[0].subject, archived: true, ...finalState.profile ? { profile: finalState.profile.name } : {} });
             restore(); await ctx.sessions.flush(agent.session); await handle.dispose();
         }
         process.stdout.write('PROTOCOL_COMPATIBILITY_OK\n');

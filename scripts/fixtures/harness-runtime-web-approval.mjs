@@ -74,7 +74,6 @@ class WebApprovalAdapter extends LlmAdapter {
             else if (!names.includes('agent_teams_send_message')) chunks = call('agent_teams_send_message', { to: 'captain', content: 'WEB_MEMBER_REPORT_OK' });
             else chunks = textChunks('WEB_MEMBER_DONE');
         }
-        else if (!names.includes('agent_teams_open')) chunks = call('agent_teams_open', {});
         else if (!names.includes('agent_teams_create')) chunks = call('agent_teams_create', { name: 'runtime-lab', description: 'Web approval regression', approval: 'required' });
         else if (!names.includes('agent_teams_add_member')) chunks = call('agent_teams_add_member', { name: 'worker', role: 'WEB_APPROVAL_MEMBER', executionPrompt: 'WEB_APPROVAL_MEMBER: complete the assigned task and report.', reasoning_effort: 'high' });
         else if (!names.includes('agent_teams_create_task')) chunks = call('agent_teams_create_task', { subject: 'Web approval task', description: 'Complete the deterministic task after human approval', assignee: 'worker' });
@@ -189,7 +188,8 @@ export function apply(ctx) {
         assert.equal(completed.tasks[0].status, 'completed');
         assert.equal(completed.tasks[0].output, 'WEB_MEMBER_TASK_DONE');
         const modelCalls = events.filter(event => event.event === 'web-model-tool-call');
-        assert.equal(modelCalls[0].name, 'agent_teams_open');
+        assert.equal(modelCalls[0].name, 'agent_teams_create');
+        assert.ok(events.filter(event => event.event === 'web-request').every(event => !event.tools.some(tool => tool.name === 'agent_teams_open')));
         assert.equal(modelCalls.filter(event => event.name === 'agent_teams_approve' || event.name === 'agent_teams_status').length, 0, 'No duplicate approval or status polling');
         assert.equal(modelCalls.filter(event => event.name === 'agent_teams_create').length, 1);
         assert.equal(modelCalls.filter(event => event.name === 'agent_teams_add_member').length, 1);

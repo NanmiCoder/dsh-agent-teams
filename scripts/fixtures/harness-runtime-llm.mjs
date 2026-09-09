@@ -4,8 +4,6 @@ import { createHash } from 'node:crypto';
 let seq = 0;
 let memberStarted = false;
 const delayedMembers = new Set();
-const pendingOpen = new Map();
-const opened = new Set();
 const capturedRequests = new Set();
 const model = { provider: 'runtime-lab', id: 'fixture-model', name: 'Deterministic fixture', context: { contextWindow: 262144 }, defaultMaxTokens: 8192, reasoning: { efforts: [{ id: 'low', name: 'low' }, { id: 'high', name: 'high' }], defaultEffort: 'low' } };
 function record(data) { appendFileSync(process.env.LAB_TRACE, JSON.stringify({ ...data, time: Date.now() }) + '\n'); }
@@ -19,6 +17,7 @@ class FixtureAdapter extends LlmAdapter {
         const blocks = history(options), tools = blocks.filter(b => b.type === 'tool-call'), names = tools.map(b => b.name);
         const userText = options.messages.filter(m => m.role === 'user').flatMap(m => m.content.filter(b => b.type === 'text').map(b => b.text)).join('\n');
         const lastUserText = options.messages.filter(m => m.role === 'user' && m.source?.kind === 'user').map(m => m.content.filter(b => b.type === 'text').map(b => b.text).join('\n')).filter(Boolean).at(-1) ?? '';
+        const currentNames = options.messages.slice(options.messages.findLastIndex(m => m.role === 'user' && m.source?.kind === 'user') + 1).flatMap(m => m.content ?? []).filter(b => b.type === 'tool-call').map(b => b.name);
         const toolText = blocks.filter(b => b.type === 'tool-result').flatMap(b => b.content?.filter(t => t.type === 'text').map(t => t.text) ?? []).join('\n');
         const isMember = options.system?.includes('MEMBER_FIXTURE') === true;
         const teamTools = (options.tools ?? []).filter(t => t.name.startsWith('agent_teams_'));
@@ -33,13 +32,6 @@ class FixtureAdapter extends LlmAdapter {
             teamSchemaBytes: Buffer.byteLength(JSON.stringify(teamTools)), teamTools: teamTools.map(t => t.name) });
         record({ event: 'request', sessionId: options.sessionId, purpose: options.purpose, provider: options.provider, model: options.model, reasoningEffort: options.reasoningEffort, isMember, toolNames: (options.tools ?? []).map(t => t.name), called: names, lastToolText: toolText.slice(-12000), userText: userText.slice(-6000), userMessages: options.messages.filter(m => m.role === 'user').map(m => m.content.filter(b => b.type === 'text').map(b => b.text).join('\n')) });
         let chunks;
-        const openId = pendingOpen.get(options.sessionId);
-        if (openId) {
-            const result = blocks.find(b => b.type === 'tool-result' && b.toolCallId === openId);
-            if (!result || result.isError) throw Error('Entry tool did not return a successful result');
-            opened.add(options.sessionId);
-            pendingOpen.delete(options.sessionId);
-        }
         if (isMember && options.model === 'fixture-failing' && userText.includes('AgentTeams automatic task assignment'))
             throw new LlmError('Runtime fixture rejected primary route', 'AUTH', { status: 401 });
         if (options.purpose)
@@ -77,10 +69,6 @@ class FixtureAdapter extends LlmAdapter {
             else
                 chunks = textChunks('MEMBER_FIRST_TURN_OK');
         }
-        else if (!opened.has(options.sessionId)) {
-            chunks = call('agent_teams_open', process.env.LAB_SCENARIO === 'progressive-entry' && userText.includes('demo-profile') ? { profile: 'demo-profile' } : {});
-            pendingOpen.set(options.sessionId, chunks.find(c => c.type === 'block-end').block.id);
-        }
         else if (process.env.LAB_COLD === '1') {
             if (!tools.some(t => t.name === 'agent_teams_send_message' && t.arguments.includes('COLD_WAKE_FIXTURE')))
                 chunks = call('agent_teams_send_message', { to: 'worker', content: 'COLD_WAKE_FIXTURE' });
@@ -93,7 +81,13 @@ class FixtureAdapter extends LlmAdapter {
             chunks = names.includes('agent_teams_delete') ? textChunks('ENDED_ENTRY_OK') : call('agent_teams_delete', {});
         }
         else if (process.env.LAB_SCENARIO === 'progressive-entry' && lastUserText.includes('INSPECT_ENDED_ENTRY')) {
-            chunks = names.filter(n => n === 'agent_teams_open').length < 3 ? call('agent_teams_open', {}) : textChunks('INSPECTED_ENDED_ENTRY_OK');
+            if (!currentNames.includes('agent_teams_status')) chunks = call('agent_teams_status', {});
+            else {
+                const result = blocks.filter(b => b.type === 'tool-result').at(-1);
+                if (!result?.isError || !JSON.stringify(result).includes('you do not lead or belong to any active team yet'))
+                    throw Error('Archived-team inspection must report no active team');
+                chunks = textChunks('INSPECTED_ENDED_ENTRY_OK');
+            }
         }
         else if (process.env.LAB_SCENARIO === 'progressive-entry') {
             const failed = blocks.find(b => b.type === 'tool-result' && b.isError);
@@ -113,8 +107,8 @@ class FixtureAdapter extends LlmAdapter {
                     chunks = call('agent_teams_status', {});
                 } else chunks = textChunks('APPROVED_ENTRY_OK');
             }
-            else if (userText.includes('REOPEN_ENTRY') && names.filter(n => n === 'agent_teams_open').length < 2)
-                chunks = call('agent_teams_open', {});
+            else if (userText.includes('REOPEN_ENTRY') && !currentNames.includes('agent_teams_status'))
+                chunks = call('agent_teams_status', {});
             else chunks = textChunks('STAGED_ENTRY_OK');
         }
         else if (!names.includes('agent_teams_create'))

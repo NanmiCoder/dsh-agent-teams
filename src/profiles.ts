@@ -159,34 +159,6 @@ export function formatProfilesForPrompt(
   return lines.join('\n')
 }
 
-/** Bounded model-facing profile metadata; core policy never depends on it. */
-export interface TeamProfileSummary {
-  name: string
-  taskPlanning: 'captain' | 'seed'
-  members: number
-  tasks: number
-  description?: string
-  protocol?: string
-}
-
-/** Name plus purpose/planning metadata lets callers choose without guessing. */
-export function summarizeTeamProfiles(profiles: Record<string, TeamProfileConfig> | undefined | null): TeamProfileSummary[] {
-  return listConfiguredProfiles(profiles).map(({ name, config }) => {
-    const taskPlanning = resolveProfileTaskPlanning(config)
-    const description = protocolSummary(config.description)
-    const protocol = protocolSummary(config.protocol)
-    return {
-      name,
-      taskPlanning,
-      members: Array.isArray(config.members) ? config.members.length : 0,
-      // Captain planning ignores configured seed tasks when creating a team.
-      tasks: taskPlanning === 'seed' && Array.isArray(config.tasks) ? config.tasks.length : 0,
-      ...description === undefined ? {} : { description },
-      ...protocol === undefined ? {} : { protocol },
-    }
-  })
-}
-
 /**
  * Walk `rawInput` from the front and eat standalone profile flags. Only
  * `--profile <name>`, `--profile=<name>`, and `profile=<name>` count; the
@@ -245,7 +217,7 @@ function formatProfileListingLine(entry: ListedTeamProfile): string {
     ? 'captain planning'
     : countLabel(Array.isArray(entry.config.tasks) ? entry.config.tasks.length : 0, 'task')
   const counts = `(${countLabel(memberCount, 'member')}, ${graph})`
-  const summary = protocolSummary(entry.config.protocol)
+  const summary = protocolSummary(entry.config.protocol) ?? protocolSummary(entry.config.description)
   return summary === undefined
     ? `- ${entry.name} ${counts}`
     : `- ${entry.name} ${counts}: ${summary}`

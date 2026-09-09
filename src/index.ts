@@ -3,7 +3,7 @@
  *
  * A host-plane plugin that registers the `agent_teams_*` tools and one usage
  * agent-scoped usage section. Each session keeps a stable tool set and core
- * instructions; agent_teams_open optionally reads team/profile metadata.
+ * instructions. Existing business tools cover the complete team lifecycle.
  * After installation any session can
  * run multi-agent teamwork through natural language (e.g. "use AgentTeams to research X"):
  * the model creates a team (it becomes the captain), spawns members as
@@ -39,7 +39,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { collectArchivedTeamsActivity, collectTeamsActivity } from './snapshot.ts'
 import { findTeamByCaptain } from './state.ts'
-import { formatProfilesForPrompt, summarizeTeamProfiles, type TeamProfileConfig } from './profiles.ts'
+import { formatProfilesForPrompt, type TeamProfileConfig } from './profiles.ts'
 import { installTeamCapabilities } from './capabilities.ts'
 import { TEAM_TOOL_NAMES } from './tool-names.ts'
 
@@ -137,7 +137,7 @@ export const Config: z<Config> = z.object({
 /** The model-facing usage policy: when and how to drive AgentTeams. */
 export function usageSectionText(toolNames: string, profilesText = ''): string {
   return `AgentTeams captain protocol:
-1. Inspect current team state when needed, using agent_teams_open or agent_teams_status. Continue existing work without duplicating its roster/tasks. Create only when no current team exists, with the user's goal as description and approval="required"; automatic approval requires an explicit request to run immediately. Staged plans never spawn or schedule work.
+1. Inspect current team state when needed, using agent_teams_status. Continue existing work without duplicating its roster/tasks. Create only when no current team exists, with the user's goal as description and approval="required"; automatic approval requires an explicit request to run immediately. Staged plans never spawn or schedule work.
 2. Add each needed role once; members inherit your model route unless another is requested/needed. A requested profile goes to create({profile}); it supplies its roster. Seed profiles also supply tasks; captain-planning profiles require your DAG. Do not duplicate either.
 3. Build the complete smallest useful DAG while staged. Every task needs a subject; dependencies represent prerequisites. Give every required contributor a task or explicit message. Present the plan and end your turn for review; never approve in that planning turn. Approve only after a later explicit user approval or the Web action.
 4. Respect Web approve/return/discard control messages. On return, ask what to change before editing; after the answer, use one atomic agent_teams_edit_plan batch (edit downstream references before removals), summarize and await review again. Never inspect or edit .agent-teams state files or plugin source code to revise plans. Discard does not authorize a replacement.
@@ -173,8 +173,7 @@ export function apply(ctx: Context, config: Config): void {
     stateDir: resolved.stateDir,
     isPendingMember: agentTeamsRuntime.isPendingMember,
     order: config.promptSectionOrder,
-    profileCatalog: () => summarizeTeamProfiles(config.profiles),
-    // Keep the existing bounded directory for legacy allowlists that omit open.
+    // Keep the bounded profile directory available without extra tool calls.
     // installTeamCapabilities snapshots this once; no business state rewrites it.
     captainPrompt: () => usageSectionText(TEAM_TOOL_NAMES.join(', '), formatProfilesForPrompt(config.profiles)),
   })

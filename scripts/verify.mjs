@@ -78,7 +78,7 @@ import {
 } from '../lib/client/locales.js'
 import { openAgentTeamMember } from '../lib/client/session-navigation.js'
 import { steerCaptainReport } from '../lib/tools.js'
-import { parseProfileInvocation, resolveTeamProfile, formatProfilesForPrompt, summarizeTeamProfiles } from '../lib/profiles.js'
+import { parseProfileInvocation, resolveTeamProfile, formatProfilesForPrompt } from '../lib/profiles.js'
 import { memberPersona, memberWelcome } from '../lib/members.js'
 import { collectCompletedDependencyOutputs, formatDependencyOutputs, assignmentPrompt } from '../lib/scheduler.js'
 import {
@@ -109,12 +109,7 @@ check('profile invocation supports --profile=', parseProfileInvocation('--profil
 check('profile invocation leaves mid-goal profile text untouched', parseProfileInvocation('research profile=prod config').goal === 'research profile=prod config')
 check('profile prompt omits empty config and truncates protocol', formatProfilesForPrompt(demoProfiles).includes('demo') && formatProfilesForPrompt(demoProfiles).length < 400)
 check('seed planning remains the default', normalizedDemo.taskPlanning === 'seed')
-const catalog = summarizeTeamProfiles({
-  ...demoProfiles,
-  dynamic: { description: '  Review\n   the UI  ', protocol: 'x'.repeat(400), taskPlanning: 'captain', members: [{ name: 'reviewer' }], tasks: [{ id: 'unused', subject: 'Ignored seed' }] },
-})
-check('optional profile catalog supplies purpose and bounded protocol', catalog[0].name === 'demo' && catalog[0].members === 2 && catalog[0].tasks === 2 && catalog[0].taskPlanning === 'seed' && catalog[0].protocol.length === 240 && catalog[1].description === 'Review the UI' && catalog[1].protocol.length === 240)
-check('captain-planning catalog does not advertise ignored seed tasks', catalog[1].taskPlanning === 'captain' && catalog[1].tasks === 0)
+check('fixed profile directory includes purpose when no protocol is configured', formatProfilesForPrompt({ named: { description: '  Review\n  the UI  ', members: [{ name: 'reviewer' }] } }).includes('Review the UI'))
 const captainPlanned = resolveTeamProfile({
   dynamic: {
     taskPlanning: 'captain',

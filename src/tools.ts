@@ -738,7 +738,10 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         const current = await findTeamByParticipant(stateRoot, captain.id)
         if (current !== undefined) {
           const relationship = current.captainSessionId === captain.id ? 'lead' : 'belong to'
-          throw new Error(`you already ${relationship} team "${current.name}" — end or leave it before creating another`)
+          const guidance = current.captainSessionId === captain.id
+            ? 'Use agent_teams_status and continue the existing team. Do not delete and recreate it merely to continue work. End it only when the user explicitly wants a separate new team.'
+            : 'Continue your assigned member work and report to your captain; do not create a separate team.'
+          throw new Error(`you already ${relationship} team "${current.name}" (id ${current.id}). ${guidance}`)
         }
         return withTeamLock(teamLockKey(stateRoot, teamId), async () => {
           const existing = await readTeam(stateRoot, teamId)

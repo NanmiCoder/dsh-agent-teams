@@ -408,7 +408,7 @@ check('slash --profile without a goal still activates',
 check('profile-only activation asks for the goal',
   buildActivationDirective('', 'demo-delivery').includes('The goal was not given')
     && buildActivationDirective('', 'demo-delivery').includes('Use profile="demo-delivery" when creating a new team')
-    && buildActivationDirective('', 'demo-delivery').includes('open is optional'))
+    && buildActivationDirective('', 'demo-delivery').includes('Inspect existing team state with agent_teams_status'))
 check('captain-planning activation requires a staged user-reviewed graph',
   buildActivationDirective('ship it', 'dynamic-delivery', 'captain').includes('approval="required"')
     && buildActivationDirective('ship it', 'dynamic-delivery', 'captain').includes('review the Web plan')

@@ -11,4 +11,3 @@ export const MEMBER_TOOL_NAMES: readonly string[] = [
 ]
 
 export const CAPTAIN_TOOL_NAMES = TEAM_TOOL_NAMES.filter(name => !MEMBER_TOOL_NAMES.includes(name))
-export const OPEN_TEAM_TOOL = 'agent_teams_open'

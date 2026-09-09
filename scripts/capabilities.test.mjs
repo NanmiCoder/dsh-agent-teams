@@ -4,6 +4,7 @@ import { mkdtemp, rm, readFile, writeFile, mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createRequire } from 'node:module'
+import { pathToFileURL } from 'node:url'
 import { Context } from '@deepseek-ai/cordis'
 import { ToolRuntime } from '@deepseek-ai/dsh-tools'
 import { SystemPrompt, renderPrompt } from '@deepseek-ai/dsh-system-prompt'
@@ -17,9 +18,9 @@ import { createTeamDir, archiveTeamDir, recordRetiredMemberIds } from '../lib/st
 const requireTools = createRequire(import.meta.resolve('@deepseek-ai/dsh-tools'))
 const requireDsh = createRequire(import.meta.resolve('@deepseek-ai/dsh/package.json'))
 const requireBase = createRequire(requireDsh.resolve('@deepseek-ai/dsh-base/package.json'))
-const { ToolResultPruner } = await import(requireBase.resolve('@deepseek-ai/dsh-compaction-tool-result-pruner'))
-const { WorkerThreadCodeRuntime } = await import(requireBase.resolve('@deepseek-ai/dsh-code-runtime-worker-thread'))
-const { createScope } = await import(requireTools.resolve('@deepseek-ai/dsh-scope'))
+const { ToolResultPruner } = await import(pathToFileURL(requireBase.resolve('@deepseek-ai/dsh-compaction-tool-result-pruner')).href)
+const { WorkerThreadCodeRuntime } = await import(pathToFileURL(requireBase.resolve('@deepseek-ai/dsh-code-runtime-worker-thread')).href)
+const { createScope } = await import(pathToFileURL(requireTools.resolve('@deepseek-ai/dsh-scope')).href)
 
 function assertCaptainProtocol(system) {
   for (const rule of [/the user's goal as description/, /attempt_id/, /never approve in that planning turn/i, /Never approve your own implementation/, /depend on a failed task/, /Resume only on a later explicit user request/]) assert.match(system, rule)

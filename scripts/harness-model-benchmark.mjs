@@ -12,7 +12,7 @@ import { resolve, join, dirname } from 'node:path';
 import { homedir } from 'node:os';
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { sources, freshPrompt, coldPrompt } from './fixtures/harness-model-case.mjs';
 
 const args = new Map(), allowed = new Set(['--runtime-dir','--baseline-artifact','--candidate-artifact','--report-dir','--settings','--credential-file','--only','--timeout-ms','--max-requests']);
@@ -32,7 +32,7 @@ const model={provider:chosen.provider,model:chosen.model,...chosen.reasoningEffo
 const configured=settings['llm-deepseek']??{};
 const credentialRef=configured.apiKeyEnv??'DEEPSEEK_API_KEY';
 if(!/^[A-Za-z_][A-Za-z0-9_]*$/.test(credentialRef))throw Error('Invalid configured credential reference');
-const {parseCredentialsDocument,renderFlatLayoutMigration}=await import(req.resolve('@deepseek-ai/dsh-credentials-local'));
+const {parseCredentialsDocument,renderFlatLayoutMigration}=await import(pathToFileURL(req.resolve('@deepseek-ai/dsh-credentials-local')).href);
 // Parse only to check the selected route. Values never enter artifacts or logs.
 // Refuse the legacy format because the official provider would migrate it.
 const credentialText=existsSync(credentialFile)?readFileSync(credentialFile,'utf8'):'';

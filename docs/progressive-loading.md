@@ -47,7 +47,7 @@ pnpm verify
 pnpm pack --pack-destination /tmp/agentteams-artifacts
 node scripts/harness-runtime-verify.mjs \
   --host-version 0.1.2-rc.1 \
-  --artifact /tmp/agentteams-artifacts/nanmicoder-dsh-agent-teams-0.1.16-rc.2.tgz \
+  --artifact /tmp/agentteams-artifacts/nanmicoder-dsh-agent-teams-0.1.16-rc.3.tgz \
   --report-dir /tmp/agentteams-runtime-rc1
 ```
 
@@ -55,4 +55,4 @@ node scripts/harness-runtime-verify.mjs \
 
 删除 open 后的验证结果见 [no-open-verification.json](./no-open-verification.json)。真实模型使用隔离的小应用，外部检查三名成员报告、任务状态、实际写入来源、队长汇总顺序和源文件字节。单个真实案例不能证明任意业务、长期费用或统计成功率相等。
 
-[旧固定协议报告](./progressive-loading-verification.json)和[先前真实模型对照](./agent-teams-real-model-verification.json)是仍包含 open 的历史产物证据，不代表当前 13 工具版本。删除 open 的本地验证记录使用暂未升号的 `0.1.16-rc.1` 开发包，以 SHA-256 区分，不能与 npm 上的 rc.1 混淆。本次发布版本为 `0.1.16-rc.2`，GitHub Actions 会重新打包并验证该发布版本的同一份产物。
+[旧固定协议报告](./progressive-loading-verification.json)和[先前真实模型对照](./agent-teams-real-model-verification.json)是仍包含 open 的历史产物证据，不代表当前 13 工具版本。删除 open 的本地验证记录使用暂未升号的 `0.1.16-rc.1` 开发包，以 SHA-256 区分，不能与 npm 上的 rc.1 混淆。本次发布版本为 `0.1.16-rc.3`，GitHub Actions 会重新打包并验证该发布版本的同一份产物。

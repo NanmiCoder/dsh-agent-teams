@@ -412,6 +412,16 @@ export async function haltTeamWork(input: {
   }
 }
 
+/** Web approval has no tool result in the captain's conversation. */
+export function stagedPlanApprovedContext(teamName: string): string {
+  return [
+    `The user approved the staged AgentTeams plan "${teamName}" from the pre-run review UI.`,
+    'Approval has committed; the scheduler owns dispatch of the approved team. Do not approve again, recreate the roster, or send messages merely to start assigned tasks.',
+    'Acknowledge the approval and handle any reports or user work already pending. Yield only when waiting for members is the remaining action. Their reports will wake you automatically; do not busy-poll status or keep a turn running just to wait.',
+    'On a report, inspect the result and coordinate the next necessary action. If work has since been halted, respect that state and resume only on an explicit user request.',
+  ].join('\n')
+}
+
 /** Context queued after the human rejects a staged plan. */
 export function stagedPlanDiscardContext(teamName: string): string {
   return [

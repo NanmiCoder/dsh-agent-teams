@@ -33,14 +33,14 @@ export function apply(ctx) {
                 teamSchemaBytes: Buffer.byteLength(JSON.stringify(teamTools)), teamToolCount: teamTools.length }) + '\n');
         };
         const ordinary = await create('ordinary');
-        await measure(ordinary.agent, 'discovery');
+        await measure(ordinary.agent, 'captain-idle');
         for (const text of [
             'ENTRY_NO_ACTIVATION: What is 2 + 2?',
             'ENTRY_NO_ACTIVATION: Explain what AgentTeams means.',
             'ENTRY_NO_ACTIVATION: Do not use AgentTeams; answer directly.',
             'ENTRY_NO_ACTIVATION: Translate this quote: "use AgentTeams to research this".',
         ]) await send(ordinary.agent, text);
-        assert.deepEqual(await teamNames(ordinary.agent), ['agent_teams_open']);
+        assert.equal((await teamNames(ordinary.agent)).length, 14);
         assert.equal(existsSync(join(ordinary.cwd, '.agent-teams/runtime-lab/team.json')), false);
         const cases = [
             ['natural', 'Use AgentTeams to plan this task.', false],
@@ -52,6 +52,7 @@ export function apply(ctx) {
         ];
         for (const [label, input, command] of cases) {
             const { agent, cwd } = await create(label);
+            if (label === 'natural') for (let i = 0; i < 30; i++) await send(agent, `ENTRY_NO_ACTIVATION: Ordinary conversation turn ${i}.`);
             if (command) {
                 const execution = await ctx.commands.execute(agent, input, [], new AbortController().signal);
                 assert.equal(execution?.result.kind, 'success');
@@ -63,12 +64,13 @@ export function apply(ctx) {
             assert.equal(staged.tasks.length, 1);
             assert.equal(staged.members.length, 1);
             assert.ok(staged.members.every(m => !m.id));
-            const requests = trace().filter(x => x.event === 'request' && !x.purpose && x.sessionId === agent.id);
-            assert.deepEqual(requests[0].toolNames.filter(n => n.startsWith('agent_teams_')), ['agent_teams_open']);
+            const requests = trace().filter(x => x.event === 'request' && !x.purpose && x.sessionId === agent.id).slice(label === 'natural' ? 30 : 0);
+            assert.equal(requests[0].toolNames.filter(n => n.startsWith('agent_teams_')).length, 14);
+            assert.match(requests[1].lastToolText, /Tasks carry attempt_id/);
             assert.equal(requests[1].called[0], 'agent_teams_open');
             assert.equal(requests[1].toolNames.filter(n => n.startsWith('agent_teams_')).length, 14);
             if (input.startsWith('/')) assert.match(requests[0].userText, /calling agent_teams_open first/);
-            assert.deepEqual(await teamNames(ordinary.agent), ['agent_teams_open']);
+            assert.equal((await teamNames(ordinary.agent)).length, 14);
             await measure(agent, label.startsWith('profile') ? 'captain-profile' : 'captain');
             await send(agent, 'REOPEN_ENTRY: open the existing AgentTeams plan for inspection.');
             assert.equal(readFileSync(statePath, 'utf8'), before);
@@ -80,6 +82,16 @@ export function apply(ctx) {
             const memberRequests = trace().filter(x => x.event === 'request' && !x.purpose && x.sessionId === completed.members[0].id);
             assert.ok(memberRequests.length > 0);
             for (const request of memberRequests) assert.deepEqual(request.toolNames.filter(n => n.startsWith('agent_teams_')).sort(), ['agent_teams_claim_task', 'agent_teams_send_message', 'agent_teams_status', 'agent_teams_update_task']);
+            await send(agent, 'END_ENTRY: End and archive this team.');
+            assert.equal(existsSync(statePath), false);
+            await send(agent, 'ENTRY_NO_ACTIVATION: Back to ordinary conversation.');
+            await send(agent, 'INSPECT_ENDED_ENTRY: Open AgentTeams for inspection only.');
+            assert.equal(existsSync(statePath), false);
+            const budgets = trace().filter(x => x.event === 'request-budget' && !x.purpose && x.sessionId === agent.id);
+            assert.ok(budgets.length > (label === 'natural' ? 35 : 5));
+            assert.equal(new Set(budgets.map(x => x.systemSha256)).size, 1, `${label}: system prefix changed`);
+            assert.equal(new Set(budgets.map(x => x.toolsSha256)).size, 1, `${label}: tools prefix changed`);
+            appendFileSync(process.env.LAB_TRACE, JSON.stringify({ event: 'stable-prefix-passed', label, requests: budgets.length, precedingOrdinaryTurns: label === 'natural' ? 30 : 0, systemSha256: budgets[0].systemSha256, toolsSha256: budgets[0].toolsSha256 }) + '\n');
             appendFileSync(process.env.LAB_TRACE, JSON.stringify({ event: 'entry-case-passed', label, captain: agent.id, member: completed.members[0].id }) + '\n');
         }
         for (const agent of ctx.agents.list()) { await agent.whenIdle(); await ctx.sessions.flush(agent.session); }

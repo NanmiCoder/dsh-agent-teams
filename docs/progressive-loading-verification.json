@@ -1,30 +1,30 @@
 {
   "verificationDate": "2026-09-09",
-  "baseCommit": "e4a9b946c38f9f57b51c4d71ffd2f37cbac063df",
+  "baseCommit": "b7b44acdc54fa3e31de4b46943af5675c72e6232",
+  "design": "stable captain system/tools; on-demand appended protocol; Web approval wakes captain",
+  "artifactSha256": "50d179edccfdf3b9130d991f860db4730a711152e6cdfb6acb1703e83f04aeab",
+  "pluginVersion": "0.1.16-rc.1",
+  "node": "v26.7.0",
+  "platform": "darwin",
+  "arch": "arm64",
   "validation": [
     "pnpm typecheck",
     "pnpm build",
     "pnpm verify",
-    "15 scoped capability tests",
-    "one packaged artifact through three exact published Harness cohorts"
+    "16 scoped capability tests including actual ToolResultPruner",
+    "one packaged artifact; 8 scenarios on each of 3 exact published Harness cohorts"
   ],
-  "scope": "Scripted external LLM, real CLI/Loader/tools/session/scheduler/state. Not a real-model semantic benchmark.",
+  "scope": "Scripted external LLM, real CLI/Loader/tools/session/scheduler/state and authenticated HTTP. Not a real-model semantic or cost benchmark.",
+  "coreProtocol": {
+    "serializedChars": 3911,
+    "defaultPrunerHeadChars": 4096,
+    "oversizedProfileNamesInPrunerTest": 300,
+    "coreSurvivesActualPruneContent": true
+  },
   "hosts": [
     {
-      "passed": true,
       "version": "0.1.2-rc.1",
-      "artifactSha256": "2f945939e43ad5a8f9be8fd457e2f7fa4c7dd1d157550c98e760d14803e5831d",
-      "pluginVersion": "0.1.16-rc.1",
-      "testFiles": {
-        "harness-runtime-verify.mjs": "9f922154ab60c4c0810a17c64e5ac26995c6cc1ceb516556db3c6e91886bcb3a",
-        "fixtures/harness-runtime-llm.mjs": "c8e8f6bf428ba974bcf91ad80b3d7543f1d6cf80a4f9e46258b468aa9884e387",
-        "fixtures/harness-runtime-resume.mjs": "0ff88e3bf1d10788676ee0a2ad3d03bc4783fe06bddffbb707513b5c632cda0d",
-        "fixtures/harness-runtime-idle.mjs": "15e4c8f9c77d35052e7458d672fb29ba298bf6b6e0426900e4236e1e7c437a46",
-        "fixtures/harness-runtime-entry.mjs": "96656fa0fb03e3eec9e6960e6e06be38f39027c9e9d4792c451631723bf2274f"
-      },
-      "node": "v26.7.0",
-      "platform": "darwin",
-      "arch": "arm64",
+      "passed": true,
       "cohortCount": 214,
       "runs": [
         {
@@ -47,7 +47,8 @@
             "messagesSentWhileBusy": true
           },
           "requests": 25,
-          "memberRequests": 9
+          "memberRequests": 9,
+          "sourceBatch": "full"
         },
         {
           "scenario": "lifecycle-cold-restore",
@@ -63,7 +64,8 @@
             "code": 0,
             "signal": null,
             "timedOut": false
-          }
+          },
+          "sourceBatch": "full"
         },
         {
           "scenario": "fallback",
@@ -85,7 +87,8 @@
             "fallbackReasoningReset": true
           },
           "requests": 22,
-          "memberRequests": 8
+          "memberRequests": 8,
+          "sourceBatch": "full"
         },
         {
           "scenario": "fallback-cold-restore",
@@ -101,7 +104,8 @@
             "code": 0,
             "signal": null,
             "timedOut": false
-          }
+          },
+          "sourceBatch": "full"
         },
         {
           "scenario": "failure",
@@ -120,7 +124,8 @@
             "taskTerminal": true
           },
           "requests": 14,
-          "memberRequests": 2
+          "memberRequests": 2,
+          "sourceBatch": "full"
         },
         {
           "scenario": "captain-idle-wakeup",
@@ -141,7 +146,8 @@
             "notifiedAfterIdle": true
           },
           "requests": 14,
-          "memberRequests": 6
+          "memberRequests": 6,
+          "sourceBatch": "full"
         },
         {
           "scenario": "progressive-entry",
@@ -149,7 +155,9 @@
           "assertions": {
             "exit0": true,
             "productMarker": true,
-            "allEntries": true
+            "allEntries": true,
+            "stablePrefixes": true,
+            "thirtyOrdinaryTurns": true
           },
           "cases": [
             "natural",
@@ -163,37 +171,200 @@
             "code": 0,
             "signal": null,
             "timedOut": false
-          }
+          },
+          "sourceBatch": "full"
+        },
+        {
+          "scenario": "web-approval",
+          "passed": true,
+          "assertions": {
+            "exit0": true,
+            "productMarker": true,
+            "driverCompleted": true,
+            "stagedBeforeApproval": true,
+            "independentApprovalWake": true,
+            "reportWakeAfterYield": true,
+            "noPollingOrDuplicateApproval": true,
+            "oneUserMessageAndHttpApproval": true,
+            "invalidTeamRejected": true,
+            "repeatApprovalRejected": true,
+            "stableCaptainHeaders": true,
+            "memberFourTools": true,
+            "taskCompleted": true
+          },
+          "evidence": {
+            "event": "web-approval-passed",
+            "sessionId": "session-ecb3de64-064e-426b-badf-bc0dbfd93a8d",
+            "teamId": "runtime-lab",
+            "memberId": "eb253cfc-3961-41da-9fea-a361d9558905",
+            "taskStatus": "completed",
+            "captainRequests": 8,
+            "order": 34,
+            "time": 1788945400485
+          },
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          },
+          "sourceBatch": "web-recheck"
         }
       ],
-      "unverified": [
-        "real provider APIs and credentials",
-        "browser interaction",
-        "other operating systems",
-        "native terminal execution",
-        "live user-data migration"
+      "stablePrefixes": [
+        {
+          "event": "stable-prefix-passed",
+          "label": "natural",
+          "requests": 51,
+          "precedingOrdinaryTurns": 30,
+          "systemSha256": "cc15800d8064a515eb3fbc56829a80851dec53169d18731c79010a565b89c539",
+          "toolsSha256": "ef1fd1ebcf3aba558d60129c0c1797de237d5a1d91edecd48b937d240d37fbf2"
+        },
+        {
+          "event": "stable-prefix-passed",
+          "label": "natural-zh",
+          "requests": 21,
+          "precedingOrdinaryTurns": 0,
+          "systemSha256": "b8abfa2bc8bb8c85221d747c22fba8b6e1efbe3a80ebfb04ca236e60e742001d",
+          "toolsSha256": "ef1fd1ebcf3aba558d60129c0c1797de237d5a1d91edecd48b937d240d37fbf2"
+        },
+        {
+          "event": "stable-prefix-passed",
+          "label": "raw-slash",
+          "requests": 21,
+          "precedingOrdinaryTurns": 0,
+          "systemSha256": "c4b2b2008860a44602e191f73d7c213bf66889b244439c6c09552a29a77352a4",
+          "toolsSha256": "ef1fd1ebcf3aba558d60129c0c1797de237d5a1d91edecd48b937d240d37fbf2"
+        },
+        {
+          "event": "stable-prefix-passed",
+          "label": "command",
+          "requests": 21,
+          "precedingOrdinaryTurns": 0,
+          "systemSha256": "87e551af745c557ca655a5b1fc740ca47af66d14463b032eb5977ec185f25abc",
+          "toolsSha256": "ef1fd1ebcf3aba558d60129c0c1797de237d5a1d91edecd48b937d240d37fbf2"
+        },
+        {
+          "event": "stable-prefix-passed",
+          "label": "profile-command",
+          "requests": 20,
+          "precedingOrdinaryTurns": 0,
+          "systemSha256": "28f74ccdc37625aaa6c5389abe351146d04621cc9c7328291e323c866fc7c5a7",
+          "toolsSha256": "ef1fd1ebcf3aba558d60129c0c1797de237d5a1d91edecd48b937d240d37fbf2"
+        },
+        {
+          "event": "stable-prefix-passed",
+          "label": "profile-raw",
+          "requests": 20,
+          "precedingOrdinaryTurns": 0,
+          "systemSha256": "000e0975d3f70fa58cfef3de3b7df9e7bda13628f8ab9fbf856993d07741cae2",
+          "toolsSha256": "ef1fd1ebcf3aba558d60129c0c1797de237d5a1d91edecd48b937d240d37fbf2"
+        }
       ],
-      "discoveryBudget": {
-        "teamPromptBytes": 339,
-        "teamSchemaBytes": 449,
-        "teamToolCount": 1
-      }
+      "webStableHeaders": {
+        "event": "web-headers-stable",
+        "sessionId": "session-ecb3de64-064e-426b-badf-bc0dbfd93a8d",
+        "systemSha256": "be18e3a3e261bbbc65494d5be2d34bcd500629108b3d4c65611afe03e870be5d",
+        "toolsSha256": "ef1fd1ebcf3aba558d60129c0c1797de237d5a1d91edecd48b937d240d37fbf2",
+        "captainRequests": 8,
+        "memberRequests": 6,
+        "memberTeamToolCount": 4,
+        "order": 33,
+        "time": 1788945400483
+      },
+      "budgets": [
+        {
+          "event": "exposure-budget",
+          "role": "captain-idle",
+          "teamPromptBytes": 573,
+          "teamSchemaBytes": 13879,
+          "teamToolCount": 14
+        },
+        {
+          "event": "exposure-budget",
+          "role": "captain",
+          "teamPromptBytes": 573,
+          "teamSchemaBytes": 13879,
+          "teamToolCount": 14
+        },
+        {
+          "event": "exposure-budget",
+          "role": "captain",
+          "teamPromptBytes": 573,
+          "teamSchemaBytes": 13879,
+          "teamToolCount": 14
+        },
+        {
+          "event": "exposure-budget",
+          "role": "captain",
+          "teamPromptBytes": 573,
+          "teamSchemaBytes": 13879,
+          "teamToolCount": 14
+        },
+        {
+          "event": "exposure-budget",
+          "role": "captain",
+          "teamPromptBytes": 573,
+          "teamSchemaBytes": 13879,
+          "teamToolCount": 14
+        },
+        {
+          "event": "exposure-budget",
+          "role": "captain-profile",
+          "teamPromptBytes": 573,
+          "teamSchemaBytes": 13879,
+          "teamToolCount": 14
+        },
+        {
+          "event": "exposure-budget",
+          "role": "captain-profile",
+          "teamPromptBytes": 573,
+          "teamSchemaBytes": 13879,
+          "teamToolCount": 14
+        }
+      ],
+      "batches": [
+        {
+          "id": "full",
+          "reportDirectory": "/tmp/dsh-stable-final-rc1",
+          "testFiles": {
+            "harness-runtime-verify.mjs": "e9bb2a615da7a820c36a91f2b28e1f8df2cb1452587a3232e4d1b86bfa10881e",
+            "fixtures/harness-runtime-llm.mjs": "2bd8d8150e602d032e40cf94283075498b155f2807728938acfc844a2a1f2f12",
+            "fixtures/harness-runtime-resume.mjs": "0ff88e3bf1d10788676ee0a2ad3d03bc4783fe06bddffbb707513b5c632cda0d",
+            "fixtures/harness-runtime-idle.mjs": "15e4c8f9c77d35052e7458d672fb29ba298bf6b6e0426900e4236e1e7c437a46",
+            "fixtures/harness-runtime-entry.mjs": "535c59a2bda9b5fa308b97d57d58fa35b1987748693f9a489f12cadecef53eff",
+            "fixtures/harness-runtime-web-approval.mjs": "c734b7667b5f307f20f80131867e4992c4e1833fe06ce8c95c0367a1522cd480"
+          },
+          "passedScenarios": [
+            "lifecycle",
+            "lifecycle-cold-restore",
+            "fallback",
+            "fallback-cold-restore",
+            "failure",
+            "captain-idle-wakeup",
+            "progressive-entry"
+          ],
+          "failedScenario": "web-approval",
+          "failure": "Test expected HTTP 400 on repeat approval; existing production handler correctly returns HTTP 409."
+        },
+        {
+          "id": "web-recheck",
+          "reportDirectory": "/tmp/dsh-stable-web-final-rc1",
+          "testFiles": {
+            "harness-runtime-verify.mjs": "9750d787d6c3b992c67533c3fec23292bdd1cbe4e495b2ddcb21d2afc5e36ae5",
+            "fixtures/harness-runtime-llm.mjs": "2bd8d8150e602d032e40cf94283075498b155f2807728938acfc844a2a1f2f12",
+            "fixtures/harness-runtime-resume.mjs": "0ff88e3bf1d10788676ee0a2ad3d03bc4783fe06bddffbb707513b5c632cda0d",
+            "fixtures/harness-runtime-idle.mjs": "15e4c8f9c77d35052e7458d672fb29ba298bf6b6e0426900e4236e1e7c437a46",
+            "fixtures/harness-runtime-entry.mjs": "535c59a2bda9b5fa308b97d57d58fa35b1987748693f9a489f12cadecef53eff",
+            "fixtures/harness-runtime-web-approval.mjs": "b57d01759e74704753c5602729dff4f63e5099207d641bf4a4dc38ceca858f3e"
+          },
+          "passed": true,
+          "correction": "Only the Web fixture and its report assertion changed from 400 to 409. Production artifact and other scenarios are unchanged."
+        }
+      ]
     },
     {
-      "passed": true,
       "version": "0.1.2-alpha.5",
-      "artifactSha256": "2f945939e43ad5a8f9be8fd457e2f7fa4c7dd1d157550c98e760d14803e5831d",
-      "pluginVersion": "0.1.16-rc.1",
-      "testFiles": {
-        "harness-runtime-verify.mjs": "9f922154ab60c4c0810a17c64e5ac26995c6cc1ceb516556db3c6e91886bcb3a",
-        "fixtures/harness-runtime-llm.mjs": "c8e8f6bf428ba974bcf91ad80b3d7543f1d6cf80a4f9e46258b468aa9884e387",
-        "fixtures/harness-runtime-resume.mjs": "0ff88e3bf1d10788676ee0a2ad3d03bc4783fe06bddffbb707513b5c632cda0d",
-        "fixtures/harness-runtime-idle.mjs": "15e4c8f9c77d35052e7458d672fb29ba298bf6b6e0426900e4236e1e7c437a46",
-        "fixtures/harness-runtime-entry.mjs": "96656fa0fb03e3eec9e6960e6e06be38f39027c9e9d4792c451631723bf2274f"
-      },
-      "node": "v26.7.0",
-      "platform": "darwin",
-      "arch": "arm64",
+      "passed": true,
       "cohortCount": 214,
       "runs": [
         {
@@ -216,7 +387,8 @@
             "messagesSentWhileBusy": true
           },
           "requests": 25,
-          "memberRequests": 9
+          "memberRequests": 9,
+          "sourceBatch": "full"
         },
         {
           "scenario": "lifecycle-cold-restore",
@@ -232,7 +404,8 @@
             "code": 0,
             "signal": null,
             "timedOut": false
-          }
+          },
+          "sourceBatch": "full"
         },
         {
           "scenario": "fallback",
@@ -254,7 +427,8 @@
             "fallbackReasoningReset": true
           },
           "requests": 22,
-          "memberRequests": 8
+          "memberRequests": 8,
+          "sourceBatch": "full"
         },
         {
           "scenario": "fallback-cold-restore",
@@ -270,7 +444,8 @@
             "code": 0,
             "signal": null,
             "timedOut": false
-          }
+          },
+          "sourceBatch": "full"
         },
         {
           "scenario": "failure",
@@ -289,7 +464,8 @@
             "taskTerminal": true
           },
           "requests": 14,
-          "memberRequests": 2
+          "memberRequests": 2,
+          "sourceBatch": "full"
         },
         {
           "scenario": "captain-idle-wakeup",
@@ -310,7 +486,8 @@
             "notifiedAfterIdle": true
           },
           "requests": 14,
-          "memberRequests": 6
+          "memberRequests": 6,
+          "sourceBatch": "full"
         },
         {
           "scenario": "progressive-entry",
@@ -318,7 +495,9 @@
           "assertions": {
             "exit0": true,
             "productMarker": true,
-            "allEntries": true
+            "allEntries": true,
+            "stablePrefixes": true,
+            "thirtyOrdinaryTurns": true
           },
           "cases": [
             "natural",
@@ -332,37 +511,200 @@
             "code": 0,
             "signal": null,
             "timedOut": false
-          }
+          },
+          "sourceBatch": "full"
+        },
+        {
+          "scenario": "web-approval",
+          "passed": true,
+          "assertions": {
+            "exit0": true,
+            "productMarker": true,
+            "driverCompleted": true,
+            "stagedBeforeApproval": true,
+            "independentApprovalWake": true,
+            "reportWakeAfterYield": true,
+            "noPollingOrDuplicateApproval": true,
+            "oneUserMessageAndHttpApproval": true,
+            "invalidTeamRejected": true,
+            "repeatApprovalRejected": true,
+            "stableCaptainHeaders": true,
+            "memberFourTools": true,
+            "taskCompleted": true
+          },
+          "evidence": {
+            "event": "web-approval-passed",
+            "sessionId": "session-b3a10b9a-a392-4241-94c4-3fd6dd3db0de",
+            "teamId": "runtime-lab",
+            "memberId": "a4802d4c-907c-451a-a40a-0435490157c6",
+            "taskStatus": "completed",
+            "captainRequests": 9,
+            "order": 36,
+            "time": 1788945401575
+          },
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          },
+          "sourceBatch": "web-recheck"
         }
       ],
-      "unverified": [
-        "real provider APIs and credentials",
-        "browser interaction",
-        "other operating systems",
-        "native terminal execution",
-        "live user-data migration"
+      "stablePrefixes": [
+        {
+          "event": "stable-prefix-passed",
+          "label": "natural",
+          "requests": 51,
+          "precedingOrdinaryTurns": 30,
+          "systemSha256": "62289a14869a706a1105b4d9b79a24681a2a23974d659ddce0db56fb314b692f",
+          "toolsSha256": "ef1fd1ebcf3aba558d60129c0c1797de237d5a1d91edecd48b937d240d37fbf2"
+        },
+        {
+          "event": "stable-prefix-passed",
+          "label": "natural-zh",
+          "requests": 21,
+          "precedingOrdinaryTurns": 0,
+          "systemSha256": "1051ae41b1576ec7ac9953c9508d917771914458f3e9b8279d4766ec0ac26c2c",
+          "toolsSha256": "ef1fd1ebcf3aba558d60129c0c1797de237d5a1d91edecd48b937d240d37fbf2"
+        },
+        {
+          "event": "stable-prefix-passed",
+          "label": "raw-slash",
+          "requests": 22,
+          "precedingOrdinaryTurns": 0,
+          "systemSha256": "580f6008d9659adc936338401682b024a8f972864d2dd71795671e6e6026b51e",
+          "toolsSha256": "ef1fd1ebcf3aba558d60129c0c1797de237d5a1d91edecd48b937d240d37fbf2"
+        },
+        {
+          "event": "stable-prefix-passed",
+          "label": "command",
+          "requests": 21,
+          "precedingOrdinaryTurns": 0,
+          "systemSha256": "9991d8357866d1b04b74e9549e04c115281c8850fafedb8e8b46f28e6bf2ab67",
+          "toolsSha256": "ef1fd1ebcf3aba558d60129c0c1797de237d5a1d91edecd48b937d240d37fbf2"
+        },
+        {
+          "event": "stable-prefix-passed",
+          "label": "profile-command",
+          "requests": 20,
+          "precedingOrdinaryTurns": 0,
+          "systemSha256": "93fbdfad4d6467e30b479bd16d93a753aa52a46610611eee8c6bb2d6597e8586",
+          "toolsSha256": "ef1fd1ebcf3aba558d60129c0c1797de237d5a1d91edecd48b937d240d37fbf2"
+        },
+        {
+          "event": "stable-prefix-passed",
+          "label": "profile-raw",
+          "requests": 20,
+          "precedingOrdinaryTurns": 0,
+          "systemSha256": "13b3c96da4de1c100b5cccd8654cae22958a7c0025de24e94974c5cba8364906",
+          "toolsSha256": "ef1fd1ebcf3aba558d60129c0c1797de237d5a1d91edecd48b937d240d37fbf2"
+        }
       ],
-      "discoveryBudget": {
-        "teamPromptBytes": 339,
-        "teamSchemaBytes": 449,
-        "teamToolCount": 1
-      }
+      "webStableHeaders": {
+        "event": "web-headers-stable",
+        "sessionId": "session-b3a10b9a-a392-4241-94c4-3fd6dd3db0de",
+        "systemSha256": "554a39d62c9e92952b5fbc3b1ca1c354dd94d6b03037e384f6ba0d29eed422b0",
+        "toolsSha256": "ef1fd1ebcf3aba558d60129c0c1797de237d5a1d91edecd48b937d240d37fbf2",
+        "captainRequests": 9,
+        "memberRequests": 6,
+        "memberTeamToolCount": 4,
+        "order": 35,
+        "time": 1788945401573
+      },
+      "budgets": [
+        {
+          "event": "exposure-budget",
+          "role": "captain-idle",
+          "teamPromptBytes": 573,
+          "teamSchemaBytes": 13879,
+          "teamToolCount": 14
+        },
+        {
+          "event": "exposure-budget",
+          "role": "captain",
+          "teamPromptBytes": 573,
+          "teamSchemaBytes": 13879,
+          "teamToolCount": 14
+        },
+        {
+          "event": "exposure-budget",
+          "role": "captain",
+          "teamPromptBytes": 573,
+          "teamSchemaBytes": 13879,
+          "teamToolCount": 14
+        },
+        {
+          "event": "exposure-budget",
+          "role": "captain",
+          "teamPromptBytes": 573,
+          "teamSchemaBytes": 13879,
+          "teamToolCount": 14
+        },
+        {
+          "event": "exposure-budget",
+          "role": "captain",
+          "teamPromptBytes": 573,
+          "teamSchemaBytes": 13879,
+          "teamToolCount": 14
+        },
+        {
+          "event": "exposure-budget",
+          "role": "captain-profile",
+          "teamPromptBytes": 573,
+          "teamSchemaBytes": 13879,
+          "teamToolCount": 14
+        },
+        {
+          "event": "exposure-budget",
+          "role": "captain-profile",
+          "teamPromptBytes": 573,
+          "teamSchemaBytes": 13879,
+          "teamToolCount": 14
+        }
+      ],
+      "batches": [
+        {
+          "id": "full",
+          "reportDirectory": "/tmp/dsh-stable-final-alpha5",
+          "testFiles": {
+            "harness-runtime-verify.mjs": "e9bb2a615da7a820c36a91f2b28e1f8df2cb1452587a3232e4d1b86bfa10881e",
+            "fixtures/harness-runtime-llm.mjs": "2bd8d8150e602d032e40cf94283075498b155f2807728938acfc844a2a1f2f12",
+            "fixtures/harness-runtime-resume.mjs": "0ff88e3bf1d10788676ee0a2ad3d03bc4783fe06bddffbb707513b5c632cda0d",
+            "fixtures/harness-runtime-idle.mjs": "15e4c8f9c77d35052e7458d672fb29ba298bf6b6e0426900e4236e1e7c437a46",
+            "fixtures/harness-runtime-entry.mjs": "535c59a2bda9b5fa308b97d57d58fa35b1987748693f9a489f12cadecef53eff",
+            "fixtures/harness-runtime-web-approval.mjs": "c734b7667b5f307f20f80131867e4992c4e1833fe06ce8c95c0367a1522cd480"
+          },
+          "passedScenarios": [
+            "lifecycle",
+            "lifecycle-cold-restore",
+            "fallback",
+            "fallback-cold-restore",
+            "failure",
+            "captain-idle-wakeup",
+            "progressive-entry"
+          ],
+          "failedScenario": "web-approval",
+          "failure": "Test expected HTTP 400 on repeat approval; existing production handler correctly returns HTTP 409."
+        },
+        {
+          "id": "web-recheck",
+          "reportDirectory": "/tmp/dsh-stable-web-final-alpha5",
+          "testFiles": {
+            "harness-runtime-verify.mjs": "9750d787d6c3b992c67533c3fec23292bdd1cbe4e495b2ddcb21d2afc5e36ae5",
+            "fixtures/harness-runtime-llm.mjs": "2bd8d8150e602d032e40cf94283075498b155f2807728938acfc844a2a1f2f12",
+            "fixtures/harness-runtime-resume.mjs": "0ff88e3bf1d10788676ee0a2ad3d03bc4783fe06bddffbb707513b5c632cda0d",
+            "fixtures/harness-runtime-idle.mjs": "15e4c8f9c77d35052e7458d672fb29ba298bf6b6e0426900e4236e1e7c437a46",
+            "fixtures/harness-runtime-entry.mjs": "535c59a2bda9b5fa308b97d57d58fa35b1987748693f9a489f12cadecef53eff",
+            "fixtures/harness-runtime-web-approval.mjs": "b57d01759e74704753c5602729dff4f63e5099207d641bf4a4dc38ceca858f3e"
+          },
+          "passed": true,
+          "correction": "Only the Web fixture and its report assertion changed from 400 to 409. Production artifact and other scenarios are unchanged."
+        }
+      ]
     },
     {
-      "passed": true,
       "version": "0.1.2-alpha.2",
-      "artifactSha256": "2f945939e43ad5a8f9be8fd457e2f7fa4c7dd1d157550c98e760d14803e5831d",
-      "pluginVersion": "0.1.16-rc.1",
-      "testFiles": {
-        "harness-runtime-verify.mjs": "9f922154ab60c4c0810a17c64e5ac26995c6cc1ceb516556db3c6e91886bcb3a",
-        "fixtures/harness-runtime-llm.mjs": "c8e8f6bf428ba974bcf91ad80b3d7543f1d6cf80a4f9e46258b468aa9884e387",
-        "fixtures/harness-runtime-resume.mjs": "0ff88e3bf1d10788676ee0a2ad3d03bc4783fe06bddffbb707513b5c632cda0d",
-        "fixtures/harness-runtime-idle.mjs": "15e4c8f9c77d35052e7458d672fb29ba298bf6b6e0426900e4236e1e7c437a46",
-        "fixtures/harness-runtime-entry.mjs": "96656fa0fb03e3eec9e6960e6e06be38f39027c9e9d4792c451631723bf2274f"
-      },
-      "node": "v26.7.0",
-      "platform": "darwin",
-      "arch": "arm64",
+      "passed": true,
       "cohortCount": 215,
       "runs": [
         {
@@ -385,7 +727,8 @@
             "messagesSentWhileBusy": true
           },
           "requests": 25,
-          "memberRequests": 9
+          "memberRequests": 9,
+          "sourceBatch": "full"
         },
         {
           "scenario": "lifecycle-cold-restore",
@@ -401,7 +744,8 @@
             "code": 0,
             "signal": null,
             "timedOut": false
-          }
+          },
+          "sourceBatch": "full"
         },
         {
           "scenario": "fallback",
@@ -423,7 +767,8 @@
             "fallbackReasoningReset": true
           },
           "requests": 22,
-          "memberRequests": 8
+          "memberRequests": 8,
+          "sourceBatch": "full"
         },
         {
           "scenario": "fallback-cold-restore",
@@ -439,7 +784,8 @@
             "code": 0,
             "signal": null,
             "timedOut": false
-          }
+          },
+          "sourceBatch": "full"
         },
         {
           "scenario": "failure",
@@ -457,8 +803,9 @@
             "explicitReasoning": true,
             "taskTerminal": true
           },
-          "requests": 13,
-          "memberRequests": 2
+          "requests": 14,
+          "memberRequests": 2,
+          "sourceBatch": "full"
         },
         {
           "scenario": "captain-idle-wakeup",
@@ -478,8 +825,9 @@
             "captainActuallyYielded": true,
             "notifiedAfterIdle": true
           },
-          "requests": 14,
-          "memberRequests": 6
+          "requests": 13,
+          "memberRequests": 6,
+          "sourceBatch": "full"
         },
         {
           "scenario": "progressive-entry",
@@ -487,7 +835,9 @@
           "assertions": {
             "exit0": true,
             "productMarker": true,
-            "allEntries": true
+            "allEntries": true,
+            "stablePrefixes": true,
+            "thirtyOrdinaryTurns": true
           },
           "cases": [
             "natural",
@@ -501,21 +851,204 @@
             "code": 0,
             "signal": null,
             "timedOut": false
-          }
+          },
+          "sourceBatch": "full"
+        },
+        {
+          "scenario": "web-approval",
+          "passed": true,
+          "assertions": {
+            "exit0": true,
+            "productMarker": true,
+            "driverCompleted": true,
+            "stagedBeforeApproval": true,
+            "independentApprovalWake": true,
+            "reportWakeAfterYield": true,
+            "noPollingOrDuplicateApproval": true,
+            "oneUserMessageAndHttpApproval": true,
+            "invalidTeamRejected": true,
+            "repeatApprovalRejected": true,
+            "stableCaptainHeaders": true,
+            "memberFourTools": true,
+            "taskCompleted": true
+          },
+          "evidence": {
+            "event": "web-approval-passed",
+            "sessionId": "session-415830b8-c153-41f9-a992-ce73a10810cb",
+            "teamId": "runtime-lab",
+            "memberId": "4b94b432-997d-4618-b089-c994b84e7a7f",
+            "taskStatus": "completed",
+            "captainRequests": 9,
+            "order": 36,
+            "time": 1788945418054
+          },
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          },
+          "sourceBatch": "web-recheck"
         }
       ],
-      "unverified": [
-        "real provider APIs and credentials",
-        "browser interaction",
-        "other operating systems",
-        "native terminal execution",
-        "live user-data migration"
+      "stablePrefixes": [
+        {
+          "event": "stable-prefix-passed",
+          "label": "natural",
+          "requests": 51,
+          "precedingOrdinaryTurns": 30,
+          "systemSha256": "ae4c2e0d4d89ff4cd61465ed1129bee9cae0c2be0b4725f3df28b2f50fdcc5d1",
+          "toolsSha256": "a434eaa56fae3db641f27e2289b1b89e7bd1b2fc7daada27ed88783a61b09486"
+        },
+        {
+          "event": "stable-prefix-passed",
+          "label": "natural-zh",
+          "requests": 21,
+          "precedingOrdinaryTurns": 0,
+          "systemSha256": "01f82671f375cd3d53282d63ea0404244fd0e27c39b949ee8185105a8ae6f3db",
+          "toolsSha256": "a434eaa56fae3db641f27e2289b1b89e7bd1b2fc7daada27ed88783a61b09486"
+        },
+        {
+          "event": "stable-prefix-passed",
+          "label": "raw-slash",
+          "requests": 21,
+          "precedingOrdinaryTurns": 0,
+          "systemSha256": "43db79c3c6198874ac8d4a979066e48966262903c00e9c4ff650144f398dc1f3",
+          "toolsSha256": "a434eaa56fae3db641f27e2289b1b89e7bd1b2fc7daada27ed88783a61b09486"
+        },
+        {
+          "event": "stable-prefix-passed",
+          "label": "command",
+          "requests": 21,
+          "precedingOrdinaryTurns": 0,
+          "systemSha256": "5a5e9677e53247b8180957fbbed090fdd9823e24e2faa6c0d20abe7071d026f0",
+          "toolsSha256": "a434eaa56fae3db641f27e2289b1b89e7bd1b2fc7daada27ed88783a61b09486"
+        },
+        {
+          "event": "stable-prefix-passed",
+          "label": "profile-command",
+          "requests": 20,
+          "precedingOrdinaryTurns": 0,
+          "systemSha256": "3761180933c5fb13e0f745f198b399261f3d094c800ea05c99dbbfc32fdac699",
+          "toolsSha256": "a434eaa56fae3db641f27e2289b1b89e7bd1b2fc7daada27ed88783a61b09486"
+        },
+        {
+          "event": "stable-prefix-passed",
+          "label": "profile-raw",
+          "requests": 20,
+          "precedingOrdinaryTurns": 0,
+          "systemSha256": "a6c9659faf5ffa53bc292c6c109b865b32936ca355394166e636ac45414fefa6",
+          "toolsSha256": "a434eaa56fae3db641f27e2289b1b89e7bd1b2fc7daada27ed88783a61b09486"
+        }
       ],
-      "discoveryBudget": {
-        "teamPromptBytes": 339,
-        "teamSchemaBytes": 449,
-        "teamToolCount": 1
-      }
+      "webStableHeaders": {
+        "event": "web-headers-stable",
+        "sessionId": "session-415830b8-c153-41f9-a992-ce73a10810cb",
+        "systemSha256": "a3a92eb7b43a1a7d150d3c6a79529c1dd30b8579348061583078d681d28696b6",
+        "toolsSha256": "a434eaa56fae3db641f27e2289b1b89e7bd1b2fc7daada27ed88783a61b09486",
+        "captainRequests": 9,
+        "memberRequests": 6,
+        "memberTeamToolCount": 4,
+        "order": 35,
+        "time": 1788945418054
+      },
+      "budgets": [
+        {
+          "event": "exposure-budget",
+          "role": "captain-idle",
+          "teamPromptBytes": 573,
+          "teamSchemaBytes": 13879,
+          "teamToolCount": 14
+        },
+        {
+          "event": "exposure-budget",
+          "role": "captain",
+          "teamPromptBytes": 573,
+          "teamSchemaBytes": 13879,
+          "teamToolCount": 14
+        },
+        {
+          "event": "exposure-budget",
+          "role": "captain",
+          "teamPromptBytes": 573,
+          "teamSchemaBytes": 13879,
+          "teamToolCount": 14
+        },
+        {
+          "event": "exposure-budget",
+          "role": "captain",
+          "teamPromptBytes": 573,
+          "teamSchemaBytes": 13879,
+          "teamToolCount": 14
+        },
+        {
+          "event": "exposure-budget",
+          "role": "captain",
+          "teamPromptBytes": 573,
+          "teamSchemaBytes": 13879,
+          "teamToolCount": 14
+        },
+        {
+          "event": "exposure-budget",
+          "role": "captain-profile",
+          "teamPromptBytes": 573,
+          "teamSchemaBytes": 13879,
+          "teamToolCount": 14
+        },
+        {
+          "event": "exposure-budget",
+          "role": "captain-profile",
+          "teamPromptBytes": 573,
+          "teamSchemaBytes": 13879,
+          "teamToolCount": 14
+        }
+      ],
+      "batches": [
+        {
+          "id": "full",
+          "reportDirectory": "/tmp/dsh-stable-final-alpha2",
+          "testFiles": {
+            "harness-runtime-verify.mjs": "e9bb2a615da7a820c36a91f2b28e1f8df2cb1452587a3232e4d1b86bfa10881e",
+            "fixtures/harness-runtime-llm.mjs": "2bd8d8150e602d032e40cf94283075498b155f2807728938acfc844a2a1f2f12",
+            "fixtures/harness-runtime-resume.mjs": "0ff88e3bf1d10788676ee0a2ad3d03bc4783fe06bddffbb707513b5c632cda0d",
+            "fixtures/harness-runtime-idle.mjs": "15e4c8f9c77d35052e7458d672fb29ba298bf6b6e0426900e4236e1e7c437a46",
+            "fixtures/harness-runtime-entry.mjs": "535c59a2bda9b5fa308b97d57d58fa35b1987748693f9a489f12cadecef53eff",
+            "fixtures/harness-runtime-web-approval.mjs": "c734b7667b5f307f20f80131867e4992c4e1833fe06ce8c95c0367a1522cd480"
+          },
+          "passedScenarios": [
+            "lifecycle",
+            "lifecycle-cold-restore",
+            "fallback",
+            "fallback-cold-restore",
+            "failure",
+            "captain-idle-wakeup",
+            "progressive-entry"
+          ],
+          "failedScenario": "web-approval",
+          "failure": "Test expected HTTP 400 on repeat approval; existing production handler correctly returns HTTP 409."
+        },
+        {
+          "id": "web-recheck",
+          "reportDirectory": "/tmp/dsh-stable-web-final-alpha2",
+          "testFiles": {
+            "harness-runtime-verify.mjs": "9750d787d6c3b992c67533c3fec23292bdd1cbe4e495b2ddcb21d2afc5e36ae5",
+            "fixtures/harness-runtime-llm.mjs": "2bd8d8150e602d032e40cf94283075498b155f2807728938acfc844a2a1f2f12",
+            "fixtures/harness-runtime-resume.mjs": "0ff88e3bf1d10788676ee0a2ad3d03bc4783fe06bddffbb707513b5c632cda0d",
+            "fixtures/harness-runtime-idle.mjs": "15e4c8f9c77d35052e7458d672fb29ba298bf6b6e0426900e4236e1e7c437a46",
+            "fixtures/harness-runtime-entry.mjs": "535c59a2bda9b5fa308b97d57d58fa35b1987748693f9a489f12cadecef53eff",
+            "fixtures/harness-runtime-web-approval.mjs": "b57d01759e74704753c5602729dff4f63e5099207d641bf4a4dc38ceca858f3e"
+          },
+          "passed": true,
+          "correction": "Only the Web fixture and its report assertion changed from 400 to 409. Production artifact and other scenarios are unchanged."
+        }
+      ]
     }
+  ],
+  "unverified": [
+    "real provider caching, token cost, latency and intent accuracy",
+    "real-model recovery after history compaction",
+    "browser clicks and rendering",
+    "other operating systems",
+    "live user-data migration",
+    "durable cross-process retry for Web approval notifications"
   ]
 }

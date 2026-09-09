@@ -64,7 +64,7 @@ export function invokedAgentTeamsGoal(messages: readonly UserMessage[]): string 
 
 export function buildActivationDirective(goal: string, profile?: string, taskPlanning: 'captain' | 'seed' = 'seed'): string {
   const lines = [
-    'The user invoked an AgentTeams slash command. Enter the AgentTeams protocol by calling agent_teams_open first; it loads the tools and reads any current team without starting work.',
+    'The user invoked an AgentTeams slash command. Enter the AgentTeams protocol by calling agent_teams_open first; it reads the operating instructions and current team summary without starting work.',
     'Use the returned current-team summary. Continue an existing plan or team without recreating it. For a new team, after open call agent_teams_create with approval="required". Build the complete staged roster and DAG, then stop and ask the user to review the Web plan. Do not approve or start it in this same turn.',
   ]
   if (profile !== undefined) {

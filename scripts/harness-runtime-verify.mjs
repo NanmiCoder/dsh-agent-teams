@@ -21,7 +21,7 @@ for (let i = 2; i < process.argv.length; i++) {
     else
         throw Error('Invalid argument ' + arg);
 }
-const scenarios = ['lifecycle', 'fallback', 'failure', 'captain-idle-wakeup', 'progressive-entry'];
+const scenarios = ['lifecycle', 'fallback', 'failure', 'captain-idle-wakeup', 'progressive-entry', 'web-approval'];
 if (flags.has('--scenario') && !scenarios.includes(flags.get('--scenario'))) throw Error('Unknown scenario');
 const version = flags.get('--host-version');
 if (typeof version !== 'string' || !/^\d+\.\d+\.\d+(?:-[\w.]+)?$/.test(version))
@@ -93,7 +93,7 @@ function verifyCohort() {
     json(join(report, 'cohort.json'), result);
     return result;
 }
-const testFiles = Object.fromEntries(['harness-runtime-verify.mjs', 'fixtures/harness-runtime-llm.mjs', 'fixtures/harness-runtime-resume.mjs', 'fixtures/harness-runtime-idle.mjs', 'fixtures/harness-runtime-entry.mjs'].map(path => [path, hash(join(dirname(fileURLToPath(import.meta.url)), path))]));
+const testFiles = Object.fromEntries(['harness-runtime-verify.mjs', 'fixtures/harness-runtime-llm.mjs', 'fixtures/harness-runtime-resume.mjs', 'fixtures/harness-runtime-idle.mjs', 'fixtures/harness-runtime-entry.mjs', 'fixtures/harness-runtime-web-approval.mjs'].map(path => [path, hash(join(dirname(fileURLToPath(import.meta.url)), path))]));
 let artifactSha;
 const manifestPath = join(runtime, 'package.json');
 let manifest = existsSync(manifestPath) ? JSON.parse(readFileSync(manifestPath, 'utf8')) : undefined;
@@ -165,13 +165,48 @@ for (const scenario of (flags.has('--scenario') ? [flags.get('--scenario')] : sc
       name: ./fixture-entry.mjs
 `);
     }
+    if (scenario === 'web-approval') {
+        copyFileSync(join(dirname(fileURLToPath(import.meta.url)), 'fixtures/harness-runtime-web-approval.mjs'), join(profile, 'fixture-web-approval.mjs'));
+        writeFileSync(join(profile, 'cordis.patch.yml'), readFileSync(join(profile, 'cordis.patch.yml'), 'utf8') + `- id: runtime-lab-fixture
+  disabled: true
+- id: headless-startup
+  disabled: true
+- id: headless-runner
+  disabled: true
+- insert:
+    - id: runtime-lab-webserver
+      name: '@deepseek-ai/dsh-host-webserver'
+      config:
+        host: 127.0.0.1
+        port: 0
+    - id: runtime-lab-connection
+      name: '@deepseek-ai/dsh-client-connection'
+    - id: runtime-lab-workspace
+      name: '@deepseek-ai/dsh-workspace'
+    - id: runtime-lab-web-approval
+      name: ./fixture-web-approval.mjs
+`);
+    }
     const tracePath = join(report, scenario, 'trace.jsonl');
     const result = await command([process.execPath, join(runtime, 'node_modules/@deepseek-ai/dsh/lib/bin.js'), '--profile', 'headless', 'Run the authorized deterministic AgentTeams fixture immediately.'], workspace, environment({ DSH_HOME: home, DSH_PERMISSION_MODE: 'danger-full-access', DSH_TELEMETRY_DISABLED: '1', LAB_TRACE: tracePath, LAB_TEAMS: '1', LAB_SCENARIO: scenario }), scenario, 90000);
     const trace = existsSync(tracePath) ? readFileSync(tracePath, 'utf8').trim().split('\n').filter(Boolean).map(s => JSON.parse(s)) : [];
     if (scenario === 'progressive-entry') {
         const cases = trace.filter(x => x.event === 'entry-case-passed').map(x => x.label);
-        const assertions = { exit0: result.code === 0 && !result.timedOut, productMarker: result.stdout.includes('PROGRESSIVE_ENTRY_OK'), allEntries: ['natural', 'natural-zh', 'raw-slash', 'command', 'profile-command', 'profile-raw'].every(label => cases.includes(label)) };
+        const stablePrefixes = trace.filter(x => x.event === 'stable-prefix-passed');
+        const labels = ['natural', 'natural-zh', 'raw-slash', 'command', 'profile-command', 'profile-raw'];
+        const assertions = { exit0: result.code === 0 && !result.timedOut, productMarker: result.stdout.includes('PROGRESSIVE_ENTRY_OK'), allEntries: labels.every(label => cases.includes(label)), stablePrefixes: labels.every(label => stablePrefixes.some(x => x.label === label)), thirtyOrdinaryTurns: stablePrefixes.some(x => x.label === 'natural' && x.precedingOrdinaryTurns === 30) };
         runs.push({ scenario, passed: Object.values(assertions).every(Boolean), assertions, cases, exit: { code: result.code, signal: result.signal, timedOut: result.timedOut } });
+        continue;
+    }
+    if (scenario === 'web-approval') {
+        const staged = trace.find(x => x.event === 'web-staged-idle'), approved = trace.find(x => x.event === 'web-http-approved');
+        const approvalWake = trace.find(x => x.event === 'web-captain-approval-wake'), yielded = trace.find(x => x.event === 'web-approved-idle');
+        const released = trace.find(x => x.event === 'web-member-output-released'), reportWake = trace.find(x => x.event === 'web-captain-report-wake');
+        const evidence = trace.find(x => x.event === 'web-approval-passed');
+        const invalid = trace.find(x => x.event === 'web-http-invalid-team-rejected'), repeated = trace.find(x => x.event === 'web-http-repeat-rejected');
+        const stable = trace.find(x => x.event === 'web-headers-stable');
+        const assertions = { exit0: result.code === 0 && !result.timedOut, productMarker: result.stdout.includes('WEB_APPROVAL_OK'), driverCompleted: Boolean(evidence), stagedBeforeApproval: Boolean(staged?.status === 'idle' && approved?.status === 200 && staged.order < approved.order), independentApprovalWake: Boolean(approvalWake && yielded?.status === 'idle' && released && approvalWake.order < yielded.order && yielded.order < released.order), reportWakeAfterYield: Boolean(released && reportWake && released.order < reportWake.order && reportWake.sessionId === staged?.sessionId), noPollingOrDuplicateApproval: !trace.some(x => x.event === 'web-model-tool-call' && ['agent_teams_approve', 'agent_teams_status'].includes(x.name)), oneUserMessageAndHttpApproval: trace.filter(x => x.event === 'web-driver-user-message').length === 1 && trace.filter(x => x.event === 'web-http-approval-start').length === 1, invalidTeamRejected: Boolean(invalid?.status === 404 && approved && invalid.order < approved.order), repeatApprovalRejected: Boolean(repeated?.status === 409 && yielded && released && yielded.order < repeated.order && repeated.order < released.order), stableCaptainHeaders: Boolean(stable?.systemSha256 && stable?.toolsSha256), memberFourTools: stable?.memberTeamToolCount === 4 && stable.memberRequests > 0, taskCompleted: evidence?.taskStatus === 'completed' };
+        runs.push({ scenario, passed: Object.values(assertions).every(Boolean), assertions, evidence, exit: { code: result.code, signal: result.signal, timedOut: result.timedOut } });
         continue;
     }
     const statePath = join(workspace, '.agent-teams/runtime-lab/team.json'), state = existsSync(statePath) ? JSON.parse(readFileSync(statePath, 'utf8')) : undefined;

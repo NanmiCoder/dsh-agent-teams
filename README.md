@@ -88,7 +88,7 @@ Then ask for a team directly:
 
 ## How it works
 
-1. For a request to use AgentTeams, the model first calls `agent_teams_open`. This loads the captain tools for that session and reads any existing team. A new goal then creates a staged team for review.
+1. For a request to use AgentTeams, the model first calls `agent_teams_open`. This reads operating instructions and any existing team. When no team exists, the goal becomes a staged plan for review.
 2. The captain adds role-specific members backed by continuable sub-agents.
 3. The goal becomes tasks with owners and explicit dependencies.
 4. The shared scheduler uses real `running / idle / ready` state to atomically claim one ready task per idle member and wake it. An interrupted resident attempt stays parked and can resume through a direct message without losing its capability; after a cold process restart, the scheduler retries stranded open work with a fresh attempt.
@@ -99,7 +99,7 @@ Team state is stored under `<workspace>/.agent-teams/`; the Web panel reads that
 
 Member creation is zero-interaction by default: a member on the captain's current LLM route snapshots that provider, model, and reasoning effort, while a member on a requested alternative route snapshots the target model's default effort; later continuations restore the resolved snapshot. Only an explicit heterogeneous-team request (for example, “backend on provider A/model X, frontend on provider B/model Y”) supplies a member-specific `provider` + `model`; there is no per-member model or reasoning prompt.
 
-Ordinary conversations receive a short discovery hint and only `agent_teams_open`. Opening is read-only: it does not create, approve, resume, or schedule work. Team captains then receive the full collaboration tools; members receive only claim, update, message, and status tools plus their member instructions. Existing teams restore their role after restart, and ending a team withdraws the captain tools at a safe turn boundary. This also filters the generated SDK in PTC mode. See the [loading and benchmark contract](./docs/progressive-loading.md).
+Captain sessions keep a short, fixed system instruction and the same 14 native team tools from their first request. `agent_teams_open` returns detailed operating instructions, the selected profile, and the current team summary as a tool result; opening or ending a team does not rewrite the system prompt or tool schemas. Members receive four team tools and fixed member instructions from their first request. Web approval wakes the captain with a control message; later member reports wake it again. See the [loading and benchmark contract](./docs/progressive-loading.md).
 
 ## Slash command
 

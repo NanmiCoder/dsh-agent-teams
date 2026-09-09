@@ -13,7 +13,7 @@
 | `ctx.subagents.followup()` | 唤醒收件成员（消息进入其下一轮次） |
 | 持久化团队成员表 + `ctx.agents` | 前者保存 durable 成员身份，后者提供真实 `running / idle / ready` 活动状态（不依赖易变的子代理目录投影） |
 | `agent/status` | 成员进入 idle 后触发共享任务池自动续领与下一轮唤醒 |
-| `ctx.systemPrompt.section()` | 按普通会话、队长、成员分别生成使用策略 |
+| `ctx.systemPrompt.section()` | 按初始队长/成员身份提供固定简短策略；详细队长协议通过入口工具返回 |
 | Web server 路由注册 | 活动面板数据路由 `/plugins/dsh-agent-teams/state` + 鲸鱼图片静态服务（`webServer`/`httpServer` 双键兼容，见下） |
 | 文件系统 | 团队状态持久化在 `<workspace>/.agent-teams/<teamId>/` |
 
@@ -48,7 +48,7 @@
 
 | 工具 | 作用 |
 |---|---|
-| `agent_teams_open` | 请求使用团队时先调用；只读当前团队摘要，加载当前会话的工具与协议，不启动工作 |
+| `agent_teams_open` | 请求使用团队时先调用；只读当前团队摘要并返回操作协议，不改变系统提示词或工具集合、不启动工作 |
 | `agent_teams_create` | 创建团队，调用者成为队长（一个队长同时只带一个团队） |
 | `agent_teams_add_member` | 拉成员入队（spawn 可续聊子代理 + 成员 persona） |
 | `agent_teams_remove_member` | 安全移除成员：撤销 attempt、回收其未完成任务、等待中断收敛后重新调度 |

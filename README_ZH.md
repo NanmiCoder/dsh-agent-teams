@@ -85,7 +85,7 @@ dsh plugin --profile web add --save-exact @nanmicoder/dsh-agent-teams@0.1.16-rc.
 
 > 使用 AgentTeams 审查 v0.5.3 之后的提交，分别从性能、安全和产品角度分工，最后输出一份汇总报告。
 
-普通对话只加载简短说明和 `agent_teams_open`。明确请求团队协作或使用 slash command 后，模型先调用这个只读入口，再获得队长业务工具；已有团队会恢复当前身份，成员仅获得领取、更新、消息和状态四个团队工具。入口不会创建团队、批准计划、恢复暂停或触发调度。结束团队后，在安全轮次边界收回完整工具；PTC 模式生成的 SDK 也遵守同样范围。详见[加载机制与 benchmark 标准](./docs/progressive-loading.md)。
+队长会话从第一轮起保留固定的简短系统说明和 14 个原生团队工具。`agent_teams_open` 通过工具返回追加详细协议、选中模板和当前团队摘要；打开或结束团队都不会改写系统提示词和工具 schema。成员从第一轮起只获得四个团队工具和固定成员说明。Web 批准后会通知并唤醒队长，后续成员报告会再次唤醒它，无需忙轮询。详见[加载机制与 benchmark 标准](./docs/progressive-loading.md)。
 
 ## 工作方式
 

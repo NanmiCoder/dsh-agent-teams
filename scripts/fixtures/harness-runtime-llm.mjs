@@ -18,6 +18,7 @@ class FixtureAdapter extends LlmAdapter {
     async *stream(options) {
         const blocks = history(options), tools = blocks.filter(b => b.type === 'tool-call'), names = tools.map(b => b.name);
         const userText = options.messages.filter(m => m.role === 'user').flatMap(m => m.content.filter(b => b.type === 'text').map(b => b.text)).join('\n');
+        const lastUserText = options.messages.filter(m => m.role === 'user' && m.source?.kind === 'user').map(m => m.content.filter(b => b.type === 'text').map(b => b.text).join('\n')).filter(Boolean).at(-1) ?? '';
         const toolText = blocks.filter(b => b.type === 'tool-result').flatMap(b => b.content?.filter(t => t.type === 'text').map(t => t.text) ?? []).join('\n');
         const isMember = options.system?.includes('MEMBER_FIXTURE') === true;
         const teamTools = (options.tools ?? []).filter(t => t.name.startsWith('agent_teams_'));
@@ -28,6 +29,7 @@ class FixtureAdapter extends LlmAdapter {
         }
         record({ event: 'request-budget', sessionId: options.sessionId, purpose: options.purpose, isMember,
             systemBytes: Buffer.byteLength(options.system ?? ''), systemSha256: createHash('sha256').update(options.system ?? '').digest('hex'),
+            toolsSha256: createHash('sha256').update(JSON.stringify(options.tools ?? [])).digest('hex'),
             teamSchemaBytes: Buffer.byteLength(JSON.stringify(teamTools)), teamTools: teamTools.map(t => t.name) });
         record({ event: 'request', sessionId: options.sessionId, purpose: options.purpose, provider: options.provider, model: options.model, reasoningEffort: options.reasoningEffort, isMember, toolNames: (options.tools ?? []).map(t => t.name), called: names, lastToolText: toolText.slice(-12000), userText: userText.slice(-6000), userMessages: options.messages.filter(m => m.role === 'user').map(m => m.content.filter(b => b.type === 'text').map(b => b.text).join('\n')) });
         let chunks;
@@ -44,7 +46,7 @@ class FixtureAdapter extends LlmAdapter {
             chunks = textChunks('Runtime lab');
         else if (!process.env.LAB_TEAMS)
             chunks = textChunks('HARNESS_PRODUCT_TURN_OK');
-        else if (process.env.LAB_SCENARIO === 'progressive-entry' && userText.includes('ENTRY_NO_ACTIVATION'))
+        else if (process.env.LAB_SCENARIO === 'progressive-entry' && lastUserText.includes('ENTRY_NO_ACTIVATION'))
             chunks = textChunks('ORDINARY_ENTRY_OK');
         else if (isMember) {
             if (userText.includes('COLD_WAKE_FIXTURE')) {
@@ -86,6 +88,12 @@ class FixtureAdapter extends LlmAdapter {
                 await new Promise(r => setTimeout(r, 1000));
                 chunks = textChunks('COLD_CAPTAIN_OK');
             }
+        }
+        else if (process.env.LAB_SCENARIO === 'progressive-entry' && lastUserText.includes('END_ENTRY')) {
+            chunks = names.includes('agent_teams_delete') ? textChunks('ENDED_ENTRY_OK') : call('agent_teams_delete', {});
+        }
+        else if (process.env.LAB_SCENARIO === 'progressive-entry' && lastUserText.includes('INSPECT_ENDED_ENTRY')) {
+            chunks = names.filter(n => n === 'agent_teams_open').length < 3 ? call('agent_teams_open', {}) : textChunks('INSPECTED_ENDED_ENTRY_OK');
         }
         else if (process.env.LAB_SCENARIO === 'progressive-entry') {
             const failed = blocks.find(b => b.type === 'tool-result' && b.isError);

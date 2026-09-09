@@ -14,9 +14,12 @@ import { registerAgentTeamsTools } from '../lib/tools.js'
 import { createTeamDir, archiveTeamDir, recordRetiredMemberIds } from '../lib/state.js'
 
 const requireTools = createRequire(import.meta.resolve('@deepseek-ai/dsh-tools'))
+const requireDsh = createRequire(import.meta.resolve('@deepseek-ai/dsh/package.json'))
+const requireBase = createRequire(requireDsh.resolve('@deepseek-ai/dsh-base/package.json'))
+const { ToolResultPruner } = await import(requireBase.resolve('@deepseek-ai/dsh-compaction-tool-result-pruner'))
 const { createScope } = await import(requireTools.resolve('@deepseek-ai/dsh-scope'))
 
-test('progressive loading uses real scoped registry and prompt assembly', async t => {
+test('stable tool presentation uses real scoped registry and prompt assembly', async t => {
   const workspace = await mkdtemp(join(tmpdir(), 'agent-teams-capabilities-'))
   const stateRoot = join(workspace, '.agent-teams')
   const host = new Context()
@@ -52,39 +55,47 @@ test('progressive loading uses real scoped registry and prompt assembly', async 
   }
   const a = createAgent('captain-a'), b = createAgent('ordinary-b')
   const pendingMembers = new Set()
-  const options = { stateDir: '.agent-teams', isPendingMember: agent => pendingMembers.has(agent.id), profileNames: () => ['demo'], captainPrompt: profile => usageSectionText(TEAM_TOOL_NAMES.join(', ')) + (profile ? '\nSELECTED_PROFILE:' + profile : '') }
+  const profiles = ['demo']
+  const options = { stateDir: '.agent-teams', isPendingMember: agent => pendingMembers.has(agent.id), profileNames: () => profiles, captainPrompt: profile => usageSectionText(TEAM_TOOL_NAMES.join(', ')) + (profile ? '\nSELECTED_PROFILE:' + profile : '') }
   const plugin = { inject: ['tools', 'systemPrompt', 'agents'], apply(ctx) { installTeamCapabilities(ctx, options) } }
   let fiber = host.plugin(plugin)
   await fiber.await()
   const assemble = agent => host.systemPrompt.assemble({ agent, scope: agent })
   const names = async agent => (await assemble(agent)).tools.map(tool => tool.name)
   const open = (agent, args = {}, signal = new AbortController().signal) => host.tools.get('agent_teams_open', agent).execute(args, { agent, signal })
+  const captainNames = [...TEAM_TOOL_NAMES, 'agent_teams_open'].sort()
+  const header = async agent => { const assembled = await assemble(agent); return JSON.stringify({ system: renderPrompt(assembled), tools: assembled.tools }) }
+  const initialHeader = await header(a)
   const team = { id: 'saved', name: 'Saved', captainSessionId: a.id, createdAt: 1, members: [], tasks: [], taskSeq: 0, phase: 'staged' }
   try {
-    await t.test('unrelated conversation has only discovery, not captain instructions or schemas', async () => {
-      assert.deepEqual(await names(a), ['agent_teams_open'])
+    await t.test('unrelated conversation keeps native tools and only short fixed instructions', async () => {
+      assert.deepEqual(await names(a), captainNames)
       assert.equal(renderPrompt(await assemble(a)), TEAM_DISCOVERY_PROMPT)
-      assert.ok(JSON.stringify((await assemble(a)).tools).length < 1000)
+      assert.equal((await names(a)).length, 14)
       assert.ok(Buffer.byteLength(TEAM_DISCOVERY_PROMPT) < 600)
-      t.diagnostic(JSON.stringify({ role: 'discovery', promptBytes: Buffer.byteLength(TEAM_DISCOVERY_PROMPT), schemaBytes: Buffer.byteLength(JSON.stringify((await assemble(a)).tools)) }))
+      t.diagnostic(JSON.stringify({ role: 'captain-idle', promptBytes: Buffer.byteLength(TEAM_DISCOVERY_PROMPT), schemaBytes: Buffer.byteLength(JSON.stringify((await assemble(a)).tools)) }))
     })
-    await t.test('cancellation and invalid profiles leave the scope unactivated', async () => {
+    await t.test('cancellation and invalid profiles preserve the header', async () => {
       const controller = new AbortController()
       const pending = open(a, {}, controller.signal)
       controller.abort()
       await assert.rejects(pending)
       await assert.rejects(open(a, { profile: 'missing' }), /unknown AgentTeams profile/)
-      assert.deepEqual(await names(a), ['agent_teams_open'])
+      assert.deepEqual(await names(a), captainNames)
     })
-    await t.test('open activates A while preserving B and independently owned restrictions', async () => {
+    await t.test('open appends protocol and selected profile, preserving all headers and user restrictions', async () => {
       const userDeny = a.ctx.tools.restrict({ deny: ['agent_teams_delete'] })
       const result = await open(a, { profile: 'demo' })
       assert.match(result.next, /No current team/)
       assert.ok((await names(a)).includes('agent_teams_create'))
       assert.ok(!(await names(a)).includes('agent_teams_delete'))
-      assert.deepEqual(await names(b), ['agent_teams_open'])
-      assert.match(renderPrompt(await assemble(a)), /Tasks carry attempt_id/)
+      assert.deepEqual(await names(b), captainNames)
+      assert.match(result.instructions, /Tasks carry attempt_id/)
+      assert.match(result.instructions, /SELECTED_PROFILE:demo/)
+      assert.equal(renderPrompt(await assemble(a)), TEAM_DISCOVERY_PROMPT)
+      assert.equal(await header(b), initialHeader)
       userDeny()
+      assert.equal(await header(a), initialHeader)
     })
     await t.test('opening existing paused work is idempotent and does not mutate or wake it', async () => {
       await createTeamDir(stateRoot, { ...team, phase: 'running', halted: true })
@@ -117,7 +128,7 @@ test('progressive loading uses real scoped registry and prompt assembly', async 
         version: 3, mode: 'continuable', provider: 'spawn', label: 'agent-teams:saved:worker', agentProvider: 'fake', agentModel: 'fake',
       } }])
       host.emit('agent/session-start', { agent: child, source: 'startup' })
-      assert.deepEqual(await names(child), ['agent_teams_open'])
+      assert.deepEqual(await names(child), captainNames)
     })
     await t.test('a retired member cannot acquire the captain entry on cold resume', async () => {
       await recordRetiredMemberIds(stateRoot, ['retired-child'])
@@ -125,13 +136,16 @@ test('progressive loading uses real scoped registry and prompt assembly', async 
       host.emit('agent/session-start', { agent: child, source: 'resume' })
       assert.deepEqual((await names(child)).sort(), [...MEMBER_TOOL_NAMES].sort())
     })
-    await t.test('PTC and both modes hide business SDK declarations in unrelated scopes', async () => {
+    await t.test('PTC and both modes keep generated SDK stable after opening', async () => {
       for (const mode of ['ptc', 'both']) {
         const restore = b.ctx.tools.presentAs(mode)
         const assembly = await assemble(b)
         const sdk = assembly.sections.find(section => section.name === 'tools:sdk').text
         assert.match(sdk, /agent_teams_open/)
-        for (const name of TEAM_TOOL_NAMES) assert.ok(!sdk.includes(name), name)
+        for (const name of TEAM_TOOL_NAMES) assert.ok(sdk.includes(name), name)
+        const before = await header(b)
+        await open(b)
+        assert.equal(await header(b), before)
         restore()
       }
     })
@@ -142,19 +156,19 @@ test('progressive loading uses real scoped registry and prompt assembly', async 
       fiber = host.plugin(plugin)
       await fiber.await()
       assert.equal((await names(a)).length, 14)
-      assert.deepEqual(await names(b), ['agent_teams_open'])
+      assert.deepEqual(await names(b), captainNames)
     })
     await t.test('a cold captain loads its durable role before its first request', async () => {
       const cold = createAgent(a.id)
       host.emit('agent/session-start', { agent: cold, source: 'resume' })
       assert.equal((await names(cold)).length, 14)
-      assert.match(renderPrompt(await assemble(cold)), /continue that team/)
+      assert.equal(await header(cold), initialHeader)
     })
-    await t.test('archive revokes only at the idle boundary, not during a tool batch', async () => {
+    await t.test('archive and idle preserve the original captain prefix', async () => {
       await archiveTeamDir(stateRoot, team.id)
       assert.equal((await names(a)).length, 14)
       host.emit('agent/status', { agent: a, status: 'idle' })
-      assert.deepEqual(await names(a), ['agent_teams_open'])
+      assert.deepEqual(await names(a), captainNames)
     })
     await t.test('a halted draft and a profile conflict give accurate continuation instructions', async () => {
       await createTeamDir(stateRoot, { ...team, halted: true })
@@ -163,12 +177,14 @@ test('progressive loading uses real scoped registry and prompt assembly', async 
       assert.equal(result.profile_conflict, true)
       assert.equal(result.requested_profile, 'demo')
       assert.match(result.next, /has not switched/)
-      assert.doesNotMatch(renderPrompt(await assemble(a)), /SELECTED_PROFILE:demo/)
+      assert.doesNotMatch(result.instructions, /SELECTED_PROFILE:demo/)
+      assert.equal(await header(a), initialHeader)
       await archiveTeamDir(stateRoot, team.id)
       host.emit('agent/status', { agent: a, status: 'idle' })
     })
-    await t.test('create and archive in one batch drops the open latch for native and nested dispatch', async () => {
+    await t.test('create, archive, and reopen preserve the prefix in native and nested dispatch', async () => {
       for (const nested of [false, true]) {
+        assert.equal(await header(a), initialHeader)
         await open(a)
         const exec = name => host.tools.execute({ name, arguments: name === 'agent_teams_create' ? { name: 'Saved', approval: 'required' } : {}, callId: name + '-test', agent: a, signal: new AbortController().signal, ...(nested ? { parent: {} } : {}) })
         const created = await exec('agent_teams_create')
@@ -177,14 +193,39 @@ test('progressive loading uses real scoped registry and prompt assembly', async 
         assert.equal(archived.isError, false, JSON.stringify(archived))
         assert.equal((await names(a)).length, 14)
         host.emit('agent/status', { agent: a, status: 'idle' })
-        assert.deepEqual(await names(a), ['agent_teams_open'])
+        assert.deepEqual(await names(a), captainNames)
+        assert.equal(await header(a), initialHeader)
+        const reopened = await open(a)
+        assert.match(reopened.next, /No current team/)
+        assert.equal(await header(a), initialHeader)
       }
     })
-    await t.test('read failure cannot half-activate the discovery scope', async () => {
+    await t.test('oversized profile listings cannot prune core instructions with the real host pruner', async () => {
+      const pruner = new ToolResultPruner(new Context())
+      const core = options.captainPrompt()
+      const escapedCore = JSON.stringify({ instructions: core }).slice(0, -1)
+      assert.ok(escapedCore.length <= pruner.config.headChars, escapedCore.length)
+      // The instructions lead the rendered result, before unbounded names or
+      // summaries. Do not infer survival merely from the unescaped length.
+      profiles.push(...Array.from({ length: 300 }, (_, i) => `review-template-${i}`))
+      try {
+        const result = await open(b)
+        const definition = host.tools.get('agent_teams_open', b)
+        const rendered = definition.output.render({}, result)
+        const pruned = pruner.pruneContent(rendered)
+        assert.ok(pruned, 'fixture must exceed the actual host pruning threshold')
+        assert.ok(pruned.map(block => block.text ?? '').join('').startsWith(escapedCore))
+        assert.match(core, /Never approve your own implementation/)
+        assert.match(core, /depend on a failed task/)
+        assert.match(core, /attempt_id/)
+        assert.equal(await header(b), initialHeader)
+      } finally { profiles.splice(1) }
+    })
+    await t.test('read failure leaves the fixed header intact', async () => {
       await mkdir(join(stateRoot, 'broken'))
       await writeFile(join(stateRoot, 'broken/team.json'), '{broken')
       await assert.rejects(open(b))
-      assert.deepEqual(await names(b), ['agent_teams_open'])
+      assert.deepEqual(await names(b), captainNames)
     })
   } finally {
     await fiber.dispose()

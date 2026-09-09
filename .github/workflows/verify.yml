@@ -204,7 +204,7 @@ jobs:
             assert.equal(report.pluginVersion, pkg.version)
             assert.equal(report.artifactSha256, process.env.EXPECTED_SHA256)
             assert.ok(report.runs.length > 0 && report.runs.every(run => run.passed), `Host ${version} lacks successful functional evidence`)
-            for (const scenario of ['lifecycle', 'lifecycle-cold-restore', 'fallback', 'fallback-cold-restore', 'failure', 'captain-idle-wakeup', 'progressive-entry']) {
+            for (const scenario of ['lifecycle', 'lifecycle-cold-restore', 'fallback', 'fallback-cold-restore', 'failure', 'captain-idle-wakeup', 'progressive-entry', 'web-approval']) {
               assert.ok(report.runs.some(run => run.scenario === scenario && run.passed), `Host ${version} did not exercise ${scenario}`)
             }
           }

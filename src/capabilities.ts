@@ -1,4 +1,4 @@
-/** Progressive, agent-scoped presentation. Business authority stays in the tools. */
+/** Stable, agent-scoped presentation. Business authority stays in the tools. */
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { defineTool } from '@deepseek-ai/dsh-tools'
@@ -8,18 +8,11 @@ import { findTeamByParticipant, readTeamSync, readRetiredMemberIdsSync } from '.
 import type { TeamState } from './types.ts'
 import { MEMBER_TOOL_NAMES, OPEN_TEAM_TOOL, TEAM_TOOL_NAMES } from './tool-names.ts'
 
-export const TEAM_DISCOVERY_PROMPT = 'AgentTeams (Agent Teams) provides multi-agent team collaboration. When the user requests it, including /agent-teams, first call agent_teams_open to load the team tools and read the current team summary. Mentioning, quoting, discussing, or declining AgentTeams alone is not a request to use it. Opening does not create a team or start work.'
+export const TEAM_DISCOVERY_PROMPT = 'AgentTeams (Agent Teams) provides multi-agent team collaboration. When the user requests it, including /agent-teams, first call agent_teams_open to read the operating instructions and current team summary. Mentioning, quoting, discussing, or declining AgentTeams alone is not a request to use it. If instructions were pruned or lost, reopen before team operations. Opening does not create or start work. New teams require user review and approval unless the user explicitly requests immediate execution. Preserve existing teams; resume halted work only on explicit request.'
 export const TEAM_MEMBER_PROMPT = 'You are an AgentTeams member. Follow your assigned member persona and task contract. Use agent_teams_claim_task, agent_teams_update_task, agent_teams_send_message and agent_teams_status for your own work. Include the current attempt_id in updates; report completion or failure to the captain. Do not create, approve, edit or resume a team. If your durable membership is unavailable, report that to the parent instead of creating a replacement.'
 
-type Role = 'discovery' | 'captain' | 'member'
 interface Exposure {
-  agent: Agent
-  role: Role
-  opened: boolean
   member: boolean
-  teamId?: string
-  profile?: string
-  revoke?: () => void
   dispose: () => void
 }
 
@@ -68,53 +61,31 @@ export function installTeamCapabilities(ctx: Context, config: CapabilityConfig):
   const active = new Set<Exposure>()
   let mounted = true
 
-  function present(state: Exposure, role: Role): void {
-    if (state.role === role && state.revoke !== undefined) return
-    const deny = role === 'captain' ? [] : TEAM_TOOL_NAMES.filter(name => role === 'discovery' || !MEMBER_TOOL_NAMES.includes(name))
-    const names: string[] = [...deny, ...role === 'member' ? [OPEN_TEAM_TOOL] : []]
-    // Install the new mask before lifting our old one. Other owners' masks
-    // remain in place; never register scoped copies to bypass their denial.
-    const revoke = names.length === 0 ? () => undefined : state.agent.ctx.tools.restrict({ deny: names })
-    state.revoke?.()
-    state.revoke = revoke
-    state.role = role
-  }
-
-  function refresh(state: Exposure): void {
-    let team: TeamState | undefined
-    try {
-      state.member ||= config.isPendingMember(state.agent) || readRetiredMemberIdsSync(stateRoot(state.agent, config)).has(state.agent.id)
-      team = currentTeam(state.agent, config)
-    } catch (error) {
-      // Ordinary conversation must remain usable when unrelated state is
-      // corrupt. The explicit open tool surfaces the read failure to callers.
-      ctx.logger.warn(`agent-teams: capability hydration failed: ${String(error)}`)
-      present(state, state.member ? 'member' : 'discovery')
-      return
-    }
-    if (team !== undefined) {
-      state.teamId = team.id
-      state.profile = team.profile?.name
-      state.member = team.captainSessionId !== state.agent.id
-      present(state, state.member ? 'member' : 'captain')
-    } else {
-      if (state.teamId !== undefined) state.opened = false
-      state.teamId = undefined
-      present(state, state.member ? 'member' : state.opened ? 'captain' : 'discovery')
-    }
-  }
-
   function attach(agent: Agent): Exposure {
     const prior = states.get(agent)
     if (prior !== undefined) return prior
     if (!mounted) throw new Error('AgentTeams capability provider is disposed')
-    const state: Exposure = { agent, role: 'discovery', opened: false, member: config.isPendingMember(agent), dispose: () => undefined }
+    // Determine a member's role before its first request and retain it for the
+    // lifetime of this scope. Team creation/archive must never rewrite the
+    // captain's system/tools prefix, even after a long ordinary conversation.
+    let member = config.isPendingMember(agent)
+    try {
+      member ||= readRetiredMemberIdsSync(stateRoot(agent, config)).has(agent.id)
+      const team = currentTeam(agent, config)
+      member ||= team !== undefined && team.captainSessionId !== agent.id
+    } catch (error) {
+      // Unrelated damaged state must not disable ordinary conversation.
+      // Explicit open still reports its read error instead of replacing work.
+      ctx.logger.warn(`agent-teams: capability hydration failed: ${String(error)}`)
+    }
+    const state: Exposure = { member, dispose: () => undefined }
+    let revoke: (() => void) | undefined
     let disposed = false
     let releaseLifetime: (() => void) | undefined
     state.dispose = () => {
       if (disposed) return
       disposed = true
-      state.revoke?.()
+      revoke?.()
       releaseLifetime?.()
       states.delete(agent)
       active.delete(state)
@@ -122,7 +93,9 @@ export function installTeamCapabilities(ctx: Context, config: CapabilityConfig):
     states.set(agent, state)
     active.add(state)
     try {
-      refresh(state)
+      if (member) revoke = agent.ctx.tools.restrict({
+        deny: [...TEAM_TOOL_NAMES.filter(name => !MEMBER_TOOL_NAMES.includes(name)), OPEN_TEAM_TOOL],
+      })
       releaseLifetime = agent.ctx.effect(() => state.dispose, 'agent-teams: capability lifetime')
       return state
     } catch (error) { state.dispose(); throw error }
@@ -130,7 +103,7 @@ export function installTeamCapabilities(ctx: Context, config: CapabilityConfig):
 
   ctx.tools.register(defineTool({
     name: OPEN_TEAM_TOOL,
-    description: 'Load AgentTeams tools when the user requests AgentTeams / Agent Teams or multi-agent team collaboration. Call this first for natural-language or /agent-teams requests. Reads the current team summary; does not create, approve, resume, stop, or schedule work.',
+    description: 'Read AgentTeams operating instructions when the user requests AgentTeams / Agent Teams or multi-agent team collaboration. Call this first for natural-language or /agent-teams requests. Reads the current team summary; does not create, approve, resume, stop, or schedule work.',
     parameters: { profile: { type: 'string', description: 'Optional configured team profile requested by the user.' } },
     output: {
       schema: { type: 'object', additionalProperties: true, properties: {} },
@@ -149,12 +122,10 @@ export function installTeamCapabilities(ctx: Context, config: CapabilityConfig):
       if (state.member || (team !== undefined && team.captainSessionId !== agent.id)) {
         throw new Error('AgentTeams members use their assigned tools; only the captain opens team planning')
       }
-      state.opened = true
-      state.teamId = team?.id
-      state.profile = team === undefined ? profile : team.profile?.name
-      present(state, 'captain')
+      const selectedProfile = team === undefined ? profile : team.profile?.name
       const profileConflict = team !== undefined && profile !== undefined && profile !== team.profile?.name
       return {
+        instructions: config.captainPrompt(selectedProfile),
         role: 'captain',
         next: profileConflict ? 'The requested profile differs from the current team. Opening has not switched it. Preserve the current team unless the user already explicitly requested ending it for a new goal; otherwise clarify that choice before replacing it.' : nextAction(team),
         ...profile === undefined ? { profiles: [...profiles] } : { requested_profile: profile },
@@ -174,30 +145,10 @@ export function installTeamCapabilities(ctx: Context, config: CapabilityConfig):
   ctx.systemPrompt.section({
     name: 'agent-teams:usage', order: config.order ?? 117,
     text: ({ agent }) => {
-      const state = agent === undefined ? undefined : states.get(agent)
-      if (state?.role === 'member') return TEAM_MEMBER_PROMPT
-      if (state?.role === 'captain') return config.captainPrompt(state.profile)
-      return TEAM_DISCOVERY_PROMPT
+      return agent !== undefined && states.get(agent)?.member ? TEAM_MEMBER_PROMPT : TEAM_DISCOVERY_PROMPT
     },
   })
   ctx.on('agent/session-start', ({ agent }) => { attach(agent) })
-  ctx.on('tools/result', (exec) => {
-    if (exec.agent === undefined || !['agent_teams_create', 'agent_teams_delete'].includes(exec.name)) return
-    const state = states.get(exec.agent)
-    if (state === undefined) return
-    // A create/delete may both commit within one batch, including PTC child
-    // dispatches. Drop the temporary open latch even if later result policy
-    // rejects a committed side effect. Durable state decides the role at idle.
-    state.opened = false
-    try {
-      const team = currentTeam(exec.agent, config)
-      if (team !== undefined) { state.teamId = team.id; state.profile = team.profile?.name }
-    } catch (error) { ctx.logger.warn(`agent-teams: capability observation failed: ${String(error)}`) }
-    return undefined
-  })
-  // Safe boundaries: do not revoke tools in the middle of a model's batch.
-  ctx.on('agent/inbox/claimed', ({ agent }) => { refresh(attach(agent)) })
-  ctx.on('agent/status', ({ agent, status }) => { if (status === 'idle') refresh(attach(agent)) })
   ctx.effect(() => () => {
     mounted = false
     for (const state of [...active]) state.dispose()

@@ -2,7 +2,8 @@
  * AgentTeams for DeepSeek Harness.
  *
  * A host-plane plugin that registers the `agent_teams_*` tools and one usage
- * agent-scoped usage section. Ordinary sessions see only a discovery entry.
+ * agent-scoped usage section. Each session keeps a stable tool set; detailed
+ * captain instructions are read on demand through agent_teams_open.
  * After installation any session can
  * run multi-agent teamwork through natural language (e.g. "use AgentTeams to research X"):
  * the model creates a team (it becomes the captain), spawns members as
@@ -20,13 +21,14 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-// Declaration merge only: makes ctx.llm, ctx.subagents and ctx.systemPrompt visible.
-import type {} from '@deepseek-ai/dsh-llm'
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
+// Declaration merges make ctx.subagents and ctx.systemPrompt visible.
 import type {} from '@deepseek-ai/dsh-subagent'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import type { WorkspaceRegistry } from '@deepseek-ai/dsh-workspace'
 import {
   haltTeamWork,
+  stagedPlanApprovedContext,
   registerAgentTeamsTools,
   type StagedPlanMutation,
   type ToolsConfig,
@@ -38,7 +40,6 @@ import { fileURLToPath } from 'node:url'
 import { collectArchivedTeamsActivity, collectTeamsActivity } from './snapshot.ts'
 import { findTeamByCaptain } from './state.ts'
 import { formatProfilesForPrompt, type TeamProfileConfig } from './profiles.ts'
-import { qualityPlanningPrompt } from './quality-gates.ts'
 import { installTeamCapabilities } from './capabilities.ts'
 import { TEAM_TOOL_NAMES } from './tool-names.ts'
 
@@ -135,18 +136,17 @@ export const Config: z<Config> = z.object({
 
 /** The model-facing usage policy: when and how to drive AgentTeams. */
 export function usageSectionText(toolNames: string, profilesText = ''): string {
-  return `When the user asks to run something with AgentTeams (e.g. "use AgentTeams to do X"), or an activation message from the /agent-teams slash command arrives, you are the captain of a multi-agent team. Follow this protocol:
-1. First call agent_teams_open to read the current team summary. If you already lead a team, continue that team instead of creating a replacement or duplicating its roster and tasks. Only when no current team exists, call agent_teams_create with a team name, the goal as description, and approval="required". This creates a staged plan and must not spawn members or schedule work. Use approval="automatic" only when the user explicitly asks to skip review and run immediately.
-2. Call agent_teams_add_member once per role the goal needs (researcher, engineer, reviewer, ...). In staging these are editable roster entries, not running subagents. By default a member snapshots your current provider/model/reasoning route; use a different route only when the goal or user requires it.
-3. Analyze the goal and create the smallest useful task DAG while staged. Every agent_teams_create_task call must include a non-empty subject, including verification and review tasks. Independent work should be parallel; dependencies are only genuine prerequisites. Finish the complete roster and DAG, tell the user the Web plan is ready, then end this turn. Never call agent_teams_approve during the planning turn. The user may click Approve & Run, explicitly approve in a later user turn, return to chat to request changes, or discard the plan. The review UI injects an authoritative control message for return/discard actions: follow it exactly and never infer that a missing or paused team should be recreated. When the user returns to chat, first ask one concise clarification question without editing or recreating; after their answer, call agent_teams_edit_plan once with an ordered atomic batch, update downstream dependencies/assignees before removals, summarize the revision, and wait for review again. Never inspect or edit .agent-teams state files or plugin source code to revise a plan. Only explicit approval may call agent_teams_approve.
-4. After approval, the final member configuration is spawned atomically and the scheduler starts ready work. Lead by delegation: monitor with agent_teams_status, send guidance with agent_teams_send_message, and let idle teammates execute ready work. Do not duplicate a teammate's work merely because its turn is slow. If the user requires every member to contribute or report, create one task per required contribution (or message each member directly); never wait for an unassigned member to produce work it was never given.
-5. If the user explicitly asks to pause a running member, its open attempt remains parked after interruption; after answering the user, send that same member guidance with agent_teams_send_message so it continues the same attempt. Do not interrupt members for an ordinary user question that did not request a pause. If work must change owner, restart from scratch, or be taken over, call agent_teams_reassign_task first. Prefer another idle member or a retry with the same member. Use assignee=captain only for one ready task that you will personally drive to a terminal status in this same turn; never start a second captain takeover while one is unfinished, and never end your turn with captain-owned work open. Reassignment revokes the old attempt and waits for that member to quiesce, preventing late results from overwriting the new attempt.
-6. Tasks carry attempt_id capabilities. Members must use the current attempt_id for updates; stale-attempt errors mean ownership changed. After dispatch, end your turn while members work: mailbox progress deliveries will wake you. Read status after a delivery or an explicit user request until every required task is terminal and every member is idle/ready; do not busy-poll or require reports from members with no assigned work.
-7. If the user names a configured profile / template / fixed roster, pass that name as profile= to agent_teams_create. After a successful profile create, do not recreate the same members. Seed profiles provide their template tasks; captain-planning profiles provide only the roster and guardrails, so you must design their DAG while staged. Add repair or retry tasks when review/test fails, but never make a new task depend on a failed task. Do not send_message to start the next stage; the scheduler assigns ready work after approval. Watch every required task until it is terminal before deleting the team. Never perform a real deployment without explicit user confirmation.
-8. Quality kinds (requirements, implementation, verification, review, repair, integration) need a contract: non-empty objective and acceptance; implementation/repair also need inScope and verify. Review/requirements can complete only with verdict=pass; needs_revision/reject must fail with findings. The system then opens repair + next review that depend on the successful source, never the failed review. Do not approve your own implementation. create_task no longer silently resumes a halted team — call agent_teams_resume with a reason, or create_task({resume:true, resumeReason}).
-9. ${qualityPlanningPrompt()}
-10. Present the team's results to the user, then agent_teams_delete the team unless the user wants to keep working with it. Stopping a team aborts the Captain's current turn as well as member work; only a later explicit user turn may resume it.
-
+  return `AgentTeams captain protocol:
+1. Use the returned current-team summary. Continue existing work without duplicating its roster/tasks. Create only when no current team exists, with approval="required"; automatic approval requires an explicit request to run immediately. Staged plans never spawn or schedule work.
+2. Add each needed role once; members inherit your model route unless another is requested/needed. A requested profile goes to create({profile}); it supplies its roster. Seed profiles also supply tasks; captain-planning profiles require your DAG. Do not duplicate either.
+3. Build the complete smallest useful DAG while staged. Every task needs a subject; dependencies represent prerequisites. Give every required contributor a task or explicit message. Present the plan and end your turn for review; never approve in that planning turn. Approve only after a later explicit user approval or the Web action.
+4. Respect Web approve/return/discard control messages. On return, ask what to change before editing; after the answer, use one atomic agent_teams_edit_plan batch (edit downstream references before removals), summarize and await review again. Never inspect or edit .agent-teams state files or plugin source code to revise plans. Discard does not authorize a replacement.
+5. The scheduler dispatches ready tasks after approval. Delegate; do not duplicate slow work or send messages merely to start a stage. Handle reports/user work, then yield when waiting is all that remains: reports wake you automatically. Use status after a delivery or user request, never busy-poll or wait for unassigned members.
+6. Tasks carry attempt_id capabilities. Use the current attempt_id; stale means ownership changed. Pause members only on explicit request; later guidance via send_message continues that same attempt. Retry, transfer or take over through reassign_task first; it revokes the old attempt and waits for quiescence. Prefer a member. Captain implementation/review takeover requires a user request. Every takeover is one ready task at a time, finished in this turn; never yield with captain-owned work open.
+7. Quality kinds (requirements, implementation, verification, review, repair, integration) require objective + acceptance; implementation/repair also require inScope + verify. Derive paths/commands from the workspace/profile, never assume src/ or pnpm test. Review/requirements complete only with verdict=pass; needs_revision/reject fail with findings. Never approve your own implementation or ask for a deliberate failure.
+8. Full quality mode: requirements → implementation → verification → review → integration. Plan the entire DAG while staged, including implementation before requirements finishes and integration depending on review round 1. Failed review automatically adds repair + next review and rewires pending downstream gates. Do not recreate this loop, omit integration or depend on a failed task. Review acceptance judges the latest implementation. Do not put smoke-test scripts into task instructions.
+9. Halted means the user stopped work (including the captain turn). Resume only on a later explicit user request with a reason, via agent_teams_resume or create_task({resume:true,resumeReason}); creating tasks alone never resumes. Escalated means the review loop hit its limit, not a halt. Deployment requires explicit user confirmation.
+10. Wait for all required tasks to be terminal and members idle/ready, present results, then delete/archive unless the user wants to continue. Never discard unfinished work without authorization.
 Tools: ${toolNames}${profilesText === '' ? '' : `\n\n${profilesText}`}`
 }
 
@@ -333,6 +333,19 @@ export function apply(ctx: Context, config: Config): void {
         try {
           if (action === 'approve') {
             const approved = await agentTeamsRuntime.approveStagedTeam(captain, teamId)
+            // The browser receives the HTTP result, so the model needs its own
+            // control message. steer wakes an idle captain or joins its next
+            // step; the tool approve path already returns to the model itself.
+            try {
+              captain.steer(createUserMessage({
+                content: [{ type: 'text', text: stagedPlanApprovedContext(team.name) }],
+                source: { kind: 'plugin', plugin: 'dsh-agent-teams' },
+              }))
+            } catch (error) {
+              // Approval is already committed. Do not report a failed approval
+              // and invite a retry that could duplicate the user's action.
+              ctx.logger.warn(`agent-teams: approval notification failed for ${teamId}: ${String(error)}`)
+            }
             res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
             res.end(JSON.stringify({ ok: true, phase: 'running', ...approved }))
             return

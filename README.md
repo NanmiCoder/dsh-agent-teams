@@ -30,7 +30,7 @@ Ask in natural language. The plugin provides the team protocol, 13 coordination 
 
 ## Releases
 
-[v0.1.16-rc.3](./release-notes/v0.1.16-rc.3.md) targets npm `next`, with a concise fixed team protocol, existing-team reuse guidance, Web approval wakeups, and team-lock cleanup. Choose a version pair below.
+[v0.1.16-rc.3](./release-notes/v0.1.16-rc.3.md) is published on npm `next`, with a concise fixed team protocol, existing-team reuse guidance, Web approval wakeups, and team-lock cleanup. See the [release verification](./docs/releases/v0.1.16-rc.3/README.md) and choose a version pair below.
 
 ## Why AgentTeams?
 

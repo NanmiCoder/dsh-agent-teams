@@ -30,7 +30,7 @@
 
 ## 版本更新
 
-[v0.1.16-rc.3](./release-notes/v0.1.16-rc.3.md) 面向 npm `next` 渠道，精简固定团队协议、引导复用已有团队，并修复 Web 批准通知和团队锁清理。安装版本见下方配对表。
+[v0.1.16-rc.3](./release-notes/v0.1.16-rc.3.md) 已发布到 npm `next` 渠道，精简固定团队协议、引导复用已有团队，并修复 Web 批准通知和团队锁清理。参见[发布验收记录](./docs/releases/v0.1.16-rc.3/README.md)，安装版本见下方配对表。
 
 ## 为什么需要 AgentTeams？
 

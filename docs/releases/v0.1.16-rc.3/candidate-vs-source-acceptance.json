@@ -1,0 +1,33 @@
+{
+  "artifacts": [
+    {
+      "path": "/tmp/dsh-no-open-artifacts/nanmicoder-dsh-agent-teams-0.1.16-rc.1.tgz",
+      "sha256": "3b03096455bf2d97bf8272756eebd4715d251ea9798e103bb98d641c19ca5a18"
+    },
+    {
+      "path": "/tmp/dsh-rc3-release/candidate/candidate.tgz",
+      "sha256": "4584cf9b4b2270f7c907cb862d2134d4624f69b45ad5d5f8c31de7a80bbd45f0"
+    }
+  ],
+  "added": [
+    "package/release-notes/v0.1.16-rc.2.md",
+    "package/release-notes/v0.1.16-rc.3.md"
+  ],
+  "removed": [],
+  "changed": [
+    "package/README.md",
+    "package/README_ZH.md",
+    "package/lib/client.js",
+    "package/package.json"
+  ],
+  "clientDifference": {
+    "onlyBuildLocationAndCssModulePrefixes": true,
+    "prefixMapping": {
+      "jm5CAa": "kPAopq",
+      "ZeemNq": "aYQbCq"
+    },
+    "acceptedRoot": "/Users/nanmi/.codex/worktrees/8a20/dsh-agent-teams/",
+    "candidateRoot": "/home/runner/work/dsh-agent-teams/dsh-agent-teams/"
+  },
+  "otherRuntimeAndAssetsByteIdentical": true
+}

@@ -1,0 +1,20 @@
+{
+  "capturedAt": "2026-09-09T12:59:57.120Z",
+  "passed": true,
+  "package": "@nanmicoder/dsh-agent-teams",
+  "version": "0.1.16-rc.3",
+  "sourceCommit": "bf17f93d35ef75964e96333ff644ab2c9c57b3cb",
+  "actionRun": "https://github.com/NanmiCoder/dsh-agent-teams/actions/runs/34353925675",
+  "metadataUrl": "https://registry.npmjs.org/%40nanmicoder%2Fdsh-agent-teams/0.1.16-rc.3",
+  "tarballUrl": "https://registry.npmjs.org/@nanmicoder/dsh-agent-teams/-/dsh-agent-teams-0.1.16-rc.3.tgz",
+  "bytes": 1932562,
+  "sha256": "4584cf9b4b2270f7c907cb862d2134d4624f69b45ad5d5f8c31de7a80bbd45f0",
+  "sha1": "d29988bfe5c79dd487bc2c63f63ca6543fe3fcbd",
+  "integrity": "sha512-ZTCuQLDB65pcoFODNLyFgJRW6xwZhzDPafLeHxzhINWlnFNYqNkLfytkmbRDKPz3MZr7rn6IPFp/yzxxiIGyUA==",
+  "byteIdenticalToActionCandidate": true,
+  "distTags": {
+    "alpha": "0.1.15-alpha.1",
+    "latest": "0.1.15",
+    "next": "0.1.16-rc.3"
+  }
+}

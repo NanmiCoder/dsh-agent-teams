@@ -1,0 +1,16 @@
+{
+  "releaseSource": "bf17f93d35ef75964e96333ff644ab2c9c57b3cb",
+  "acceptedSource": "7468f992c3195f6a1c7d7905c239fc7fbca3fcfc",
+  "productionSourcesUnchanged": true,
+  "sourceFiles": {
+    "src/capabilities.ts": "f701c6b6bc505bbb476343744c5feacb237adf1af919b4050671622880dfdef1",
+    "src/command.ts": "e6e3155c39dbbd0b1459e597bebfc389b792773ef06eee99ee4b0c0431d6fe47",
+    "src/index.ts": "3c83424c7cf181f1b3bfc76ece67e490c778384456dcac10e7d7e3ed53603221",
+    "src/profiles.ts": "d085921924ded4a91e33abb6bfb316df1afe765aa76d4d54ac645dabde4780cf",
+    "src/tool-names.ts": "e5e38e4cb24a9dba08c64ea3afffe8ed6244b9b0209d02606459d118016f9796",
+    "src/tools.ts": "7f20260ef82eb394e7873c4f10fcf936e6a675802117c304c564c94bd5b978e9"
+  },
+  "realModelReport": "docs/no-open-verification.json",
+  "browserArtifact": "0.1.16-rc.2 local candidate, same runtime code/assets as rc.3",
+  "remainingDifferences": "Release metadata/docs and test/benchmark portability and scheduling synchronization"
+}

@@ -1,0 +1,74 @@
+{
+  "conclusion": "success",
+  "createdAt": "2026-09-09T12:55:55Z",
+  "headSha": "bf17f93d35ef75964e96333ff644ab2c9c57b3cb",
+  "jobs": [
+    {
+      "name": "verify / Static checks (Ubuntu) and candidate package",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-09-09T12:55:58Z",
+      "completedAt": "2026-09-09T12:56:32Z",
+      "url": "https://github.com/NanmiCoder/dsh-agent-teams/actions/runs/34353925675/job/102473695536"
+    },
+    {
+      "name": "verify / Static checks (Windows)",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-09-09T12:55:58Z",
+      "completedAt": "2026-09-09T12:57:15Z",
+      "url": "https://github.com/NanmiCoder/dsh-agent-teams/actions/runs/34353925675/job/102473696028"
+    },
+    {
+      "name": "verify / Real Harness (0.1.2-rc.1)",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-09-09T12:57:17Z",
+      "completedAt": "2026-09-09T12:58:45Z",
+      "url": "https://github.com/NanmiCoder/dsh-agent-teams/actions/runs/34353925675/job/102474148105"
+    },
+    {
+      "name": "verify / Real Harness (0.1.2-alpha.2)",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-09-09T12:57:18Z",
+      "completedAt": "2026-09-09T12:58:48Z",
+      "url": "https://github.com/NanmiCoder/dsh-agent-teams/actions/runs/34353925675/job/102474148131"
+    },
+    {
+      "name": "verify / Real Harness (0.1.2-alpha.5)",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-09-09T12:57:18Z",
+      "completedAt": "2026-09-09T12:58:41Z",
+      "url": "https://github.com/NanmiCoder/dsh-agent-teams/actions/runs/34353925675/job/102474148223"
+    },
+    {
+      "name": "verify / Complete compatibility gate",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-09-09T12:58:51Z",
+      "completedAt": "2026-09-09T12:58:59Z",
+      "url": "https://github.com/NanmiCoder/dsh-agent-teams/actions/runs/34353925675/job/102474664954"
+    },
+    {
+      "name": "publish",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-09-09T12:59:02Z",
+      "completedAt": "2026-09-09T12:59:23Z",
+      "url": "https://github.com/NanmiCoder/dsh-agent-teams/actions/runs/34353925675/job/102474725312"
+    },
+    {
+      "name": "release",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-09-09T12:59:26Z",
+      "completedAt": "2026-09-09T12:59:31Z",
+      "url": "https://github.com/NanmiCoder/dsh-agent-teams/actions/runs/34353925675/job/102474853993"
+    }
+  ],
+  "status": "completed",
+  "updatedAt": "2026-09-09T12:59:32Z",
+  "url": "https://github.com/NanmiCoder/dsh-agent-teams/actions/runs/34353925675"
+}

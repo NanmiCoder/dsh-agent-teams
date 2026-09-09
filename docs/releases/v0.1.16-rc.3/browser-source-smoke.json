@@ -1,0 +1,24 @@
+{
+  "passed": true,
+  "host": "0.1.2-rc.1",
+  "plugin": "0.1.16-rc.2",
+  "workspace": "/tmp",
+  "browser": "Ego Browser",
+  "artifactSha256": "5eb37a874fff5be93dac41e99fb85fc257c6a86cf2acb8793103eb3036b31b8b",
+  "assertions": {
+    "bootManifestContainsPlugin": true,
+    "clientBundleHttp200": true,
+    "teamImagesLoaded": true,
+    "conversationCardMounted": true,
+    "activityPanelMounted": true,
+    "stagedPlanShown": true,
+    "clickedApproveAndRun": true,
+    "approvedControlMessageShown": true,
+    "renderedTaskCompleted": true,
+    "capturedPageErrors": 0,
+    "taskPersistedCompleted": true,
+    "memberSpawned": true,
+    "removedToolNotExposed": true
+  },
+  "scope": "Real published CLI/Loader and Web UI, native tools and scheduling; deterministic external model. Test session created through the host SDK directly in /tmp; no workspace chooser used for the successful run."
+}

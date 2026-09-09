@@ -52,10 +52,13 @@ import {
   subscribeActivityMonitorTargets,
   subscribeActivitySnapshots,
   type ActivityMember,
+  type ActivityArtwork,
   type ActivityTask,
   type ActivityTeam,
 } from './activity-monitor.ts'
-import { ACTION_ART, LEAD_ART, memberArtUrl } from './artwork.ts'
+import { ACTION_ART, captainArtCandidates, memberArtCandidates } from './artwork.ts'
+import { ArtworkImage } from './ArtworkImage.tsx'
+import { clearAvatar, setAvatarUrl, uploadAvatarFile, type AvatarTarget } from './avatar-api.ts'
 import { OPEN_PANEL_EVENT } from './AgentTeamsCard.tsx'
 import { StagingPlanEditor } from './StagingPlanEditor.tsx'
 import type { AgentTeamsCardData } from './agent-teams-card-definition.ts'
@@ -471,8 +474,102 @@ function DependencyMap({ tasks, members, t, discarded = false }: {
   )
 }
 
-function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscarded, onNavigate, t, historic = false }: {
+function AvatarEditor({ team, artwork, t, onClose }: {
   readonly team: ActivityTeam
+  readonly artwork: ActivityArtwork
+  readonly t: AgentTeamsTranslate
+  readonly onClose: () => void
+}) {
+  const [targetKey, setTargetKey] = useState('captain')
+  const [url, setUrl] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState<{ kind: 'success' | 'error'; text: string } | null>(null)
+  const target = useMemo<AvatarTarget>(() => {
+    if (targetKey === 'captain') return { kind: 'captain' }
+    const index = Number(targetKey.slice('member:'.length))
+    return { kind: 'member', name: team.members[index]?.name ?? '' }
+  }, [targetKey, team.members])
+  const run = async (operation: () => Promise<void>): Promise<void> => {
+    setBusy(true)
+    setMessage(null)
+    try {
+      await operation()
+      setMessage({ kind: 'success', text: t('avatar.saved') })
+      setUrl('')
+    } catch (error: unknown) {
+      setMessage({ kind: 'error', text: error instanceof Error ? error.message : t('avatar.failed') })
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <form
+      className={css.avatarEditor}
+      data-avatar-editor
+      onSubmit={(event) => {
+        event.preventDefault()
+        if (url.trim() === '') {
+          setMessage({ kind: 'error', text: t('avatar.urlRequired') })
+          return
+        }
+        void run(() => setAvatarUrl(team, target, url))
+      }}
+    >
+      <label className={css.avatarField}>
+        <span>{t('avatar.target')}</span>
+        <select value={targetKey} disabled={busy} onChange={(event) => { setTargetKey(event.currentTarget.value) }}>
+          <option value="captain">{t('avatar.captain')}</option>
+          {team.members.map((member, index) => (
+            <option key={member.id} value={`member:${index}`}>{member.name}</option>
+          ))}
+        </select>
+      </label>
+      <label className={css.avatarField}>
+        <span>{t('avatar.url')}</span>
+        <input
+          type="url"
+          value={url}
+          disabled={busy}
+          placeholder="https://example.com/avatar.png"
+          onChange={(event) => { setUrl(event.currentTarget.value) }}
+        />
+      </label>
+      <span className={css.avatarHint}>{t('avatar.hint', { mb: Math.floor(artwork.maxUploadBytes / 1024 / 1024) })}</span>
+      {message !== null && <span className={css.avatarMessage} data-kind={message.kind}>{message.text}</span>}
+      <span className={css.avatarActions}>
+        <button type="submit" disabled={busy}>{t('avatar.applyUrl')}</button>
+        <label className={css.avatarUpload} data-disabled={busy || undefined}>
+          {t('avatar.upload')}
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            disabled={busy}
+            onChange={(event) => {
+              const file = event.currentTarget.files?.[0]
+              event.currentTarget.value = ''
+              if (file === undefined) return
+              if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+                setMessage({ kind: 'error', text: t('avatar.fileType') })
+                return
+              }
+              if (file.size > artwork.maxUploadBytes) {
+                setMessage({ kind: 'error', text: t('avatar.fileTooLarge') })
+                return
+              }
+              void run(() => uploadAvatarFile(team, target, file))
+            }}
+          />
+        </label>
+        <button type="button" disabled={busy} onClick={() => { void run(() => clearAvatar(team, target)) }}>{t('avatar.clear')}</button>
+        <button type="button" disabled={busy} onClick={onClose}>{t('avatar.close')}</button>
+      </span>
+    </form>
+  )
+}
+
+function TeamSection({ team, artwork, modelDirectory, onContinuePlanning, onDiscarded, onNavigate, t, historic = false }: {
+  readonly team: ActivityTeam
+  readonly artwork: ActivityArtwork
   readonly modelDirectory?: ModelDirectory
   readonly onContinuePlanning?: () => void
   readonly onDiscarded?: () => void
@@ -487,6 +584,7 @@ function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscarded, on
   const [stopError, setStopError] = useState('')
   const discarded = historic && team.phase === 'staged'
   const stopped = !historic && team.halted === true
+  const [avatarEditorOpen, setAvatarEditorOpen] = useState(false)
   const busyCount = team.members.filter((member) => member.activity === 'working').length
   const assignedCount = team.tasks.filter((task) => task.assignee !== '' && task.assignee !== CAPTAIN_ASSIGNEE).length
   const captainOwned = team.tasks.filter((task) => task.assignee === CAPTAIN_ASSIGNEE
@@ -535,6 +633,16 @@ function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscarded, on
           <span className={css.teamName} title={team.name}>{team.name}</span>
           {historic && <span className={css.historicPill}>{t(discarded ? 'team.discarded' : 'team.ended')}</span>}
           {stopped && <span className={css.historicPill}>{t('team.stopped')}</span>}
+          {!historic && team.avatarEditToken !== undefined && (
+            <button
+              type="button"
+              className={css.avatarManageButton}
+              aria-expanded={avatarEditorOpen}
+              onClick={() => { setAvatarEditorOpen((current) => !current) }}
+            >
+              {t('avatar.manage')}
+            </button>
+          )}
           <span className={css.teamStats}>
             <span data-stat="members">{t('team.stats.members', { count: team.members.length })}</span>
             <span data-stat="tasks">{t('team.stats.completed', { completed: completedCount, total: team.tasks.length })}</span>
@@ -563,10 +671,17 @@ function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscarded, on
           />
         )}
 
+      {avatarEditorOpen && !historic && (
+        <AvatarEditor team={team} artwork={artwork} t={t} onClose={() => { setAvatarEditorOpen(false) }} />
+      )}
+
       <section className={css.delegationSection} aria-label={t('delegation.aria')} data-delegation-map>
         <div className={css.captainNode}>
           <span className={css.captainAvatar}>
-            <img className={css.leadAvatar} src={LEAD_ART} alt="" aria-hidden />
+            <ArtworkImage
+              className={css.leadAvatar}
+              sources={captainArtCandidates(team.captainAvatarUrl, artwork.captainAvatarUrl)}
+            />
           </span>
           <span className={css.captainInfo}>
             <span className={css.captainLine}>
@@ -629,11 +744,11 @@ function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscarded, on
                   }}
                 >
                   <span className={css.memberAvatar} data-unread={member.unread > 0}>
-                    {memberArtUrl(member.name, member.role) !== null ? (
-                      <img className={css.memberArt} src={memberArtUrl(member.name, member.role) ?? ''} alt="" aria-hidden />
-                    ) : (
-                      <span className={css.memberInitial} style={{ background: accentOf(member.id) }}>{memberInitial(member.name)}</span>
-                    )}
+                    <ArtworkImage
+                      className={css.memberArt}
+                      sources={memberArtCandidates(member.name, member.role, member.avatarUrl, artwork.roleAvatars)}
+                      fallback={<span className={css.memberInitial} style={{ background: accentOf(member.id) }}>{memberInitial(member.name)}</span>}
+                    />
                     <img className={css.stateArt} data-activity={member.activity} src={ACTION_ART[member.activity]} alt="" aria-hidden />
                   </span>
                   <span className={css.memberInfo}>
@@ -738,6 +853,7 @@ function historicCardTeam(data: AgentTeamsCardData, owner: string): ActivityTeam
     name: data.teamName,
     captainSessionId: data.captainSessionId || owner,
     phase: 'running',
+    ...data.captainAvatarUrl === undefined ? {} : { captainAvatarUrl: data.captainAvatarUrl },
     members: data.members.map((member) => ({
       ...member,
       status: 'removed',
@@ -805,7 +921,7 @@ export function ActivityPanel({ sessionsList, modelDirectories, openMember, t }:
       document.querySelector<HTMLTextAreaElement>('[data-composer-card] textarea')?.focus()
     })
   }
-  const { teams, archivedTeams } = useSyncExternalStore(
+  const { teams, archivedTeams, artwork } = useSyncExternalStore(
     subscribeActivitySnapshots,
     getActivitySnapshotsSnapshot,
   )
@@ -1235,6 +1351,7 @@ export function ActivityPanel({ sessionsList, modelDirectories, openMember, t }:
                     <TeamSection
                       key={team.teamId}
                       team={team}
+                      artwork={artwork}
                       modelDirectory={team.phase === 'staged'
                         ? modelDirectories.directoryFor(team.captainSessionId as SessionId)
                         : undefined}
@@ -1247,13 +1364,13 @@ export function ActivityPanel({ sessionsList, modelDirectories, openMember, t }:
                   {visibleArchived.map((team) => (
                     <div key={`${team.captainSessionId}:${team.teamId}`} data-team-id={team.teamId} data-historic className={css.archivedWrap}>
                       <span className={css.archiveLabel}>{t(team.phase === 'staged' ? 'archive.discardedLabel' : 'archive.label')}</span>
-                      <TeamSection team={team} onNavigate={navigateToSession} t={t} historic />
+                      <TeamSection team={team} artwork={artwork} onNavigate={navigateToSession} t={t} historic />
                     </div>
                   ))}
                   {visibleHistoric.map(({ data: team, owner }) => {
                     const teamKey = `${owner}:${team.teamId}`
                     return (
-                      <TeamSection key={teamKey} team={historicCardTeam(team, owner)} onNavigate={navigateToSession} t={t} historic />
+                      <TeamSection key={teamKey} team={historicCardTeam(team, owner)} artwork={artwork} onNavigate={navigateToSession} t={t} historic />
                     )
                   })}
                 </>

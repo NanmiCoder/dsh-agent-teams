@@ -122,11 +122,18 @@ dsh plugin --profile web add --save-exact @nanmicoder/dsh-agent-teams@0.1.16-rc.
     memberModel: deepseek-v4
     memberMaxDepth: 1
     maxMembers: 8
+    captainAvatar: ''            # 空值保留默认队长鲸鱼
+    roleAvatars:                 # 可选：覆盖角色分类头像
+      researcher: https://example.com/researcher.webp
+      engineer: https://example.com/engineer.png
+    avatarMaxBytes: 2097152      # 默认/最大 2 MiB，可调小
 ```
 
 这里的 `memberProvider` 指子 Agent 的运行后端（`spawn` / `fork`），不是 LLM provider。跨 LLM provider 由 `agent_teams_add_member` 的可选 `provider` + `model` 参数表达；`memberModel` 只是所有成员的模型默认覆盖。成员沿用队长当前 provider/model 时会继承队长的思考强度；provider 或 model 任一改变时会自动使用目标模型的默认档。需要指定特定强度时，可传入可选的 `reasoning_effort` 参数（目标模型支持的档位 id，或 `"default"` 表示强制使用模型自身默认档）。
 
 `slashCommand: false` 可关闭确定性的 `/agent-teams` 激活面（slash 命令与手势边界），仅保留自然语言触发。
+
+活动面板团队标题旁的“头像”入口可以为当前队长或任一成员粘贴 HTTP(S) URL、上传 PNG/JPEG/WebP，或恢复默认。会话级设置优先于 `roleAvatars`，后者再优先于内置角色鲸鱼；无匹配成员仍显示首字母。上传文件保存在团队目录的 `avatars/` 下，`team.json` 只记录短引用。外链由 Host 同源代理加载，以兼容 Desktop CSP。
 
 ## 使用边界
 

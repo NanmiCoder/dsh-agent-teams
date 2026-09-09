@@ -439,6 +439,121 @@
   margin-top: 1px;
 }
 
+.avatarManageButton {
+  flex: none;
+  padding: 2px 7px;
+  border: 1px solid var(--dsw-alias-line-strong);
+  border-radius: 999px;
+  background: var(--dsw-alias-bg-module);
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  font-size: 10px;
+  line-height: 15px;
+  cursor: pointer;
+}
+
+.avatarManageButton:hover,
+.avatarManageButton[aria-expanded='true'] {
+  border-color: var(--dsw-alias-state-business-primary);
+  color: var(--dsw-alias-state-business-primary);
+}
+
+.avatarEditor {
+  display: grid;
+  grid-template-columns: minmax(100px, 0.75fr) minmax(150px, 1.5fr);
+  gap: 7px 9px;
+  padding: 9px;
+  border: 1px solid var(--dsw-alias-line-normal);
+  border-radius: 9px;
+  background: var(--dsw-alias-bg-fill-neutral);
+}
+
+.avatarField {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 9.5px;
+  line-height: 14px;
+}
+
+.avatarField select,
+.avatarField input {
+  width: 100%;
+  min-width: 0;
+  height: 28px;
+  padding: 3px 7px;
+  box-sizing: border-box;
+  border: 1px solid var(--dsw-alias-line-strong);
+  border-radius: 6px;
+  background: var(--dsw-alias-bg-module);
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 10.5px;
+}
+
+.avatarHint,
+.avatarMessage {
+  grid-column: 1 / -1;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 9.5px;
+  line-height: 14px;
+}
+
+.avatarMessage[data-kind='success'] {
+  color: var(--dsw-alias-state-success);
+}
+
+.avatarMessage[data-kind='error'] {
+  color: var(--dsw-alias-state-danger);
+}
+
+.avatarActions {
+  display: flex;
+  grid-column: 1 / -1;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.avatarActions button,
+.avatarUpload {
+  display: inline-flex;
+  min-height: 25px;
+  align-items: center;
+  padding: 3px 8px;
+  box-sizing: border-box;
+  border: 1px solid var(--dsw-alias-line-strong);
+  border-radius: 6px;
+  background: var(--dsw-alias-bg-module);
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  font-size: 9.5px;
+  line-height: 15px;
+  cursor: pointer;
+}
+
+.avatarActions button:hover,
+.avatarUpload:hover {
+  border-color: var(--dsw-alias-state-business-primary);
+  color: var(--dsw-alias-state-business-primary);
+}
+
+.avatarActions button:disabled,
+.avatarUpload[data-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.avatarUpload input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+}
+
 .sectionHead {
   display: flex;
   align-items: center;

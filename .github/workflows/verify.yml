@@ -49,6 +49,7 @@ jobs:
           pnpm typecheck
           pnpm build
           pnpm verify
+          pnpm verify:browser
       - name: Pack the actual candidate once
         id: artifact
         run: |
@@ -94,6 +95,7 @@ jobs:
           pnpm typecheck
           pnpm build
           pnpm verify
+          pnpm verify:browser
 
   harness:
     name: Real Harness (${{ matrix.host }})

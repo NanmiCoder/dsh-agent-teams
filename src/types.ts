@@ -149,6 +149,8 @@ export interface TeamMember {
   name: string
   /** Role description, e.g. `researcher`, `engineer`, `reviewer`. */
   role?: string
+  /** Custom avatar URL or short host-managed file reference (never image bytes). */
+  avatar?: string
   /** Resolved LLM provider route captured when this member was created. */
   provider?: string
   /** Resolved model captured when this member was created. */
@@ -215,6 +217,8 @@ export interface TeamState {
   profile?: TeamProfileSnapshot
   /** Session id of the captain agent that owns this team. */
   captainSessionId: string
+  /** Per-team captain avatar URL or short host-managed file reference. */
+  captainAvatar?: string
   createdAt: number
   /** Teammates only; the captain is implicit (the owning session). */
   members: TeamMember[]

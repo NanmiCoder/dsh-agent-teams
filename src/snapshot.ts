@@ -17,6 +17,7 @@ import {
   taskDepthsById, taskVisualState,
 } from './state.ts'
 import type { MemberStatus, TeamState, TeamTask } from './types.ts'
+import type { AvatarProjectionContext } from './avatar.ts'
 
 /** Visual task state for the activity panel. */
 export type VisualTaskState = 'blocked' | 'open' | 'running' | 'completed' | 'failed' | 'cancelled'
@@ -30,6 +31,8 @@ export interface TeamActivityMember {
   readonly model: string
   readonly reasoningEffort: string
   readonly executionPrompt: string
+  /** First-party URL for the member's explicit custom avatar, when set. */
+  readonly avatarUrl?: string
   readonly status: MemberStatus
   readonly activity: 'working' | 'idle' | 'unknown'
   readonly progress: number
@@ -71,6 +74,10 @@ export interface TeamActivitySnapshot {
   readonly phase: 'staged' | 'running'
   readonly planReviewState?: 'awaiting_review' | 'awaiting_feedback'
   readonly halted?: boolean
+  /** First-party URL for this team's captain override, when set. */
+  readonly captainAvatarUrl?: string
+  /** Process-local CSRF capability; live captain UI only, never durable. */
+  readonly avatarEditToken?: string
   readonly members: readonly TeamActivityMember[]
   readonly tasks: readonly TeamActivityTask[]
   readonly messageCount: number
@@ -83,6 +90,10 @@ export interface TeamSnapshotOptions {
   readonly includeRemoved?: boolean
   /** Archived teams have no meaningful live activity after their sessions stop. */
   readonly historic?: boolean
+  /** Project a durable avatar reference into a browser-safe same-origin URL. */
+  readonly avatarUrl?: (source: string, context: AvatarProjectionContext) => string | undefined
+  /** Mint the edit capability exposed only on live team snapshots. */
+  readonly avatarEditToken?: (stateRoot: string, state: TeamState) => string
 }
 
 /** The current task of a member: its first unfinished owned task. */
@@ -126,6 +137,11 @@ export async function assembleTeamSnapshot(
     ? new Map<string, 'running' | 'idle' | 'ready'>()
     : memberActivity(ctx, roster.map((member) => member.id))
   const unreadByMember = new Map<string, number>()
+  const projectAvatar = (source: string | undefined): string | undefined => {
+    if (source === undefined) return undefined
+    if (options.avatarUrl === undefined) return source
+    return options.avatarUrl(source, { stateRoot, teamId: state.id, historic: options.historic === true })
+  }
   for (const member of roster) {
     try {
       unreadByMember.set(member.name, (await readUnreadMailbox(stateRoot, state.id, member.name)).length)
@@ -137,6 +153,7 @@ export async function assembleTeamSnapshot(
   const members: TeamActivityMember[] = roster.map((member) => {
     const owned = tasks.filter((task) => task.assignee === member.name)
     const done = owned.filter((task) => task.status === 'completed').length
+    const avatarUrl = projectAvatar(member.avatar)
     return {
       id: member.id,
       name: member.name,
@@ -145,6 +162,7 @@ export async function assembleTeamSnapshot(
       model: member.model?.trim() ?? '',
       reasoningEffort: member.reasoningEffort?.trim() ?? '',
       executionPrompt: member.executionPrompt ?? '',
+      ...avatarUrl === undefined ? {} : { avatarUrl },
       status: member.status,
       activity: options.historic === true
         ? 'idle'
@@ -163,6 +181,7 @@ export async function assembleTeamSnapshot(
     }
   })
   const captainInbox = await readUnreadMailbox(stateRoot, state.id, CAPTAIN_KEY)
+  const captainAvatarUrl = projectAvatar(state.captainAvatar)
   return {
     workspace,
     teamId: state.id,
@@ -174,6 +193,12 @@ export async function assembleTeamSnapshot(
       ? { planReviewState: state.planReviewState ?? 'awaiting_review' as const }
       : {},
     ...state.halted === true ? { halted: true } : {},
+    ...captainAvatarUrl === undefined
+      ? {}
+      : { captainAvatarUrl },
+    ...options.historic === true || options.avatarEditToken === undefined
+      ? {}
+      : { avatarEditToken: options.avatarEditToken(stateRoot, state) },
     members,
     tasks: tasks.map((task) => ({
       id: task.id,
@@ -207,6 +232,7 @@ export async function assembleTeamSnapshot(
 export async function collectTeamsActivity(
   ctx: Context,
   roots: readonly { workspace: string; stateRoot: string }[],
+  presentation: Pick<TeamSnapshotOptions, 'avatarUrl' | 'avatarEditToken'> = {},
 ): Promise<TeamActivitySnapshot[]> {
   const snapshots: TeamActivitySnapshot[] = []
   for (const root of roots) {
@@ -224,7 +250,7 @@ export async function collectTeamsActivity(
       try {
         const state = await readTeam(root.stateRoot, entry.name)
         if (state === undefined) continue
-        snapshots.push(await assembleTeamSnapshot(ctx, root.stateRoot, root.workspace, state))
+        snapshots.push(await assembleTeamSnapshot(ctx, root.stateRoot, root.workspace, state, presentation))
       } catch {
         ctx.logger.warn(`agent-teams: skipped unreadable team state "${entry.name}" in workspace "${root.workspace}"`)
       }
@@ -244,6 +270,7 @@ export async function collectTeamsActivity(
 export async function collectArchivedTeamsActivity(
   ctx: Context,
   roots: readonly { workspace: string; stateRoot: string }[],
+  presentation: Pick<TeamSnapshotOptions, 'avatarUrl'> = {},
 ): Promise<TeamActivitySnapshot[]> {
   const snapshots: TeamActivitySnapshot[] = []
   for (const root of roots) {
@@ -256,7 +283,7 @@ export async function collectArchivedTeamsActivity(
           join(root.stateRoot, 'archive'),
           root.workspace,
           state,
-          { includeRemoved: true, historic: true },
+          { ...presentation, includeRemoved: true, historic: true },
         ))
       } catch {
         ctx.logger.warn(`agent-teams: skipped unreadable archived team "${teamId}" in workspace "${root.workspace}"`)

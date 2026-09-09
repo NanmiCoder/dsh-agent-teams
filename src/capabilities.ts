@@ -5,10 +5,11 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import { readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { findTeamByParticipant, readTeamSync, readRetiredMemberIdsSync } from './state.ts'
+import type { TeamProfileSummary } from './profiles.ts'
 import type { TeamState } from './types.ts'
 import { MEMBER_TOOL_NAMES, OPEN_TEAM_TOOL, TEAM_TOOL_NAMES } from './tool-names.ts'
 
-export const TEAM_DISCOVERY_PROMPT = 'AgentTeams (Agent Teams) provides multi-agent team collaboration. When the user requests it, including /agent-teams, first call agent_teams_open to read the operating instructions and current team summary. Mentioning, quoting, discussing, or declining AgentTeams alone is not a request to use it. If instructions were pruned or lost, reopen before team operations. Opening does not create or start work. New teams require user review and approval unless the user explicitly requests immediate execution. Preserve existing teams; resume halted work only on explicit request.'
+export const TEAM_DISCOVERY_PROMPT = 'AgentTeams (Agent Teams) provides multi-agent team collaboration. Apply the following team rules when the user requests it (including /agent-teams) or when continuing an existing team. Mentioning, quoting, discussing, or declining AgentTeams alone is not a request to start work. The core protocol below is already available. agent_teams_open is an optional read-only helper for team status and configured profile summaries; if unavailable, use agent_teams_status or the existing business tools. In code mode print or return any helper data you need to inspect before planning. Opening never creates, approves, resumes, or schedules work.'
 export const TEAM_MEMBER_PROMPT = 'You are an AgentTeams member. Follow your assigned member persona and task contract. Use agent_teams_claim_task, agent_teams_update_task, agent_teams_send_message and agent_teams_status for your own work. Include the current attempt_id in updates; report completion or failure to the captain. Do not create, approve, edit or resume a team. If your durable membership is unavailable, report that to the parent instead of creating a replacement.'
 
 interface Exposure {
@@ -19,8 +20,8 @@ interface Exposure {
 interface CapabilityConfig {
   stateDir: string
   isPendingMember: (agent: Agent) => boolean
-  profileNames: () => readonly string[]
-  captainPrompt: (profile?: string) => string
+  profileCatalog: () => readonly TeamProfileSummary[]
+  captainPrompt: () => string
   order?: number
 }
 
@@ -60,6 +61,9 @@ export function installTeamCapabilities(ctx: Context, config: CapabilityConfig):
   const states = new WeakMap<Agent, Exposure>()
   const active = new Set<Exposure>()
   let mounted = true
+  // Snapshot policy once: profiles, team state, and tool results must never
+  // rewrite this prefix or control whether core instructions are available.
+  const captainPrompt = `${TEAM_DISCOVERY_PROMPT}\n\n${config.captainPrompt()}`
 
   function attach(agent: Agent): Exposure {
     const prior = states.get(agent)
@@ -103,7 +107,7 @@ export function installTeamCapabilities(ctx: Context, config: CapabilityConfig):
 
   ctx.tools.register(defineTool({
     name: OPEN_TEAM_TOOL,
-    description: 'Read AgentTeams operating instructions when the user requests AgentTeams / Agent Teams or multi-agent team collaboration. Call this first for natural-language or /agent-teams requests. Reads the current team summary; does not create, approve, resume, stop, or schedule work.',
+    description: 'Optional read-only AgentTeams helper: inspect the current team and available profile purposes, roster sizes and planning modes. Core team instructions are already in the system prompt; direct business tools remain usable without opening. Does not create, approve, resume, stop, or schedule work.',
     parameters: { profile: { type: 'string', description: 'Optional configured team profile requested by the user.' } },
     output: {
       schema: { type: 'object', additionalProperties: true, properties: {} },
@@ -114,21 +118,20 @@ export function installTeamCapabilities(ctx: Context, config: CapabilityConfig):
       if (agent === undefined) throw new Error('agent_teams_open requires a calling agent')
       exec.signal.throwIfAborted()
       const profile = args.profile?.trim() || undefined
-      const profiles = config.profileNames()
-      if (profile !== undefined && !profiles.includes(profile)) throw new Error(`unknown AgentTeams profile "${profile}"`)
+      const profiles = config.profileCatalog()
+      if (profile !== undefined && !profiles.some(item => item.name === profile)) throw new Error(`unknown AgentTeams profile "${profile}"`)
       const team = await findTeamByParticipant(stateRoot(agent, config), agent.id)
       exec.signal.throwIfAborted()
       const state = attach(agent)
       if (state.member || (team !== undefined && team.captainSessionId !== agent.id)) {
         throw new Error('AgentTeams members use their assigned tools; only the captain opens team planning')
       }
-      const selectedProfile = team === undefined ? profile : team.profile?.name
       const profileConflict = team !== undefined && profile !== undefined && profile !== team.profile?.name
       return {
-        instructions: config.captainPrompt(selectedProfile),
         role: 'captain',
         next: profileConflict ? 'The requested profile differs from the current team. Opening has not switched it. Preserve the current team unless the user already explicitly requested ending it for a new goal; otherwise clarify that choice before replacing it.' : nextAction(team),
-        ...profile === undefined ? { profiles: [...profiles] } : { requested_profile: profile },
+        profiles: profiles.filter(item => profile === undefined || item.name === profile).map(item => ({ ...item })),
+        ...profile === undefined ? {} : { requested_profile: profile },
         ...profileConflict ? { profile_conflict: true } : {},
         ...team === undefined ? {} : { team: {
           id: team.id, name: team.name, phase: team.phase ?? 'running', halted: team.halted === true,
@@ -145,7 +148,7 @@ export function installTeamCapabilities(ctx: Context, config: CapabilityConfig):
   ctx.systemPrompt.section({
     name: 'agent-teams:usage', order: config.order ?? 117,
     text: ({ agent }) => {
-      return agent !== undefined && states.get(agent)?.member ? TEAM_MEMBER_PROMPT : TEAM_DISCOVERY_PROMPT
+      return agent !== undefined && states.get(agent)?.member ? TEAM_MEMBER_PROMPT : captainPrompt
     },
   })
   ctx.on('agent/session-start', ({ agent }) => { attach(agent) })

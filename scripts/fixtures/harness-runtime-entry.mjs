@@ -66,10 +66,12 @@ export function apply(ctx) {
             assert.ok(staged.members.every(m => !m.id));
             const requests = trace().filter(x => x.event === 'request' && !x.purpose && x.sessionId === agent.id).slice(label === 'natural' ? 30 : 0);
             assert.equal(requests[0].toolNames.filter(n => n.startsWith('agent_teams_')).length, 14);
-            assert.match(requests[1].lastToolText, /Tasks carry attempt_id/);
+            const assembly = await ctx.systemPrompt.assemble({ agent, scope: agent });
+            assert.match(assembly.sections.find(s => s.name === 'agent-teams:usage')?.text ?? '', /Tasks carry attempt_id/);
+            assert.doesNotMatch(requests[1].lastToolText, /"instructions":/);
             assert.equal(requests[1].called[0], 'agent_teams_open');
             assert.equal(requests[1].toolNames.filter(n => n.startsWith('agent_teams_')).length, 14);
-            if (input.startsWith('/')) assert.match(requests[0].userText, /calling agent_teams_open first/);
+            if (input.startsWith('/')) assert.match(requests[0].userText, /open is optional/);
             assert.equal((await teamNames(ordinary.agent)).length, 14);
             await measure(agent, label.startsWith('profile') ? 'captain-profile' : 'captain');
             await send(agent, 'REOPEN_ENTRY: open the existing AgentTeams plan for inspection.');

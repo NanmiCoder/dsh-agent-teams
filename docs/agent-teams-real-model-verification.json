@@ -1,0 +1,720 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-09-09",
+  "passed": true,
+  "method": "Real configured provider responses through the exact published Harness CLI and Loader. The driver observes native model and tool events; it never supplies model replies or preprograms tool-call order. Business acceptance reads files and persisted team state, verifies source bytes, reproduces the three planted application defects and checks actual member write provenance.",
+  "host": {
+    "version": "0.1.2-rc.1",
+    "exactCohortPackages": 214
+  },
+  "model": {
+    "provider": "deepseek-official",
+    "model": "deepseek-v4.1-flash-expires-on-0910",
+    "reasoningEffort": "max"
+  },
+  "caseInputs": {
+    "freshSha256": "664cf9831dbdc2e0d86a7fd7c0e6660cea79aa87bb3b2a395024d8d512c1107d",
+    "coldSha256": "bc4af1831b47fc3f0f292635cef226bc44d24022814e1a75b26bbe9165a96e04",
+    "baselineAndFinalFreshInputsIdentical": true,
+    "description": "Three members perform independent performance/security/interaction read-only reviews of a deterministic small application; then the original security member handles one follow-up after upgrading and cold-starting its existing team."
+  },
+  "runnerFiles": {
+    "harness-model-benchmark.mjs": "0286c10a9d43012fdf045409b0484a1a3869c3328ee563f6ee07386fb558bc63",
+    "fixtures/harness-model-case.mjs": "5036cc52b5b6bae997a400828c4bc341068c0c9e261b73aafe728a8463faeb4e",
+    "fixtures/harness-model-driver.mjs": "4010e82dfe1c6ed39f83ee86166f6536023219883d0e7651d41ac8bcd8d2ef5d"
+  },
+  "judgeRegression": {
+    "command": "node --test scripts/fixtures/harness-model-case.test.mjs",
+    "passed": 3,
+    "failed": 0
+  },
+  "runs": [
+    {
+      "kind": "baseline",
+      "phase": "fresh",
+      "artifactSha256": "c857bc23801dc6239ee27ad6bb9d9b4326de4311dee28be16e25554431acf816",
+      "originalPassed": true,
+      "accepted": true,
+      "requests": 72,
+      "elapsedMs": 119201,
+      "summaryWrittenAtMs": 112807,
+      "checks": {
+        "source:app/orders.mjs": true,
+        "source:app/comments.mjs": true,
+        "source:app/signup.mjs": true,
+        "oneCurrentTeam": true,
+        "exactRoster": true,
+        "running": true,
+        "groundedReport:performance": true,
+        "memberWroteReport:performance": true,
+        "taskCompleted:performance": true,
+        "groundedReport:security": true,
+        "memberWroteReport:security": true,
+        "taskCompleted:security": true,
+        "groundedReport:interaction": true,
+        "memberWroteReport:interaction": true,
+        "taskCompleted:interaction": true,
+        "summary": true,
+        "captainSummarizedAfterCompletion": true,
+        "exactTaskCount": true
+      },
+      "external": {
+        "sourceUnchanged": true,
+        "hashes": {
+          "app/orders.mjs": "437ebb9e258f51ae043c84aed195e5d7ce53a89b56c487a002a018bf97f3a8a6",
+          "app/comments.mjs": "7f5cec1d0b7eec9248c43fbdb8f1151cf6ae52ee37a0e649a39579a289a2c198",
+          "app/signup.mjs": "f28019ae6905f30beae40491a3d73298c853b370aea6740cdbd81679262207b8"
+        },
+        "repeatedProductScans": true,
+        "productIdReads": 20100,
+        "unsafeHtmlEcho": true,
+        "validInputStillDisabled": true
+      },
+      "strictWriteProvenance": {
+        "passed": true,
+        "memberWrites": [
+          {
+            "role": "performance",
+            "events": [
+              {
+                "tool": "write",
+                "order": 189
+              }
+            ]
+          },
+          {
+            "role": "security",
+            "events": [
+              {
+                "tool": "write",
+                "order": 143
+              }
+            ]
+          },
+          {
+            "role": "interaction",
+            "events": [
+              {
+                "tool": "write",
+                "order": 247
+              }
+            ]
+          }
+        ],
+        "completedTaskOrders": [
+          155,
+          203,
+          255
+        ],
+        "captainSummaryWrites": [
+          {
+            "tool": "write",
+            "order": 293
+          }
+        ]
+      },
+      "metrics": {
+        "sessionHeaders": [
+          {
+            "role": "captain",
+            "requests": 25,
+            "systemHashes": [
+              "4147b577206df49613fc042c26f25725b0d230b0f8a8b17da32b267b9623152a"
+            ],
+            "toolsHashes": [
+              "0e8babb45f87269655e4ae08f6850532d14eaf853d927c30a609ae5a70f26f4b"
+            ],
+            "systemBytes": [
+              11629
+            ],
+            "teamToolCounts": [
+              13
+            ]
+          },
+          {
+            "role": "performance",
+            "requests": 14,
+            "systemHashes": [
+              "d34178f6cbfefc30c1337e1be1740d1a56a805826f11d9a99a073833ba7fb9ba"
+            ],
+            "toolsHashes": [
+              "0f172039bc5fffb2df4ce90cad8f740e373ac2649b57c995754f69ba9db476b6"
+            ],
+            "systemBytes": [
+              16696
+            ],
+            "teamToolCounts": [
+              6
+            ]
+          },
+          {
+            "role": "security",
+            "requests": 15,
+            "systemHashes": [
+              "460f77f23bce7ab7aa54797bad7cad18176d5a1f550ac616be805d39bdd0da5b"
+            ],
+            "toolsHashes": [
+              "0f172039bc5fffb2df4ce90cad8f740e373ac2649b57c995754f69ba9db476b6"
+            ],
+            "systemBytes": [
+              16692
+            ],
+            "teamToolCounts": [
+              6
+            ]
+          },
+          {
+            "role": "interaction",
+            "requests": 18,
+            "systemHashes": [
+              "a829644648fc464be95277fba08138d99b1539ed0a718b1b0977281dcb439c25"
+            ],
+            "toolsHashes": [
+              "0f172039bc5fffb2df4ce90cad8f740e373ac2649b57c995754f69ba9db476b6"
+            ],
+            "systemBytes": [
+              16827
+            ],
+            "teamToolCounts": [
+              6
+            ]
+          }
+        ],
+        "stableSessionHeaders": true,
+        "openCalls": 0,
+        "usageRequests": 72,
+        "requestsWithoutUsage": [],
+        "usage": {
+          "uncachedInputTokens": 85810,
+          "cacheReadTokens": 1609216,
+          "cacheWriteTokens": null,
+          "outputTokens": 55511,
+          "reasoningTokens": 36597
+        },
+        "usageSemantics": "Harness Usage counts inputTokens as uncached input; cacheRead/cacheWrite are separate. Last usage per request; unavailable fields remain null. Requests without usage are listed and excluded from sums. No price inference."
+      },
+      "observedModelErrors": 0,
+      "evidenceHashes": {
+        "rawResult": "c918376e697afc15ec2fe89ace733edaf7f5790dab3fc98b919699b646af703d",
+        "rawTrace": "e1f7601357e3cf646ccf6d6c669fc25f07d38aebe30c20c0e754530796ea37b8",
+        "executedJudge": "7b63c882515a9203d66a126f080b7a89d5a26a62da033a7d70b1d1c17611852d"
+      },
+      "notes": [
+        "Fresh team-state checks were captured before the same workspace was reused for cold recovery; report-write chronology is additionally rechecked against the immutable fresh trace."
+      ]
+    },
+    {
+      "kind": "finalCandidate",
+      "phase": "fresh",
+      "artifactSha256": "67258d3a30b523d53b7fe61a1a68da9a7462a332ee27f176721228824dd2df0e",
+      "originalPassed": true,
+      "accepted": true,
+      "requests": 65,
+      "elapsedMs": 101209,
+      "summaryWrittenAtMs": 95488,
+      "checks": {
+        "source:app/orders.mjs": true,
+        "source:app/comments.mjs": true,
+        "source:app/signup.mjs": true,
+        "oneCurrentTeam": true,
+        "exactRoster": true,
+        "running": true,
+        "groundedReport:performance": true,
+        "memberWroteReport:performance": true,
+        "taskCompleted:performance": true,
+        "groundedReport:security": true,
+        "memberWroteReport:security": true,
+        "taskCompleted:security": true,
+        "groundedReport:interaction": true,
+        "memberWroteReport:interaction": true,
+        "taskCompleted:interaction": true,
+        "summary": true,
+        "captainSummarizedAfterCompletion": true,
+        "exactTaskCount": true
+      },
+      "external": {
+        "sourceUnchanged": true,
+        "hashes": {
+          "app/orders.mjs": "437ebb9e258f51ae043c84aed195e5d7ce53a89b56c487a002a018bf97f3a8a6",
+          "app/comments.mjs": "7f5cec1d0b7eec9248c43fbdb8f1151cf6ae52ee37a0e649a39579a289a2c198",
+          "app/signup.mjs": "f28019ae6905f30beae40491a3d73298c853b370aea6740cdbd81679262207b8"
+        },
+        "repeatedProductScans": true,
+        "productIdReads": 20100,
+        "unsafeHtmlEcho": true,
+        "validInputStillDisabled": true
+      },
+      "strictWriteProvenance": {
+        "passed": true,
+        "memberWrites": [
+          {
+            "role": "performance",
+            "events": [
+              {
+                "tool": "write",
+                "order": 166
+              }
+            ]
+          },
+          {
+            "role": "security",
+            "events": [
+              {
+                "tool": "write",
+                "order": 213
+              }
+            ]
+          },
+          {
+            "role": "interaction",
+            "events": [
+              {
+                "tool": "write",
+                "order": 198
+              }
+            ]
+          }
+        ],
+        "completedTaskOrders": [
+          174,
+          217,
+          239
+        ],
+        "captainSummaryWrites": [
+          {
+            "tool": "write",
+            "order": 261
+          }
+        ]
+      },
+      "metrics": {
+        "sessionHeaders": [
+          {
+            "role": "captain",
+            "requests": 21,
+            "systemHashes": [
+              "dac3955daf747554fc9458e1958c795c9620b1ccd5a5b01103efd77277394217"
+            ],
+            "toolsHashes": [
+              "a7ee4c54732e5224abd9506f54465c44575243d4a0d9c4089126277c181ad332"
+            ],
+            "systemBytes": [
+              9200
+            ],
+            "teamToolCounts": [
+              14
+            ]
+          },
+          {
+            "role": "performance",
+            "requests": 12,
+            "systemHashes": [
+              "3b494e280b22411f54ee8adc43e5984c85a7780c1d8e876c9505e0caf45db5e7"
+            ],
+            "toolsHashes": [
+              "487ed0ad33d0a1016a2eec288570d2a3eed96f094402cc6f0afa52423cf3f34a"
+            ],
+            "systemBytes": [
+              9121
+            ],
+            "teamToolCounts": [
+              4
+            ]
+          },
+          {
+            "role": "security",
+            "requests": 16,
+            "systemHashes": [
+              "f6fc0c2d27659813b66d0486e69c353b2c8887a45c3001754bcedc2619c19595"
+            ],
+            "toolsHashes": [
+              "487ed0ad33d0a1016a2eec288570d2a3eed96f094402cc6f0afa52423cf3f34a"
+            ],
+            "systemBytes": [
+              9151
+            ],
+            "teamToolCounts": [
+              4
+            ]
+          },
+          {
+            "role": "interaction",
+            "requests": 16,
+            "systemHashes": [
+              "354088e9d641a36af9a4305efafda1c67d65fba1db2f8dba075441004c01afe5"
+            ],
+            "toolsHashes": [
+              "487ed0ad33d0a1016a2eec288570d2a3eed96f094402cc6f0afa52423cf3f34a"
+            ],
+            "systemBytes": [
+              9202
+            ],
+            "teamToolCounts": [
+              4
+            ]
+          }
+        ],
+        "stableSessionHeaders": true,
+        "openCalls": 1,
+        "usageRequests": 62,
+        "requestsWithoutUsage": [
+          18,
+          19,
+          20
+        ],
+        "usage": {
+          "uncachedInputTokens": 78710,
+          "cacheReadTokens": 1125120,
+          "cacheWriteTokens": null,
+          "outputTokens": 52103,
+          "reasoningTokens": 33184
+        },
+        "usageSemantics": "Harness Usage counts inputTokens as uncached input; cacheRead/cacheWrite are separate. Last usage per request; unavailable fields remain null. Requests without usage are listed and excluded from sums. No price inference."
+      },
+      "observedModelErrors": 0,
+      "evidenceHashes": {
+        "rawResult": "3fd0467c37f152488e4c0404ada183f6c381176b6c588d155cc240980c88c13e",
+        "rawTrace": "65a1cff97dcca31cf6d5fa0522af0d83f7e881bba8341045f7f974c1fb76bb46",
+        "executedJudge": "5036cc52b5b6bae997a400828c4bc341068c0c9e261b73aafe728a8463faeb4e"
+      },
+      "notes": []
+    },
+    {
+      "kind": "oldTeamColdResume",
+      "phase": "cold",
+      "artifactSha256": "5d35e4e55fb397bee87e24b89c8c2f62c2cac1a48b077d89a5d770a49b299699",
+      "originalPassed": true,
+      "accepted": true,
+      "requests": 19,
+      "elapsedMs": 26788,
+      "summaryWrittenAtMs": 22587,
+      "checks": {
+        "source:app/orders.mjs": true,
+        "source:app/comments.mjs": true,
+        "source:app/signup.mjs": true,
+        "oneCurrentTeam": true,
+        "exactRoster": true,
+        "running": true,
+        "groundedReport:security": true,
+        "memberWroteReport:security": true,
+        "taskCompleted:security": true,
+        "summary": true,
+        "captainSummarizedAfterCompletion": true,
+        "sameTeam": true,
+        "sameMembers": true,
+        "exactlyOneNewTask": true
+      },
+      "external": {
+        "sourceUnchanged": true,
+        "hashes": {
+          "app/orders.mjs": "437ebb9e258f51ae043c84aed195e5d7ce53a89b56c487a002a018bf97f3a8a6",
+          "app/comments.mjs": "7f5cec1d0b7eec9248c43fbdb8f1151cf6ae52ee37a0e649a39579a289a2c198",
+          "app/signup.mjs": "f28019ae6905f30beae40491a3d73298c853b370aea6740cdbd81679262207b8"
+        },
+        "repeatedProductScans": true,
+        "productIdReads": 20100,
+        "unsafeHtmlEcho": true,
+        "validInputStillDisabled": true
+      },
+      "strictWriteProvenance": {
+        "passed": true,
+        "memberWrites": [
+          {
+            "role": "security",
+            "events": [
+              {
+                "tool": "write",
+                "order": 38
+              }
+            ]
+          }
+        ],
+        "completedTaskOrders": [
+          46
+        ],
+        "captainSummaryWrites": [
+          {
+            "tool": "write",
+            "order": 66
+          }
+        ]
+      },
+      "metrics": {
+        "sessionHeaders": [
+          {
+            "role": "captain",
+            "requests": 8,
+            "systemHashes": [
+              "345c0429b10c5275855d7fbc4f7d04940e533573f513fb12b6b69a063eee196d"
+            ],
+            "toolsHashes": [
+              "a7ee4c54732e5224abd9506f54465c44575243d4a0d9c4089126277c181ad332"
+            ],
+            "systemBytes": [
+              9199
+            ],
+            "teamToolCounts": [
+              14
+            ]
+          },
+          {
+            "role": "security",
+            "requests": 11,
+            "systemHashes": [
+              "54b8d86479efcca477c5473215859accffe7928046247f5bbb3c8dfe1b06b4fa"
+            ],
+            "toolsHashes": [
+              "487ed0ad33d0a1016a2eec288570d2a3eed96f094402cc6f0afa52423cf3f34a"
+            ],
+            "systemBytes": [
+              10078
+            ],
+            "teamToolCounts": [
+              4
+            ]
+          }
+        ],
+        "stableSessionHeaders": true,
+        "openCalls": 0,
+        "usageRequests": 18,
+        "requestsWithoutUsage": [
+          3
+        ],
+        "usage": {
+          "uncachedInputTokens": 44012,
+          "cacheReadTokens": 516352,
+          "cacheWriteTokens": null,
+          "outputTokens": 6478,
+          "reasoningTokens": 1638
+        },
+        "usageSemantics": "Harness Usage counts inputTokens as uncached input; cacheRead/cacheWrite are separate. Last usage per request; unavailable fields remain null. Requests without usage are listed and excluded from sums. No price inference."
+      },
+      "observedModelErrors": 0,
+      "evidenceHashes": {
+        "rawResult": "55a163f2a12fe250f26b24dbb00f275863eeae4df19ce6a9a989da92834d7879",
+        "rawTrace": "ff57a678af1f31f15256383d44d8e86d1a81fd258d9eb6516050282ab6bbca98",
+        "executedJudge": "1c78c8aa7ba9bd4aad41d44ead32d74db7377b888c66b047ad4107c4fa6eb838"
+      },
+      "notes": []
+    }
+  ],
+  "coldArtifactRelation": {
+    "passed": true,
+    "realModelColdArtifactSha256": "5d35e4e55fb397bee87e24b89c8c2f62c2cac1a48b077d89a5d770a49b299699",
+    "finalArtifactSha256": "67258d3a30b523d53b7fe61a1a68da9a7462a332ee27f176721228824dd2df0e",
+    "changedLibFiles": [
+      "index.js"
+    ],
+    "exactSourceDeltaVerified": true,
+    "noProfileCaptainPromptIdentical": true,
+    "noProfileCaptainPromptBytes": 4627,
+    "noProfileCaptainPromptSha256": "f2ad458e8d0589f57cfaa58a1844070c50c90b1ee300b00e17723a7593848eb7",
+    "otherLibFilesByteIdentical": true,
+    "scope": "Cold real-model benchmark used no configured profiles. The final package only restores the bounded directory for configured profiles; every other lib file is byte-identical. Configured-profile behavior is separately tested through published CLI/Loader on all supported hosts."
+  },
+  "supersededIntermediate": {
+    "kind": "supersededIntermediate",
+    "phase": "fresh",
+    "artifactSha256": "756464aa2c483792fc98bc5e146124c1fdcc8cedfb5cc7f59c0f77ea56207910",
+    "originalPassed": false,
+    "accepted": true,
+    "requests": 63,
+    "elapsedMs": 117296,
+    "summaryWrittenAtMs": 101433,
+    "checks": {
+      "source:app/orders.mjs": true,
+      "source:app/comments.mjs": true,
+      "source:app/signup.mjs": true,
+      "oneCurrentTeam": true,
+      "exactRoster": true,
+      "running": true,
+      "groundedReport:performance": true,
+      "memberWroteReport:performance": true,
+      "taskCompleted:performance": true,
+      "groundedReport:security": true,
+      "memberWroteReport:security": true,
+      "taskCompleted:security": true,
+      "groundedReport:interaction": true,
+      "memberWroteReport:interaction": true,
+      "taskCompleted:interaction": true,
+      "summary": true,
+      "captainSummarizedAfterCompletion": true,
+      "exactTaskCount": true
+    },
+    "external": {
+      "sourceUnchanged": true,
+      "hashes": {
+        "app/orders.mjs": "437ebb9e258f51ae043c84aed195e5d7ce53a89b56c487a002a018bf97f3a8a6",
+        "app/comments.mjs": "7f5cec1d0b7eec9248c43fbdb8f1151cf6ae52ee37a0e649a39579a289a2c198",
+        "app/signup.mjs": "f28019ae6905f30beae40491a3d73298c853b370aea6740cdbd81679262207b8"
+      },
+      "repeatedProductScans": true,
+      "productIdReads": 20100,
+      "unsafeHtmlEcho": true,
+      "validInputStillDisabled": true
+    },
+    "strictWriteProvenance": {
+      "passed": true,
+      "memberWrites": [
+        {
+          "role": "performance",
+          "events": [
+            {
+              "tool": "write",
+              "order": 172
+            }
+          ]
+        },
+        {
+          "role": "security",
+          "events": [
+            {
+              "tool": "write",
+              "order": 150
+            }
+          ]
+        },
+        {
+          "role": "interaction",
+          "events": [
+            {
+              "tool": "write",
+              "order": 233
+            }
+          ]
+        }
+      ],
+      "completedTaskOrders": [
+        176,
+        207,
+        243
+      ],
+      "captainSummaryWrites": [
+        {
+          "tool": "write",
+          "order": 261
+        }
+      ]
+    },
+    "metrics": {
+      "sessionHeaders": [
+        {
+          "role": "captain",
+          "requests": 23,
+          "systemHashes": [
+            "72d826ee217175ef73f642c0c7021381b5a50c7a23d757a86ca5f885fe030dfd"
+          ],
+          "toolsHashes": [
+            "a7ee4c54732e5224abd9506f54465c44575243d4a0d9c4089126277c181ad332"
+          ],
+          "systemBytes": [
+            9165
+          ],
+          "teamToolCounts": [
+            14
+          ]
+        },
+        {
+          "role": "performance",
+          "requests": 15,
+          "systemHashes": [
+            "d5e26346e079421b7bd7c8479c5f413a28827dc9529780f77b6ff57a264e5e1a"
+          ],
+          "toolsHashes": [
+            "487ed0ad33d0a1016a2eec288570d2a3eed96f094402cc6f0afa52423cf3f34a"
+          ],
+          "systemBytes": [
+            10506
+          ],
+          "teamToolCounts": [
+            4
+          ]
+        },
+        {
+          "role": "security",
+          "requests": 10,
+          "systemHashes": [
+            "82e2c7030330d97f7ee53f23ef24d34e0863d0542b4accc1885948cc4b3f29f1"
+          ],
+          "toolsHashes": [
+            "487ed0ad33d0a1016a2eec288570d2a3eed96f094402cc6f0afa52423cf3f34a"
+          ],
+          "systemBytes": [
+            10507
+          ],
+          "teamToolCounts": [
+            4
+          ]
+        },
+        {
+          "role": "interaction",
+          "requests": 15,
+          "systemHashes": [
+            "b86a23c5f37e7dc25c093150745f847af8e81aff0f0983d483ab71a9193481b5"
+          ],
+          "toolsHashes": [
+            "487ed0ad33d0a1016a2eec288570d2a3eed96f094402cc6f0afa52423cf3f34a"
+          ],
+          "systemBytes": [
+            10555
+          ],
+          "teamToolCounts": [
+            4
+          ]
+        }
+      ],
+      "stableSessionHeaders": true,
+      "openCalls": 0,
+      "usageRequests": 62,
+      "requestsWithoutUsage": [
+        16
+      ],
+      "usage": {
+        "uncachedInputTokens": 83804,
+        "cacheReadTokens": 1284864,
+        "cacheWriteTokens": null,
+        "outputTokens": 55444,
+        "reasoningTokens": 31485
+      },
+      "usageSemantics": "Harness Usage counts inputTokens as uncached input; cacheRead/cacheWrite are separate. Last usage per request; unavailable fields remain null. Requests without usage are listed and excluded from sums. No price inference."
+    },
+    "observedModelErrors": 0,
+    "evidenceHashes": {
+      "rawResult": "45d87ea1fea7dfbea19599a122eaa3e8c1a2598071f77e1f85332c0d579fd43c",
+      "rawTrace": "b4ca86d163128b461c91d8690252bacef7b8af6438ab6361adf1be202b9e533c",
+      "executedJudge": "7b63c882515a9203d66a126f080b7a89d5a26a62da033a7d70b1d1c17611852d"
+    },
+    "notes": []
+  },
+  "judgmentCorrection": {
+    "originalResultsPreserved": true,
+    "affectedRun": "supersededIntermediate",
+    "originalFailedCheck": "captainSummarizedAfterCompletion",
+    "cause": "The initial judge treated any non-AgentTeams tool argument mentioning the report path as a write. todo_write at trace order 15 described a future summary; it did not write a report.",
+    "correctedEvidence": {
+      "completedTaskOrders": [
+        176,
+        207,
+        243
+      ],
+      "firstActualSummaryWrite": {
+        "tool": "write",
+        "order": 261
+      }
+    },
+    "fix": "Require successful writes/edits to the exact report target; do not count todo_write, read, ls or JSON validation. The final candidate ran from startup with the strict frozen judge and passed its original evaluation.",
+    "baselineStrictSupplementBeforeColdSha256": "bd16b50791f59b0fd80f21f0bfebcdd1fc05275f839b0693b0f5ab608193d733",
+    "strictValidatorSha256": "5036cc52b5b6bae997a400828c4bc341068c0c9e261b73aafe728a8463faeb4e"
+  },
+  "interpretation": {
+    "supported": "The baseline, final candidate and upgraded old team all completed this real-model business gate. Each observed captain/member kept one system hash and one tools hash within its run. This is direct evidence that the tested core cooperation and cold-recovery paths remain usable.",
+    "notProven": [
+      "Statistical success-rate equivalence: only one baseline/final pair, plus one historical intermediate run.",
+      "General review precision: acceptance checks the three planted facts; additional model findings are not all independently scored.",
+      "Quality repair loops, mid-task pause/resume or takeover, staged approval and configured profiles with this real provider.",
+      "Other providers or models.",
+      "Exact invoice or cost reduction: some requests have no usage event; missing usage is explicit and token sums cover returned usage only."
+    ]
+  },
+  "baselineSourceCommit": "e4a9b946c38f9f57b51c4d71ffd2f37cbac063df"
+}

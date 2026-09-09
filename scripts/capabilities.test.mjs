@@ -7,7 +7,7 @@ import { createRequire } from 'node:module'
 import { Context } from '@deepseek-ai/cordis'
 import { ToolRuntime } from '@deepseek-ai/dsh-tools'
 import { SystemPrompt, renderPrompt } from '@deepseek-ai/dsh-system-prompt'
-import { installTeamCapabilities, TEAM_DISCOVERY_PROMPT, TEAM_MEMBER_PROMPT } from '../lib/capabilities.js'
+import { installTeamCapabilities, TEAM_MEMBER_PROMPT } from '../lib/capabilities.js'
 import { TEAM_TOOL_NAMES, MEMBER_TOOL_NAMES } from '../lib/tool-names.js'
 import { usageSectionText } from '../lib/index.js'
 import { registerAgentTeamsTools } from '../lib/tools.js'
@@ -17,7 +17,12 @@ const requireTools = createRequire(import.meta.resolve('@deepseek-ai/dsh-tools')
 const requireDsh = createRequire(import.meta.resolve('@deepseek-ai/dsh/package.json'))
 const requireBase = createRequire(requireDsh.resolve('@deepseek-ai/dsh-base/package.json'))
 const { ToolResultPruner } = await import(requireBase.resolve('@deepseek-ai/dsh-compaction-tool-result-pruner'))
+const { WorkerThreadCodeRuntime } = await import(requireBase.resolve('@deepseek-ai/dsh-code-runtime-worker-thread'))
 const { createScope } = await import(requireTools.resolve('@deepseek-ai/dsh-scope'))
+
+function assertCaptainProtocol(system) {
+  for (const rule of [/the user's goal as description/, /attempt_id/, /never approve in that planning turn/i, /Never approve your own implementation/, /depend on a failed task/, /Resume only on a later explicit user request/]) assert.match(system, rule)
+}
 
 test('stable tool presentation uses real scoped registry and prompt assembly', async t => {
   const workspace = await mkdtemp(join(tmpdir(), 'agent-teams-capabilities-'))
@@ -27,6 +32,8 @@ test('stable tool presentation uses real scoped registry and prompt assembly', a
   await prompt.await()
   const tools = host.plugin(ToolRuntime, { mode: 'native' })
   await tools.await()
+  const worker = host.plugin(WorkerThreadCodeRuntime, { computeMs: 3000, maxWallMs: 10000, maxOutputBytes: 1048576, maxOldGenerationSizeMb: 128 })
+  await worker.await()
   const agents = []
   const scopes = []
   const noop = () => {}
@@ -42,11 +49,12 @@ test('stable tool presentation uses real scoped registry and prompt assembly', a
     owned = ctx
     for (const definition of definitions) ctx.tools.register(definition)
     ctx.provide('agents', { list: () => agents })
-    ctx.provide('codeRuntime', { language: 'typescript' })
   } })
   await business.await()
   const createAgent = (id, parentSession, events = []) => {
-    const agent = { id, status: 'idle', session: { header: { cwd: workspace, parentSession, seedLength: 0 }, events } }
+    const agent = { id, status: 'idle', session: { header: { cwd: workspace, parentSession, seedLength: 0 }, events,
+      append(type, data) { const event = { type, data }; events.push(event); return event },
+    } }
     const scope = createScope(owned, agent)
     agent.ctx = scope.ctx.extend({ agent })
     agents.push(agent)
@@ -56,7 +64,8 @@ test('stable tool presentation uses real scoped registry and prompt assembly', a
   const a = createAgent('captain-a'), b = createAgent('ordinary-b')
   const pendingMembers = new Set()
   const profiles = ['demo']
-  const options = { stateDir: '.agent-teams', isPendingMember: agent => pendingMembers.has(agent.id), profileNames: () => profiles, captainPrompt: profile => usageSectionText(TEAM_TOOL_NAMES.join(', ')) + (profile ? '\nSELECTED_PROFILE:' + profile : '') }
+  const core = usageSectionText(TEAM_TOOL_NAMES.join(', '))
+  const options = { stateDir: '.agent-teams', isPendingMember: agent => pendingMembers.has(agent.id), profileCatalog: () => profiles.map(name => ({ name, members: 1, tasks: 0, taskPlanning: 'captain', description: 'A bounded profile summary' })), captainPrompt: () => core }
   const plugin = { inject: ['tools', 'systemPrompt', 'agents'], apply(ctx) { installTeamCapabilities(ctx, options) } }
   let fiber = host.plugin(plugin)
   await fiber.await()
@@ -68,12 +77,11 @@ test('stable tool presentation uses real scoped registry and prompt assembly', a
   const initialHeader = await header(a)
   const team = { id: 'saved', name: 'Saved', captainSessionId: a.id, createdAt: 1, members: [], tasks: [], taskSeq: 0, phase: 'staged' }
   try {
-    await t.test('unrelated conversation keeps native tools and only short fixed instructions', async () => {
+    await t.test('first request keeps all tools and the complete fixed captain protocol', async () => {
       assert.deepEqual(await names(a), captainNames)
-      assert.equal(renderPrompt(await assemble(a)), TEAM_DISCOVERY_PROMPT)
+      assertCaptainProtocol(renderPrompt(await assemble(a)))
       assert.equal((await names(a)).length, 14)
-      assert.ok(Buffer.byteLength(TEAM_DISCOVERY_PROMPT) < 600)
-      t.diagnostic(JSON.stringify({ role: 'captain-idle', promptBytes: Buffer.byteLength(TEAM_DISCOVERY_PROMPT), schemaBytes: Buffer.byteLength(JSON.stringify((await assemble(a)).tools)) }))
+      t.diagnostic(JSON.stringify({ role: 'captain-idle', promptBytes: Buffer.byteLength(renderPrompt(await assemble(a))), schemaBytes: Buffer.byteLength(JSON.stringify((await assemble(a)).tools)) }))
     })
     await t.test('cancellation and invalid profiles preserve the header', async () => {
       const controller = new AbortController()
@@ -83,19 +91,44 @@ test('stable tool presentation uses real scoped registry and prompt assembly', a
       await assert.rejects(open(a, { profile: 'missing' }), /unknown AgentTeams profile/)
       assert.deepEqual(await names(a), captainNames)
     })
-    await t.test('open appends protocol and selected profile, preserving all headers and user restrictions', async () => {
+    await t.test('optional open reads a profile without changing headers or user restrictions', async () => {
       const userDeny = a.ctx.tools.restrict({ deny: ['agent_teams_delete'] })
       const result = await open(a, { profile: 'demo' })
       assert.match(result.next, /No current team/)
       assert.ok((await names(a)).includes('agent_teams_create'))
       assert.ok(!(await names(a)).includes('agent_teams_delete'))
       assert.deepEqual(await names(b), captainNames)
-      assert.match(result.instructions, /Tasks carry attempt_id/)
-      assert.match(result.instructions, /SELECTED_PROFILE:demo/)
-      assert.equal(renderPrompt(await assemble(a)), TEAM_DISCOVERY_PROMPT)
+      assert.equal(result.requested_profile, 'demo')
+      assert.deepEqual(result.profiles, options.profileCatalog())
+      assert.equal(result.instructions, undefined, 'Core rules need not be duplicated in helper results')
+      assertCaptainProtocol(renderPrompt(await assemble(a)))
       assert.equal(await header(b), initialHeader)
       userDeny()
       assert.equal(await header(a), initialHeader)
+    })
+    await t.test('profile discovery includes purpose and planning metadata without changing system text', async () => {
+      profiles.push('another')
+      try {
+        const result = await open(b)
+        assert.deepEqual(result.profiles, options.profileCatalog())
+        assert.ok(result.profiles.every(profile => profile.description && profile.members === 1 && profile.taskPlanning === 'captain'))
+        assert.equal(await header(b), initialHeader)
+      } finally { profiles.pop() }
+    })
+    await t.test('a legacy thirteen-tool allowlist can create and archive without open', async () => {
+      const legacy = createAgent('legacy-captain')
+      host.emit('agent/session-start', { agent: legacy, source: 'startup' })
+      const restore = legacy.ctx.tools.restrict({ allow: [...TEAM_TOOL_NAMES] })
+      try {
+        assert.deepEqual((await names(legacy)).sort(), [...TEAM_TOOL_NAMES].sort())
+        assert.equal(host.tools.get('agent_teams_open', legacy), undefined)
+        assertCaptainProtocol(renderPrompt(await assemble(legacy)))
+        for (const name of ['agent_teams_create', 'agent_teams_delete']) {
+          const result = await host.tools.execute({ name, arguments: name === 'agent_teams_create' ? { name: 'Legacy', approval: 'required' } : {}, callId: name + '-legacy', agent: legacy, signal: new AbortController().signal })
+          assert.equal(result.isError, false, JSON.stringify(result))
+        }
+        assertCaptainProtocol(renderPrompt(await assemble(legacy)))
+      } finally { restore() }
     })
     await t.test('opening existing paused work is idempotent and does not mutate or wake it', async () => {
       await createTeamDir(stateRoot, { ...team, phase: 'running', halted: true })
@@ -149,20 +182,46 @@ test('stable tool presentation uses real scoped registry and prompt assembly', a
         restore()
       }
     })
+    await t.test('real run_code may discard optional open output without losing operating rules', async () => {
+      const restore = b.ctx.tools.presentAs('ptc')
+      try {
+        const before = await header(b)
+        const result = await host.tools.execute({ name: 'run_code', arguments: { code: 'await tools.agent_teams_open({}); return "OPEN_OUTPUT_DISCARDED";', description: 'Inspect current team without returning the optional result' }, callId: 'discard-open-output', agent: b, signal: new AbortController().signal })
+        assert.equal(result.isError, false, JSON.stringify(result))
+        assert.match(JSON.stringify(result.content), /OPEN_OUTPUT_DISCARDED/)
+        assert.doesNotMatch(JSON.stringify(result.content), /attempt_id|captain protocol/)
+        assert.ok(b.session.events.some(event => event.type === 'tool/code-dispatch' && event.data.name === 'agent_teams_open'))
+        assertCaptainProtocol(renderPrompt(await assemble(b)))
+        assert.equal(await header(b), before)
+      } finally { restore() }
+    })
     await t.test('HMR removes old masks and restores persisted participants in existing scopes', async () => {
       await fiber.dispose()
       assert.equal(host.tools.get('agent_teams_open', b), undefined)
       assert.equal((await names(b)).length, 13)
+      assert.doesNotMatch(renderPrompt(await assemble(b)), /AgentTeams captain protocol/)
       fiber = host.plugin(plugin)
       await fiber.await()
       assert.equal((await names(a)).length, 14)
       assert.deepEqual(await names(b), captainNames)
+      assertCaptainProtocol(renderPrompt(await assemble(b)))
+      assert.equal(await header(b), initialHeader)
+      const retired = agents.find(agent => agent.id === 'retired-child')
+      assert.deepEqual((await names(retired)).sort(), [...MEMBER_TOOL_NAMES].sort())
+      assert.equal(renderPrompt(await assemble(retired)), TEAM_MEMBER_PROMPT)
     })
     await t.test('a cold captain loads its durable role before its first request', async () => {
       const cold = createAgent(a.id)
       host.emit('agent/session-start', { agent: cold, source: 'resume' })
       assert.equal((await names(cold)).length, 14)
       assert.equal(await header(cold), initialHeader)
+      // This new Agent has no historical open event. Persisted staged work is
+      // still directly addressable through the original business tools.
+      assert.equal(cold.session.events.length, 0)
+      const result = await host.tools.execute({ name: 'agent_teams_status', arguments: {}, callId: 'cold-direct-status', agent: cold, signal: new AbortController().signal })
+      assert.equal(result.isError, false, JSON.stringify(result))
+      assert.match(JSON.stringify(result.content), /Saved/)
+      assertCaptainProtocol(renderPrompt(await assemble(cold)))
     })
     await t.test('archive and idle preserve the original captain prefix', async () => {
       await archiveTeamDir(stateRoot, team.id)
@@ -177,7 +236,7 @@ test('stable tool presentation uses real scoped registry and prompt assembly', a
       assert.equal(result.profile_conflict, true)
       assert.equal(result.requested_profile, 'demo')
       assert.match(result.next, /has not switched/)
-      assert.doesNotMatch(result.instructions, /SELECTED_PROFILE:demo/)
+      assertCaptainProtocol(renderPrompt(await assemble(a)))
       assert.equal(await header(a), initialHeader)
       await archiveTeamDir(stateRoot, team.id)
       host.emit('agent/status', { agent: a, status: 'idle' })
@@ -200,26 +259,14 @@ test('stable tool presentation uses real scoped registry and prompt assembly', a
         assert.equal(await header(a), initialHeader)
       }
     })
-    await t.test('oversized profile listings cannot prune core instructions with the real host pruner', async () => {
-      const pruner = new ToolResultPruner(new Context())
-      const core = options.captainPrompt()
-      const escapedCore = JSON.stringify({ instructions: core }).slice(0, -1)
-      assert.ok(escapedCore.length <= pruner.config.headChars, escapedCore.length)
-      // The instructions lead the rendered result, before unbounded names or
-      // summaries. Do not infer survival merely from the unescaped length.
-      profiles.push(...Array.from({ length: 300 }, (_, i) => `review-template-${i}`))
-      try {
-        const result = await open(b)
-        const definition = host.tools.get('agent_teams_open', b)
-        const rendered = definition.output.render({}, result)
-        const pruned = pruner.pruneContent(rendered)
-        assert.ok(pruned, 'fixture must exceed the actual host pruning threshold')
-        assert.ok(pruned.map(block => block.text ?? '').join('').startsWith(escapedCore))
-        assert.match(core, /Never approve your own implementation/)
-        assert.match(core, /depend on a failed task/)
-        assert.match(core, /attempt_id/)
-        assert.equal(await header(b), initialHeader)
-      } finally { profiles.splice(1) }
+    await t.test('even aggressive host result pruning cannot remove the system protocol', async () => {
+      const pruner = new ToolResultPruner(new Context(), { thresholdChars: 128, headChars: 16, tailChars: 16 })
+      const rendered = [{ type: 'text', text: 'x'.repeat(256) + core + 'y'.repeat(256) }]
+      const pruned = pruner.pruneContent(rendered)
+      assert.ok(pruned, 'the real host pruner must actually remove content')
+      assert.doesNotMatch(JSON.stringify(pruned), /attempt_id|captain protocol/)
+      assertCaptainProtocol(renderPrompt(await assemble(b)))
+      assert.equal(await header(b), initialHeader)
     })
     await t.test('read failure leaves the fixed header intact', async () => {
       await mkdir(join(stateRoot, 'broken'))
@@ -230,7 +277,7 @@ test('stable tool presentation uses real scoped registry and prompt assembly', a
   } finally {
     await fiber.dispose()
     for (const scope of scopes.reverse()) await scope.dispose()
-    await business.dispose(); await tools.dispose(); await prompt.dispose()
+    await business.dispose(); await tools.dispose(); await worker.dispose(); await prompt.dispose()
     await rm(workspace, { recursive: true, force: true })
   }
 })

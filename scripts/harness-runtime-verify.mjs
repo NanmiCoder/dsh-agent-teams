@@ -21,7 +21,7 @@ for (let i = 2; i < process.argv.length; i++) {
     else
         throw Error('Invalid argument ' + arg);
 }
-const scenarios = ['lifecycle', 'fallback', 'failure', 'captain-idle-wakeup', 'progressive-entry', 'web-approval'];
+const scenarios = ['lifecycle', 'fallback', 'failure', 'captain-idle-wakeup', 'progressive-entry', 'web-approval', 'protocol-compatibility'];
 if (flags.has('--scenario') && !scenarios.includes(flags.get('--scenario'))) throw Error('Unknown scenario');
 const version = flags.get('--host-version');
 if (typeof version !== 'string' || !/^\d+\.\d+\.\d+(?:-[\w.]+)?$/.test(version))
@@ -93,7 +93,7 @@ function verifyCohort() {
     json(join(report, 'cohort.json'), result);
     return result;
 }
-const testFiles = Object.fromEntries(['harness-runtime-verify.mjs', 'fixtures/harness-runtime-llm.mjs', 'fixtures/harness-runtime-resume.mjs', 'fixtures/harness-runtime-idle.mjs', 'fixtures/harness-runtime-entry.mjs', 'fixtures/harness-runtime-web-approval.mjs'].map(path => [path, hash(join(dirname(fileURLToPath(import.meta.url)), path))]));
+const testFiles = Object.fromEntries(['harness-runtime-verify.mjs', 'fixtures/harness-runtime-llm.mjs', 'fixtures/harness-runtime-resume.mjs', 'fixtures/harness-runtime-idle.mjs', 'fixtures/harness-runtime-entry.mjs', 'fixtures/harness-runtime-web-approval.mjs', 'fixtures/harness-runtime-protocol.mjs'].map(path => [path, hash(join(dirname(fileURLToPath(import.meta.url)), path))]));
 let artifactSha;
 const manifestPath = join(runtime, 'package.json');
 let manifest = existsSync(manifestPath) ? JSON.parse(readFileSync(manifestPath, 'utf8')) : undefined;
@@ -187,9 +187,47 @@ for (const scenario of (flags.has('--scenario') ? [flags.get('--scenario')] : sc
       name: ./fixture-web-approval.mjs
 `);
     }
+    if (scenario === 'protocol-compatibility') {
+        copyFileSync(join(dirname(fileURLToPath(import.meta.url)), 'fixtures/harness-runtime-protocol.mjs'), join(profile, 'fixture-protocol.mjs'));
+        writeFileSync(join(profile, 'cordis.patch.yml'), readFileSync(join(profile, 'cordis.patch.yml'), 'utf8') + `- id: runtime-lab-fixture
+  disabled: true
+- id: headless-startup
+  disabled: true
+- id: headless-runner
+  disabled: true
+- id: agent-teams
+  config:
+    profiles:
+      north:
+        protocol: Investigate an existing codebase and design a goal-specific task DAG.
+        taskPlanning: captain
+        members:
+          - name: worker
+            role: Research the existing implementation
+      south:
+        protocol: Apply a fixed release-readiness checklist to a prepared release.
+        taskPlanning: seed
+        members:
+          - name: reviewer
+            role: Review release readiness
+        tasks:
+          - id: release-check
+            subject: Check the release checklist
+            assignee: reviewer
+- insert:
+    - id: runtime-lab-protocol-compatibility
+      name: ./fixture-protocol.mjs
+`);
+    }
     const tracePath = join(report, scenario, 'trace.jsonl');
     const result = await command([process.execPath, join(runtime, 'node_modules/@deepseek-ai/dsh/lib/bin.js'), '--profile', 'headless', 'Run the authorized deterministic AgentTeams fixture immediately.'], workspace, environment({ DSH_HOME: home, DSH_PERMISSION_MODE: 'danger-full-access', DSH_TELEMETRY_DISABLED: '1', LAB_TRACE: tracePath, LAB_TEAMS: '1', LAB_SCENARIO: scenario }), scenario, 90000);
     const trace = existsSync(tracePath) ? readFileSync(tracePath, 'utf8').trim().split('\n').filter(Boolean).map(s => JSON.parse(s)) : [];
+    if (scenario === 'protocol-compatibility') {
+        const cases = trace.filter(x => x.event === 'protocol-case-passed');
+        const assertions = { exit0: result.code === 0 && !result.timedOut, productMarker: result.stdout.includes('PROTOCOL_COMPATIBILITY_OK'), legacyAllowlistAndColdRestore: cases.some(x => x.label === 'legacy-allowlist-cold-compact') && trace.some(x => x.event === 'protocol-cold-restored'), legacyProfileDirectory: trace.some(x => x.event === 'protocol-legacy-profile-directory' && x.openAvailable === false && x.northPurposeVisible && x.southPurposeVisible) && cases.some(x => x.label === 'legacy-allowlist-cold-compact' && x.profile === 'north'), actualPtcDiscard: cases.some(x => x.label === 'ptc-discard-and-compact') && trace.some(x => x.event === 'protocol-ptc-output-discarded'), actualPruning: trace.some(x => x.event === 'protocol-pruned'), actualCompaction: trace.filter(x => x.event === 'protocol-compacted').length === 2, existingPlanRevised: cases.length === 2 && cases.every(x => x.persistedSubject === 'Recovered task') };
+        runs.push({ scenario, passed: Object.values(assertions).every(Boolean), assertions, cases, exit: { code: result.code, signal: result.signal, timedOut: result.timedOut } });
+        continue;
+    }
     if (scenario === 'progressive-entry') {
         const cases = trace.filter(x => x.event === 'entry-case-passed').map(x => x.label);
         const stablePrefixes = trace.filter(x => x.event === 'stable-prefix-passed');

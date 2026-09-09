@@ -21,7 +21,7 @@ for (let i = 2; i < process.argv.length; i++) {
     else
         throw Error('Invalid argument ' + arg);
 }
-const scenarios = ['lifecycle', 'fallback', 'failure', 'captain-idle-wakeup'];
+const scenarios = ['lifecycle', 'fallback', 'failure', 'captain-idle-wakeup', 'progressive-entry'];
 if (flags.has('--scenario') && !scenarios.includes(flags.get('--scenario'))) throw Error('Unknown scenario');
 const version = flags.get('--host-version');
 if (typeof version !== 'string' || !/^\d+\.\d+\.\d+(?:-[\w.]+)?$/.test(version))
@@ -93,7 +93,7 @@ function verifyCohort() {
     json(join(report, 'cohort.json'), result);
     return result;
 }
-const testFiles = Object.fromEntries(['harness-runtime-verify.mjs', 'fixtures/harness-runtime-llm.mjs', 'fixtures/harness-runtime-resume.mjs', 'fixtures/harness-runtime-idle.mjs'].map(path => [path, hash(join(dirname(fileURLToPath(import.meta.url)), path))]));
+const testFiles = Object.fromEntries(['harness-runtime-verify.mjs', 'fixtures/harness-runtime-llm.mjs', 'fixtures/harness-runtime-resume.mjs', 'fixtures/harness-runtime-idle.mjs', 'fixtures/harness-runtime-entry.mjs'].map(path => [path, hash(join(dirname(fileURLToPath(import.meta.url)), path))]));
 let artifactSha;
 const manifestPath = join(runtime, 'package.json');
 let manifest = existsSync(manifestPath) ? JSON.parse(readFileSync(manifestPath, 'utf8')) : undefined;
@@ -143,9 +143,37 @@ for (const scenario of (flags.has('--scenario') ? [flags.get('--scenario')] : sc
         copyFileSync(join(dirname(fileURLToPath(import.meta.url)), 'fixtures/harness-runtime-idle.mjs'), join(profile, 'fixture-idle.mjs'));
         writeFileSync(join(profile, 'cordis.patch.yml'), readFileSync(join(profile, 'cordis.patch.yml'), 'utf8') + '- id: headless-startup\n  disabled: true\n- id: headless-runner\n  disabled: true\n- insert:\n    - id: runtime-lab-idle-captain\n      name: ./fixture-idle.mjs\n');
     }
+    if (scenario === 'progressive-entry') {
+        copyFileSync(join(dirname(fileURLToPath(import.meta.url)), 'fixtures/harness-runtime-entry.mjs'), join(profile, 'fixture-entry.mjs'));
+        writeFileSync(join(profile, 'cordis.patch.yml'), readFileSync(join(profile, 'cordis.patch.yml'), 'utf8') + `- id: headless-startup
+  disabled: true
+- id: headless-runner
+  disabled: true
+- id: agent-teams
+  config:
+    profiles:
+      demo-profile:
+        description: Entry benchmark roster
+        taskPlanning: captain
+        members:
+          - name: worker
+            role: MEMBER_FIXTURE
+            executionPrompt: 'MEMBER_FIXTURE: complete the assigned task and report.'
+            reasoning_effort: high
+- insert:
+    - id: runtime-lab-progressive-entry
+      name: ./fixture-entry.mjs
+`);
+    }
     const tracePath = join(report, scenario, 'trace.jsonl');
     const result = await command([process.execPath, join(runtime, 'node_modules/@deepseek-ai/dsh/lib/bin.js'), '--profile', 'headless', 'Run the authorized deterministic AgentTeams fixture immediately.'], workspace, environment({ DSH_HOME: home, DSH_PERMISSION_MODE: 'danger-full-access', DSH_TELEMETRY_DISABLED: '1', LAB_TRACE: tracePath, LAB_TEAMS: '1', LAB_SCENARIO: scenario }), scenario, 90000);
     const trace = existsSync(tracePath) ? readFileSync(tracePath, 'utf8').trim().split('\n').filter(Boolean).map(s => JSON.parse(s)) : [];
+    if (scenario === 'progressive-entry') {
+        const cases = trace.filter(x => x.event === 'entry-case-passed').map(x => x.label);
+        const assertions = { exit0: result.code === 0 && !result.timedOut, productMarker: result.stdout.includes('PROGRESSIVE_ENTRY_OK'), allEntries: ['natural', 'natural-zh', 'raw-slash', 'command', 'profile-command', 'profile-raw'].every(label => cases.includes(label)) };
+        runs.push({ scenario, passed: Object.values(assertions).every(Boolean), assertions, cases, exit: { code: result.code, signal: result.signal, timedOut: result.timedOut } });
+        continue;
+    }
     const statePath = join(workspace, '.agent-teams/runtime-lab/team.json'), state = existsSync(statePath) ? JSON.parse(readFileSync(statePath, 'utf8')) : undefined;
     const requests = trace.filter(x => x.event === 'request' && x.purpose === undefined), memberRequests = requests.filter(x => x.isMember);
     const isFailure = scenario === 'failure';

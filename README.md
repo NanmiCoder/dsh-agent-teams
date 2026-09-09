@@ -88,7 +88,7 @@ Then ask for a team directly:
 
 ## How it works
 
-1. The current session creates a team and becomes its captain.
+1. For a request to use AgentTeams, the model first calls `agent_teams_open`. This loads the captain tools for that session and reads any existing team. A new goal then creates a staged team for review.
 2. The captain adds role-specific members backed by continuable sub-agents.
 3. The goal becomes tasks with owners and explicit dependencies.
 4. The shared scheduler uses real `running / idle / ready` state to atomically claim one ready task per idle member and wake it. An interrupted resident attempt stays parked and can resume through a direct message without losing its capability; after a cold process restart, the scheduler retries stranded open work with a fresh attempt.
@@ -98,6 +98,8 @@ Then ask for a team directly:
 Team state is stored under `<workspace>/.agent-teams/`; the Web panel reads that disk truth and combines it with live sub-agent activity.
 
 Member creation is zero-interaction by default: a member on the captain's current LLM route snapshots that provider, model, and reasoning effort, while a member on a requested alternative route snapshots the target model's default effort; later continuations restore the resolved snapshot. Only an explicit heterogeneous-team request (for example, “backend on provider A/model X, frontend on provider B/model Y”) supplies a member-specific `provider` + `model`; there is no per-member model or reasoning prompt.
+
+Ordinary conversations receive a short discovery hint and only `agent_teams_open`. Opening is read-only: it does not create, approve, resume, or schedule work. Team captains then receive the full collaboration tools; members receive only claim, update, message, and status tools plus their member instructions. Existing teams restore their role after restart, and ending a team withdraws the captain tools at a safe turn boundary. This also filters the generated SDK in PTC mode. See the [loading and benchmark contract](./docs/progressive-loading.md).
 
 ## Slash command
 
@@ -113,7 +115,7 @@ command), describe the goal, and press Enter.
 The command pipeline claims the line, then preserves that exact input as an
 ordinary user follow-up so it remains visible in the main chat. The gesture
 boundary adds the deterministic activation directive at pre-step, so the
-captain protocol still starts immediately. The invocation is also durably
+first model request can call `agent_teams_open`, followed by the staged planning protocol. The invocation is also durably
 logged (`command/run` / `command/done`).
 
 Surfaces without command adjudication (for example the headless CLI) get the

@@ -122,6 +122,7 @@ export type StagedPlanMutation =
 
 /** Runtime bridge shared by model-facing tools and the Web staging surface. */
 export interface AgentTeamsRuntime {
+  isPendingMember(agent: Agent): boolean
   updateStagedPlan(captain: Agent, teamId: string, mutation: StagedPlanMutation, signal?: AbortSignal): Promise<TeamState>
   updateStagedPlanBatch(captain: Agent, teamId: string, mutations: readonly StagedPlanMutation[], signal?: AbortSignal): Promise<TeamState>
   approveStagedTeam(captain: Agent, teamId: string, signal?: AbortSignal): Promise<{ teamId: string; members: number; tasks: number }>
@@ -666,6 +667,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
   }
 
   const runtime: AgentTeamsRuntime = {
+    isPendingMember: memberSelections.isPendingMember,
     updateStagedPlan,
     updateStagedPlanBatch,
     approveStagedTeam,
@@ -2032,7 +2034,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
 
   ctx.tools.register(defineTool({
     name: 'agent_teams_delete',
-    description: 'End your team: interrupts all members (best effort) and deletes the team\'s state directory (team file, tasks, mailboxes). Use when the team\'s work is done or abandoned.',
+    description: 'End and archive your team: interrupts members and moves the current tasks and mailboxes out of active state for later inspection. Use when the work is done or explicitly abandoned. A same-name archive replaces its previous generation.',
     parameters: {},
     output: {
       schema: {
@@ -2045,7 +2047,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
       },
       render: (args, value) => [{
         type: 'text',
-        text: `Team "${value.team_name}" deleted.`,
+        text: `Team "${value.team_name}" ended and archived.`,
       }],
     },
     async execute(_args, exec) {

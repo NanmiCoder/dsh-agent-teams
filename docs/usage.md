@@ -8,12 +8,12 @@
 
 | DSH 能力 | AgentTeams 用法 |
 |---|---|
-| `ctx.tools` 注册表 | 注册 11 个 `agent_teams_*` 工具（与 `tool-workflow` 同一注册路径） |
+| `ctx.tools` 注册表 | 注册 13 个业务工具和 1 个入口；按会话身份限制模型可见工具 |
 | `ctx.subagents.startContinuable()` | 创建成员：durable 可续聊子代理，带成员 persona |
 | `ctx.subagents.followup()` | 唤醒收件成员（消息进入其下一轮次） |
 | 持久化团队成员表 + `ctx.agents` | 前者保存 durable 成员身份，后者提供真实 `running / idle / ready` 活动状态（不依赖易变的子代理目录投影） |
 | `agent/status` | 成员进入 idle 后触发共享任务池自动续领与下一轮唤醒 |
-| `ctx.systemPrompt.section()` | 注册"AgentTeams 使用策略"提示段 |
+| `ctx.systemPrompt.section()` | 按普通会话、队长、成员分别生成使用策略 |
 | Web server 路由注册 | 活动面板数据路由 `/plugins/dsh-agent-teams/state` + 鲸鱼图片静态服务（`webServer`/`httpServer` 双键兼容，见下） |
 | 文件系统 | 团队状态持久化在 `<workspace>/.agent-teams/<teamId>/` |
 
@@ -48,6 +48,7 @@
 
 | 工具 | 作用 |
 |---|---|
+| `agent_teams_open` | 请求使用团队时先调用；只读当前团队摘要，加载当前会话的工具与协议，不启动工作 |
 | `agent_teams_create` | 创建团队，调用者成为队长（一个队长同时只带一个团队） |
 | `agent_teams_add_member` | 拉成员入队（spawn 可续聊子代理 + 成员 persona） |
 | `agent_teams_remove_member` | 安全移除成员：撤销 attempt、回收其未完成任务、等待中断收敛后重新调度 |
@@ -86,7 +87,7 @@
 
 ## 使用协议
 
-插件提示段会指导模型按两阶段协议执行：创建 staged 团队 → 写入可编辑成员占位 → 拆任务并声明依赖 → 等待用户审查 → **Approve & Run** 后原子创建成员并启动调度 → 队长监控/引导 → 汇报后 `agent_teams_delete`。staged 阶段没有子会话、不会领取任务。只有用户明确要求跳过审查时才使用 `approval: automatic`。成员之间可以直接互发消息，无需队长中转。驻留成员在中断或正常结束一轮后若仍持有 `claimed/in_progress` 任务，该 attempt 会停驻；只有显式重试/转派/接管才会撤销它。本进程已经观察过的停驻 attempt 在 Harness 回收其 AgentHandle 后仍保持原 attempt，Captain 轮询 `agent_teams_status` 不会因此重铸。只有冷启动或从未被本进程观察过的开放任务，才会自动恢复一次；恢复投递失败会回到原来的 capability，而不会变成可无限重派的 `pending`。
+插件提示段会指导模型按两阶段协议执行：先调用只读 `agent_teams_open`，确认是否已有团队 → 无团队时创建 staged 团队 → 写入可编辑成员占位 → 拆任务并声明依赖 → 等待用户审查 → **Approve & Run** 后原子创建成员并启动调度 → 队长监控/引导 → 汇报后 `agent_teams_delete`。staged 阶段没有子会话、不会领取任务。只有用户明确要求跳过审查时才使用 `approval: automatic`。成员之间可以直接互发消息，无需队长中转。驻留成员在中断或正常结束一轮后若仍持有 `claimed/in_progress` 任务，该 attempt 会停驻；只有显式重试/转派/接管才会撤销它。本进程已经观察过的停驻 attempt 在 Harness 回收其 AgentHandle 后仍保持原 attempt，Captain 轮询 `agent_teams_status` 不会因此重铸。只有冷启动或从未被本进程观察过的开放任务，才会自动恢复一次；恢复投递失败会回到原来的 capability，而不会变成可无限重派的 `pending`。
 
 ## 命名多角色 profiles
 

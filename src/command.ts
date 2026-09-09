@@ -64,11 +64,11 @@ export function invokedAgentTeamsGoal(messages: readonly UserMessage[]): string 
 
 export function buildActivationDirective(goal: string, profile?: string, taskPlanning: 'captain' | 'seed' = 'seed'): string {
   const lines = [
-    'The user invoked an AgentTeams slash command. Activate the AgentTeams protocol from your instructions now: you are the captain of a multi-agent team.',
-    'Call agent_teams_create with approval="required". Build the complete staged roster and DAG, then stop and ask the user to review the Web plan. Do not approve or start it in this same turn.',
+    'The user invoked an AgentTeams slash command. Enter the AgentTeams protocol by calling agent_teams_open first; it loads the tools and reads any current team without starting work.',
+    'Use the returned current-team summary. Continue an existing plan or team without recreating it. For a new team, after open call agent_teams_create with approval="required". Build the complete staged roster and DAG, then stop and ask the user to review the Web plan. Do not approve or start it in this same turn.',
   ]
   if (profile !== undefined) {
-    lines.push(`Use configured AgentTeams profile "${profile}" when calling agent_teams_create.`)
+    lines.push(`Pass profile="${profile}" to agent_teams_open and, if creating a new team, agent_teams_create.`)
     if (taskPlanning === 'captain') {
       lines.push(
         'This profile supplies the roster and guardrails. After create, do not recreate members.',

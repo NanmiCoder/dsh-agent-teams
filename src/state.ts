@@ -278,15 +278,25 @@ export async function writeTeam(stateRoot: string, state: TeamState): Promise<vo
 }
 
 /** Read the durable set of member session ids retired by remove/delete. */
+function parseRetiredMemberIds(raw: string): Set<string> {
+  const parsed: unknown = JSON.parse(stripLeadingBom(raw))
+  if (!Array.isArray(parsed) || parsed.some(value => typeof value !== 'string' || value === '')) {
+    throw new Error('invalid AgentTeams retired member index')
+  }
+  return new Set(parsed)
+}
+
+/** Synchronous role hydration before the host's first prompt assembly. */
+export function readRetiredMemberIdsSync(stateRoot: string): Set<string> {
+  try { return parseRetiredMemberIds(readFileSync(join(stateRoot, RETIRED_MEMBERS_FILE), 'utf8')) } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return new Set()
+    throw error
+  }
+}
+
 export async function readRetiredMemberIds(stateRoot: string): Promise<Set<string>> {
   try {
-    const parsed: unknown = JSON.parse(stripLeadingBom(
-      await readFile(join(stateRoot, RETIRED_MEMBERS_FILE), 'utf8'),
-    ))
-    if (!Array.isArray(parsed) || parsed.some(value => typeof value !== 'string' || value === '')) {
-      throw new Error('invalid AgentTeams retired member index')
-    }
-    return new Set(parsed)
+    return parseRetiredMemberIds(await readFile(join(stateRoot, RETIRED_MEMBERS_FILE), 'utf8'))
   } catch (error: unknown) {
     if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
       return new Set()

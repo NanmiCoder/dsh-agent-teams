@@ -1,0 +1,521 @@
+{
+  "verificationDate": "2026-09-09",
+  "baseCommit": "e4a9b946c38f9f57b51c4d71ffd2f37cbac063df",
+  "validation": [
+    "pnpm typecheck",
+    "pnpm build",
+    "pnpm verify",
+    "15 scoped capability tests",
+    "one packaged artifact through three exact published Harness cohorts"
+  ],
+  "scope": "Scripted external LLM, real CLI/Loader/tools/session/scheduler/state. Not a real-model semantic benchmark.",
+  "hosts": [
+    {
+      "passed": true,
+      "version": "0.1.2-rc.1",
+      "artifactSha256": "2f945939e43ad5a8f9be8fd457e2f7fa4c7dd1d157550c98e760d14803e5831d",
+      "pluginVersion": "0.1.16-rc.1",
+      "testFiles": {
+        "harness-runtime-verify.mjs": "9f922154ab60c4c0810a17c64e5ac26995c6cc1ceb516556db3c6e91886bcb3a",
+        "fixtures/harness-runtime-llm.mjs": "c8e8f6bf428ba974bcf91ad80b3d7543f1d6cf80a4f9e46258b468aa9884e387",
+        "fixtures/harness-runtime-resume.mjs": "0ff88e3bf1d10788676ee0a2ad3d03bc4783fe06bddffbb707513b5c632cda0d",
+        "fixtures/harness-runtime-idle.mjs": "15e4c8f9c77d35052e7458d672fb29ba298bf6b6e0426900e4236e1e7c437a46",
+        "fixtures/harness-runtime-entry.mjs": "96656fa0fb03e3eec9e6960e6e06be38f39027c9e9d4792c451631723bf2274f"
+      },
+      "node": "v26.7.0",
+      "platform": "darwin",
+      "arch": "arm64",
+      "cohortCount": 214,
+      "runs": [
+        {
+          "scenario": "lifecycle",
+          "passed": true,
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          },
+          "assertions": {
+            "exit0": true,
+            "productMarker": true,
+            "pluginToolsVisible": true,
+            "memberExecuted": true,
+            "explicitReasoning": true,
+            "taskTerminal": true,
+            "secondWake": true,
+            "fifoMessageOrder": true,
+            "messagesSentWhileBusy": true
+          },
+          "requests": 25,
+          "memberRequests": 9
+        },
+        {
+          "scenario": "lifecycle-cold-restore",
+          "passed": true,
+          "assertions": {
+            "exit0": true,
+            "driverCompleted": true,
+            "sameMemberRestored": true,
+            "routeRestored": true,
+            "reasoningRestored": true
+          },
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          }
+        },
+        {
+          "scenario": "fallback",
+          "passed": true,
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          },
+          "assertions": {
+            "exit0": true,
+            "productMarker": true,
+            "pluginToolsVisible": true,
+            "memberExecuted": true,
+            "explicitReasoning": true,
+            "taskTerminal": true,
+            "secondWake": true,
+            "fallbackActivated": true,
+            "fallbackReasoningReset": true
+          },
+          "requests": 22,
+          "memberRequests": 8
+        },
+        {
+          "scenario": "fallback-cold-restore",
+          "passed": true,
+          "assertions": {
+            "exit0": true,
+            "driverCompleted": true,
+            "sameMemberRestored": true,
+            "routeRestored": true,
+            "reasoningRestored": true
+          },
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          }
+        },
+        {
+          "scenario": "failure",
+          "passed": true,
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          },
+          "assertions": {
+            "exit0": true,
+            "productMarker": true,
+            "pluginToolsVisible": true,
+            "memberExecuted": true,
+            "explicitReasoning": true,
+            "taskTerminal": true
+          },
+          "requests": 14,
+          "memberRequests": 2
+        },
+        {
+          "scenario": "captain-idle-wakeup",
+          "passed": true,
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          },
+          "assertions": {
+            "exit0": true,
+            "productMarker": true,
+            "pluginToolsVisible": true,
+            "memberExecuted": true,
+            "explicitReasoning": true,
+            "taskTerminal": true,
+            "captainActuallyYielded": true,
+            "notifiedAfterIdle": true
+          },
+          "requests": 14,
+          "memberRequests": 6
+        },
+        {
+          "scenario": "progressive-entry",
+          "passed": true,
+          "assertions": {
+            "exit0": true,
+            "productMarker": true,
+            "allEntries": true
+          },
+          "cases": [
+            "natural",
+            "natural-zh",
+            "raw-slash",
+            "command",
+            "profile-command",
+            "profile-raw"
+          ],
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          }
+        }
+      ],
+      "unverified": [
+        "real provider APIs and credentials",
+        "browser interaction",
+        "other operating systems",
+        "native terminal execution",
+        "live user-data migration"
+      ],
+      "discoveryBudget": {
+        "teamPromptBytes": 339,
+        "teamSchemaBytes": 449,
+        "teamToolCount": 1
+      }
+    },
+    {
+      "passed": true,
+      "version": "0.1.2-alpha.5",
+      "artifactSha256": "2f945939e43ad5a8f9be8fd457e2f7fa4c7dd1d157550c98e760d14803e5831d",
+      "pluginVersion": "0.1.16-rc.1",
+      "testFiles": {
+        "harness-runtime-verify.mjs": "9f922154ab60c4c0810a17c64e5ac26995c6cc1ceb516556db3c6e91886bcb3a",
+        "fixtures/harness-runtime-llm.mjs": "c8e8f6bf428ba974bcf91ad80b3d7543f1d6cf80a4f9e46258b468aa9884e387",
+        "fixtures/harness-runtime-resume.mjs": "0ff88e3bf1d10788676ee0a2ad3d03bc4783fe06bddffbb707513b5c632cda0d",
+        "fixtures/harness-runtime-idle.mjs": "15e4c8f9c77d35052e7458d672fb29ba298bf6b6e0426900e4236e1e7c437a46",
+        "fixtures/harness-runtime-entry.mjs": "96656fa0fb03e3eec9e6960e6e06be38f39027c9e9d4792c451631723bf2274f"
+      },
+      "node": "v26.7.0",
+      "platform": "darwin",
+      "arch": "arm64",
+      "cohortCount": 214,
+      "runs": [
+        {
+          "scenario": "lifecycle",
+          "passed": true,
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          },
+          "assertions": {
+            "exit0": true,
+            "productMarker": true,
+            "pluginToolsVisible": true,
+            "memberExecuted": true,
+            "explicitReasoning": true,
+            "taskTerminal": true,
+            "secondWake": true,
+            "fifoMessageOrder": true,
+            "messagesSentWhileBusy": true
+          },
+          "requests": 25,
+          "memberRequests": 9
+        },
+        {
+          "scenario": "lifecycle-cold-restore",
+          "passed": true,
+          "assertions": {
+            "exit0": true,
+            "driverCompleted": true,
+            "sameMemberRestored": true,
+            "routeRestored": true,
+            "reasoningRestored": true
+          },
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          }
+        },
+        {
+          "scenario": "fallback",
+          "passed": true,
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          },
+          "assertions": {
+            "exit0": true,
+            "productMarker": true,
+            "pluginToolsVisible": true,
+            "memberExecuted": true,
+            "explicitReasoning": true,
+            "taskTerminal": true,
+            "secondWake": true,
+            "fallbackActivated": true,
+            "fallbackReasoningReset": true
+          },
+          "requests": 22,
+          "memberRequests": 8
+        },
+        {
+          "scenario": "fallback-cold-restore",
+          "passed": true,
+          "assertions": {
+            "exit0": true,
+            "driverCompleted": true,
+            "sameMemberRestored": true,
+            "routeRestored": true,
+            "reasoningRestored": true
+          },
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          }
+        },
+        {
+          "scenario": "failure",
+          "passed": true,
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          },
+          "assertions": {
+            "exit0": true,
+            "productMarker": true,
+            "pluginToolsVisible": true,
+            "memberExecuted": true,
+            "explicitReasoning": true,
+            "taskTerminal": true
+          },
+          "requests": 14,
+          "memberRequests": 2
+        },
+        {
+          "scenario": "captain-idle-wakeup",
+          "passed": true,
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          },
+          "assertions": {
+            "exit0": true,
+            "productMarker": true,
+            "pluginToolsVisible": true,
+            "memberExecuted": true,
+            "explicitReasoning": true,
+            "taskTerminal": true,
+            "captainActuallyYielded": true,
+            "notifiedAfterIdle": true
+          },
+          "requests": 14,
+          "memberRequests": 6
+        },
+        {
+          "scenario": "progressive-entry",
+          "passed": true,
+          "assertions": {
+            "exit0": true,
+            "productMarker": true,
+            "allEntries": true
+          },
+          "cases": [
+            "natural",
+            "natural-zh",
+            "raw-slash",
+            "command",
+            "profile-command",
+            "profile-raw"
+          ],
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          }
+        }
+      ],
+      "unverified": [
+        "real provider APIs and credentials",
+        "browser interaction",
+        "other operating systems",
+        "native terminal execution",
+        "live user-data migration"
+      ],
+      "discoveryBudget": {
+        "teamPromptBytes": 339,
+        "teamSchemaBytes": 449,
+        "teamToolCount": 1
+      }
+    },
+    {
+      "passed": true,
+      "version": "0.1.2-alpha.2",
+      "artifactSha256": "2f945939e43ad5a8f9be8fd457e2f7fa4c7dd1d157550c98e760d14803e5831d",
+      "pluginVersion": "0.1.16-rc.1",
+      "testFiles": {
+        "harness-runtime-verify.mjs": "9f922154ab60c4c0810a17c64e5ac26995c6cc1ceb516556db3c6e91886bcb3a",
+        "fixtures/harness-runtime-llm.mjs": "c8e8f6bf428ba974bcf91ad80b3d7543f1d6cf80a4f9e46258b468aa9884e387",
+        "fixtures/harness-runtime-resume.mjs": "0ff88e3bf1d10788676ee0a2ad3d03bc4783fe06bddffbb707513b5c632cda0d",
+        "fixtures/harness-runtime-idle.mjs": "15e4c8f9c77d35052e7458d672fb29ba298bf6b6e0426900e4236e1e7c437a46",
+        "fixtures/harness-runtime-entry.mjs": "96656fa0fb03e3eec9e6960e6e06be38f39027c9e9d4792c451631723bf2274f"
+      },
+      "node": "v26.7.0",
+      "platform": "darwin",
+      "arch": "arm64",
+      "cohortCount": 215,
+      "runs": [
+        {
+          "scenario": "lifecycle",
+          "passed": true,
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          },
+          "assertions": {
+            "exit0": true,
+            "productMarker": true,
+            "pluginToolsVisible": true,
+            "memberExecuted": true,
+            "explicitReasoning": true,
+            "taskTerminal": true,
+            "secondWake": true,
+            "fifoMessageOrder": true,
+            "messagesSentWhileBusy": true
+          },
+          "requests": 25,
+          "memberRequests": 9
+        },
+        {
+          "scenario": "lifecycle-cold-restore",
+          "passed": true,
+          "assertions": {
+            "exit0": true,
+            "driverCompleted": true,
+            "sameMemberRestored": true,
+            "routeRestored": true,
+            "reasoningRestored": true
+          },
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          }
+        },
+        {
+          "scenario": "fallback",
+          "passed": true,
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          },
+          "assertions": {
+            "exit0": true,
+            "productMarker": true,
+            "pluginToolsVisible": true,
+            "memberExecuted": true,
+            "explicitReasoning": true,
+            "taskTerminal": true,
+            "secondWake": true,
+            "fallbackActivated": true,
+            "fallbackReasoningReset": true
+          },
+          "requests": 22,
+          "memberRequests": 8
+        },
+        {
+          "scenario": "fallback-cold-restore",
+          "passed": true,
+          "assertions": {
+            "exit0": true,
+            "driverCompleted": true,
+            "sameMemberRestored": true,
+            "routeRestored": true,
+            "reasoningRestored": true
+          },
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          }
+        },
+        {
+          "scenario": "failure",
+          "passed": true,
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          },
+          "assertions": {
+            "exit0": true,
+            "productMarker": true,
+            "pluginToolsVisible": true,
+            "memberExecuted": true,
+            "explicitReasoning": true,
+            "taskTerminal": true
+          },
+          "requests": 13,
+          "memberRequests": 2
+        },
+        {
+          "scenario": "captain-idle-wakeup",
+          "passed": true,
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          },
+          "assertions": {
+            "exit0": true,
+            "productMarker": true,
+            "pluginToolsVisible": true,
+            "memberExecuted": true,
+            "explicitReasoning": true,
+            "taskTerminal": true,
+            "captainActuallyYielded": true,
+            "notifiedAfterIdle": true
+          },
+          "requests": 14,
+          "memberRequests": 6
+        },
+        {
+          "scenario": "progressive-entry",
+          "passed": true,
+          "assertions": {
+            "exit0": true,
+            "productMarker": true,
+            "allEntries": true
+          },
+          "cases": [
+            "natural",
+            "natural-zh",
+            "raw-slash",
+            "command",
+            "profile-command",
+            "profile-raw"
+          ],
+          "exit": {
+            "code": 0,
+            "signal": null,
+            "timedOut": false
+          }
+        }
+      ],
+      "unverified": [
+        "real provider APIs and credentials",
+        "browser interaction",
+        "other operating systems",
+        "native terminal execution",
+        "live user-data migration"
+      ],
+      "discoveryBudget": {
+        "teamPromptBytes": 339,
+        "teamSchemaBytes": 449,
+        "teamToolCount": 1
+      }
+    }
+  ]
+}

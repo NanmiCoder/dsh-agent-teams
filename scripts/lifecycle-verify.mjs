@@ -748,6 +748,19 @@ try {
     missingContractRejected = true
   }
   check('quality implementation without contract is rejected', missingContractRejected)
+  // Parallel Emission slice 1 (issue #62): same-response create_task may
+  // depend on earlier ids from the same response, but dependency ids must
+  // still EXIST — no forward references to ids that were never created.
+  let unknownDependencyRejected = false
+  try {
+    await call('agent_teams_create_task', {
+      subject: 'child before its parent exists',
+      dependencies: ['task-that-never-existed'],
+    })
+  } catch (error) {
+    unknownDependencyRejected = /does not exist/.test(String(error?.message ?? error))
+  }
+  check('create_task still rejects unknown dependency ids (no forward references)', unknownDependencyRejected)
   const qualityTeam = await readTeam(stateRoot, 'quality-loop')
   const builder = [...liveAgents.values()].find(agent => qualityTeam?.members.some(member => member.id === agent.id && member.name === 'builder'))
   const criticMember = [...liveAgents.values()].find(agent => qualityTeam?.members.some(member => member.id === agent.id && member.name === 'critic'))

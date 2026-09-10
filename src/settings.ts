@@ -9,9 +9,12 @@
  * one-tool-call protocol. The execution pool cap is a different knob owned by
  * the Agent Loop settings (`agent-loop` namespace) and is never written here.
  *
- * The namespace is registered lazily: on hosts (or headless profiles) without
- * the settings service the registration never happens, the switch reads
- * `false`, and the rest of the plugin is unaffected.
+ * The namespace is registered synchronously when the settings service is
+ * already mounted at plugin activation (the standard web profile case, so
+ * the saved value reaches the mount-time usage snapshot), and lazily via
+ * `ctx.inject(['settings'], ...)` otherwise: on hosts (or headless
+ * profiles) without the settings service the registration never happens,
+ * the switch reads `false`, and the rest of the plugin is unaffected.
  * @module dsh-agent-teams/settings
  */
 

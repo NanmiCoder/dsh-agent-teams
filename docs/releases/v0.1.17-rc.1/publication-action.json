@@ -1,0 +1,63 @@
+{
+  "runId": 34488258594,
+  "url": "https://github.com/NanmiCoder/dsh-agent-teams/actions/runs/34488258594",
+  "headSha": "2e59da17918558cfa3bf91d30d40f737509cca0c",
+  "status": "completed",
+  "conclusion": "success",
+  "jobs": [
+    {
+      "name": "verify / Static checks (Ubuntu) and candidate package",
+      "conclusion": "success",
+      "startedAt": "2026-09-10T14:19:11Z",
+      "completedAt": "2026-09-10T14:19:42Z"
+    },
+    {
+      "name": "verify / Static checks (Windows)",
+      "conclusion": "success",
+      "startedAt": "2026-09-10T14:19:11Z",
+      "completedAt": "2026-09-10T14:20:23Z"
+    },
+    {
+      "name": "verify / Real Harness (0.1.2-alpha.2)",
+      "conclusion": "success",
+      "startedAt": "2026-09-10T14:20:26Z",
+      "completedAt": "2026-09-10T14:21:56Z"
+    },
+    {
+      "name": "verify / Real Harness (0.1.5-rc.1)",
+      "conclusion": "success",
+      "startedAt": "2026-09-10T14:20:26Z",
+      "completedAt": "2026-09-10T14:21:46Z"
+    },
+    {
+      "name": "verify / Real Harness (0.1.2-rc.1)",
+      "conclusion": "success",
+      "startedAt": "2026-09-10T14:20:27Z",
+      "completedAt": "2026-09-10T14:21:54Z"
+    },
+    {
+      "name": "verify / Real Harness (0.1.2-alpha.5)",
+      "conclusion": "success",
+      "startedAt": "2026-09-10T14:20:26Z",
+      "completedAt": "2026-09-10T14:22:04Z"
+    },
+    {
+      "name": "verify / Complete compatibility gate",
+      "conclusion": "success",
+      "startedAt": "2026-09-10T14:22:06Z",
+      "completedAt": "2026-09-10T14:22:15Z"
+    },
+    {
+      "name": "publish",
+      "conclusion": "success",
+      "startedAt": "2026-09-10T14:22:18Z",
+      "completedAt": "2026-09-10T14:22:37Z"
+    },
+    {
+      "name": "release",
+      "conclusion": "success",
+      "startedAt": "2026-09-10T14:22:40Z",
+      "completedAt": "2026-09-10T14:22:45Z"
+    }
+  ]
+}

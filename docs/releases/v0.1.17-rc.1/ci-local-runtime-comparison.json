@@ -1,0 +1,7 @@
+{
+  "runtimeFiles": 56,
+  "identicalFiles": 55,
+  "clientDifference": "CSS module hashes and virtual source region paths differ by build directory",
+  "equalAfterCssNamesAndRegionPaths": true,
+  "cssClassRenames": 142
+}

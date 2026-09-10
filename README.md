@@ -144,6 +144,8 @@ Defaults work without extra setup. A trusted profile can override member behavio
 
 `slashCommand: false` disables the deterministic `/agent-teams` activation surfaces (slash command and gesture boundary), leaving the natural-language trigger as the only entry point.
 
+The Plugins configuration tab exposes one AgentTeams checkbox, 支持工具并行 (Parallel Emission, settings namespace `agent-teams`, default off). When enabled, the captain usage section, newly spawned member personas, and assignment prompts allow several `agent_teams_*` tool calls in one response; same-response calls still run in order, and the Agent Loop parallel-cap setting is never touched.
+
 ## Boundaries
 
 - One captain leads one active team at a time.

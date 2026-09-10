@@ -17,8 +17,9 @@ import { buildActivationDirective, invokedAgentTeamsGoal, invokedAgentTeamsInvoc
 import { readArchivedTeam, readMailbox, readTeam, readUnreadMailbox } from '../lib/state.js'
 import { collectArchivedTeamsActivity } from '../lib/snapshot.js'
 
-const modernHarness = process.argv.includes('--modern-harness')
-const hostQueue = Symbol.for('dsh.subagent.queuePrompt')
+const deliveryHarness = process.argv.includes('--delivery-harness')
+const modernHarness = deliveryHarness || process.argv.includes('--modern-harness')
+const hostQueue = Symbol.for(deliveryHarness ? 'dsh.subagent.deliverPrompt' : 'dsh.subagent.queuePrompt')
 
 const workspace = await mkdtemp(join(tmpdir(), 'dsh-agent-teams-lifecycle-'))
 const definitions = new Map()
@@ -199,6 +200,7 @@ const ctx = {
         }]
       }
       child.ctx = childContext(child)
+      if (deliveryHarness) delete child.ctx.agent
       if (modernHarness) {
         for (const listener of listeners.get('agent/session-start') ?? []) listener({ agent: child, source: 'startup' })
       } else {
@@ -255,7 +257,8 @@ if (modernHarness) {
   const followup = ctx.subagents.followup
   delete ctx.subagents.followup
   delete ctx.subagents.registerContinuableSetup
-  ctx.subagents[hostQueue] = function (parent, childId, content, source, signal) {
+  ctx.subagents[hostQueue] = function (parent, childId, content, source, signal, delivery) {
+    if (deliveryHarness && delivery !== 'queue') throw new Error('team tasks must queue a distinct turn')
     return followup.call(this, parent, childId, content, { source, signal })
   }
   ctx.subagents.sendMessage = async function () { throw new Error('team jobs must use FIFO, not steer') }
@@ -263,7 +266,7 @@ if (modernHarness) {
 
 function directPrompt(parent, childId, content, options) {
   return modernHarness
-    ? ctx.subagents[hostQueue](parent, childId, content, options.source, options.signal)
+    ? ctx.subagents[hostQueue](parent, childId, content, options.source, options.signal, ...(deliveryHarness ? ['queue'] : []))
     : ctx.subagents.followup(parent, childId, content, options)
 }
 

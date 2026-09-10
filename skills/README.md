@@ -4,13 +4,31 @@
 
 ## 来源与更新
 
-新增 9 个 skill 来自 [oh-my-dsh/dsh-plugin-upgrade-skill](https://github.com/oh-my-dsh/dsh-plugin-upgrade-skill/tree/cd4d497588cdd4f16300622779b62a78fe803169)，固定 commit `cd4d497588cdd4f16300622779b62a78fe803169`，取入日期 2026-09-06。115 个上游文件保持原样。来源清单及每个文件的 SHA-256 见 [upstream-lock.json](upstream-lock.json)，MIT 许可见 [LICENSE.dsh-plugin-upgrade-skill](LICENSE.dsh-plugin-upgrade-skill)。
+9 个上游 skill 来自 [oh-my-dsh/dsh-plugin-upgrade-skill](https://github.com/oh-my-dsh/dsh-plugin-upgrade-skill/tree/ecab245c6c1831c51b0240aca13573b94a6e525e)，固定 commit `ecab245c6c1831c51b0240aca13573b94a6e525e`，更新日期 2026-09-10。120 个上游文件保持原样。来源清单及每个文件的 SHA-256 见 [upstream-lock.json](upstream-lock.json)，MIT 许可见 [LICENSE.dsh-plugin-upgrade-skill](LICENSE.dsh-plugin-upgrade-skill)。首次导入基线为 `cd4d497588cdd4f16300622779b62a78fe803169`（2026-09-06，115 文件）。
 
 项目原有 `dsh-plugin-development` 单独维护；其历史 API 示例已加适用范围说明，不包含在上游 hash 清单中。
 
 更新时先审阅明确 commit 的差异，再更新 skill 目录、来源清单和镜像，并保留清单中 4 个上游脚本的执行权限。不要自动追随上游 `main`。同步器会报告额外镜像文件和已从 canonical 删除的旧 skill 目录，不会自动删除；须审阅来源后单独处理。新增或删除 skill 时也要同步 `.agents/skills/` 的发现链接。
 
-这批资料是开发维护工具，不是运行时依赖；当前 npm `files` 清单不包含这些目录。上游完整 benchmark 保留在独立 clone，不复制进应用。此次 clone 位于 `/tmp/dsh-plugin-upgrade-skill`；用户指定的 `/gmp` 因 macOS 根文件系统只读而不可创建。临时目录丢失后，可按以上固定 SHA 重新克隆。
+这批资料是开发维护工具，不是运行时依赖；当前 npm `files` 清单不包含这些目录。上游完整 benchmark 保留在独立 clone，不复制进应用。本次 clone 位于 `/tmp/dsh-plugin-upgrade-skill-20260910`；临时目录丢失后，可按固定 SHA 重新克隆。
+
+### 重复升级命令
+
+已有 clone 时先 `git -C /tmp/dsh-plugin-upgrade-skill-20260910 fetch origin main`，读取 `origin/main` 的完整 SHA，并审阅它相对 `upstream-lock.json` 中 commit 的差异。首次下载可运行 `git clone https://github.com/oh-my-dsh/dsh-plugin-upgrade-skill.git /tmp/dsh-plugin-upgrade-skill-20260910`。
+
+```sh
+# 默认只预览；将 SHA 换为本次已经审阅的完整 commit。
+pnpm update:skills /tmp/dsh-plugin-upgrade-skill-20260910 ecab245c6c1831c51b0240aca13573b94a6e525e
+pnpm update:skills /tmp/dsh-plugin-upgrade-skill-20260910 ecab245c6c1831c51b0240aca13573b94a6e525e --apply
+pnpm verify:skill
+pnpm test:skills-updater
+```
+
+更新器直接读取 Git commit 中的文件，不执行上游代码，也不导入 clone 的未提交修改。它核验当前锁定哈希、执行权限、镜像和发现链接，更新 canonical、镜像及锁定清单；拒绝覆盖本地修改。新增/删除 skill、删除文件、许可证变化及非后继 commit 需要单独审阅处理。它不是事务性安装器：如果磁盘写入中断，先用 Git diff 检查并恢复本次涉及的 skill 文件、镜像和锁定清单，再重试。每次更新后同步本 README 的来源 SHA、文件数与适用范围。
+
+上游推荐的通用安装方式是 `npx skills add oh-my-dsh/dsh-plugin-upgrade-skill`，Skills CLI 也提供 `npx skills update [skills]`。本项目采用自有 `skills/upstream-lock.json` 与 `skills/ → .agents/skills/ + .dsh/skills/` 布局，通用 CLI 不负责维护这些清单；本仓库使用上述项目命令，避免混合两套管理方式。
+
+本次更新新增 `0.1.3-alpha.1` / `0.1.3-alpha.2` 迁移卡、precision checklist 和 `inject-lint`；**仍未覆盖 `0.1.3-alpha.2 → 0.1.5-rc.1`**。AgentTeams 的缺口审查单独记录在 [0.1.5 适配报告](../docs/harness-0.1.5-rc.1-audit-2026-09-10/README.md)，不改写上游文件，也不将资料更新视为运行时适配完成。
 
 ## 使用入口
 
@@ -38,5 +56,6 @@
 6. **回退要区分对象。** Git tag、GitHub release、npm tarball、dist-tag、用户 profile 和持久化数据是不同对象。不要套用“删除/重指向 Git tag”来回滚 npm 包或用户安装。
 7. **测试通过要说明范围。** 52 道 Harbor 题测 AI 的迁移能力，不是 AgentTeams 的 52 项回归。Docker ready 或 HTTP 200 只证明特定启动条件；发布需要插件激活、队员唤醒/执行/回报、模型与推理力度、失败收尾、恢复和 UI 的项目探针。
 8. **只读扫描避开维护资料本身。** planner 会扫描代码、配置和脚本，也会命中 vendored skills 的示例。分析生产仓库时使用清楚标识的源码快照，或逐条排除这些维护资料带来的结果；零命中不等于没有风险。
+9. **新增检查器也有版本范围。** `inject-lint` 面向 alpha.2，并把 Cordis peer 必须等于 `^4.0.1` 写死；AgentTeams 已使用 `^4.0.2`，不能按其 `FIX-REQUIRED` 机械降级。新版 publish-playbook 的 amend/re-tag/force-push 历史修复配方也不适用于本项目已发布产物；修复应使用新插件版本并遵循项目发布规则。
 
 统一治理方案见 [兼容性与发布生命周期审查](../docs/compatibility-audit-2026-09-05/README.md)，本次研究与扫描证据见 [升级 skill 接入研究](../docs/upgrade-skill-study-2026-09-06/README.md)。二者均为审查/方案，不能视为已完成兼容修复或渠道发布。

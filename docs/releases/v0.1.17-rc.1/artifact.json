@@ -1,0 +1,9 @@
+{
+  "pluginVersion": "0.1.17-rc.1",
+  "recommendedHost": "0.1.5-rc.1",
+  "artifactSha256": "208dd0cdf235b4e7b788b8df7c25bb9041f41525f9d857fa3e82978513962147",
+  "artifactBytes": 1931534,
+  "published": false,
+  "branch": "codex/harness-015-support",
+  "baseCommit": "502dd6c6bb1d0f59cb5f902cda4b68494e7aedf4"
+}

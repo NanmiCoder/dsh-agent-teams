@@ -12,7 +12,7 @@
 
 **素材来源**: 社区迁移实践（2026-08-28 完成迁移，实机 boot 验证 + 单测回归）——[deepseek-harness discussion #5120](https://github.com/deepseek-ai/deepseek-harness/discussions/5120#discussioncomment-18208001)，六个插件仓库见文末。
 
-> 走廊覆盖说明: 走廊现已覆盖 `dsh-v0.1.1-rc.1 → dsh-v0.1.2-alpha.2`（本示例写作时 rc.1 → rc.2 段尚无卡片，后由 [v0.1.1-rc.2.md](../references/v0.1.1-rc.2.md) 补齐，3 张卡，`DSH-0.1.1-R2` 前缀）。文中 client-runtime 移除、`ctx.slots.inject`、`views.get('chat')?.legacy` 等技术声明写作时为本示例一手来源；同一批插件后续跟随 0.1.2 列车至 rc.1 的零代码追车记录见文末「后续」一节；主题最接近的现有卡片为 DSH-0.1.2-A1-03 · 会话视图工程大幅拆分。
+> 走廊覆盖说明: 走廊现已覆盖 `dsh-v0.1.1-rc.1 → dsh-v0.1.3-alpha.2`（本示例写作时 rc.1 → rc.2 段尚无卡片，后由 [v0.1.1-rc.2.md](../references/v0.1.1-rc.2.md) 补齐，3 张卡，`DSH-0.1.1-R2` 前缀；0.1.2 线止于 rc.1，0.1.3 线的 rc.1→0.1.3-alpha.1 与 0.1.3-alpha.1→0.1.3-alpha.2 为 2026-09-07 后补的 draft 卡）。文中 client-runtime 移除、`ctx.slots.inject`、`views.get('chat')?.legacy` 等技术声明写作时为本示例一手来源；同一批插件后续跟随 0.1.2 列车至 rc.1 的零代码追车记录见文末「后续」一节；主题最接近的现有卡片为 DSH-0.1.2-A1-03 · 会话视图工程大幅拆分。
 
 ---
 

@@ -1,0 +1,19 @@
+{
+  "web": {
+    "filesChecked": 92,
+    "mismatches": [],
+    "matchesArtifact": true
+  },
+  "agentteams-015": {
+    "filesChecked": 92,
+    "mismatches": [],
+    "matchesArtifact": true
+  },
+  "startup": {
+    "profile": "agentteams-015",
+    "command": "dsh --profile agentteams-015",
+    "globalHostVersion": "0.1.5-rc.1",
+    "httpReady": true,
+    "errorLines": 0
+  }
+}

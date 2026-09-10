@@ -8,7 +8,8 @@
 
 | 当前候选宿主 | 定位 | 安装与支持边界 |
 | --- | --- | --- |
-| `0.1.2-rc.1` | recommended | 当前普通用户默认组合的验收目标；RC 不是 GA，仍须实际验证 |
+| `0.1.5-rc.1` | recommended | 当前普通用户默认组合的验收目标；RC 不是 GA，仍须实际验证 |
+| `0.1.2-rc.1` | legacy | 保留旧 RC；与新版使用隔离的 profile 与会话副本 |
 | `0.1.2-alpha.5` | preview | 主动选择的预览宿主；不能通过插件默认更新要求普通用户切到 Alpha |
 | `0.1.2-alpha.2` | legacy | 兼容保留目标；必须检查完整依赖闭包，单独锁 CLI 仍可能混入 rc.1 分包 |
 
@@ -100,7 +101,7 @@ CI 仅上传报告、日志和 fixture 状态，不上传 runtime 的 node_modul
 [publish.yml](../.github/workflows/publish.yml) 必须等待整个 `verify` 可复用工作流成功。发布 job 下载该 run 的候选 tgz，重新核验 SHA-256、版本和完整宿主清单，再通过现有 npm OIDC trusted publishing 发布该文件；发布 job 不重新构建，也不以 `pack --dry-run` 作为门禁。
 
 - 预发布插件版本（alpha / beta / rc）统一进入项目的 `next` 渠道。
-- 无后缀插件版本才能进入 `latest`，开发基线必须是清单中的 recommended 宿主，全部支持目标都要通过。当前 recommended 为 `0.1.2-rc.1`，不得把只在 Alpha 通过的包提升为普通用户默认版本。
+- 无后缀插件版本才能进入 `latest`，开发基线必须是清单中的 recommended 宿主，全部支持目标都要通过。当前 recommended 为 `0.1.5-rc.1`，不得把只在 Alpha 通过的包提升为普通用户默认版本。
 - 发版 tag 必须等于 `v<package.version>`，GitHub prerelease 标志与 npm 渠道一致。稳定发布前查询 npm 当前 latest，拒绝倒退。
 - 准备 PR、版本或产物不表示已经发布。发布后读取 registry 的版本、integrity 与 dist-tag，并从 registry 再安装精确版本做消费者复验，记录与候选是否一致。
 - 回退分别处理 npm dist-tag、用户 profile/锁文件和数据；保留不可变版本及 Git 历史。不通过删除或重指向 Git tag 来冒充 npm 回滚。

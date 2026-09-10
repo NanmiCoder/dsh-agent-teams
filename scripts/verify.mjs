@@ -1222,6 +1222,27 @@ check(
   'pre-rc.8 member navigation keeps the ordinary session fallback',
   legacyNavigation === 'session' && legacyNavigationCalls[0] === 'member-session',
 )
+const panelNavigationCalls = []
+await openAgentTeamMember({
+  open() { throw new Error('expected addressed navigation') },
+  refreshSubagents: async () => {},
+  openSubagent: () => panelNavigationCalls.push('member'),
+}, 'captain-session', 'member-session', {
+  beginNavigation: () => new AbortController().signal,
+  selectPanel: id => panelNavigationCalls.push(id),
+})
+check('0.1.5 member navigation selects the Conversation after opening its transcript',
+  JSON.stringify(panelNavigationCalls) === JSON.stringify(['member', null]))
+const supersededNavigation = new AbortController()
+const cancelledNavigation = await openAgentTeamMember({
+  open() { throw new Error('cancelled navigation must not open a Session') },
+  refreshSubagents: async () => { supersededNavigation.abort() },
+  openSubagent() { throw new Error('cancelled refresh must not steal the current Session') },
+}, 'captain-session', 'member-session', {
+  beginNavigation: () => supersededNavigation.signal,
+  selectPanel() { throw new Error('cancelled navigation must not change main panel') },
+})
+check('0.1.5 superseded catalog refresh cannot steal navigation', cancelledNavigation === 'cancelled')
 check(
   'agent team cards derive a stable id from the standard create tool call',
   JSON.stringify(parseAgentTeamsCreateArgs('{"name":" Repo Review 2W! "}'))

@@ -14,7 +14,7 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 // The frame-level overlay is declared by ui-layout. This import is type-only;
 // ctx.slots.inject below owns the runtime wait for the declaration.
-import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
+import type { UsePanelInfo } from '@deepseek-ai/dsh-client-ui-layout/client'
 // Official model catalog/directory service. The staged roster reads its
 // provider/model/effort metadata without mutating the captain's own selection.
 import type {} from '@deepseek-ai/dsh-client-ui-model-selection/client'
@@ -24,7 +24,7 @@ import { agentTeamsCardDefinition } from './agent-teams-card-definition.ts'
 import {
   AGENT_TEAMS_LOCALE_NAMESPACE, en, zh, type AgentTeamsLocaleKey,
 } from './locales.ts'
-import { openAgentTeamMember } from './session-navigation.ts'
+import { openAgentTeamMember, type AgentTeamsLayoutNavigator } from './session-navigation.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -34,7 +34,13 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 }
 
 /** Required services: conversation nodes, slots, sessions navigation, and locale. */
-export const inject = ['uiConversation', 'slots', 'sessions', 'locale', 'modelDirectories']
+export const inject = ['uiConversation', 'slots', 'sessions', 'locale', 'modelDirectories', 'layout']
+
+/** The host supplies this hook for the lifetime of a 0.1.5 root slot. */
+interface PanelNavigationProps {
+  usePanelInfo?: UsePanelInfo
+}
+const useLegacyPanelInfo: UsePanelInfo = select => select({ activePanelId: null })
 
 /** The replayed user message is the canonical transcript entry. */
 function HiddenAgentTeamsCommand(): null {
@@ -52,18 +58,24 @@ export function apply(ctx: ClientContext): void {
     'agent-teams: dictionaries',
   )
   const openMember = (parentId: SessionId, childId: SessionId): void => {
-    void openAgentTeamMember(ctx.sessions, parentId, childId).catch((error: unknown) => {
+    void openAgentTeamMember(ctx.sessions, parentId, childId, ctx.layout as AgentTeamsLayoutNavigator).catch((error: unknown) => {
       console.warn(`agent-teams: failed to open member transcript ${childId}: ${String(error)}`)
     })
   }
-  const Panel = ({ t }: PropsLocale<'agentTeams'>) => (
+  const Panel = ({ t, usePanelInfo }: PropsLocale<'agentTeams'> & PanelNavigationProps) => {
+    // A host's standard hook set is fixed for this mounted plugin instance.
+    const usePanel = usePanelInfo ?? useLegacyPanelInfo
+    const conversationVisible = usePanel(panel => panel.activePanelId === null)
+    return (
     <ActivityPanel
+      conversationVisible={conversationVisible}
       sessionsList={ctx.sessions.list}
       modelDirectories={ctx.modelDirectories}
       openMember={openMember}
       t={t}
     />
-  )
+    )
+  }
   ctx.slots.inject('shell.overlay', () => ctx.slots.register({
     name: 'shell.overlay',
     id: 'agent-teams-activity',

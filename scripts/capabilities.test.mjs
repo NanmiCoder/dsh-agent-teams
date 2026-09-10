@@ -58,7 +58,7 @@ test('stable tool presentation uses real scoped registry and prompt assembly', a
       append(type, data) { const event = { type, data }; events.push(event); return event },
     } }
     const scope = createScope(owned, agent)
-    agent.ctx = scope.ctx.extend({ agent })
+    agent.ctx = scope.ctx
     agents.push(agent)
     scopes.push(scope)
     return agent
@@ -194,7 +194,7 @@ test('stable tool presentation uses real scoped registry and prompt assembly', a
         assert.equal(result.isError, false, JSON.stringify(result))
         assert.match(JSON.stringify(result.content), /STATUS_OUTPUT_DISCARDED/)
         assert.doesNotMatch(JSON.stringify(result.content), /attempt_id|captain protocol/)
-        assert.ok(a.session.events.some(event => event.type === 'tool/code-dispatch' && event.data.name === 'agent_teams_status'))
+        assert.ok(a.session.events.some(event => event.type === 'tool/ptc-dispatch' && event.data.name === 'agent_teams_status'))
         assertCaptainProtocol(renderPrompt(await assemble(a)))
         assert.equal(await header(a), before)
       } finally { restore() }

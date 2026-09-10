@@ -30,7 +30,7 @@ Ask in natural language. The plugin provides the team protocol, 13 coordination 
 
 ## Releases
 
-[v0.1.16-rc.3](./release-notes/v0.1.16-rc.3.md) is published on npm `next`, with a concise fixed team protocol, existing-team reuse guidance, Web approval wakeups, and team-lock cleanup. See the [release verification](./docs/releases/v0.1.16-rc.3/README.md) and choose a version pair below.
+[v0.1.17-rc.1](./release-notes/v0.1.17-rc.1.md) supports DeepSeek Harness `0.1.5-rc.1` on the npm `next` channel. It adapts subagent delivery, explicit member initialization, and Web panel navigation while retaining three older host targets.
 
 ## Why AgentTeams?
 
@@ -49,18 +49,19 @@ The conversation card and activity panel use Harness's official locale service. 
 
 ## Install and choose versions
 
-**Recommended pair: DeepSeek Harness `0.1.2-rc.1` + AgentTeams `0.1.16-rc.3`. Both are still prereleases.**
+**Recommended pair: DeepSeek Harness `0.1.5-rc.1` + AgentTeams `0.1.17-rc.1`. Both are prereleases.**
 
 | Use case | DeepSeek Harness | AgentTeams plugin |
 | --- | --- | --- |
-| **Recommended installation** | **`0.1.2-rc.1`** | **`0.1.16-rc.3`** |
-| Developer Alpha testing | `0.1.2-alpha.5` | `0.1.16-rc.3` |
-| Retaining an older Alpha | `0.1.2-alpha.2` | `0.1.16-rc.3` |
+| **Recommended installation** | **`0.1.5-rc.1`** | **`0.1.17-rc.1`** |
+| Retaining an older RC | `0.1.2-rc.1` | `0.1.17-rc.1` |
+| Developer Alpha testing | `0.1.2-alpha.5` | `0.1.17-rc.1` |
+| Retaining an older Alpha | `0.1.2-alpha.2` | `0.1.17-rc.1` |
 
 ### 1. Install DeepSeek Harness
 
 ```sh
-npm install --global @deepseek-ai/dsh@0.1.2-rc.1
+npm install --global @deepseek-ai/dsh@0.1.5-rc.1
 dsh --version
 ```
 
@@ -68,15 +69,15 @@ Skip this if you already run this version. Alpha is opt-in: select an exact Alph
 
 ### 2. Install the AgentTeams plugin
 
-This installs into the `web` profile. Replace `web` with your actual profile name if different:
+Install into the `web` profile. Replace the profile name if needed:
 
 ```sh
-dsh plugin --profile web add --save-exact @nanmicoder/dsh-agent-teams@0.1.16-rc.3
+dsh plugin --profile web add --save-exact @nanmicoder/dsh-agent-teams@0.1.17-rc.1
 ```
 
 **After installation, stop and restart Harness for that profile, then refresh the browser.**
 
-Plugin `0.1.16-rc.3` uses the `next` channel; `latest` still points to `0.1.15`, which targets Alpha.2. Use the exact-version command above. Future plugin prereleases use `next`; only stable plugin releases that pass the full verification matrix may use `latest`.
+Plugin prereleases use npm `next`; use the exact-version command above. `latest` is not the recommended entry for this host pair. See the [source installation guide](./docs/maintenance-workflow.md) and [release verification](./docs/releases/v0.1.17-rc.1/README.md).
 
 > Desktop users must check the app's embedded Harness core; upgrading the global CLI does not upgrade it. For older `0.1.0-*` / `0.1.1-*` or unlisted hosts, keep a working pair and follow the [older-version and diagnostic guide](./docs/maintenance-workflow.md).
 
@@ -122,6 +123,8 @@ Surfaces without command adjudication (for example the headless CLI) get the
 same deterministic activation through a gesture boundary: any genuine user
 message starting with `/agent-teams` activates the protocol for the rest of
 the text. Mid-sentence mentions stay ordinary prose.
+
+Historical panels require saved team state or archives. Sessions from early versions that deleted teams without retaining archives do not yet support reconstructing the full panel from logs.
 
 ## Configuration
 

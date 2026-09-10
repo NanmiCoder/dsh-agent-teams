@@ -1,0 +1,245 @@
+[p1 "You have joined the team — DeepSeek Harness" | space "AgentTeams Harness 0.1.5 validation"(5): 1 managed, 0 untracked — p1* "You have joined the team — DeepSeek Harness"]
+root
+  container
+    container
+      button "新建会话" [ref=1]
+        svg_root
+        svg_root
+      button "收起侧边栏" [ref=2, loc=css:button[aria-label="收起侧边栏"]]
+        svg_root
+    button "新建会话" [ref=3]
+      svg_root
+      text "新会话"
+    container
+      container
+        text "工作区"
+        button "搜索会话" [ref=4, loc=css:button[aria-label="搜索会话"]]
+          svg_root
+        container
+          button "视图选项" [ref=5, loc=css:button[aria-label="视图选项"]]
+            svg_root
+          button "添加工作区" [ref=6, loc=css:button[aria-label="添加工作区"]]
+            svg_root
+      tree "会话"
+        treeitem
+          svg_root
+          text "AgentTeams 0.1.5 实测"
+        treeitem
+          text "使用 AgentTeams 完成这次小型验"
+          text "刚刚"
+        treeitem
+          text "使用 AgentTeams 完成这次小型验"
+          text "10分钟"
+    button "设置" [ref=7, loc=css:button[aria-label="设置"]]
+      svg_root
+      text "设置"
+  container
+    container
+      container
+        container
+          container "会话层级"
+            button [ref=8]
+              text "使用 AgentTeams 完成这次小型验"
+            container
+              text "/"
+              button "切换子代理：agent-teams:browser-final:calc" [ref=9, loc=css:button[aria-label="切换子代理：agent-teams:browser-final:calc"]]
+                text "agent-teams:browser-final:calc"
+                svg_root
+          container
+            svg_root
+            text "标准模式"
+        container
+          container
+            button "在 访达 中打开工作目录" [ref=10, loc=css:button[aria-label="在 访达 中打开工作目录"]]
+              image
+            button "选择打开方式" [ref=11, loc=css:button[aria-label="选择打开方式"]]
+              svg_root
+          button "更多操作" [ref=12, loc=css:button[aria-label="更多操作"]]
+            svg_root
+        button "打开右侧边栏" [ref=13, loc=css:button[aria-label="打开右侧边栏"]]
+          svg_root
+      tablist
+        tab [ref=14]
+          text "对话"
+        tab [ref=15]
+          text "轨迹"
+    container
+      container
+        container "轮次导航"
+          button "跳转到第 1 轮" [ref=16, loc=css:button[aria-label="跳转到第 1 轮"]]
+          button "跳转到第 2 轮" [ref=17, loc=css:button[aria-label="跳转到第 2 轮"]]
+        container
+          button [ref=18]
+            container
+              svg_root
+              svg_root
+            text "系统提示词"
+          container
+            text "You have joined the team "browser-final" as a member. Wait for an automatic assignment or a captain message. Current team status: 0 task(s), 0 pending task(s) assigned to you. Do not start work until ..."
+            container
+              text "21:46"
+              button "复制" [ref=19]
+                svg_root
+          button [ref=20]
+            container
+              svg_root
+              svg_root
+            text "上下文注入"
+            text "@deepseek-ai/dsh-system-prompt"
+          button [ref=21]
+            container
+              svg_root
+              svg_root
+            text "上下文注入"
+            text "skill-catalog"
+          button [ref=22]
+            container
+              svg_root
+              svg_root
+            text "思考"
+            text "I'm calc, a worker member. The instructions say to wait for assignment, but let me check the team status and see if there's a task assigned. The message says 0 tasks, 0 pending. But the execution guid..."
+          button [ref=23]
+            container
+              svg_root
+              svg_root
+            text "工具调用"
+            text "agent_teams_status · {}"
+          button [ref=24]
+            container
+              svg_root
+              svg_root
+            text "Bash"
+            text "List workspace files"
+          button [ref=25]
+            container
+              svg_root
+              svg_root
+            text "思考"
+            text "There's a task t1 pending assigned to me. Let me claim it. Also read input.txt."
+          button [ref=26]
+            container
+              svg_root
+              svg_root
+            text "工具调用"
+            text "agent_teams_claim_task · t1"
+          button [ref=27]
+            container
+              svg_root
+              svg_root
+            text "读取"
+            button [ref=28]
+              text "input.txt"
+          button [ref=29]
+            container
+              svg_root
+              svg_root
+            text "系统提示词"
+          button [ref=30]
+            text "9 次工具调用"
+            svg_root
+          container
+            paragraph
+              text "t1 complete."
+            unordered_list
+              list_item
+                text "Read"
+                text "input.txt"
+                text "(3, 5, 8) in the team workspace and computed the total"
+                text "16"
+                text "."
+              list_item
+                text "Wrote"
+                button "在默认程序中打开 /private/tmp/agent-teams-015-validation/browser-real/workspace/final-sum.txt" [ref=31]
+                  svg_root
+                  text "final-sum.txt"
+                text "containing only"
+                text "16"
+                text "plus a trailing newline (1 line, 3 bytes)."
+              list_item
+                text "Verified:"
+                text "cat final-sum.txt"
+                text "→"
+                text "16"
+                text ","
+                text "wc -l"
+                text "→"
+                text "1"
+                text "; no other file created or modified ("
+                text "input.txt"
+                text ","
+                text "sum.txt"
+                text ","
+                text "result.md"
+                text "untouched)."
+              list_item
+                text "Marked t1 completed with attempt_id"
+                text "0aff16a5-8d3a-4fa1-b5c6-c515655a2b81"
+                text ", reported to captain and parent. Now idle;"
+                text "check"
+                text "can read the file and produce"
+                text "final-result.md"
+                text "."
+          container
+            container
+              text "本轮文件改动"
+              button "打开 /private/tmp/agent-teams-015-validation/browser-real/workspace/final-sum.txt" [ref=32]
+                svg_root
+                text "final-sum.txt"
+            container
+              button "在侧边栏预览 /private/tmp/agent-teams-015-validation/browser-real/workspace/final-sum.txt" [ref=33]
+              svg_root
+              text "final-sum.txt"
+              text "Sum of the three numbers from input.txt"
+              container
+                button "在侧边栏打开 /private/tmp/agent-teams-015-validation/browser-real/workspace/final-sum.txt" [ref=34]
+                  text "打开"
+                button "/private/tmp/agent-teams-015-validation/browser-real/workspace/final-sum.txt 的更多文件操作" [ref=35]
+                  svg_root
+            container
+              button "复制" [ref=36]
+                svg_root
+              button "好的回答" [ref=37, loc=css:button[aria-label="好的回答"]]
+                svg_root
+              button "有问题的回答" [ref=38, loc=css:button[aria-label="有问题的回答"]]
+                svg_root
+              button "在新对话中分支" [ref=39, loc=css:button[aria-label="在新对话中分支"]]
+                svg_root
+              button [ref=40]
+                svg_root
+                text "用量 153K tok"
+              button [ref=41]
+                svg_root
+                text "用时 13秒"
+              text "21:46"
+      container
+        container
+          container
+            textfield "发消息或创建任务, / 调用指令, @ 文件或对话" [ref=42]
+            text "发消息或创建任务, / 调用指令, @ 文件或对话"
+          container
+            container
+              button "指令" [ref=43, loc=css:button[aria-label="指令"]]
+                svg_root
+              button "添加附件" [ref=44, loc=css:button[aria-label="添加附件"]]
+                svg_root
+              button "访问模式，当前：Benchmark Workspace" [ref=45, loc=css:button[aria-label="访问模式，当前：Benchmark Workspace"]]
+                text "Benchmark Workspace"
+                svg_root
+            container
+              button "上下文已用 2%" [ref=46, loc=css:button[aria-label="上下文已用 2%"]]
+                svg_root
+              button "发送消息" [ref=47, loc=css:button[aria-label="发送消息"]]
+                svg_root
+        container
+          button "2 轮 12 步 · 299 tok/s" [ref=48, loc=css:button[aria-label="2 轮 12 步 · 299 tok/s"]]
+            svg_root
+            container
+              text "2 轮 12 步"
+              text "·"
+              text "299 tok/s"
+          button "183K tok · 缓存命中 90%" [ref=49, loc=css:button[aria-label="183K tok · 缓存命中 90%"]]
+            svg_root
+            container
+              text "183K tok"
+              text "·"
+              text "缓存命中 90%"

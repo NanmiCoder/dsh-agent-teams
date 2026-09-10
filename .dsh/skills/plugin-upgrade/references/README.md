@@ -15,10 +15,12 @@ source: if a field is removed in alpha.1 and restored in alpha.2, do not delete 
 | 1 | [v0.1.1-rc.2.md](v0.1.1-rc.2.md) | `dsh-v0.1.1-rc.1` | `dsh-v0.1.1-rc.2` | 3 | reviewed / curated |
 | 2 | [v0.1.2-alpha.1.md](v0.1.2-alpha.1.md) | `dsh-v0.1.1-rc.2` | `dsh-v0.1.2-alpha.1` | 28 | reviewed / curated |
 | 3 | [v0.1.2-alpha.2.md](v0.1.2-alpha.2.md) | `dsh-v0.1.2-alpha.1` | `dsh-v0.1.2-alpha.2` | 8 | reviewed / curated |
-| 4 | [v0.1.2-alpha.3.md](v0.1.2-alpha.3.md) | `dsh-v0.1.2-alpha.2` | `dsh-v0.1.2-alpha.3` | 1 | reviewed / curated (no breaking plugin changes; one additive capability: `settings.plugin.item` keyed-slot settings card, first real-world integrations) |
+| 4 | [v0.1.2-alpha.3.md](v0.1.2-alpha.3.md) | `dsh-v0.1.2-alpha.2` | `dsh-v0.1.2-alpha.3` | 2 | reviewed / curated (one opt-in breaking removal: the SQLite Session-persistence provider (`session-persistence-sqlite`) — retained databases need an older build to export; one additive capability: `settings.plugin.item` keyed-slot settings card, first real-world integrations) |
 | 5 | [v0.1.2-alpha.4.md](v0.1.2-alpha.4.md) | `dsh-v0.1.2-alpha.3` | `dsh-v0.1.2-alpha.4` | 6 | reviewed / curated |
 | 6 | [v0.1.2-alpha.5.md](v0.1.2-alpha.5.md) | `dsh-v0.1.2-alpha.4` | `dsh-v0.1.2-alpha.5` | 3 | reviewed / curated |
 | 7 | [v0.1.2-rc.1.md](v0.1.2-rc.1.md) | `dsh-v0.1.2-alpha.5` | `dsh-v0.1.2-rc.1` | 0 | reviewed / curated |
+| 8 | [v0.1.3-alpha.1.md](v0.1.3-alpha.1.md) | `dsh-v0.1.2-rc.1` | `dsh-v0.1.3-alpha.1` | 5 | draft / curated (A1-01/A1-02 session-log corridor measured on the release tarball: the v0→v1 migrator refuses 0.1.2-alpha.x-writer logs (`replayState` `kind` member) — pre-alpha.4-writer history unloadable; cross-version `resume` reports `cursor behind the last applied entry`; A1-04…A1-06 git-tag anchored: outbound HTTP(S)/ALL_PROXY bootstrap install (`dsh-http-proxy`, `$DSH_HOME/.env` home layer), session persistence `SessionHandle` + async `agentLoop.create()` + per-session lock, Session log format v2 + released migration catalog) |
+| 9 | [v0.1.3-alpha.2.md](v0.1.3-alpha.2.md) | `dsh-v0.1.3-alpha.1` | `dsh-v0.1.3-alpha.2` | 5 | draft / curated (persona `text`/`persona` config splits into prefix + suffix with `PERSONA_SECTION` removed, `SubprocessHandle.pid` removal, base bundle drops the `tool-str-replace-editor` default row, launcher `runCli()`/`import.meta.main`, pi-ai `^0.84.2`→`^0.85.1`; first 0.1.3 build on npm — alpha.1 items debut for npm upgrades, read the [alpha.1 corridor](v0.1.3-alpha.1.md) first) |
 | — | [rollup-0.1.2.md](rollup-0.1.2.md) | `dsh-v0.1.1-rc.2` → `dsh-v0.1.2-rc.1` full corridor | rollup | non-card file: corridor-level increment (cross-cohort coexistence, unpublished-cohort installation, `RemoteResult` error flow, pre-migration baseline attribution, bounded retry for boot race, base-only preset precondition, type-surface export drift, host-self safety boundary, three install-channel pitfalls, layered validation checklist); based on rc.1, subject to final-release review |
 
 `curated` means only the identified plugin-relevant changes are included, not a complete
@@ -35,6 +37,7 @@ Companion material:
 - [host-plane-probes.md](host-plane-probes.md): three ways for the host plane to run dual-cohort probes in `cordis.patch.yml`;
 - [migration-hygiene.md](migration-hygiene.md): version-independent toolchain pitfalls (tsbuildinfo false positives, oxc parsing strictness, the plane a change takes effect in, pnpm interception, test syntax);
 - [troubleshooting.md](troubleshooting.md): post-migration symptom → root cause → card lookup;
+- [precision-checklist.md](precision-checklist.md): alpha.2 static-migration precision checklist — peer floors, runtime module composition versus type declarations, locale pairing, channel authentication with protocol preservation, landing discipline and citations; pairs with `inject-lint` for residue/peer checks;
 - [examples/legacy-plugin/](../examples/legacy-plugin/): static fixture for the seven touchpoint classes.
 
 ## Card file metadata

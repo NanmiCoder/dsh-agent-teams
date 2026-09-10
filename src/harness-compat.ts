@@ -1,9 +1,10 @@
 /**
- * The audited Harness 0.1.2 subagent boundary. Keep version-specific shapes
+ * The audited Harness 0.1.2 / 0.1.5 subagent boundary. Keep version-specific shapes
  * here: API presence alone is not a promise of support for future versions.
  *
  * Alpha.2 owns followup/registerContinuableSetup; Alpha.5 and rc.1 own a
- * host-only FIFO queue and synchronous agent/session-start. Their public
+ * host-only FIFO queue; 0.1.5 uses a queue/steer deliverer. Both emit
+ * synchronous agent/session-start with the explicit Agent. Their public
  * sendMessage instead steers a running Agent and must never carry team jobs.
  */
 import type { Context } from '@deepseek-ai/cordis'
@@ -20,17 +21,23 @@ import { SubagentError } from '@deepseek-ai/dsh-subagent'
  * Source: packages/subagent/subagent/src/internal.ts at dsh-v0.1.2-rc.1.
  */
 const hostPromptQueue = Symbol.for('dsh.subagent.queuePrompt')
-type Setup = (childCtx: Context) => () => void
+// 0.1.5 keeps queueHostSubagentPrompt but replaces its symbol with this
+// delivery-mode-aware implementation (packages/subagent/subagent/src/internal.ts).
+const hostPromptDeliver = Symbol.for('dsh.subagent.deliverPrompt')
+type Setup = (childCtx: Context, child: Agent) => () => void
+type LegacySetup = (childCtx: Context & { agent?: Agent }) => () => void
 type Followup = (parent: Agent, childId: SessionId, content: ContentBlock[], options: {
   source: MessageSource; signal: AbortSignal
 }) => Promise<MessageId>
 type Queue = (parent: Agent, childId: SessionId, content: ContentBlock[], source: MessageSource, signal: AbortSignal) => Promise<MessageId>
+type Deliver = (parent: Agent, childId: SessionId, content: ContentBlock[], source: MessageSource, signal: AbortSignal, delivery: 'queue' | 'steer') => Promise<MessageId>
 type Send = (sender: Agent, targetId: SessionId, content: ContentBlock[], options: { signal: AbortSignal }) => Promise<MessageId>
 interface RuntimeBoundary {
   followup?: Followup
-  registerContinuableSetup?: (setup: Setup) => () => void
+  registerContinuableSetup?: (setup: LegacySetup) => () => void
   sendMessage?: Send
   [hostPromptQueue]?: Queue
+  [hostPromptDeliver]?: Deliver
 }
 
 function boundary(runtime: Context['subagents']): RuntimeBoundary {
@@ -57,10 +64,13 @@ export function installContinuableMemberSetup(ctx: Context, setup: Setup): void 
     // Upstream owns this registration with this.ctx.effect. Cordis resolves
     // that ctx to the accessing plugin, so its disposal revokes installations
     // even while the subagents service and child Agents remain live.
-    runtime.registerContinuableSetup.call(ctx.subagents, setup)
+    runtime.registerContinuableSetup.call(ctx.subagents, (childCtx) => {
+      if (childCtx.agent === undefined) return unsupported('legacy setup lacks child Agent')
+      return setup(childCtx, childCtx.agent)
+    })
     return
   }
-  if (typeof runtime[hostPromptQueue] !== 'function' || typeof runtime.sendMessage !== 'function') {
+  if ((typeof runtime[hostPromptQueue] !== 'function' && typeof runtime[hostPromptDeliver] !== 'function') || typeof runtime.sendMessage !== 'function') {
     return unsupported('missing continuable setup and modern host queue')
   }
   const installed = new WeakSet<Agent>()
@@ -71,7 +81,7 @@ export function installContinuableMemberSetup(ctx: Context, setup: Setup): void 
       // Deliberately synchronous: awaiting here loses the first-request race.
       let teardown: () => void
       try {
-        teardown = setup(agent.ctx)
+        teardown = setup(agent.ctx, agent)
       } catch (error: unknown) {
         // session-start is a notification: Harness logs a thrown listener and
         // still admits the first prompt. Reject request assembly explicitly so
@@ -116,6 +126,8 @@ export async function queueMemberPrompt(
   if (typeof host.followup === 'function') {
     return host.followup.call(runtime, parent, childId, content, { source, signal })
   }
+  const deliver = host[hostPromptDeliver]
+  if (typeof deliver === 'function') return deliver.call(runtime, parent, childId, content, source, signal, 'queue')
   const queue = host[hostPromptQueue]
   if (typeof queue !== 'function') return unsupported('missing host FIFO delivery')
   return queue.call(runtime, parent, childId, content, source, signal)
@@ -129,14 +141,16 @@ export function guardSubagentDelivery(
   const host = boundary(runtime)
   const legacy = host.followup
   const queue = host[hostPromptQueue]
+  const deliver = host[hostPromptDeliver]
   const send = host.sendMessage
-  if (typeof legacy !== 'function' && (typeof queue !== 'function' || typeof send !== 'function')) {
+  if (typeof legacy !== 'function' && ((typeof queue !== 'function' && typeof deliver !== 'function') || typeof send !== 'function')) {
     return unsupported('cannot install complete retired-member guard')
   }
   ctx.effect(() => {
     const descriptors = new Map<PropertyKey, PropertyDescriptor | undefined>([
       ['followup', Object.getOwnPropertyDescriptor(host, 'followup')],
       [hostPromptQueue, Object.getOwnPropertyDescriptor(host, hostPromptQueue)],
+      [hostPromptDeliver, Object.getOwnPropertyDescriptor(host, hostPromptDeliver)],
       ['sendMessage', Object.getOwnPropertyDescriptor(host, 'sendMessage')],
     ])
     let active = true
@@ -157,8 +171,13 @@ export function guardSubagentDelivery(
       await check(sender, targetId)
       return send!.call(runtime, sender, targetId, content, options)
     }
+    const guardedDeliver: Deliver = async (parent, childId, content, source, signal, delivery) => {
+      await check(parent, childId)
+      return deliver!.call(runtime, parent, childId, content, source, signal, delivery)
+    }
     if (typeof legacy === 'function') host.followup = guardedLegacy
     if (typeof queue === 'function') host[hostPromptQueue] = guardedQueue
+    if (typeof deliver === 'function') host[hostPromptDeliver] = guardedDeliver
     if (typeof send === 'function') host.sendMessage = guardedSend
     // Cordis wraps method reads in fresh Proxies. Compare the actual own
     // descriptor to restore only our contribution, including prototype methods.
@@ -172,6 +191,7 @@ export function guardSubagentDelivery(
       active = false
       if (typeof legacy === 'function') restore('followup', guardedLegacy)
       if (typeof queue === 'function') restore(hostPromptQueue, guardedQueue)
+      if (typeof deliver === 'function') restore(hostPromptDeliver, guardedDeliver)
       if (typeof send === 'function') restore('sendMessage', guardedSend)
     }
   }, 'agent-teams: retired member guard')

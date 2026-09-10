@@ -361,9 +361,7 @@ export function installMemberSelectionRuntime(
   onFailureSettled?: (workspace: string, teamId: string, memberName: string) => Promise<void>,
 ): MemberSelectionRuntime {
   const pending = new Map<string, MemberLlmSelection>()
-  installContinuableMemberSetup(ctx, (childCtx) => {
-    const child = childCtx.agent
-    if (child === undefined) return () => undefined
+  installContinuableMemberSetup(ctx, (childCtx, child) => {
     const descriptor = foldSubagentDescriptor(sessionOwnEvents(child.session))
     if (descriptor?.mode !== 'continuable' || !descriptor.label.startsWith(MEMBER_LABEL_PREFIX)) {
       return () => undefined

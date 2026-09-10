@@ -758,12 +758,13 @@ function historicCardTeam(data: AgentTeamsCardData, owner: string): ActivityTeam
  * snapshots and historic card summaries are only shown while their captain
  * session is the one currently open. */
 export type ActivityPanelProps = {
+  readonly conversationVisible?: boolean
   readonly sessionsList: ObservableSnapshot<SessionListState>
   readonly modelDirectories: ModelDirectoryResolver
   readonly openMember: (parentId: SessionId, childId: SessionId) => void
 } & PropsLocale<'agentTeams'>
 
-export function ActivityPanel({ sessionsList, modelDirectories, openMember, t }: ActivityPanelProps) {
+export function ActivityPanel({ sessionsList, modelDirectories, openMember, t, conversationVisible = true }: ActivityPanelProps) {
   // Navigating to a member's subagent transcript is an explicit departure:
   // hide the floater immediately instead of waiting out the autocollapse
   // grace, so the panel never lingers over the member session.
@@ -802,7 +803,9 @@ export function ActivityPanel({ sessionsList, modelDirectories, openMember, t }:
     setOpen(false)
     setOpenOwner(undefined)
     window.requestAnimationFrame(() => {
-      document.querySelector<HTMLTextAreaElement>('[data-composer-card] textarea')?.focus()
+      document.querySelector<HTMLElement>(
+        '[data-composer-card] [contenteditable="true"][role="textbox"], [data-composer-card] textarea',
+      )?.focus()
     })
   }
   const { teams, archivedTeams } = useSyncExternalStore(
@@ -816,7 +819,7 @@ export function ActivityPanel({ sessionsList, modelDirectories, openMember, t }:
   const currentRef = useRef(current)
   useEffect(() => { currentRef.current = current }, [current])
   const mountedAtRef = useRef(performance.now())
-  const expanded = activityPanelExpandedForSession(open, openOwner, current)
+  const expanded = conversationVisible && activityPanelExpandedForSession(open, openOwner, current)
   const geometry = useMemo(() => resolvePanelGeometry(layout, bounds), [layout, bounds])
   const compact = compactPanelForBounds(bounds)
 
@@ -1161,7 +1164,7 @@ export function ActivityPanel({ sessionsList, modelDirectories, openMember, t }:
     transform: `translate3d(${geometry.x}px, ${geometry.y}px, 0)`,
   }
 
-  if (!hasTeams && !expanded) return null
+  if (!conversationVisible || (!hasTeams && !expanded)) return null
 
   return (
     <>

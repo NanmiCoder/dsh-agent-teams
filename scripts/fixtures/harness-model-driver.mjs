@@ -17,7 +17,7 @@ export function apply(ctx) {
     ctx.on('llm/stream', async function* (options, next) {
         const request = ++requestCount;
         if (request > config.maxRequests) throw Error('Real-model benchmark request limit reached');
-        record({ event: 'model-request', request, sessionId: options.sessionId, provider: options.provider, model: options.model, reasoningEffort: options.reasoningEffort, purpose: options.purpose, systemSha256: createHash('sha256').update(options.system ?? '').digest('hex'), systemBytes: Buffer.byteLength(options.system ?? ''), toolsSha256: createHash('sha256').update(JSON.stringify(options.tools ?? [])).digest('hex'), teamTools: options.tools?.filter(tool => tool.name.startsWith('agent_teams_')).map(tool => tool.name) });
+        record({ event: 'model-request', request, sessionId: options.sessionId, provider: options.provider, model: options.model, reasoningEffort: options.reasoningEffort, purpose: options.purpose, systemSha256: createHash('sha256').update(options.system ?? options.messages.filter(message => message.role === 'system').flatMap(message => message.content.filter(block => block.type === 'text').map(block => block.text)).join('\n')).digest('hex'), systemBytes: Buffer.byteLength(options.system ?? options.messages.filter(message => message.role === 'system').flatMap(message => message.content.filter(block => block.type === 'text').map(block => block.text)).join('\n')), toolsSha256: createHash('sha256').update(JSON.stringify(options.tools ?? [])).digest('hex'), teamTools: options.tools?.filter(tool => tool.name.startsWith('agent_teams_')).map(tool => tool.name) });
         let response = '';
         try {
             for await (const chunk of next()) {

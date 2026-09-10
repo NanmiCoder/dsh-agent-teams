@@ -36,6 +36,7 @@ class ProtocolAdapter extends LlmAdapter {
     async listModels() { return [model]; }
     async resolveModel(provider, id) { return { ...model, provider, id }; }
     async *stream(options) {
+        const system = options.system ?? options.messages.filter(message => message.role === 'system').flatMap(message => message.content.filter(block => block.type === 'text').map(block => block.text)).join('\n');
         if (options.purpose) {
             record({ event: 'protocol-background-request', purpose: options.purpose });
             yield* textChunks(options.purpose === 'compaction' ? 'A staged team named protocol-team has task t1 awaiting user review.' : 'Protocol lab');
@@ -43,21 +44,21 @@ class ProtocolAdapter extends LlmAdapter {
         }
         const scenario = cases.get(options.sessionId);
         assert.ok(scenario, 'Unexpected live agent request');
-        assertProtocol(options.system);
-        assert.doesNotMatch(options.system ?? '', /agent_teams_open/);
+        assertProtocol(system);
+        assert.doesNotMatch(system ?? '', /agent_teams_open/);
         assert.ok(!(options.tools ?? []).some(tool => tool.name === 'agent_teams_open'));
         const blocks = options.messages.flatMap(message => message.content ?? []);
         const failed = blocks.find(block => block.type === 'tool-result' && block.isError);
         assert.equal(failed, undefined, JSON.stringify(failed));
         const resultText = blocks.filter(block => block.type === 'tool-result').flatMap(block => block.content?.filter(content => content.type === 'text').map(content => content.text) ?? []).join('\n');
-        const snapshot = { event: 'protocol-request', label: scenario.label, phase: scenario.phase, step: scenario.step, sessionId: options.sessionId, system: options.system, tools: options.tools, messages: options.messages, systemSha256: hash(options.system ?? ''), toolsSha256: hash(JSON.stringify(options.tools ?? [])) };
+        const snapshot = { event: 'protocol-request', label: scenario.label, phase: scenario.phase, step: scenario.step, sessionId: options.sessionId, system: system, tools: options.tools, messages: options.messages, systemSha256: hash(system ?? ''), toolsSha256: hash(JSON.stringify(options.tools ?? [])) };
         requests.push(snapshot); record(snapshot);
         if (!scenario.ptc && scenario.phase === 'plan' && scenario.step === 0) {
             // Anonymous names cannot convey their purpose by themselves. The
             // original thirteen-tool allowlist must still see the configured
             // directory in its FIRST request, before any business or error result.
-            const north = options.system.split('\n').find(line => line.startsWith('- north '));
-            const south = options.system.split('\n').find(line => line.startsWith('- south '));
+            const north = system.split('\n').find(line => line.startsWith('- north '));
+            const south = system.split('\n').find(line => line.startsWith('- south '));
             assert.match(north ?? '', /1 member, captain planning/);
             assert.match(north ?? '', /Investigate an existing codebase and design a goal-specific task DAG/);
             assert.match(south ?? '', /1 member, 1 task/);
@@ -138,7 +139,7 @@ export function apply(ctx) {
             assert.ok(!state().members[0].id, 'Staging must not spawn a member');
             assert.equal(await usage(agent), beforeUsage);
             if (ptc) {
-                assert.ok(sessionEvents(agent.session).some(event => event.type === 'tool/code-dispatch' && event.data.name === 'agent_teams_status'));
+                assert.ok(sessionEvents(agent.session).some(event => ['tool/code-dispatch', 'tool/ptc-dispatch'].includes(event.type) && event.data.name === 'agent_teams_status'));
                 const pruned = ctx.toolResultPruner.pruneSession(agent.session);
                 assert.ok(sessionEvents(agent.session).some(event => event.type === 'compaction/prune'), 'Oversized PTC receipt must actually be pruned');
                 record({ event: 'protocol-pruned', label, result: pruned });

@@ -30,7 +30,7 @@
 
 ## 版本更新
 
-[v0.1.16-rc.3](./release-notes/v0.1.16-rc.3.md) 已发布到 npm `next` 渠道，精简固定团队协议、引导复用已有团队，并修复 Web 批准通知和团队锁清理。参见[发布验收记录](./docs/releases/v0.1.16-rc.3/README.md)，安装版本见下方配对表。
+[v0.1.17-rc.1](./release-notes/v0.1.17-rc.1.md) 适配 DeepSeek Harness `0.1.5-rc.1`，发布到 npm `next` 渠道。新增子代理投递、成员初始化和 Web 面板导航适配，保留三个旧宿主目标。
 
 ## 为什么需要 AgentTeams？
 
@@ -48,18 +48,19 @@
 
 ## 安装与版本选择
 
-**推荐组合：DeepSeek Harness `0.1.2-rc.1` + AgentTeams `0.1.16-rc.3`。两者都仍是预发布版本。**
+**推荐组合：DeepSeek Harness `0.1.5-rc.1` + AgentTeams `0.1.17-rc.1`。两者均为预发布版本。**
 
 | 使用场景 | DeepSeek Harness | AgentTeams 插件 |
 | --- | --- | --- |
-| **推荐安装** | **`0.1.2-rc.1`** | **`0.1.16-rc.3`** |
-| 开发者测试 Alpha | `0.1.2-alpha.5` | `0.1.16-rc.3` |
-| 保留旧 Alpha | `0.1.2-alpha.2` | `0.1.16-rc.3` |
+| **推荐安装** | **`0.1.5-rc.1`** | **`0.1.17-rc.1`** |
+| 保留旧 RC | `0.1.2-rc.1` | `0.1.17-rc.1` |
+| 开发者测试 Alpha | `0.1.2-alpha.5` | `0.1.17-rc.1` |
+| 保留旧 Alpha | `0.1.2-alpha.2` | `0.1.17-rc.1` |
 
 ### 1. 安装 DeepSeek Harness
 
 ```sh
-npm install --global @deepseek-ai/dsh@0.1.2-rc.1
+npm install --global @deepseek-ai/dsh@0.1.5-rc.1
 dsh --version
 ```
 
@@ -67,15 +68,15 @@ dsh --version
 
 ### 2. 安装 AgentTeams 插件
 
-以下安装到 `web` profile；使用其他 profile 时，将 `web` 换成实际名称：
+安装到 `web` profile；使用其他 profile 时替换名称：
 
 ```sh
-dsh plugin --profile web add --save-exact @nanmicoder/dsh-agent-teams@0.1.16-rc.3
+dsh plugin --profile web add --save-exact @nanmicoder/dsh-agent-teams@0.1.17-rc.1
 ```
 
 **安装后，停止并重新启动该 profile 的 Harness 进程，再刷新浏览器。**
 
-插件 `0.1.16-rc.3` 使用 `next` 渠道；当前 `latest` 仍是面向 Alpha.2 的 `0.1.15`。请使用上面的精确版本命令。后续插件预发布版本继续进入 `next`，通过完整验证的正式版本才进入 `latest`。
+插件预发布使用 npm `next`，请使用上面的精确版本命令；`latest` 不是这组宿主的推荐安装入口。源码安装见[维护指南](./docs/maintenance-workflow.md)，验证范围见[本版验收记录](./docs/releases/v0.1.17-rc.1/README.md)。
 
 > Desktop 用户需核对应用内置的 Harness 核心；全局 CLI 升级不会升级桌面内核。旧 `0.1.0-*` / `0.1.1-*` 或其他未列出的宿主，请先保留已工作的组合，参考[旧版本与诊断指引](./docs/maintenance-workflow.md)。
 
@@ -135,6 +136,7 @@ dsh plugin --profile web add --save-exact @nanmicoder/dsh-agent-teams@0.1.16-rc.
 - 一个队长同一时间只能带一个活动团队。
 - 没有开放任务的空闲成员会自动续领就绪任务；仍持有开放 attempt 的空闲成员会停驻，队长可发消息让其沿用原 attempt 继续，或显式转派；冷重启遗留的开放任务才会生成新 attempt。暂时无法实时投递的消息会持久保存在邮箱中并在后续状态边界重投。
 - 状态使用文件持久化，并在单个 DSH 进程内串行操作；多个进程同时修改同一团队不保证一致。
+- 历史面板依赖保存的团队状态或归档；早期版本删除团队时未保留归档的会话，暂不支持从日志重建完整面板。
 - 活动面板如实展示持久化状态；模型偶尔可能完成工作却没有按协议更新任务状态。
 
 完整工具列表、状态模型、Web UI 行为、配置与已知限制见 [docs/usage.md](./docs/usage.md)。

@@ -1,6 +1,6 @@
 ---
 name: plugin-workflow
-description: Coordinate the complete DeepSeek Harness plugin lifecycle across inspection, host compatibility upgrades, tests, naming and central registry checks, packaging, release, and rollback. Use when a user wants one guided workflow, asks which plugin capabilities to run, requests a pre-run feature menu, or needs several DSH plugin Skills chained with a unified status report. Default to read-only discovery and require separate confirmation before repository writes, dependency or runtime execution, and external publication.
+description: Coordinate multiple DeepSeek Harness plugin Skills across inspection, migration, runtime debugging, heavy dependencies, testing, naming, and release. Use for a guided lifecycle workflow, a pre-run capability menu, or several DSH plugin operations with one status report. Preserve the user's selected scope and existing authorization across stages.
 ---
 
 # Coordinate the DSH Plugin Lifecycle
@@ -50,6 +50,12 @@ Inspect only enough context to make the choices concrete:
 | `naming-registry` | Validate identifiers and optionally check or register a cloud ID | discovery, offline naming, registry query, optional registration |
 | `package-release` | Prepare and optionally publish a release | discovery, required test gates, pack, consumer smoke, optional publication |
 | `full-lifecycle` | Migrate, validate, name, package, and optionally publish | all applicable stages in dependency order |
+| `runtime-debug` | Diagnose and fix Web Client runtime behavior | runtime diagnosis/fix, static, functional and browser proof, rollback |
+| `heavy-dependency` | Integrate a lazy-loaded Web Client dependency | integration, static, functional and browser proof, rollback, package inspection |
+
+The last two workflows require the `web-client` surface. They can also be added as
+capabilities to a migration. Use `health-check` for a read-only investigation; a
+request to diagnose a symptom does not by itself select a fix workflow.
 
 Then let the user include or exclude these capabilities. Recommend the smallest set that proves their stated outcome and state which recommended items are still unselected.
 
@@ -67,6 +73,8 @@ Then let the user include or exclude these capabilities. Recommend the smallest 
 | Rollback rehearsal or recipe | `rollback` | Recipe on for every write workflow; rehearsal is opt-in |
 | Build and inspect a package artifact | `package-artifact` | On for package/release and full lifecycle workflows |
 | Publish an artifact or release | `release` | Off unless external release intent is explicit |
+| Diagnose and fix Web Client runtime behavior | `runtime-debug` | Off unless selected; requires static, functional and browser proof plus rollback |
+| Integrate a heavy browser dependency | `heavy-dependency` | Off unless selected; requires the same proof plus package inspection |
 
 After the user chooses, normalize the selection with the bundled read-only planner. Read [`references/workflow-selection.schema.json`](references/workflow-selection.schema.json) when another tool needs to produce the input JSON.
 
@@ -106,17 +114,25 @@ Before executing a stage, load and follow its owning Skill. If the owner is unav
 
 | Stage | Owning Skill | Boundary |
 |---|---|---|
-| Installed update or source compatibility migration | `$plugin-upgrade` | Inspect first; confirm before config, dependency, or source changes |
+| Installed update or source compatibility migration | `$plugin-upgrade` | Inspect first; check authorization for config, dependency, or source changes |
 | New plugin code or offline naming declaration | `$plugin-write` | Follow the exact target Harness contract |
 | Static, runtime, Docker, functional, or browser validation | `$plugin-test` | Select the minimum sufficient levels and preserve evidence |
-| Package, release gates, publication, and release rollback | `$plugin-release` | Confirm publication separately |
+| Package, release gates, publication, and release rollback | `$plugin-release` | Check the publication destination and authorization |
 | DSH host version-to-version evidence | `$dsh-upgrade-audit` | Keep generated evidence separate from plugin source changes |
+| Web Client runtime diagnosis and repair | `$plugin-runtime-debug` | Establish the exact host contract and reproduce the failing interaction |
+| Lazy-loaded browser dependency integration | `$plugin-heavy-dep` | Own chunk loading, host route, fallback and markup handling |
+
+Keep one owner per phase. When runtime debugging and dependency integration overlap,
+record the diagnosed contract and let the integration owner consume it instead of
+starting a competing rewrite. Reuse the selected target version and source identity
+across owners. If a later owner changes source, dependencies or the package artifact,
+invalidate the earlier verification that depended on those inputs and rerun it.
 
 Run stages in dependency order:
 
 1. discovery and source identity;
 2. DSH audit when selected;
-3. upgrade or implementation changes;
+3. upgrade or implementation changes, then selected runtime repair or dependency integration;
 4. offline naming and optional registry query;
 5. static tests;
 6. Docker, functional, and browser proof;
@@ -125,15 +141,20 @@ Run stages in dependency order:
 
 Skip stages that are not selected unless an owning Skill makes them a hard gate for a later selected stage. In that case, add the gate to the ledger, explain why it is required, and obtain any needed confirmation before running it.
 
-## Enforce three confirmation boundaries
+## Preserve authorization across three boundaries
 
-Group planned actions by boundary and never use approval for one boundary as approval for another:
+Group planned actions by boundary and check each against the user's request and
+higher-priority instructions. Existing explicit authorization applies to the same
+scope when handing off to another Skill; do not ask again merely because the owner
+changed. A generated plan grants no authorization, and authorization for source edits
+does not implicitly authorize publication. Ask only when a required action is outside
+the authorization already supplied.
 
 1. **Repository writes**: show exact files, intended changes, and rollback scope before editing source, configuration, manifests, or lockfiles.
 2. **Dependency and runtime execution**: show package-manager commands, lifecycle-script risk, containers, services, browsers, credentials, and expected generated outputs before installs or nontrivial runtime tests. Ordinary read-only Git and file inspection does not need confirmation.
-3. **External publication**: immediately before pushing commits or tags, opening a registry PR, publishing npm artifacts, or changing a hub/collection, show the exact destination and payload and obtain separate confirmation.
+3. **External publication**: identify the exact destination and payload for commits, tags, registry PRs, npm artifacts, or hub/collection changes, and confirm that this action is within the user's authorization.
 
-If a selected phase crosses more than one boundary, confirm each boundary when it becomes actionable. Never request or expose secrets merely to complete a phase.
+If a selected phase crosses more than one boundary, check each boundary when it becomes actionable. Never request or expose secrets merely to complete a phase.
 
 ## Maintain and report evidence
 

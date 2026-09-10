@@ -11,8 +11,9 @@ import { installMemberSelectionRuntime } from '../lib/members.js'
 import { installTeamScheduler } from '../lib/scheduler.js'
 import { appendMailbox, createMessage, createTeamDir, readTeam, readMailbox, readUnreadMailbox, withTeamLock, writeTeam } from '../lib/state.js'
 
-const modernHarness = process.argv.includes('--modern-harness')
-const hostQueue = Symbol.for('dsh.subagent.queuePrompt')
+const deliveryHarness = process.argv.includes('--delivery-harness')
+const modernHarness = deliveryHarness || process.argv.includes('--modern-harness')
+const hostQueue = Symbol.for(deliveryHarness ? 'dsh.subagent.deliverPrompt' : 'dsh.subagent.queuePrompt')
 
 async function eventually(predicate) {
   for (let i = 0; i < 100; i++) {
@@ -85,12 +86,14 @@ async function fixture(t, { captainStatus = 'idle', fallback, captainOffline = f
     const followup = ctx.subagents.followup
     delete ctx.subagents.followup
     delete ctx.subagents.registerContinuableSetup
-    ctx.subagents[hostQueue] = function (parent, id, content, source, signal) {
+    ctx.subagents[hostQueue] = function (parent, id, content, source, signal, delivery) {
+      if (deliveryHarness && delivery !== 'queue') throw new Error('recovery must queue a distinct turn')
       return followup.call(this, parent, id, content, { source, signal })
     }
     ctx.subagents.sendMessage = () => { throw new Error('failure recovery must not steer a job') }
     setup = childCtx => {
       child.ctx = childCtx
+      if (deliveryHarness) delete childCtx.agent
       rootListeners.get('agent/session-start')({ agent: child, source: 'startup' })
       return () => { for (const dispose of disposers) dispose() }
     }

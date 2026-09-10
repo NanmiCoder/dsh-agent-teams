@@ -15,28 +15,40 @@ export interface AgentTeamsSessionNavigator {
   subagentAddress?(id: SessionId): SubagentAddress | undefined
 }
 
+/** Main-panel navigation added in Harness 0.1.5; older layouts omit these actions. */
+export interface AgentTeamsLayoutNavigator {
+  selectPanel?(panelId: null): void
+  beginNavigation?(): AbortSignal
+}
+
 /**
  * Open one member's persisted transcript.
  *
  * Harness rc.8 intentionally removed cold subagents from the ordinary session
  * list. They must first be rediscovered in their parent's catalog, then opened
  * with the exact parent/child/mode address. Older runtimes have only `open()`;
- * the fallback preserves the plugin's rc.6 peer range.
+ * the fallback preserves ordinary-session navigation. New layouts also select
+ * the Conversation panel and cancel catalog refreshes superseded by navigation.
  */
 export async function openAgentTeamMember(
   sessions: AgentTeamsSessionNavigator,
   parentSessionId: SessionId,
   childSessionId: SessionId,
-): Promise<'subagent' | 'session'> {
+  layout?: AgentTeamsLayoutNavigator,
+): Promise<'subagent' | 'session' | 'cancelled'> {
+  const navigation = layout?.beginNavigation?.()
   if (sessions.openSubagent === undefined || sessions.refreshSubagents === undefined) {
     sessions.open(childSessionId)
+    layout?.selectPanel?.(null)
     return 'session'
   }
 
   await sessions.refreshSubagents(parentSessionId)
+  if (navigation?.aborted) return 'cancelled'
   const retained = sessions.subagentAddress?.(childSessionId)
   sessions.openSubagent(retained?.parentSessionId === parentSessionId
     ? retained
     : { parentSessionId, childSessionId, mode: 'continuable' })
+  layout?.selectPanel?.(null)
   return 'subagent'
 }

@@ -1,0 +1,472 @@
+[p1 "使用 AgentTeams 完成这次小型验 — DeepSeek Harness" | space "AgentTeams Harness 0.1.5 validation"(5): 1 managed, 0 untracked — p1* "使用 AgentTeams 完成这次小型验 — DeepSeek Harness"]
+root
+  container
+    container
+      button "新建会话" [ref=1]
+        svg_root
+        svg_root
+      button "收起侧边栏" [ref=2, loc=css:button[aria-label="收起侧边栏"]]
+        svg_root
+    button "新建会话" [ref=3]
+      svg_root
+      text "新会话"
+    container
+      container
+        text "工作区"
+        button "搜索会话" [ref=4, loc=css:button[aria-label="搜索会话"]]
+          svg_root
+        container
+          button "视图选项" [ref=5, loc=css:button[aria-label="视图选项"]]
+            svg_root
+          button "添加工作区" [ref=6, loc=css:button[aria-label="添加工作区"]]
+            svg_root
+      tree "会话"
+        treeitem
+          svg_root
+          text "AgentTeams 0.1.5 实测"
+        treeitem
+          text "使用 AgentTeams 完成这次小型验"
+          text "刚刚"
+        treeitem
+          text "使用 AgentTeams 完成这次小型验"
+          text "10分钟"
+    button "设置" [ref=7, loc=css:button[aria-label="设置"]]
+      svg_root
+      text "设置"
+  container
+    container
+      container
+        container
+          container "会话层级"
+            button [ref=8]
+              text "使用 AgentTeams 完成这次小型验"
+            container
+              text "/"
+              button "4 个子代理" [ref=9, loc=css:button[aria-label="4 个子代理"]]
+                text "4 个子代理"
+                svg_root
+          container
+            svg_root
+            text "标准模式"
+        container
+          container
+            button "在 访达 中打开工作目录" [ref=10, loc=css:button[aria-label="在 访达 中打开工作目录"]]
+              image
+            button "选择打开方式" [ref=11, loc=css:button[aria-label="选择打开方式"]]
+              svg_root
+          button "更多操作" [ref=12, loc=css:button[aria-label="更多操作"]]
+            svg_root
+        button "打开右侧边栏" [ref=13, loc=css:button[aria-label="打开右侧边栏"]]
+          svg_root
+      tablist
+        tab [ref=14]
+          text "对话"
+        tab [ref=15]
+          text "轨迹"
+    container
+      container
+        container "轮次导航"
+          button "跳转到第 1 轮" [ref=16, loc=css:button[aria-label="跳转到第 1 轮"]]
+          button "跳转到第 2 轮" [ref=17, loc=css:button[aria-label="跳转到第 2 轮"]]
+        container
+          button [ref=18]
+            container
+              svg_root
+              svg_root
+            text "系统提示词"
+          container
+            text "使用 AgentTeams 完成这次小型验收，工作区就是当前 /tmp 目录。创建团队 browser-015，有 reader 和 writer 两位成员。reader 读取 input.txt，计算总和并把结果写�..."
+            container
+              text "21:41"
+              button "复制" [ref=19]
+                svg_root
+          button [ref=20]
+            text "16 次工具调用 · 5 条消息"
+            svg_root
+          paragraph
+            text "验收完成：reader 读取"
+            text "input.txt"
+            text "（3、5、8）算出总和 16 并写入"
+            button "在默认程序中打开 sum.txt" [ref=21]
+              svg_root
+              text "sum.txt"
+            text "，writer 据此写出含总和与 PASS 结论的"
+            button "在默认程序中打开 result.md" [ref=22, loc=css:button[aria-label="在默认程序中打开 result.md"]]
+              svg_root
+              text "result.md"
+            text "，我复核确认 3+5+8=16 且"
+            button "在默认程序中打开 sum.txt" [ref=23]
+              svg_root
+              text "sum.txt"
+            text "与独立重算一致——两个文件均正确，团队 browser-015 已归档。"
+          container
+            container
+              container
+                button "在侧边栏预览 sum.txt" [ref=24, loc=css:button[aria-label="在侧边栏预览 sum.txt"]]
+                svg_root
+                text "sum.txt"
+                text "reader 计算出的总和"
+                container
+                  button "在侧边栏打开 sum.txt" [ref=25, loc=css:button[aria-label="在侧边栏打开 sum.txt"]]
+                    text "打开"
+                  button "sum.txt 的更多文件操作" [ref=26, loc=css:button[aria-label="sum.txt 的更多文件操作"]]
+                    svg_root
+              container
+                button "在侧边栏预览 result.md" [ref=27, loc=css:button[aria-label="在侧边栏预览 result.md"]]
+                svg_root
+                text "result.md"
+                text "writer 写入的总和与验证结论"
+                container
+                  button "在侧边栏打开 result.md" [ref=28, loc=css:button[aria-label="在侧边栏打开 result.md"]]
+                    text "打开"
+                  button "result.md 的更多文件操作" [ref=29, loc=css:button[aria-label="result.md 的更多文件操作"]]
+                    svg_root
+            container
+              button "复制" [ref=30]
+                svg_root
+              button "好的回答" [ref=31]
+                svg_root
+              button "有问题的回答" [ref=32]
+                svg_root
+              button "在新对话中分支" [ref=33]
+                svg_root
+              button [ref=34]
+                svg_root
+                text "用量 261K tok"
+              button [ref=35]
+                svg_root
+                text "用时 41秒"
+              text "21:41"
+          button [ref=36]
+            container
+              svg_root
+              svg_root
+            text "系统提示词"
+          container
+            text "复测最终安装包：用 AgentTeams 新建 browser-final 团队，两位成员 calc 和 check。calc 读取 input.txt，将三数总和写 final-sum.txt；check 依赖 calc 的任务完成后，读..."
+            container
+              text "21:46"
+              button "复制" [ref=37]
+                svg_root
+          button [ref=38]
+            text "12 次工具调用 · 2 条消息"
+            svg_root
+          container
+            paragraph
+              text "收到 check 的重复完成通知，与已核验结果一致，无需再操作："
+            unordered_list
+              list_item
+                text "t1"
+                text "（calc）已完成 →"
+                button "在默认程序中打开 final-sum.txt" [ref=39, loc=css:button[aria-label="在默认程序中打开 final-sum.txt"]]
+                  svg_root
+                  text "final-sum.txt"
+                text "= 16"
+              list_item
+                text "t2"
+                text "（check）已完成，verdict PASS →"
+                button "在默认程序中打开 final-result.md" [ref=40, loc=css:button[aria-label="在默认程序中打开 final-result.md"]]
+                  svg_root
+                  text "final-result.md"
+                text "含"
+                text "Total: 16"
+                text "/"
+                text "Conclusion: PASS"
+              list_item
+                text "我的独立复核（"
+                text "awk"
+                text "重算 3+5+8=16）与两文件一致；"
+                text "sum.txt"
+                text "、"
+                text "result.md"
+                text "是上一轮 browser-015 的遗留产物，本轮未触碰"
+            paragraph
+              text "browser-final 团队保持原状、未归档，界面可直接检查；两位成员均已空闲，本轮任务不再重复派发。"
+          container
+            container
+              container
+                button "在侧边栏预览 final-sum.txt" [ref=41, loc=css:button[aria-label="在侧边栏预览 final-sum.txt"]]
+                svg_root
+                text "final-sum.txt"
+                text "calc 计算出的总和"
+                container
+                  button "在侧边栏打开 final-sum.txt" [ref=42, loc=css:button[aria-label="在侧边栏打开 final-sum.txt"]]
+                    text "打开"
+                  button "final-sum.txt 的更多文件操作" [ref=43, loc=css:button[aria-label="final-sum.txt 的更多文件操作"]]
+                    svg_root
+              container
+                button "在侧边栏预览 final-result.md" [ref=44, loc=css:button[aria-label="在侧边栏预览 final-result.md"]]
+                svg_root
+                text "final-result.md"
+                text "check 写入的总和与 PASS 结论"
+                container
+                  button "在侧边栏打开 final-result.md" [ref=45, loc=css:button[aria-label="在侧边栏打开 final-result.md"]]
+                    text "打开"
+                  button "final-result.md 的更多文件操作" [ref=46, loc=css:button[aria-label="final-result.md 的更多文件操作"]]
+                    svg_root
+            container
+              button "复制" [ref=47]
+                svg_root
+              button "好的回答" [ref=48]
+                svg_root
+              button "有问题的回答" [ref=49]
+                svg_root
+              button "在新对话中分支" [ref=50]
+                svg_root
+              button [ref=51]
+                svg_root
+                text "用量 292K tok"
+              button [ref=52]
+                svg_root
+                text "用时 39秒"
+              text "21:46"
+      container
+        container
+          container
+            textfield "发消息或创建任务, / 调用指令, @ 文件或对话" [ref=53]
+            text "发消息或创建任务, / 调用指令, @ 文件或对话"
+          container
+            container
+              button "指令" [ref=54, loc=css:button[aria-label="指令"]]
+                svg_root
+              button "添加附件" [ref=55, loc=css:button[aria-label="添加附件"]]
+                svg_root
+              button "访问模式，当前：Benchmark Workspace" [ref=56, loc=css:button[aria-label="访问模式，当前：Benchmark Workspace"]]
+                text "Benchmark Workspace"
+                svg_root
+            container
+              button "选择模型，当前 DeepSeek-V4.1-Flash-Expires-On-0910，推理等级 High" [ref=57, loc=css:button[aria-label="选择模型，当前 DeepSeek-V4.1-Flash-Expires-On-0910，推理等级 High"]]
+                text "DeepSeek-V4.1-Flash-Expires-On-0910"
+                text "High"
+                svg_root
+              button "上下文已用 3%" [ref=58, loc=css:button[aria-label="上下文已用 3%"]]
+                svg_root
+              button "发送消息" [ref=59, loc=css:button[aria-label="发送消息"]]
+                svg_root
+        container
+          button "2 轮 24 步 · 255 tok/s" [ref=60, loc=css:button[aria-label="2 轮 24 步 · 255 tok/s"]]
+            svg_root
+            container
+              text "2 轮 24 步"
+              text "·"
+              text "255 tok/s"
+          button "553K tok · 缓存命中 91%" [ref=61, loc=css:button[aria-label="553K tok · 缓存命中 91%"]]
+            svg_root
+            container
+              text "553K tok"
+              text "·"
+              text "缓存命中 91%"
+  container "AgentTeams 活动面板"
+    container
+      text "AgentTeams 活动"
+      container
+        button "切换为浮动面板" [ref=62, loc=css:button[aria-label="切换为浮动面板"]]
+          svg_root
+        button "收起活动面板" [ref=63, loc=css:button[aria-label="收起活动面板"]]
+          svg_root
+    container
+      container
+        container
+          text "browser-final"
+          container
+            text "2 名成员"
+            text "2/2 完成"
+            text "0 条消息"
+        container "队长派工关系"
+          container
+            image
+            container
+              container
+                text "队长"
+                text "拆解 · 派发 · 汇总"
+              text "已派发 2 项任务给 2 名成员"
+            container
+              svg_root
+              text "已收齐"
+          container "团队总进度"
+            text "总进度"
+            container
+              text "■ 进行中 0"
+              text "■ 等待依赖 0"
+              text "■ 已交付 2"
+            text "全部 2 项任务已交付"
+          button [ref=64]
+            container
+              svg_root
+              text "2 名成员"
+            text "收起"
+          container
+            container
+              button [ref=65]
+                container
+                  text "C"
+                  image
+                container
+                  container
+                    text "calc"
+                    text "calculator"
+                    image "deepseek-official/deepseek-v4.1-flash-expires-on-0910"
+                      text "deepseek-v4.1-flash-expires-on-0910"
+                    container
+                      svg_root
+                      text "已交付"
+                  text "任务已交付"
+                container
+                  text "1"
+                  text "/"
+                  text "1"
+              container
+                text "队长派发"
+                text "t1"
+            container
+              button [ref=66]
+                container
+                  image
+                  image
+                container
+                  container
+                    text "check"
+                    text "verifier"
+                    image "deepseek-official/deepseek-v4.1-flash-expires-on-0910"
+                      text "deepseek-v4.1-flash-expires-on-0910"
+                    container
+                      svg_root
+                      text "已交付"
+                  text "任务已交付"
+                container
+                  text "1"
+                  text "/"
+                  text "1"
+              container
+                text "队长派发"
+                text "t2"
+        container "任务依赖链"
+          container
+            button [ref=67]
+              svg_root
+              svg_root
+              text "任务依赖"
+            text "悬停高亮依赖链 · 点击固定"
+          container
+            svg_root
+            button [ref=68]
+              text "t1"
+              text "calc"
+            button [ref=69]
+              text "t2"
+              text "check"
+          container
+            container
+              text "t1"
+              text "calc: read input.txt, compute sum, write final-sum.txt"
+              text "已完成"
+            container
+              text "calc"
+              text "·"
+              text "已完成并交付"
+            text "deepseek-official/deepseek-v4.1-flash-expires-on-0910"
+            text "完成后解锁 t2"
+      container
+        text "已结束 · 历史归档"
+        container
+          container
+            text "browser-015"
+            text "已结束"
+            container
+              text "2 名成员"
+              text "2/2 完成"
+              text "0 条消息"
+          container "队长派工关系"
+            container
+              image
+              container
+                container
+                  text "队长"
+                  text "拆解 · 派发 · 汇总"
+                text "已派发 2 项任务给 2 名成员"
+              container
+                svg_root
+                text "已收齐"
+            container "团队总进度"
+              text "总进度"
+              container
+                text "■ 进行中 0"
+                text "■ 等待依赖 0"
+                text "■ 已交付 2"
+              text "全部 2 项任务已交付"
+            button [ref=70]
+              container
+                svg_root
+                text "2 名成员"
+              text "收起"
+            container
+              container
+                button [ref=71]
+                  container
+                    text "R"
+                    image
+                  container
+                    container
+                      text "reader"
+                      text "reader"
+                      image "deepseek-official/deepseek-v4.1-flash-expires-on-0910"
+                        text "deepseek-v4.1-flash-expires-on-0910"
+                      container
+                        svg_root
+                        text "已交付"
+                    text "任务均已终结"
+                  container
+                    text "1"
+                    text "/"
+                    text "1"
+                container
+                  text "队长派发"
+                  text "t1"
+              container
+                button [ref=72]
+                  container
+                    image
+                    image
+                  container
+                    container
+                      text "writer"
+                      text "writer"
+                      image "deepseek-official/deepseek-v4.1-flash-expires-on-0910"
+                        text "deepseek-v4.1-flash-expires-on-0910"
+                      container
+                        svg_root
+                        text "已交付"
+                    text "任务均已终结"
+                  container
+                    text "1"
+                    text "/"
+                    text "1"
+                container
+                  text "队长派发"
+                  text "t2"
+          container "任务依赖链"
+            container
+              button [ref=73]
+                svg_root
+                svg_root
+                text "任务依赖"
+              text "悬停高亮依赖链 · 点击固定"
+            container
+              svg_root
+              button [ref=74]
+                text "t1"
+                text "reader"
+              button [ref=75]
+                text "t2"
+                text "writer"
+            container
+              container
+                text "t1"
+                text "reader: read input.txt, compute sum, write sum.txt"
+                text "已完成"
+              container
+                text "reader"
+                text "·"
+                text "已完成并交付"
+              text "deepseek-official/deepseek-v4.1-flash-expires-on-0910"
+              text "完成后解锁 t2"

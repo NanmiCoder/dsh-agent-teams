@@ -103,6 +103,27 @@ The script only validates inputs and never publishes, tags, or queries the netwo
 | PowerShell's read-only automatic variable `$Host` | Parameter name `-Host` fails to override | Rename it, e.g. to `-BindHost` |
 | `git rebase --continue` blocks on the editor | Hangs without a TTY | Use `GIT_EDITOR=true` (or `core.editor=true`) before continuing |
 | Remote advanced and the push is rejected | `[ahead 1, behind 1]` | `git pull --rebase`, then re-push with `--force-with-lease`; never a bare `--force` |
+| 版本号在 build 之后才 bump | 客户端 bundle 把 package.json 的 version 在构建时内联为常量，发布出的自更新检查拿旧常量对比镜像最新 tag → 插件对自己报「有新版本」（真实案例：file-trace v0.3.7，amend 重建后强推三镜像修正） | 先 bump 再 build；提交前 grep 产物确认新常量在位（如 `grep 0.3.8 lib/client.js`），再打 tag 并逐镜像 `ls-remote` 核验 SHA |
+
+## Bump before build: client bundles bake version constants (recipe R-13)
+
+Client bundles that ship a self-update check usually inline `package.json`'s version at
+build time (tsdown/define). Releasing with the order build → bump commits a bundle whose
+baked constant is the PREVIOUS version: the client compares that constant against the
+newest mirror tag and announces an update to the just-released version itself
+(real case: file-trace v0.3.7 showed 「新版本 v0.3.7 可用」 on v0.3.7).
+
+```sh
+VERSION_BUMPED=$(node -p "require('./package.json').version")   # 1. bump first
+pnpm run build                                                   # 2. then build
+grep -q "$VERSION_BUMPED" lib/client.js || { echo 'stale version constant in bundle'; exit 1; }  # 3. gate
+git commit -m "fix: ... (v$VERSION_BUMPED)" && git tag "v$VERSION_BUMPED"       # 4. then tag
+```
+
+If a release already went out with the stale constant, amend: rebuild (the version is
+already bumped), `git commit --amend`, re-tag with `-f`, and force-push main + the tag to
+every mirror with `--force-with-lease` (tag was published minutes ago, no consumers),
+then re-verify the SHA on each mirror with `git ls-remote`.
 
 ## Rollback recipe
 
@@ -115,3 +136,29 @@ The script only validates inputs and never publishes, tags, or queries the netwo
 
 - After the 0.1.2 final dist-tag and final tag name are published, re-verify the unpublished-cohort recipes;
 - The pnpm version sensitivity (see above) comes from a single field report; keep it marked as pending confirmation until reproduced.
+
+## Dev-loop install of a local plugin pack: tarball, not link:/file: (recipe R-07)
+
+Handing a colleague (or another agent) a plugin you just built — a local pack directory
+with `lib/` output and a manifest — fails when imported the obvious two ways:
+
+- a `link:<path>` / `file:<path>` specifier is imported AS-IS by pnpm 11's default path
+  handling and collides with the symlink junction the profile already uses for
+  link-installed plugins (two views of one directory; edits leak both ways);
+- declaring the pack's bundles via `bundledDependencies` gets the tarball REJECTED at
+  install ("bundled dependencies" are not accepted by the profile's plugin pipeline).
+
+Recipe: ship a TARBALL and refresh by remove + re-add.
+
+```sh
+npm pack <pack-dir>                      # produces <name>-<version>.tgz
+dsh plugin --profile web add ./<name>-<version>.tgz
+# later content refresh:
+dsh plugin --profile web remove <name>
+dsh plugin --profile web add ./<name>-<version>.tgz
+```
+
+The tarball is a plain, self-contained artifact: no symlink collision, no bundled-
+dependency rejection, and the remove+re-add cycle guarantees the installed copy actually
+changes. Remember the boot contract: the client combo is assembled once at host boot, so
+the refresh still needs a host restart plus a browser hard refresh before re-testing.

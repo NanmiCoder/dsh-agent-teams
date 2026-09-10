@@ -1,0 +1,150 @@
+{
+  "name": "browser-final",
+  "id": "browser-final",
+  "description": "Final acceptance re-test: calc reads input.txt and writes the three-number total to final-sum.txt; check then reads final-sum.txt and writes final-result.md stating the total and PASS. Captain verifies both files. Team is kept for UI inspection.",
+  "captainSessionId": "session-a9a5b31b-664b-40ab-93aa-5884662a53fc",
+  "createdAt": 1789047973991,
+  "members": [
+    {
+      "id": "1f968e95-23fb-4d99-9fc4-a1341187a976",
+      "name": "calc",
+      "role": "calculator",
+      "provider": "deepseek-official",
+      "model": "deepseek-v4.1-flash-expires-on-0910",
+      "reasoningEffort": "high",
+      "executionPrompt": "You are calc. Do exactly one job, once: read input.txt in the team workspace (/private/tmp/agent-teams-015-validation/browser-real/workspace), compute the sum of the three numbers, and write only that total (one line) into final-sum.txt in the same workspace. Create no other files and do not touch final-result.md.",
+      "joinedAt": 1789047976210,
+      "status": "removed"
+    },
+    {
+      "id": "44e8aa48-4372-42dd-9f63-f1478dd2b389",
+      "name": "check",
+      "role": "verifier",
+      "provider": "deepseek-official",
+      "model": "deepseek-v4.1-flash-expires-on-0910",
+      "reasoningEffort": "high",
+      "executionPrompt": "You are check. Your single job starts only after calc's task completes: read final-sum.txt in the team workspace (/private/tmp/agent-teams-015-validation/browser-real/workspace) and write final-result.md in that workspace stating the total and PASS. Do not modify final-sum.txt or input.txt.",
+      "joinedAt": 1789047976243,
+      "status": "removed"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "t1",
+      "subject": "calc: read input.txt, compute sum, write final-sum.txt",
+      "description": "Read input.txt in /private/tmp/agent-teams-015-validation/browser-real/workspace, compute the sum of the three numbers, and write only that total (one line) into final-sum.txt in the same workspace. Report the computed total in your task output. Do not create or modify any other file.",
+      "status": "completed",
+      "assignee": "calc",
+      "dependencies": [],
+      "attempt": 2,
+      "createdAt": 1789047977563,
+      "updatedAt": 1789047988389,
+      "kind": "work",
+      "reassigning": false,
+      "attemptId": "0aff16a5-8d3a-4fa1-b5c6-c515655a2b81",
+      "output": "Read input.txt (3, 5, 8) in /private/tmp/agent-teams-015-validation/browser-real/workspace; sum = 16. Wrote only \"16\" plus a trailing newline (3 bytes, 1 line) to final-sum.txt. No other file created or modified.",
+      "changedPaths": [
+        "final-sum.txt"
+      ],
+      "acceptanceResults": [
+        {
+          "criterion": "input.txt read and three numbers summed",
+          "status": "passed",
+          "evidence": "input.txt = 3,5,8; 3+5+8=16"
+        },
+        {
+          "criterion": "final-sum.txt contains only the total, one line",
+          "status": "passed",
+          "evidence": "cat final-sum.txt -> 16; wc -l -> 1; size 3 bytes"
+        },
+        {
+          "criterion": "no other files created or modified",
+          "status": "passed",
+          "evidence": "ls -la shows only final-sum.txt newly created; result.md/sum.txt/input.txt untouched"
+        }
+      ],
+      "commandsRun": [
+        {
+          "command": "cat final-sum.txt; wc -l < final-sum.txt",
+          "status": "passed",
+          "exitCode": 0,
+          "evidence": "16 / 1 line"
+        }
+      ]
+    },
+    {
+      "id": "t2",
+      "subject": "check: read final-sum.txt, write final-result.md with total and PASS",
+      "description": "After t1 completes, read final-sum.txt in /private/tmp/agent-teams-015-validation/browser-real/workspace and write final-result.md in that workspace stating the total read from final-sum.txt and the conclusion PASS. Do not modify final-sum.txt or input.txt and create no other files.",
+      "status": "completed",
+      "assignee": "check",
+      "dependencies": [
+        "t1"
+      ],
+      "attempt": 1,
+      "createdAt": 1789047978409,
+      "updatedAt": 1789048002379,
+      "kind": "work",
+      "attemptId": "7b3e8d68-ea19-45a8-a3d0-5e8a59e9eaf3",
+      "reassigning": false,
+      "output": "Verification complete: PASS. Read final-sum.txt (3 bytes, 1 line, contents \"16\") and input.txt (3, 5, 8). Independent recomputation 3+5+8=16 matches final-sum.txt exactly. Wrote final-result.md in the team workspace stating Total: 16 and Conclusion: PASS, plus verification detail. Created only final-result.md; final-sum.txt and input.txt were read-only and remain unmodified (MD5 final-sum.txt=5b6b41ed9b343fed9cd05a66d36650f0, input.txt=1a6bf63244082cac55bac797eee51136). Note: pre-existing leftover artifacts sum.txt and result.md from an earlier run remain in the workspace; they were not created or touched by this attempt and are outside t2 scope.",
+      "changedPaths": [
+        "final-result.md"
+      ],
+      "acceptanceResults": [
+        {
+          "criterion": "Read final-sum.txt in the team workspace",
+          "status": "passed",
+          "evidence": "final-sum.txt read; contents \"16\", 3 bytes, 1 line (od -c: '1 6 \\n')"
+        },
+        {
+          "criterion": "final-result.md written in the team workspace stating the total read from final-sum.txt",
+          "status": "passed",
+          "evidence": "final-result.md contains '**Total: 16**' matching final-sum.txt contents"
+        },
+        {
+          "criterion": "final-result.md states the conclusion PASS",
+          "status": "passed",
+          "evidence": "final-result.md contains '**Conclusion: PASS**'; grep -c PASS = 1"
+        },
+        {
+          "criterion": "Independent correctness check of the total against input.txt",
+          "status": "passed",
+          "evidence": "awk '{s+=$1} END {print s}' input.txt = 16; input.txt is 3, 5, 8"
+        },
+        {
+          "criterion": "Do not modify final-sum.txt or input.txt; create no other files",
+          "status": "passed",
+          "evidence": "mv/read-only; MD5 final-sum.txt=5b6b41ed9b343fed9cd05a66d36650f0, input.txt=1a6bf63244082cac55bac797eee51136; only final-result.md created this attempt"
+        }
+      ],
+      "commandsRun": [
+        {
+          "command": "awk '{s+=$1} END {print s}' input.txt",
+          "status": "passed",
+          "exitCode": 0,
+          "evidence": "output 16 — matches final-sum.txt"
+        },
+        {
+          "command": "wc -c -l final-sum.txt && od -c final-sum.txt",
+          "status": "passed",
+          "exitCode": 0,
+          "evidence": "1 line, 3 bytes, bytes are '1','6','\\n' → value 16"
+        },
+        {
+          "command": "grep -q '16' final-result.md && grep -c 'PASS' final-result.md",
+          "status": "passed",
+          "exitCode": 0,
+          "evidence": "contains total 16: yes; PASS count 1"
+        },
+        {
+          "command": "md5 final-sum.txt input.txt",
+          "status": "passed",
+          "exitCode": 0,
+          "evidence": "final-sum.txt=5b6b41ed9b343fed9cd05a66d36650f0, input.txt=1a6bf63244082cac55bac797eee51136 (unmodified)"
+        }
+      ]
+    }
+  ],
+  "taskSeq": 2
+}

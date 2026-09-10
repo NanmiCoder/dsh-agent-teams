@@ -1,0 +1,23 @@
+{
+  "passed": true,
+  "rows": [
+    {
+      "id": "5b89398c-ca97-4e1b-b475-c8a0d0a758de",
+      "version": 3,
+      "parent": "session-7b896cf8-bfc7-4b72-b81f-4563fc806655",
+      "events": 85,
+      "subagentDescriptors": 1
+    },
+    {
+      "id": "session-7b896cf8-bfc7-4b72-b81f-4563fc806655",
+      "version": 3,
+      "events": 125,
+      "subagentDescriptors": 0
+    }
+  ],
+  "originalLogsUnchanged": true,
+  "publishedV3Logs": [
+    "sessions/--private-tmp-agent-teams-015-validation-accept-0.1.2-rc.1-lifecycle-workspace--/5b89398c-ca97-4e1b-b475-c8a0d0a758de/session.v3.jsonl.zstd",
+    "sessions/--private-tmp-agent-teams-015-validation-accept-0.1.2-rc.1-lifecycle-workspace--/session-7b896cf8-bfc7-4b72-b81f-4563fc806655/session.v3.jsonl.zstd"
+  ]
+}

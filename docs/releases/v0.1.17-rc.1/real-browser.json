@@ -1,0 +1,35 @@
+{
+  "passed": true,
+  "hostVersion": "0.1.5-rc.1",
+  "pluginVersion": "0.1.17-rc.1",
+  "artifactSha256": "208dd0cdf235b4e7b788b8df7c25bb9041f41525f9d857fa3e82978513962147",
+  "browser": "Ego Lite",
+  "spaceId": 5,
+  "workspace": "/tmp/agent-teams-015-validation/browser-real/workspace",
+  "provider": "deepseek-official",
+  "model": "deepseek-v4.1-flash-expires-on-0910",
+  "reasoningEffort": "high",
+  "checks": {
+    "inputUnchanged": true,
+    "sumCorrect": true,
+    "reportCorrect": true,
+    "tasksComplete": true,
+    "dependencyPreserved": true,
+    "realMemberRequests": true,
+    "realMemberWrites": true,
+    "noApiErrors": true
+  },
+  "requests": 43,
+  "responsesWithUsage": 42,
+  "sessions": [
+    "1f968e95-23fb-4d99-9fc4-a1341187a976",
+    "44e8aa48-4372-42dd-9f63-f1478dd2b389",
+    "session-a9a5b31b-664b-40ab-93aa-5884662a53fc"
+  ],
+  "tokens": {
+    "inputTokens": 63305,
+    "outputTokens": 8626,
+    "cacheReadTokens": 835712,
+    "totalTokens": 907643
+  }
+}

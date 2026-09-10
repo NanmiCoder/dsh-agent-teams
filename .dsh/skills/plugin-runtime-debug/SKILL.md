@@ -85,7 +85,28 @@ cover most incidents:
   lib-only plugin: fully stop the host, restart `dsh web`, hard-refresh,
   then verify the loaded version marker. Never rename-aside files under an
   unresolved path: through a junction "two" directories are one, and the
-  rename moves the only copy.
+  rename moves the only copy. A source-launched host (`pnpm dsh web` in the
+  harness checkout) adds two constraints: the client bundle combo is
+  assembled once at boot (no HMR rebuilds it — every plugin edit needs a
+  full host restart), and on Windows the listener port stays bound by the
+  dying tree unless you stop the whole process tree
+  (`taskkill /PID <pid> /T /F`), or the next boot dies on EADDRINUSE.
+- **One plugin with raw ESM in its client bundle takes every plugin down,
+  and the error names an innocent entry** — the host concatenates all client
+  bundles into one classic `<script>` combo; a single top-level `import`
+  anywhere makes the whole multi-megabyte combo fail to compile, zero
+  plugins register, and the browser surfaces `failed to import loader
+  entry <first-entry>` — the first awaited entry (often
+  `dsh-typert-registry`, itself perfectly fine), not the culprit. Do not
+  chase the named entry: bisect the profile's `insert` rows (or point the
+  suspect bundle through `node --check`) until the combo loads again. The
+  client half is not a bare ESM module — it must register through
+  `window.__ModuleLoader__.load({ id, factory })`, pull react inside the
+  factory via `require("react")`, and export `inject`/`apply`.
+
+
+- **Phantom pixels at the right edges of a terminal sprite (outline, Z symbols, hearts), and ghost pixels surviving frame switches** — two half-block ANSI rendering defects, both invisible in the frame data: (a) a half-filled cell (upper-half block with only one half colored) sets the foreground but leaves the SGR background from the PREVIOUS cell set — SGR persists across cells, so the stale background paints a phantom pixel into the empty half; reset it explicitly (ESC[49m on every half-filled cell). (b) rows trimmed at their trailing transparent cells let a NARROWER frame leave the previous frame's pixels to the right of the trim — paint every row across the full sprite width (transparent cells as plain spaces) and close with an erase-to-EOL (ESC[K). And pin the frame data itself: hand-ported sprite frames drift from the source art a few cells at a time (a regression over an excerpt misses it) — digest every frame against the source and assert the digests.
+- **A head/UI process hangs for minutes (or until the CI timeout) after its work is done** — a rescheduling timer chain (an animation planner that re-arms setTimeout forever while mounted) keeps the event loop alive on hosts that mount the component without ever unmounting it (probe and test hosts; a GitHub job defaults to a 6h timeout). The interactive TUI stays alive on its TTY/stdin handles regardless — so unref the chain (timer.unref()): the probes drain and exit, real sessions lose nothing. Suspect this whenever enabling a feature flips previously-finishing jobs into timeouts.
 
 
 ## Workflow

@@ -20,7 +20,9 @@
         "test-only",
         "naming-registry",
         "package-release",
-        "full-lifecycle"
+        "full-lifecycle",
+        "runtime-debug",
+        "heavy-dependency"
       ]
     },
     "include": {
@@ -75,7 +77,9 @@
         "registry-register",
         "rollback",
         "package-artifact",
-        "release"
+        "release",
+        "runtime-debug",
+        "heavy-dependency"
       ]
     }
   }

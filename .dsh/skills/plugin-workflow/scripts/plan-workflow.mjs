@@ -45,9 +45,33 @@ const WORKFLOWS = {
     defaults: ['dsh-audit', 'touchpoint-scan', 'static-tests', 'docker-smoke', 'functional-probe', 'rollback', 'package-artifact'],
     core: { capability: 'source-migration', owner: 'plugin-upgrade', confirmations: ['repository-writes'] },
   },
+  'runtime-debug': {
+    outcome: 'Diagnose and fix Web Client runtime behavior',
+    defaults: ['runtime-debug'],
+    required: ['runtime-debug'],
+  },
+  'heavy-dependency': {
+    outcome: 'Integrate and verify a lazy-loaded Web Client dependency',
+    defaults: ['heavy-dependency'],
+    required: ['heavy-dependency'],
+  },
 }
 
 const CAPABILITIES = {
+  'runtime-debug': {
+    description: 'Diagnose and fix Web Client host-contract mismatches',
+    owner: 'plugin-runtime-debug',
+    confirmations: ['repository-writes', 'dependency-runtime'],
+    requires: ['static-tests', 'functional-probe', 'browser-check', 'rollback'],
+    surface: 'web-client',
+  },
+  'heavy-dependency': {
+    description: 'Integrate a lazy-loaded browser dependency and its fallback',
+    owner: 'plugin-heavy-dep',
+    confirmations: ['repository-writes', 'dependency-runtime'],
+    requires: ['static-tests', 'functional-probe', 'browser-check', 'rollback', 'package-artifact'],
+    surface: 'web-client',
+  },
   'dsh-audit': { description: 'DSH version compatibility audit', owner: 'dsh-upgrade-audit', confirmations: [] },
   'touchpoint-scan': { description: 'Seven-touchpoint plugin scan', owner: 'plugin-upgrade', confirmations: [] },
   'naming-local': { description: 'Offline naming declaration validation', owner: 'plugin-write', confirmations: [] },
@@ -78,6 +102,8 @@ const PHASE_ORDER = [
   'dsh-audit',
   'touchpoint-scan',
   'core',
+  'runtime-debug',
+  'heavy-dependency',
   'naming-local',
   'registry-query',
   'static-tests',
@@ -147,6 +173,9 @@ export function validateSelection(input) {
 function chooseCapabilities(selection) {
   const selected = new Map()
   const excluded = new Set(selection.exclude)
+  for (const id of WORKFLOWS[selection.workflow].required ?? []) {
+    if (excluded.has(id)) throw new Error(`${selection.workflow} requires excluded capability ${id}`)
+  }
   const select = (id, source) => {
     if (!excluded.has(id) && !selected.has(id)) selected.set(id, source)
   }
@@ -171,6 +200,11 @@ function chooseCapabilities(selection) {
     }
   }
   for (const id of [...selected.keys()]) enableDependencies(id)
+
+  for (const id of selected.keys()) {
+    const surface = CAPABILITIES[id].surface
+    if (surface && !selection.surfaces.includes(surface)) throw new Error(`${id} requires surface ${surface}`)
+  }
 
   return selected
 }
@@ -237,7 +271,7 @@ export function buildWorkflowPlan(input) {
     notes: [
       'This plan is read-only and does not grant execution approval.',
       'Load each owning Skill before executing its phase.',
-      'A selected external-publication phase still requires just-in-time confirmation.',
+      'Check authorization against the user request and higher-priority instructions; reuse existing authorization for the same scope.',
     ],
   }
 }

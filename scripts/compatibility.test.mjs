@@ -35,7 +35,7 @@ test('doctor runs through an installed bin symlink and reports success or failur
 })
 
 test('policy rejects floating targets, duplicates, and alpha recommendation', () => {
-  assert.equal(validatePolicy(policy).length, 3)
+  assert.deepEqual(validatePolicy(policy), policy.supportedHosts.map(host => host.version))
   for (const version of ['latest', '^0.1.2-rc.1', '0.1.2-rc.1\n']) {
     assert.throws(() => validatePolicy({ ...policy, supportedHosts: [{ version, track: 'recommended' }] }))
   }

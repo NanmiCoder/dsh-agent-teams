@@ -51,6 +51,12 @@ export interface MemberRuntimeConfig {
   executionPrompt?: string
   /** Plugin-wide fallback route. */
   fallback?: { provider: string; model: string }
+  /**
+   * Parallel Emission switch as of this spawn. The persona freezes the value:
+   * members already spawned keep their original protocol when the settings
+   * checkbox flips later.
+   */
+  parallelToolCalls?: boolean
 }
 
 /** Durable provider/model/reasoning snapshot for one member. */
@@ -517,11 +523,21 @@ function assignedNonTerminalCount(team: TeamState, memberName: string): number {
  * @param member - the member record (name/role are read before spawning).
  * @param stateDir - configured state directory, so the member can locate the
  *   team files with its own file tools.
+ * @param executionPrompt - plugin-wide execution guidance (member-level
+ *   guidance in `member.executionPrompt` wins).
+ * @param parallelToolCalls - Parallel Emission switch as of this spawn; when
+ *   true the persona allows several agent_teams_* calls in one response.
+ *   Frozen: later checkbox flips do not rewrite already-spawned members.
  */
-export function memberPersona(team: TeamState, member: TeamMember, stateDir: string, executionPrompt?: string): string {
+export function memberPersona(team: TeamState, member: TeamMember, stateDir: string, executionPrompt?: string, parallelToolCalls: boolean = false): string {
   const goal = team.description?.trim() || '(not provided)'
   const injectedPrompt = member.executionPrompt?.trim() || executionPrompt?.trim()
   const protocol = truncatedPersonaProtocol(team.profile?.protocol)
+  // Standalone spliceable fragment: the off branch is empty so the serial
+  // persona text is byte-identical to the pre-Parallel-Emission protocol.
+  const parallelEmissionClause = parallelToolCalls
+    ? ' Parallel Emission is enabled for you: you may claim a task and mark it in_progress in the same response, and when finishing you may mark the task completed (or failed) and send your captain report with agent_teams_send_message in that same response.'
+    : ''
   return `You are ${member.name}, a member of the multi-agent team "${team.name}" running inside DeepSeek Harness AgentTeams. The captain leads the team; you are a worker member${member.role ? ` with the role: ${member.role}` : ''}.
 
 Team context:
@@ -536,7 +552,7 @@ ${injectedPrompt}
 When you receive a task, treat the assignment prompt's dependency results as source material. Do not ignore them.
 
 Working rules:
-1. When you receive a task assignment, call agent_teams_claim_task with the task id. Keep the returned attempt_id: include it in every agent_teams_update_task call for that execution attempt. Then mark the task in_progress.
+1. When you receive a task assignment, call agent_teams_claim_task with the task id. Keep the returned attempt_id: include it in every agent_teams_update_task call for that execution attempt. Then mark the task in_progress.${parallelEmissionClause}
 2. Work thoroughly with your available tools; do not cut corners.
 3. When finishing a task:
    - use status=completed only when the task's success criteria are satisfied;
@@ -618,7 +634,7 @@ export async function spawnMember(
       request: {
         prompt: [{ type: 'text', text: memberWelcome(team, member.name) }],
         parent: captain,
-        persona: memberPersona(team, member, stateDir, config.executionPrompt),
+        persona: memberPersona(team, member, stateDir, config.executionPrompt, config.parallelToolCalls ?? false),
         toolFilter: { deny: [...MEMBER_DENIED_TOOLS] },
         agentOptions: {
           provider: llmSelection.provider,

@@ -18,8 +18,20 @@ import type { UsePanelInfo } from '@deepseek-ai/dsh-client-ui-layout/client'
 // Official model catalog/directory service. The staged roster reads its
 // provider/model/effort metadata without mutating the captain's own selection.
 import type {} from '@deepseek-ai/dsh-client-ui-model-selection/client'
+// Type-only: loads the `settings.plugin.item` keyed-slot declaration
+// (settings-plugins) and the `ctx.settingsScope` Context merge (settings).
+// Runtime collaboration runs through the cordis services only — a cross-plugin
+// value import would fail the client bundle purity gate.
+import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
+import type {} from '@deepseek-ai/dsh-client-ui-settings-plugins/client'
 import { ActivityPanel } from './ActivityPanel.tsx'
 import { AgentTeamsCard, type AgentTeamsCardInjected } from './AgentTeamsCard.tsx'
+import {
+  AGENT_TEAMS_SETTINGS_KEY,
+  AgentTeamsSettingsCard,
+  type AgentTeamsSettingsCardInjected,
+  type AgentTeamsSettingsScope,
+} from './AgentTeamsSettingsCard.tsx'
 import { agentTeamsCardDefinition } from './agent-teams-card-definition.ts'
 import {
   AGENT_TEAMS_LOCALE_NAMESPACE, en, zh, type AgentTeamsLocaleKey,
@@ -101,4 +113,25 @@ export function apply(ctx: ClientContext): void {
       openMember,
     }),
   }, AgentTeamsCard))
+
+  // The Parallel Emission settings card. Registered lazily (not a required
+  // inject): the settings transport ships in every standard web composition,
+  // but a client without it keeps every other surface — the fiber never pends
+  // on it and simply never contributes the card. The Plugins tab renders the
+  // card only when the Host serves the `agent-teams` namespace, so both
+  // halves must be present for the checkbox to appear.
+  ctx.inject(['settingsScope'], (scopeCtx) => {
+    // Bound on this plugin's fiber: the scope's disposer and its writes ride
+    // this plugin's lifecycle, and no `remote.settings` declaration is needed
+    // in this plugin's inject list.
+    const scope: AgentTeamsSettingsScope = scopeCtx.settingsScope.bind({
+      namespace: AGENT_TEAMS_SETTINGS_KEY,
+    })
+    ctx.slots.inject('settings.plugin.item', () => ctx.slots.register({
+      name: 'settings.plugin.item',
+      key: AGENT_TEAMS_SETTINGS_KEY,
+      locale: AGENT_TEAMS_LOCALE_NAMESPACE,
+      inject: (): AgentTeamsSettingsCardInjected => ({ scope }),
+    }, AgentTeamsSettingsCard))
+  })
 }

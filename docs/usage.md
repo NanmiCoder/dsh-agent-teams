@@ -84,6 +84,10 @@
 
 最终优先级为：成员显式 `provider` + `model` / `model` → `memberModel` → 队长当前路由。成员沿用队长当前 provider/model 时继承队长的思考强度；provider 或 model 任一改变时自动使用目标模型的默认档。显式 `reasoning_effort`（目标模型支持的档位 id，或 `"default"`）优先，并在目标 provider/model 上创建前校验；不兼容时成员创建会明确失败。最终生效的 provider/model/思考强度会写入 `team.json`，供状态查询和成员冷恢复使用。
 
+### 支持工具并行（Parallel Emission）
+
+Web 插件配置页的 AgentTeams 卡片提供唯一一个设置项「支持工具并行」（设置命名空间 `agent-teams` 下的 `parallelToolCalls`，默认关闭）。开启后，队长 usage 提示段（随插件挂载快照生效，切换后需重载插件/重启宿主）、新成员 persona（spawn 时定格，已创建成员不受影响）和任务派工提示词（每次派发实时读取）会允许模型在同一条回复内发出多个 `agent_teams_*` 工具调用。同一回复内的独占工具仍按顺序逐个执行，因此靠后的 `create_task` 可以引用同一回复中先前创建的任务 id；依赖 id 仍必须真实存在，不会接受前向引用。该开关不修改 Agent Loop 的并行上限（`maxParallelToolCalls`，独立设置）。
+
 ## 使用协议
 
 插件提示段会指导模型按两阶段协议执行：继续已有团队，按需通过 `agent_teams_status` 确认状态 → 无团队时创建 staged 团队 → 写入可编辑成员占位 → 拆任务并声明依赖 → 等待用户审查 → **Approve & Run** 后原子创建成员并启动调度 → 队长监控/引导 → 汇报后 `agent_teams_delete`。staged 阶段没有子会话、不会领取任务。只有用户明确要求跳过审查时才使用 `approval: automatic`。成员之间可以直接互发消息，无需队长中转。驻留成员在中断或正常结束一轮后若仍持有 `claimed/in_progress` 任务，该 attempt 会停驻；只有显式重试/转派/接管才会撤销它。本进程已经观察过的停驻 attempt 在 Harness 回收其 AgentHandle 后仍保持原 attempt，Captain 轮询 `agent_teams_status` 不会因此重铸。只有冷启动或从未被本进程观察过的开放任务，才会自动恢复一次；恢复投递失败会回到原来的 capability，而不会变成可无限重派的 `pending`。

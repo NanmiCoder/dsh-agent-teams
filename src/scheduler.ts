@@ -41,6 +41,11 @@ export const DEPENDENCY_OUTPUTS_TOTAL_MAX_CHARS = 12_000
 export interface SchedulerConfig {
   readonly stateDir: string
   readonly executionPrompt?: string
+  /**
+   * Live Parallel Emission switch, read at each dispatch so assignment
+   * prompts always match the current settings value.
+   */
+  readonly parallelToolCalls?: () => boolean
 }
 
 export interface TeamScheduler {
@@ -199,7 +204,15 @@ function nextReadyTask(tasks: readonly TeamTask[], memberName: string): TeamTask
     ?? ready.find(task => task.assignee === undefined)
 }
 
-export function assignmentPrompt(ticket: DispatchTicket, stateDir: string, teamId: string): string {
+/**
+ * Build one member's automatic task-assignment prompt.
+ * @param ticket - the dispatch ticket resolved for this delivery.
+ * @param stateDir - configured state directory, for the state policy line.
+ * @param teamId - the team the dispatched task belongs to.
+ * @param parallelToolCalls - Parallel Emission switch read live at dispatch;
+ *   when true the prompt allows several agent_teams_* calls in one response.
+ */
+export function assignmentPrompt(ticket: DispatchTicket, stateDir: string, teamId: string, parallelToolCalls: boolean = false): string {
   const description = ticket.description === undefined ? '' : `\n\n${ticket.description}`
   const seed = ticket.profileSeedId === undefined ? '' : ` [${ticket.profileSeedId}]`
   const goal = ticket.teamDescription?.trim() || '(not provided)'
@@ -221,6 +234,11 @@ Structured completion payload (keep these arrays in contract order):
 acceptanceResults: ${JSON.stringify((ticket.acceptance ?? []).map((criterion) => ({ criterion, status: 'passed', evidence: '<what proved it>' })))}
 commandsRun: ${JSON.stringify((ticket.verify ?? []).map((command) => ({ command, status: 'passed', exitCode: 0, evidence: '<observed result>' })))}
 ${kind === 'implementation' || kind === 'repair' ? 'changedPaths: list the actual workspace-relative POSIX paths you changed.\n' : ''}`
+    : ''
+  // Standalone spliceable fragment: the off branch is empty so the serial
+  // assignment text is byte-identical to the pre-Parallel-Emission protocol.
+  const parallelEmissionClause = parallelToolCalls
+    ? ' Parallel Emission is enabled: you may claim this task and mark it in_progress in the same response, and when finishing you may mark the task completed (or failed) and send_message to the captain in that same response.'
     : ''
   return `AgentTeams automatic task assignment from the shared task list.
 
@@ -245,7 +263,7 @@ ${structuredCompletion}
 Attempt: ${ticket.attempt}
 Attempt id: ${ticket.attemptId}
 
-Call agent_teams_claim_task for ${ticket.taskId}; it will return this same attempt_id. Include attempt_id=${ticket.attemptId} in every agent_teams_update_task call. If it is rejected as stale, stop work because the task was reassigned. claimed cannot jump to completed. Mark in_progress first, then completed or failed. Include attempt_id on every update. Then send_message to captain and become idle.
+Call agent_teams_claim_task for ${ticket.taskId}; it will return this same attempt_id. Include attempt_id=${ticket.attemptId} in every agent_teams_update_task call. If it is rejected as stale, stop work because the task was reassigned. claimed cannot jump to completed. Mark in_progress first, then completed or failed.${parallelEmissionClause} Include attempt_id on every update. Then send_message to captain and become idle.
 When finishing: use status=completed only when the task's success criteria are satisfied; use status=failed when blocking findings or validation failures mean downstream work must not proceed; include a concise output in either case. Quality kinds must submit structured fields: review/requirements need verdict=pass to complete (needs_revision/reject must fail with findings); implementation/repair/verification/integration need acceptanceResults and commandsRun, while implementation/repair also need in-scope changedPaths. Use status values "passed" or "failed" inside those arrays. After the work and verification finish, call agent_teams_update_task immediately; do not wait for captain confirmation and do not continue exploring. Do not approve your own implementation. Mail is not a formal next review. Treat the dependency results above as source material. Do not ignore them. Work only this task and only its in-scope paths in this turn.
 
 State policy: ${stateDir}/${teamId}/ is read-only diagnostics; mutate team state only through agent_teams_* tools.`
@@ -417,7 +435,7 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
           ctx,
           captain,
           ticket.memberId,
-          assignmentPrompt(ticket, config.stateDir, team.id),
+          assignmentPrompt(ticket, config.stateDir, team.id, config.parallelToolCalls?.() ?? false),
           new AbortController().signal,
         )
         if (accepted) return

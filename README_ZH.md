@@ -131,6 +131,8 @@ npm 默认标签 `latest` 现指向 `0.1.17-rc.1`，因此新 profile 使用 `ds
 
 `slashCommand: false` 可关闭确定性的 `/agent-teams` 激活面（slash 命令与手势边界），仅保留自然语言触发。
 
+Web 插件配置页的 AgentTeams 卡片提供唯一一个设置项「支持工具并行」（Parallel Emission，设置命名空间 `agent-teams`，默认关闭）：开启后，队长 usage 提示段、新成员 persona 与任务派工提示词允许模型在同一条回复内发出多个 `agent_teams_*` 工具调用；同一回复内的调用仍按顺序执行，且不修改 Agent Loop 的并行上限。
+
 ## 使用边界
 
 - 一个队长同一时间只能带一个活动团队。

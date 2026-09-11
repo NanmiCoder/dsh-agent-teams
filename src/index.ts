@@ -25,6 +25,10 @@ import { createUserMessage } from '@deepseek-ai/dsh-llm'
 // Declaration merges make ctx.subagents and ctx.systemPrompt visible.
 import type {} from '@deepseek-ai/dsh-subagent'
 import type {} from '@deepseek-ai/dsh-system-prompt'
+// Declaration merge only: makes ctx.settings visible on hosts that mount the
+// user-settings service. Type-only: the runtime service is reached lazily via
+// ctx.inject(['settings'], ...), never through a module import.
+import type {} from '@deepseek-ai/dsh-settings'
 import type { WorkspaceRegistry } from '@deepseek-ai/dsh-workspace'
 import {
   haltTeamWork,
@@ -42,6 +46,7 @@ import { findTeamByCaptain } from './state.ts'
 import { formatProfilesForPrompt, type TeamProfileConfig } from './profiles.ts'
 import { installTeamCapabilities } from './capabilities.ts'
 import { TEAM_TOOL_NAMES } from './tool-names.ts'
+import { AGENT_TEAMS_SETTINGS_NAMESPACE, AgentTeamsSettingsSchema } from './settings.ts'
 
 import { authenticatedWebRoutes, readJsonRequest, RequestBodyError, type BrowserRequestGate, type WebRouteHost } from './web-routes.ts'
 
@@ -134,12 +139,26 @@ export const Config: z<Config> = z.object({
   slashCommand: z.boolean().default(true),
 })
 
+/**
+ * The Parallel Emission clause of the captain usage policy. Kept as a
+ * standalone spliceable fragment: each branch is one or two whole sentences,
+ * independent of the surrounding numbered rules. Member personas freeze the
+ * switch at spawn and assignment prompts read it per dispatch; the captain
+ * clause rides installTeamCapabilities' mount-time usage snapshot, so it
+ * reflects the switch value captured at plugin mount.
+ */
+function parallelEmissionUsageClause(parallelToolCalls: boolean): string {
+  return parallelToolCalls
+    ? ' Parallel Emission is enabled: you may issue several agent_teams_* tool calls in one response, and a later agent_teams_create_task in that same response may reference task ids created by earlier calls in the same response — same-response calls still run in order, so the earlier create_task results exist by the time the dependent call is executed.'
+    : ' Issue one agent_teams_* tool call per response; when a task depends on another task, create the prerequisite first and wait for its returned id before creating the task that depends on it.'
+}
+
 /** The model-facing usage policy: when and how to drive AgentTeams. */
-export function usageSectionText(toolNames: string, profilesText = ''): string {
+export function usageSectionText(toolNames: string, profilesText = '', parallelToolCalls = false): string {
   return `AgentTeams captain protocol:
 1. Inspect current team state when needed, using agent_teams_status. Continue existing work without duplicating its roster/tasks. Create only when no current team exists, with the user's goal as description and approval="required"; automatic approval requires an explicit request to run immediately. Staged plans never spawn or schedule work.
 2. Add each needed role once; members inherit your model route unless another is requested/needed. A requested profile goes to create({profile}); it supplies its roster. Seed profiles also supply tasks; captain-planning profiles require your DAG. Do not duplicate either.
-3. Build the complete smallest useful DAG while staged. Every task needs a subject; dependencies represent prerequisites. Give every required contributor a task or explicit message. Present the plan and end your turn for review; never approve in that planning turn. Approve only after a later explicit user approval or the Web action.
+3. Build the complete smallest useful DAG while staged. Every task needs a subject; dependencies represent prerequisites. Give every required contributor a task or explicit message. Present the plan and end your turn for review; never approve in that planning turn. Approve only after a later explicit user approval or the Web action.${parallelEmissionUsageClause(parallelToolCalls)}
 4. Respect Web approve/return/discard control messages. On return, ask what to change before editing; after the answer, use one atomic agent_teams_edit_plan batch (edit downstream references before removals), summarize and await review again. Never inspect or edit .agent-teams state files or plugin source code to revise plans. Discard does not authorize a replacement.
 5. The scheduler dispatches ready tasks after approval. Delegate; do not duplicate slow work or send messages merely to start a stage. Handle reports/user work, then yield when waiting is all that remains: reports wake you automatically. Use status after a delivery or user request, never busy-poll or wait for unassigned members.
 6. Tasks carry attempt_id capabilities. Use the current attempt_id; stale means ownership changed. Pause members only on explicit request; later guidance via send_message continues that same attempt. Retry, transfer or take over through reassign_task first; it revokes the old attempt and waits for quiescence. Prefer a member. Captain implementation/review takeover requires a user request. Every takeover is one ready task at a time, finished in this turn; never yield with captain-owned work open.
@@ -151,6 +170,36 @@ Tools: ${toolNames}${profilesText === '' ? '' : `\n\n${profilesText}`}`
 }
 
 export function apply(ctx: Context, config: Config): void {
+  // Parallel Emission switch. The single source of truth is the user-settings
+  // `agent-teams` namespace; before registration lands (or on hosts and
+  // headless profiles without the settings service) it reads `false`, which
+  // keeps the serial one-call protocol. Member personas and assignment
+  // prompts pull the live value through this closure at their own evaluation
+  // points (spawn / dispatch). The captain usage clause is captured by
+  // installTeamCapabilities' mount-time snapshot, so the scope is registered
+  // synchronously here whenever the service already surrounds apply — the
+  // standard web profile mounts settings in its base composition, and the
+  // saved switch value must be visible to that snapshot.
+  let readParallelToolCalls = (): boolean => false
+  const registerSettingsScope = (settings: (typeof ctx)['settings']): void => {
+    const scope = settings.register(AGENT_TEAMS_SETTINGS_NAMESPACE, AgentTeamsSettingsSchema)
+    readParallelToolCalls = (): boolean => scope.get().parallelToolCalls === true
+  }
+  const mountedSettings = ctx.get('settings') as (typeof ctx)['settings'] | undefined
+  if (mountedSettings !== undefined) {
+    registerSettingsScope(mountedSettings)
+  } else {
+    // Registered lazily: a composition without the settings service keeps the
+    // plugin fully functional — the fiber never pends on it and simply never
+    // gains the settings section. Registration is an effect on this plugin's
+    // fiber, so it is withdrawn automatically on unmount. A late first mount
+    // drives the member/assignment surfaces immediately; the captain clause
+    // then picks the value up on the next plugin remount.
+    ctx.inject(['settings'], (settingsCtx) => {
+      registerSettingsScope(settingsCtx.settings)
+    })
+  }
+
   const resolved: ToolsConfig = {
     stateDir: config.stateDir ?? '.agent-teams',
     memberProvider: config.memberProvider ?? 'spawn',
@@ -160,6 +209,7 @@ export function apply(ctx: Context, config: Config): void {
     memberMaxDepth: config.memberMaxDepth ?? 1,
     maxMembers: config.maxMembers ?? 8,
     profiles: config.profiles ?? {},
+    parallelToolCalls: () => readParallelToolCalls(),
   }
 
   // Provider registration is a sibling plugin's effect (`subagent-spawn` /
@@ -175,7 +225,11 @@ export function apply(ctx: Context, config: Config): void {
     order: config.promptSectionOrder,
     // Keep the bounded profile directory available without extra tool calls.
     // installTeamCapabilities snapshots this once; no business state rewrites it.
-    captainPrompt: () => usageSectionText(TEAM_TOOL_NAMES.join(', '), formatProfilesForPrompt(config.profiles)),
+    // The Parallel Emission clause is part of that snapshot: it reflects the
+    // switch value at mount time (the scope above registers synchronously
+    // when settings is already mounted), and a later flip reaches the captain
+    // usage text after the plugin remounts.
+    captainPrompt: () => usageSectionText(TEAM_TOOL_NAMES.join(', '), formatProfilesForPrompt(config.profiles), readParallelToolCalls()),
   })
 
   // Deterministic activation surfaces: the closed-namespace `/agent-teams`

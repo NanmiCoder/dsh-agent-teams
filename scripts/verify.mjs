@@ -81,6 +81,8 @@ import { steerCaptainReport } from '../lib/tools.js'
 import { parseProfileInvocation, resolveTeamProfile, formatProfilesForPrompt } from '../lib/profiles.js'
 import { memberPersona, memberWelcome } from '../lib/members.js'
 import { collectCompletedDependencyOutputs, formatDependencyOutputs, assignmentPrompt } from '../lib/scheduler.js'
+import { AGENT_TEAMS_SETTINGS_NAMESPACE, AgentTeamsSettingsSchema } from '../lib/settings.js'
+import { usageSectionText } from '../lib/index.js'
 import {
   installMemberSelectionRuntime,
   resolveMemberLlmSelection,
@@ -143,6 +145,47 @@ const injected = 'The product interface should present the intended outcome, not
 const assignment = assignmentPrompt({ taskId: 't1', memberName: 'Implementer', memberId: 'm', attempt: 1, attemptId: 'a', subject: 'x', dependencyOutputs: [], executionPrompt: injected }, '.agent-teams', 'demo')
 check('execution prompt is injected into persona and assignment', assignment.includes(injected) && memberPersona({ name: 'Demo', id: 'demo', description: 'goal', captainSessionId: 'c', createdAt: 0, members: [], tasks: [], taskSeq: 0 }, { name: 'Implementer', id: 'm', role: 'builder', joinedAt: 0, status: 'idle', executionPrompt: injected }, '.agent-teams').includes(injected))
 
+// Parallel Emission (issue #62 Slice 1): the three protocol surfaces branch on
+// the boolean, and the settings namespace defaults to the serial protocol.
+const settingsDefaults = AgentTeamsSettingsSchema({})
+check(
+  'agent-teams settings namespace is the single Parallel Emission checkbox defaulting to false',
+  AGENT_TEAMS_SETTINGS_NAMESPACE === 'agent-teams'
+    && AgentTeamsSettingsSchema({ parallelToolCalls: true }).parallelToolCalls === true
+    && settingsDefaults.parallelToolCalls === false,
+  `resolved default = ${JSON.stringify(settingsDefaults)}`,
+)
+const personaOff = memberPersona({ name: 'Demo', id: 'demo', description: 'goal', captainSessionId: 'c', createdAt: 0, members: [], tasks: [], taskSeq: 0 }, { name: 'Implementer', id: 'm', role: 'builder', joinedAt: 0, status: 'idle' }, '.agent-teams')
+const personaOn = memberPersona({ name: 'Demo', id: 'demo', description: 'goal', captainSessionId: 'c', createdAt: 0, members: [], tasks: [], taskSeq: 0 }, { name: 'Implementer', id: 'm', role: 'builder', joinedAt: 0, status: 'idle' }, '.agent-teams', undefined, true)
+check(
+  'member persona keeps the serial protocol by default and allows same-response batching only when on',
+  !personaOff.includes('Parallel Emission')
+    && personaOn.includes('Parallel Emission is enabled for you')
+    && personaOn.includes('claim a task and mark it in_progress in the same response')
+    && personaOn.includes('send your captain report with agent_teams_send_message in that same response'),
+)
+const assignmentOff = assignmentPrompt({ taskId: 't1', memberName: 'Implementer', memberId: 'm', attempt: 1, attemptId: 'a', subject: 'x', dependencyOutputs: [] }, '.agent-teams', 'demo')
+const assignmentOn = assignmentPrompt({ taskId: 't1', memberName: 'Implementer', memberId: 'm', attempt: 1, attemptId: 'a', subject: 'x', dependencyOutputs: [] }, '.agent-teams', 'demo', true)
+check(
+  'assignment prompt keeps the serial protocol by default and allows same-response batching only when on',
+  !assignmentOff.includes('Parallel Emission')
+    && assignmentOn.includes('Parallel Emission is enabled')
+    && assignmentOn.includes('claim this task and mark it in_progress in the same response')
+    && assignmentOn.includes('send_message to the captain in that same response'),
+)
+const usageOff = usageSectionText('agent_teams_create_task', '')
+const usageOn = usageSectionText('agent_teams_create_task', '', true)
+check(
+  'captain usage section reads the live switch: serial by default, same-response creates when on',
+  !usageOff.includes('Parallel Emission is enabled')
+    && usageOff.includes('one agent_teams_* tool call per response')
+    && usageOff.includes('wait for its returned id')
+    && usageOn.includes('Parallel Emission is enabled')
+    && usageOn.includes('several agent_teams_* tool calls in one response')
+    && usageOn.includes('same-response calls still run in order')
+    && !usageOff.includes('Poll status until terminal'),
+)
+
 
 // The bundle patch's `name` is the specifier Node resolves when a profile
 // loads this plugin, so it must equal the published package name. A mismatch
@@ -193,6 +236,8 @@ const activityPanelCss = await readFile(new URL('../src/client/ActivityPanel.mod
 const activityPanelSource = await readFile(new URL('../src/client/ActivityPanel.tsx', import.meta.url), 'utf8')
 const stagingPlanSource = await readFile(new URL('../src/client/StagingPlanEditor.tsx', import.meta.url), 'utf8')
 const clientIndexSource = await readFile(new URL('../src/client/index.tsx', import.meta.url), 'utf8')
+const settingsCardSource = await readFile(new URL('../src/client/AgentTeamsSettingsCard.tsx', import.meta.url), 'utf8')
+const settingsModuleSource = await readFile(new URL('../src/settings.ts', import.meta.url), 'utf8')
 const agentTeamsCardCss = await readFile(new URL('../src/client/AgentTeamsCard.module.css', import.meta.url), 'utf8')
 const agentTeamsCardSource = await readFile(new URL('../src/client/AgentTeamsCard.tsx', import.meta.url), 'utf8')
 const artworkSource = await readFile(new URL('../src/client/artwork.ts', import.meta.url), 'utf8')
@@ -215,12 +260,45 @@ check(
     && clientIndexSource.includes("'uiConversation', 'slots', 'sessions', 'locale', 'modelDirectories'")
     && clientIndexSource.includes('ctx.uiConversation.events.register(agentTeamsCardDefinition)')
     && clientIndexSource.includes('ctx.locale.register(AGENT_TEAMS_LOCALE_NAMESPACE, { zh, en })')
-    && clientIndexSource.match(/locale:\s*AGENT_TEAMS_LOCALE_NAMESPACE/gu)?.length === 2,
+    // Activity overlay, conversation card, and the Parallel Emission settings card.
+    && clientIndexSource.match(/locale:\s*AGENT_TEAMS_LOCALE_NAMESPACE/gu)?.length === 3,
 )
 check(
   'slash command transcript hides the duplicate pre-message result row',
   clientIndexSource.includes('HiddenAgentTeamsCommand')
     && /name:\s*'conversation\.chat\.commandview',\s*key:\s*'agent-teams'/u.test(clientIndexSource),
+)
+check(
+  'host registers the agent-teams settings scope before the usage snapshot and threads the live switch through',
+  hostSource.includes("ctx.inject(['settings']")
+    && hostSource.includes('settings.register(AGENT_TEAMS_SETTINGS_NAMESPACE, AgentTeamsSettingsSchema)')
+    && hostSource.includes("ctx.get('settings')")
+    && /readParallelToolCalls = \(\): boolean => false/u.test(hostSource)
+    && /usageSectionText\(TEAM_TOOL_NAMES\.join\(', '\), formatProfilesForPrompt\(config\.profiles\), readParallelToolCalls\(\)\)/u.test(hostSource),
+)
+check(
+  'settings module declares exactly the Parallel Emission checkbox',
+  settingsModuleSource.includes("AGENT_TEAMS_SETTINGS_NAMESPACE = 'agent-teams'")
+    && settingsModuleSource.includes('parallelToolCalls: z.boolean().default(false)')
+    && !settingsModuleSource.includes('maxParallelToolCalls'),
+)
+check(
+  'plugins-tab card is keyed by the agent-teams namespace through type-only contracts',
+  /import type \{\} from '@deepseek-ai\/dsh-client-ui-settings\/client'/u.test(clientIndexSource)
+    && /import type \{\} from '@deepseek-ai\/dsh-client-ui-settings-plugins\/client'/u.test(clientIndexSource)
+    && clientIndexSource.includes("ctx.inject(['settingsScope']")
+    && clientIndexSource.includes("name: 'settings.plugin.item'")
+    && clientIndexSource.includes('key: AGENT_TEAMS_SETTINGS_KEY')
+    && settingsCardSource.includes("AGENT_TEAMS_SETTINGS_KEY = 'agent-teams'")
+    && settingsCardSource.includes("scope.set('parallelToolCalls'")
+    && !clientIndexSource.includes('maxParallelToolCalls')
+    && !settingsCardSource.includes('maxParallelToolCalls'),
+)
+check(
+  'the checkbox never touches the Agent Loop execution pool knob',
+  !toolsSource.includes('maxParallelToolCalls')
+    && !hostSource.includes('maxParallelToolCalls')
+    && !localesSource.includes('maxParallelToolCalls'),
 )
 check(
   'stop-team control lives in the team panel and requires confirmation',

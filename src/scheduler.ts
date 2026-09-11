@@ -41,6 +41,12 @@ export const DEPENDENCY_OUTPUTS_TOTAL_MAX_CHARS = 12_000
 export interface SchedulerConfig {
   readonly stateDir: string
   readonly executionPrompt?: string
+  /**
+   * Per-team cap of member workers dispatched concurrently, counted as open
+   * (`claimed`/`in_progress`) tasks held by current members. `0`/undefined is
+   * unlimited and matches the pre-#97 behavior.
+   */
+  readonly maxConcurrentWorkers?: number
 }
 
 export interface TeamScheduler {
@@ -361,6 +367,30 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
               await writeTeam(stateRoot, fresh)
             }
             return undefined
+          }
+          // Concurrency budget (#97): only genuinely new dispatches consume a
+          // worker license. The in-flight count is the open (`claimed` or
+          // `in_progress`) tasks held by current members. Two explicit
+          // decisions: captain takeovers do not count, because the captain is
+          // a single extra lane outside the member worker pool; and cold
+          // recovery of an unobserved durable attempt bypasses the cap, so a
+          // saturated budget can never wedge restart recovery (#86) behind
+          // the queue.
+          const cap = config.maxConcurrentWorkers ?? 0
+          if (!recoverOwned && cap > 0) {
+            const holders = new Set(
+              fresh.members.filter(candidate => candidate.status !== 'removed').map(candidate => candidate.name),
+            )
+            const inflight = fresh.tasks.filter(candidate => (
+              (candidate.status === 'claimed' || candidate.status === 'in_progress')
+              && candidate.assignee !== undefined
+              && holders.has(candidate.assignee)
+            )).length
+            if (inflight >= cap) {
+              // Leave the task pending and the member idle; write nothing so
+              // later idle/graph kicks re-run this decision for free.
+              return undefined
+            }
           }
           const previousAssignee = task.assignee
           const previousStatus = recoverOwned ? task.status as 'claimed' | 'in_progress' : undefined

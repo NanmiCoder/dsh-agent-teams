@@ -72,6 +72,14 @@ export interface Config {
   memberMaxDepth?: number
   /** Team size cap in members (default `8`). */
   maxMembers?: number
+  /**
+   * Per-team cap of member workers dispatched concurrently — counted as open
+   * (`claimed`/`in_progress`) tasks held by current members (default `0`,
+   * unlimited, which matches the pre-#97 behavior). Captain takeovers do not
+   * count toward the budget, and cold recovery of an unobserved durable
+   * attempt is never blocked by it.
+   */
+  maxConcurrentWorkers?: number
   /** Named multi-role team profiles. */
   profiles?: Record<string, TeamProfileConfig>
   /** Prompt-section order for the usage policy (default `117`, after delegation policy). */
@@ -130,6 +138,7 @@ export const Config: z<Config> = z.object({
   })).default({}),
   memberMaxDepth: z.natural().default(1),
   maxMembers: z.natural().min(1).default(8),
+  maxConcurrentWorkers: z.natural().default(0),
   promptSectionOrder: z.natural().default(117),
   slashCommand: z.boolean().default(true),
 })
@@ -159,6 +168,7 @@ export function apply(ctx: Context, config: Config): void {
     fallback: config.fallback,
     memberMaxDepth: config.memberMaxDepth ?? 1,
     maxMembers: config.maxMembers ?? 8,
+    maxConcurrentWorkers: config.maxConcurrentWorkers ?? 0,
     profiles: config.profiles ?? {},
   }
 

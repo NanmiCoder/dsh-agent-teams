@@ -97,7 +97,17 @@ export function apply(ctx) {
             appendFileSync(process.env.LAB_TRACE, JSON.stringify({ event: 'stable-prefix-passed', label, requests: budgets.length, precedingOrdinaryTurns: label === 'natural' ? 30 : 0, systemSha256: budgets[0].systemSha256, toolsSha256: budgets[0].toolsSha256 }) + '\n');
             appendFileSync(process.env.LAB_TRACE, JSON.stringify({ event: 'entry-case-passed', label, captain: agent.id, member: completed.members[0].id }) + '\n');
         }
-        for (const agent of ctx.agents.list()) { await agent.whenIdle(); await ctx.sessions.flush(agent.session); }
+        for (const agent of ctx.agents.list()) {
+            await agent.whenIdle();
+            try {
+                await ctx.sessions.flush(agent.session);
+            } catch (error) {
+                // A continuable member session can retire while teardown runs; the store
+                // then reports it as not live, and a retired session has nothing to flush.
+                if (!String(error?.message ?? error).includes('is not live in this store'))
+                    throw error;
+            }
+        }
         process.stdout.write('PROGRESSIVE_ENTRY_OK\n');
         ctx.get('appExit')(0);
     })().catch(error => { process.stderr.write(String(error.stack ?? error) + '\n'); ctx.get('appExit')(1); });

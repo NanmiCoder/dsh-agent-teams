@@ -271,7 +271,7 @@ export function collectChangedPaths(gitStatusText: string): string[] {
     let candidate = line
     const rename = /->\s+(\S+)$/u.exec(line)
     if (/^[ MADRCU?!]{1,2}\s+/u.test(line)) {
-      candidate = rename?.[1] ?? line.replace(/^[ MADRCU?!]{1,2}\s+/, '')
+      candidate = rename?.[1] ?? line.replace(/^[ MADRCU?!]{1,2}\s+/u, '')
     }
     const cleaned = candidate.replace(/^"|"$/gu, '').trim()
     const normalized = normalizeWorkspacePath(cleaned)

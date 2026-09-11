@@ -271,7 +271,7 @@ export function collectChangedPaths(gitStatusText: string): string[] {
     let candidate = line
     const rename = /->\s+(\S+)$/u.exec(line)
     if (/^[ MADRCU?!]{1,2}\s+/u.test(line)) {
-      candidate = rename?.[1] ?? line.replace(/^[ MADRCU?!]{1,2}\s+/u, '')
+      candidate = rename?.[1] ?? line.replace(/^[ MADRCU?!]{1,2}\s+/, '')
     }
     const cleaned = candidate.replace(/^"|"$/gu, '').trim()
     const normalized = normalizeWorkspacePath(cleaned)
@@ -546,6 +546,48 @@ function findingKey(ids: readonly string[]): string {
   return [...ids].sort().join(',')
 }
 
+/**
+ * Path-like tokens worth considering as repair-scope candidates. Two shapes:
+ * slash paths (`src/parser.ts`, `docs/guide.md`) and bare filenames with a
+ * known code/doc extension (`README.md`, `wc.js`). An optional `:line`
+ * suffix is tolerated and stripped. The extension allowlist keeps version
+ * tokens (`v0.1.17`), hex hashes, and prose out of the derived scope.
+ */
+const REPAIR_SCOPE_PATH_PATTERN = /(?:[A-Za-z0-9_.\-]+(?:\/[A-Za-z0-9_.\-]+)+|[\w.\-]+\.(?:tsx?|jsx?|mjs|cjs|json|md|txt|ya?ml|py|rs|go|java|html?|css|scss|sh|ps1|toml|xml|sql))(?::\d+)?/gu
+const REPAIR_SCOPE_LINE_SUFFIX = /:\d+$/
+
+/**
+ * Derive the repair round's inScope from the findings that caused it.
+ *
+ * `finding.file` records where the problem was OBSERVED, but the fix often
+ * targets a different file named in `requiredFix` (docs vs sample data,
+ * config vs code). Deriving the scope from both keeps the auto-generated
+ * repair contract satisfiable; deriving from `file` alone can produce a
+ * contract where the acceptance ("edit README.md") names a path the scope
+ * forbids, so no honest completion exists and the repair dead-locks.
+ *
+ * Absolute and otherwise illegal paths are dropped (they can never match
+ * workspace-relative scope patterns anyway); when nothing legal remains,
+ * the source task's own inScope is kept as the fallback. Over-inclusion is
+ * accepted: inScope is an audit upper bound, and the requiredFix text still
+ * tells the implementer what to touch.
+ */
+export function repairScopeFromFindings(
+  findings: readonly ReviewFinding[],
+  fallback: readonly string[] | undefined,
+): readonly string[] | undefined {
+  const derived: string[] = []
+  const push = (raw: string): void => {
+    const normalized = normalizeWorkspacePath(raw.replace(REPAIR_SCOPE_LINE_SUFFIX, ''))
+    if (normalized !== undefined && !derived.includes(normalized)) derived.push(normalized)
+  }
+  for (const finding of findings) {
+    if (nonemptyString(finding.file)) push(finding.file)
+    for (const match of finding.requiredFix.matchAll(REPAIR_SCOPE_PATH_PATTERN)) push(match[0])
+  }
+  return derived.length > 0 ? derived : fallback
+}
+
 const CAPTAIN_ASSIGNEE = 'captain'
 const OPEN_FOLLOW_UP_STATUSES: readonly TaskStatus[] = ['pending', 'claimed', 'in_progress']
 
@@ -615,7 +657,8 @@ export function planQualityFollowUp(team: TeamState, closed: TeamTask): PlanQual
   if (countRepairAttempts(team, sourceId, findingIds) >= policy.maxRepairAttempts) {
     return { ...empty, escalated: true, status: 'escalated' }
   }
-  const files = findings.map((finding) => finding.file).filter((file): file is string => nonemptyString(file))
+  // inScope is derived from the findings below: the observed file plus any
+  // workspace-relative paths referenced by the requiredFix instructions.
   const implementer = schedulableAssignee(source?.assignee, team)
   const repair: PlannedFollowUpTask = {
     id: `repair-round-${nextRound}`,
@@ -625,7 +668,7 @@ export function planQualityFollowUp(team: TeamState, closed: TeamTask): PlanQual
     dependencies: [sourceId],
     round: nextRound,
     objective: source?.objective ?? closed.objective ?? `Fix findings from ${sourceId}`,
-    inScope: files.length > 0 ? files : source?.inScope,
+    inScope: repairScopeFromFindings(findings, source?.inScope),
     outOfScope: source?.outOfScope,
     verify: source?.verify,
     acceptance: findings.map((finding) => finding.requiredFix),

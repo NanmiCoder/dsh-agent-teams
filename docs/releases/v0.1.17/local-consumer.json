@@ -1,0 +1,66 @@
+{
+  "passed": true,
+  "version": "0.1.5-rc.1",
+  "artifactSha256": "cfd353def0427b7cb034de42b66fc6ba926ddb003a31409e18bf8e57806d5e6d",
+  "pluginVersion": "0.1.17",
+  "testFiles": {
+    "harness-runtime-verify.mjs": "a2074670e07b50bbb81ef0bab10b82d8fcdf9671fe99ab3d8b468f2fff257269",
+    "fixtures/harness-runtime-llm.mjs": "61df49d9edcb70f41db4f684142c87ecd7a98b01ec4e635ffef8931eae8d136d",
+    "fixtures/harness-runtime-resume.mjs": "0ff88e3bf1d10788676ee0a2ad3d03bc4783fe06bddffbb707513b5c632cda0d",
+    "fixtures/harness-runtime-idle.mjs": "15e4c8f9c77d35052e7458d672fb29ba298bf6b6e0426900e4236e1e7c437a46",
+    "fixtures/harness-runtime-entry.mjs": "924f01c56456ee85514858688c8100c658b71d45621666ca270205c16c1b5263",
+    "fixtures/harness-runtime-web-approval.mjs": "a7f5ce0bd5f27d01d387dbf35ae05d13ef81b84ba49cadacf3b4869891ca7ed3",
+    "fixtures/harness-runtime-protocol.mjs": "c3ad840a33006dfdcc091fbf9637ac56dd7bf65f5311839a53a61f7131a531cb"
+  },
+  "node": "v26.7.0",
+  "platform": "darwin",
+  "arch": "arm64",
+  "cohortCount": 231,
+  "runs": [
+    {
+      "scenario": "lifecycle",
+      "passed": true,
+      "exit": {
+        "code": 0,
+        "signal": null,
+        "timedOut": false
+      },
+      "assertions": {
+        "exit0": true,
+        "productMarker": true,
+        "pluginToolsVisible": true,
+        "memberExecuted": true,
+        "explicitReasoning": true,
+        "taskTerminal": true,
+        "secondWake": true,
+        "fifoMessageOrder": true,
+        "messagesSentWhileBusy": true
+      },
+      "requests": 24,
+      "memberRequests": 9
+    },
+    {
+      "scenario": "lifecycle-cold-restore",
+      "passed": true,
+      "assertions": {
+        "exit0": true,
+        "driverCompleted": true,
+        "sameMemberRestored": true,
+        "routeRestored": true,
+        "reasoningRestored": true
+      },
+      "exit": {
+        "code": 0,
+        "signal": null,
+        "timedOut": false
+      }
+    }
+  ],
+  "unverified": [
+    "real provider APIs and credentials",
+    "browser interaction",
+    "other operating systems",
+    "native terminal execution",
+    "live user-data migration"
+  ]
+}

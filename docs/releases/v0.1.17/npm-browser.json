@@ -1,0 +1,34 @@
+{
+  "dark": true,
+  "scheme": "dark",
+  "panel": {
+    "background": "color(srgb 0.137255 0.137255 0.141176 / 0.95)",
+    "color": "rgb(249, 250, 251)",
+    "border": "color(srgb 1 1 1 / 0.0932549)",
+    "shadow": "color(srgb 0 0 0 / 0.119608) 0px 12px 32px 0px, color(srgb 0 0 0 / 0.157882) 0px 32px 72px 0px"
+  },
+  "card": {
+    "background": "rgb(53, 54, 56)",
+    "color": "rgb(249, 250, 251)",
+    "border": "rgba(255, 255, 255, 0.12)",
+    "shadow": "none"
+  },
+  "member": {
+    "background": "rgb(35, 35, 36)",
+    "color": "rgb(207, 211, 214)",
+    "border": "rgba(255, 255, 255, 0.12)",
+    "shadow": "none"
+  },
+  "pill": {
+    "background": "rgb(67, 69, 74)",
+    "color": "rgb(173, 178, 184)",
+    "border": "rgba(255, 255, 255, 0.12)",
+    "shadow": "none"
+  },
+  "input": {
+    "background": "rgb(21, 21, 23)",
+    "color": "rgb(249, 250, 251)",
+    "border": "rgba(255, 255, 255, 0.12)",
+    "shadow": "none"
+  }
+}

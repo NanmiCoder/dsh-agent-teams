@@ -30,7 +30,7 @@
 
 ## 版本更新
 
-[v0.1.17-rc.1](./release-notes/v0.1.17-rc.1.md) 适配 DeepSeek Harness `0.1.5-rc.1`，发布到 npm `next` 渠道。新增子代理投递、成员初始化和 Web 面板导航适配，保留三个旧宿主目标。
+[v0.1.17-rc.1](./release-notes/v0.1.17-rc.1.md) 适配 DeepSeek Harness `0.1.5-rc.1`，现为 npm `latest` 默认安装版本，同时保留 `next` 渠道。新增子代理投递、成员初始化和 Web 面板导航适配，保留三个旧宿主目标。
 
 ## 为什么需要 AgentTeams？
 
@@ -76,7 +76,7 @@ dsh plugin --profile web add --save-exact @nanmicoder/dsh-agent-teams@0.1.17-rc.
 
 **安装后，停止并重新启动该 profile 的 Harness 进程，再刷新浏览器。**
 
-插件预发布使用 npm `next`，请使用上面的精确版本命令；`latest` 不是这组宿主的推荐安装入口。源码安装见[维护指南](./docs/maintenance-workflow.md)，验证范围见[本版验收记录](./docs/releases/v0.1.17-rc.1/README.md)。
+npm 默认标签 `latest` 现指向 `0.1.17-rc.1`，因此新 profile 使用 `dsh plugin --profile web add @nanmicoder/dsh-agent-teams` 即可安装本版；需要锁定版本时使用上面的精确版本命令。推荐宿主为 Harness `0.1.5-rc.1`，安装插件不会自动升级宿主。源码安装见[维护指南](./docs/maintenance-workflow.md)，验证范围见[本版验收记录](./docs/releases/v0.1.17-rc.1/README.md)。
 
 > Desktop 用户需核对应用内置的 Harness 核心；全局 CLI 升级不会升级桌面内核。旧 `0.1.0-*` / `0.1.1-*` 或其他未列出的宿主，请先保留已工作的组合，参考[旧版本与诊断指引](./docs/maintenance-workflow.md)。
 

@@ -1,0 +1,20 @@
+{
+  "checkedAt": "2026-09-11T01:24:57.085251+00:00",
+  "operation": "Promote existing verified 0.1.17-rc.1 to latest without republishing",
+  "registry": {
+    "version": "0.1.17-rc.1",
+    "dist-tags": {
+      "alpha": "0.1.15-alpha.1",
+      "latest": "0.1.17-rc.1",
+      "next": "0.1.17-rc.1"
+    },
+    "dist.integrity": "sha512-RUpOR8C2PdQQBFpmlUQsGCekOFx712SBKpQkXh14J2tgF7XqpIHdTgQmRtqa1hAQakjD7u5NvYFLIwPv5AvzlA=="
+  },
+  "defaultDownload": {
+    "command": "npm pack @nanmicoder/dsh-agent-teams --ignore-scripts --registry=https://registry.npmjs.org",
+    "version": "0.1.17-rc.1",
+    "sha256": "efe4989adaed00b7b29b82767c2d916e98541e6b7fefbd0732a35053ffb19302",
+    "integrity": "sha512-RUpOR8C2PdQQBFpmlUQsGCekOFx712SBKpQkXh14J2tgF7XqpIHdTgQmRtqa1hAQakjD7u5NvYFLIwPv5AvzlA==",
+    "matchesPreviouslyVerifiedRelease": true
+  }
+}

@@ -48,6 +48,8 @@ pnpm test:skills-updater
 
 ## 本项目的适用规则
 
+2026-09-11 补充：维护者已明确将验收过的 `0.1.17-rc.1` 提升至 npm `latest`。RC 首发仍走 `next`，通过验收后可显式提升同一不可变产物；GitHub Release 保留预发布标志。此项目规则覆盖上游 skill 的“预发布只能进入非 latest”默认约定，流程见[维护指南](../docs/maintenance-workflow.md)。
+
 1. **版本卡是线索，不是完整 API 差异。** 当前库没有 `registerContinuableSetup`、`followup`、`sendMessage` 的专项迁移指导。`report → send_message` 工具卡不等同于子代理 runtime API 迁移。#130 必须继续用精确官方实现和本项目生命周期测试核验。
 2. **宿主、插件、发布渠道分别记录。** GitHub tag 不代表 npm 已发布；宿主 `latest` 与插件 `latest` 不保证兼容。普通用户默认组合只能来自 AgentTeams 验收矩阵；Alpha 预览须显式选择。
 3. **精确 CLI 版本还不够。** 固定并检查完整宿主依赖闭包和实际 profile。不要将 `npm install -g @deepseek-ai/dsh@<exact>` 视为所有分包已固定，也不要把宽 peer 范围当作支持承诺。

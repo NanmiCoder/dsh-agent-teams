@@ -30,7 +30,7 @@ Ask in natural language. The plugin provides the team protocol, 13 coordination 
 
 ## Releases
 
-[v0.1.17-rc.1](./release-notes/v0.1.17-rc.1.md) supports DeepSeek Harness `0.1.5-rc.1` on the npm `next` channel. It adapts subagent delivery, explicit member initialization, and Web panel navigation while retaining three older host targets.
+[v0.1.17-rc.1](./release-notes/v0.1.17-rc.1.md) supports DeepSeek Harness `0.1.5-rc.1` on the npm `latest` and `next` channels. It adapts subagent delivery, explicit member initialization, and Web panel navigation while retaining three older host targets.
 
 ## Why AgentTeams?
 
@@ -77,7 +77,7 @@ dsh plugin --profile web add --save-exact @nanmicoder/dsh-agent-teams@0.1.17-rc.
 
 **After installation, stop and restart Harness for that profile, then refresh the browser.**
 
-Plugin prereleases use npm `next`; use the exact-version command above. `latest` is not the recommended entry for this host pair. See the [source installation guide](./docs/maintenance-workflow.md) and [release verification](./docs/releases/v0.1.17-rc.1/README.md).
+The default npm `latest` tag points to `0.1.17-rc.1`, so `dsh plugin --profile web add @nanmicoder/dsh-agent-teams` installs this version on a fresh profile. Use the exact-version command above to pin it. The recommended Harness version is `0.1.5-rc.1`; installing the plugin does not upgrade the host. See the [source installation guide](./docs/maintenance-workflow.md) and [release verification](./docs/releases/v0.1.17-rc.1/README.md).
 
 > Desktop users must check the app's embedded Harness core; upgrading the global CLI does not upgrade it. For older `0.1.0-*` / `0.1.1-*` or unlisted hosts, keep a working pair and follow the [older-version and diagnostic guide](./docs/maintenance-workflow.md).
 

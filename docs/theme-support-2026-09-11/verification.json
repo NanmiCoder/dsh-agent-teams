@@ -1,0 +1,110 @@
+{
+  "host": "0.1.5-rc.1",
+  "browser": "Ego Lite",
+  "light": {
+    "dark": false,
+    "scheme": "light",
+    "panel": {
+      "background": "color(srgb 1 1 1 / 0.95)",
+      "color": "rgb(15, 17, 21)",
+      "border": "color(srgb 0 0 0 / 0.0705098)",
+      "shadow": "color(srgb 0 0 0 / 0.119608) 0px 12px 32px 0px, color(srgb 0 0 0 / 0.157882) 0px 32px 72px 0px"
+    },
+    "card": {
+      "background": "rgb(245, 246, 247)",
+      "color": "rgb(15, 17, 21)",
+      "border": "rgba(0, 0, 0, 0.1)",
+      "shadow": "none"
+    },
+    "member": {
+      "background": "rgb(255, 255, 255)",
+      "color": "rgb(97, 102, 107)",
+      "border": "rgba(0, 0, 0, 0.1)",
+      "shadow": "none"
+    },
+    "pill": {
+      "background": "rgb(235, 238, 242)",
+      "color": "rgb(129, 133, 140)",
+      "border": "rgba(0, 0, 0, 0.1)",
+      "shadow": "none"
+    },
+    "input": {
+      "background": "rgb(255, 255, 255)",
+      "color": "rgb(15, 17, 21)",
+      "border": "rgba(0, 0, 0, 0.1)",
+      "shadow": "none"
+    }
+  },
+  "dark": {
+    "dark": true,
+    "scheme": "dark",
+    "panel": {
+      "background": "color(srgb 0.137255 0.137255 0.141176 / 0.95)",
+      "color": "rgb(249, 250, 251)",
+      "border": "color(srgb 1 1 1 / 0.0932549)",
+      "shadow": "color(srgb 0 0 0 / 0.119608) 0px 12px 32px 0px, color(srgb 0 0 0 / 0.157882) 0px 32px 72px 0px"
+    },
+    "card": {
+      "background": "rgb(53, 54, 56)",
+      "color": "rgb(249, 250, 251)",
+      "border": "rgba(255, 255, 255, 0.12)",
+      "shadow": "none"
+    },
+    "member": {
+      "background": "rgb(35, 35, 36)",
+      "color": "rgb(207, 211, 214)",
+      "border": "rgba(255, 255, 255, 0.12)",
+      "shadow": "none"
+    },
+    "pill": {
+      "background": "rgb(67, 69, 74)",
+      "color": "rgb(173, 178, 184)",
+      "border": "rgba(255, 255, 255, 0.12)",
+      "shadow": "none"
+    },
+    "input": {
+      "background": "rgb(21, 21, 23)",
+      "color": "rgb(249, 250, 251)",
+      "border": "rgba(255, 255, 255, 0.12)",
+      "shadow": "none"
+    }
+  },
+  "systemPreference": {
+    "light": "light",
+    "dark": "dark",
+    "explicitLightOverridesDarkSystem": true
+  },
+  "aliasOverrideAndPortalProbe": {
+    "card": "rgb(31, 48, 63)",
+    "panel": "color(srgb 0.101961 0.152941 0.203922 / 0.95)",
+    "portalBackground": "rgb(52, 67, 83)",
+    "portalBorder": "rgb(112, 132, 152)",
+    "outsidePanel": true
+  },
+  "supportedHostTokens": {
+    "0.1.5-rc.1": {
+      "tokens": 16,
+      "missing": []
+    },
+    "0.1.2-rc.1": {
+      "tokens": 16,
+      "missing": []
+    },
+    "0.1.2-alpha.5": {
+      "tokens": 16,
+      "missing": []
+    },
+    "0.1.2-alpha.2": {
+      "tokens": 16,
+      "missing": []
+    }
+  },
+  "validation": {
+    "build": "passed",
+    "existingVerification": "passed",
+    "newLlmCalls": 0,
+    "sessionData": "Reused prior real-API acceptance sessions; no new model run needed for theme CSS.",
+    "portalScope": "DOM probe using the production stopModalActions class outside the panel; no stop action invoked.",
+    "thirdPartyThemeScope": "Controlled body semantic-token overrides; no third-party theme package installed."
+  }
+}

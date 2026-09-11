@@ -355,24 +355,20 @@ check(
     && agentTeamsCardCss.includes('object-fit: contain'),
   'portrait CSS should preserve each transparent role silhouette and use a compact unread dot',
 )
-const requiredHarnessTokenBridges = [
-  '--dsw-alias-line-normal: var(--dsw-static-neutral-bluish-150',
-  '--dsw-alias-bg-module: var(--dsw-alias-bg-layer-1',
-  '--dsw-alias-state-success: var(--dsw-alias-state-success-primary',
-  '--dsw-alias-state-warning: var(--dsw-alias-state-warn-primary',
-  '--dsw-alias-state-danger: var(--dsw-alias-state-error-primary',
-]
 check(
-  'activity panel bridges the reference palette to current Harness tokens',
-  requiredHarnessTokenBridges.every(token => activityPanelCss.includes(token)),
-  'missing token bridges make panel fills and DAG borders transparent',
+  'all client surfaces consume host semantic colors without redefining the host palette',
+  [activityPanelCss, agentTeamsCardCss].every(css =>
+    !/--dsw-[a-z0-9-]+\s*:/.test(css)
+    && !/--dsw-static-/.test(css)
+    && !/--dsw-alias-(?:line-|bg-fill-|bg-module[),]|label-on-fill|state-(?:danger|warning)[),]|state-success[),])/.test(css)),
+  'light-only palette bridges or undefined legacy tokens break dark mode and portaled surfaces',
 )
 check(
-  'working member and captain states use the fallback-bearing business color bridge',
+  'working member and captain states use the host semantic business color',
   activityPanelSource.includes('data-activity={member.activity}')
     && activityPanelCss.includes(".memberState[data-activity='working']")
-    && /\.memberState\[data-activity='working'\][^{]*\{[^}]*color:\s*var\(--dsw-alias-bg-fill-business\)/su.test(activityPanelCss),
-  'an unguarded host business token makes the working label and glyph fall back to tertiary gray',
+    && /\.memberState\[data-activity='working'\][^{]*\{[^}]*color:\s*var\(--dsw-alias-state-business-primary\)/su.test(activityPanelCss),
+  'the working label and glyph must follow the host business color',
 )
 check(
   'activity panel uses the shell overlay instead of a page-breaking body portal',
@@ -478,7 +474,7 @@ check(
   'member model badge is a compact neutral inline pill that truncates without overflowing',
   memberModelCssBlock.includes('display: inline-flex')
     && memberModelCssBlock.includes('border-radius: 999px')
-    && memberModelCssBlock.includes('background: var(--dsw-alias-bg-fill-neutral)')
+    && memberModelCssBlock.includes('background: var(--dsw-alias-button-ghost-active-fill)')
     && memberModelCssBlock.includes('max-width: 132px')
     && memberModelCssBlock.includes('min-width: 0')
     && memberModelCssBlock.includes('overflow: hidden')

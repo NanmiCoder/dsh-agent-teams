@@ -129,9 +129,9 @@ function stableHash(value: string): number {
 
 const ACCENTS = [
   'var(--dsw-alias-state-business-primary)',
-  'var(--dsw-alias-state-success)',
-  'var(--dsw-alias-state-danger)',
-  'var(--dsw-alias-state-warning)',
+  'var(--dsw-alias-state-success-primary)',
+  'var(--dsw-alias-state-error-primary)',
+  'var(--dsw-alias-state-warn-primary)',
   'var(--dsw-alias-label-tertiary)',
 ] as const
 

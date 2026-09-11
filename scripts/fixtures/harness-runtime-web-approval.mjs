@@ -178,7 +178,14 @@ export function apply(ctx) {
         await waitFor(() => events.some(event => event.event === 'web-captain-report-wake'), 'A real member report must wake the idle captain');
         for (const agent of ctx.agents.list()) {
             await agent.whenIdle();
-            await ctx.sessions.flush(agent.session);
+            try {
+                await ctx.sessions.flush(agent.session);
+            } catch (error) {
+                // A continuable member session can retire while teardown runs; the store
+                // then reports it as not live, and a retired session has nothing to flush.
+                if (!String(error?.message ?? error).includes('is not live in this store'))
+                    throw error;
+            }
         }
         await captain.whenIdle();
         const completed = readTeam();

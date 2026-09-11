@@ -12,7 +12,14 @@ export function apply(ctx) {
         await handle.agent.whenIdle();
         for (const agent of ctx.agents.list()) {
             await agent.whenIdle();
-            await ctx.sessions.flush(agent.session);
+            try {
+                await ctx.sessions.flush(agent.session);
+            } catch (error) {
+                // A continuable member session can retire while teardown runs; the store
+                // then reports it as not live, and a retired session has nothing to flush.
+                if (!String(error?.message ?? error).includes('is not live in this store'))
+                    throw error;
+            }
         }
         process.stdout.write('COLD_RESTORE_DRIVER_DONE\n');
         ctx.get('appExit')(0);

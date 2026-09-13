@@ -21,6 +21,7 @@ import { TERMINAL_TASK_STATUSES, type TaskStatus, type TeamMember, type TeamMess
 import { hasValidQualityTaskFields, isReviewPolicy, normalizeBlankOptionalTaskFields } from './quality-gates.ts'
 
 export {
+  amendTaskContract,
   buildCoverageMatrix,
   canDeclareDelivery,
   classifyChangedPath,
@@ -30,6 +31,7 @@ export {
   evaluateQualityCompletion,
   hasValidQualityTaskFields,
   isQualityKind,
+  isTaskRevision,
   normalizeBlankOptionalTaskFields,
   pathMatchesScope,
   planQualityFollowUp,
@@ -40,6 +42,7 @@ export {
   taskKindOf,
   validateCreateTask,
 } from './quality-gates.ts'
+export type { ContractAmendmentInput } from './quality-gates.ts'
 
 /** Mailbox key of the captain. */
 export const CAPTAIN_KEY = 'captain'

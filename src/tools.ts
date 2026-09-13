@@ -19,6 +19,7 @@ import type { ToolRunContext } from '@deepseek-ai/dsh-tools'
 import { join } from 'node:path'
 import { appendTeamEvent, captainSessionOf } from './events.ts'
 import {
+  amendTaskContract,
   acknowledgeMailbox,
   appendMailbox,
   archiveTeamDir,
@@ -52,6 +53,7 @@ import {
   normalizeBlankOptionalTaskFields,
   taskKindOf,
 } from './state.ts'
+import type { ContractAmendmentInput } from './state.ts'
 import type { AcceptanceResult, CommandResult, ReviewFinding, ReviewVerdict, TaskKind } from './types.ts'
 import {
   deliverToMember,
@@ -1741,6 +1743,87 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
       })
       await scheduler.kickTeam(workspace, team.id, team.captainSessionId === caller.id ? caller : undefined)
       return updated
+    },
+  }))
+
+  ctx.tools.register(defineTool({
+    name: 'agent_teams_amend_task',
+    description: 'Captain-only controlled contract amendment for one non-terminal quality task: replace a wrong objective/acceptance/verify/inScope/outOfScope when the original contract makes honest completion impossible (for example a verify command that cannot pass, or an inScope that forbids the file the objective names). The amendment is appended to the task\'s revisions ledger with previous values and the reason, and is rejected once a review/requirements task has passed judgment on this task. Members cannot amend contracts; the implementer re-reads the amended contract before its next quality gate. Lists are full replacements, not deltas.',
+    parameters: {
+      task_id: { type: 'string', required: true, description: 'Task whose contract is being amended.' },
+      reason: { type: 'string', required: true, description: 'Why the current contract is wrong; recorded in the revisions ledger.' },
+      objective: { type: 'string', description: 'Replacement objective.' },
+      acceptance: { type: 'array', items: { type: 'string' }, description: 'Replacement acceptance criteria (full list, not a delta).' },
+      verify: { type: 'array', items: { type: 'string' }, description: 'Replacement verification commands (full list, not a delta).' },
+      inScope: { type: 'array', items: { type: 'string' }, description: 'Replacement workspace-relative inScope paths (full list).' },
+      outOfScope: { type: 'array', items: { type: 'string' }, description: 'Replacement workspace-relative outOfScope paths (full list).' },
+    },
+    output: {
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          task_id: { type: 'string', required: true },
+          status: { type: 'string', required: true },
+          revised_fields: { type: 'string', required: true },
+          revision_count: { type: 'number', required: true },
+          contract: { type: 'string', required: true },
+        },
+      },
+      render: (_args, value) => [{
+        type: 'text',
+        text: `Task ${value.task_id} contract amended (${value.revised_fields}); ${value.revision_count} revision(s) on record, status ${value.status}. New contract: ${value.contract}`,
+      }],
+    },
+    async execute(args, exec) {
+      const captain = requireCaptain(exec)
+      const workspace = workspaceOf(captain)
+      const stateRoot = stateRootOf(workspace, config)
+      const team = await requireCaptainTeam(workspace, config, captain)
+      const amended = await withTeamLock(teamLockKey(stateRoot, team.id), async () => {
+        const fresh = await requireFreshCaptainTeam(stateRoot, team.id, captain.id)
+        const task = requireTask(fresh, args.task_id)
+        const input: ContractAmendmentInput = {
+          ...args.objective === undefined ? {} : { objective: args.objective },
+          ...args.acceptance === undefined ? {} : { acceptance: args.acceptance },
+          ...args.verify === undefined ? {} : { verify: args.verify },
+          ...args.inScope === undefined ? {} : { inScope: args.inScope },
+          ...args.outOfScope === undefined ? {} : { outOfScope: args.outOfScope },
+        }
+        const result = amendTaskContract(fresh, task, normalizeBlankOptionalTaskFields(input), CAPTAIN_KEY, args.reason)
+        if (!result.ok || result.task === undefined) {
+          throw new Error(result.error ?? 'amend_task rejected by quality gates')
+        }
+        Object.assign(task, result.task)
+        task.updatedAt = Date.now()
+        await writeTeam(stateRoot, fresh)
+        return {
+          taskId: task.id,
+          status: task.status,
+          fields: result.revision?.fields ?? [],
+          revisionCount: task.revisions?.length ?? 0,
+          contract: {
+            ...task.objective === undefined ? {} : { objective: task.objective },
+            ...task.acceptance === undefined ? {} : { acceptance: task.acceptance },
+            ...task.verify === undefined ? {} : { verify: task.verify },
+            ...task.inScope === undefined ? {} : { inScope: task.inScope },
+            ...task.outOfScope === undefined ? {} : { outOfScope: task.outOfScope },
+          },
+        }
+      })
+      appendTeamEvent(ctx, captainSessionOf(ctx, team.captainSessionId, captain.session), 'agent-teams/task-amended', {
+        teamId: team.id,
+        taskId: amended.taskId,
+        fields: amended.fields,
+        reason: args.reason,
+      })
+      return {
+        task_id: amended.taskId,
+        status: amended.status,
+        revised_fields: amended.fields.join(', '),
+        revision_count: amended.revisionCount,
+        contract: JSON.stringify(amended.contract),
+      }
     },
   }))
 

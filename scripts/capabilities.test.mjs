@@ -81,7 +81,7 @@ test('stable tool presentation uses real scoped registry and prompt assembly', a
     await t.test('first request keeps all tools and the complete fixed captain protocol', async () => {
       assert.deepEqual(await names(a), captainNames)
       assertCaptainProtocol(renderPrompt(await assemble(a)))
-      assert.equal((await names(a)).length, 13)
+      assert.equal((await names(a)).length, 14)
       assert.equal(host.tools.get('agent_teams_open', a), undefined)
       assert.doesNotMatch(renderPrompt(await assemble(a)), /agent_teams_open/)
       t.diagnostic(JSON.stringify({ role: 'captain-idle', profiles: ['demo'], promptBytes: Buffer.byteLength(renderPrompt(await assemble(a))), schemaBytes: Buffer.byteLength(JSON.stringify((await assemble(a)).tools)) }))
@@ -107,7 +107,7 @@ test('stable tool presentation uses real scoped registry and prompt assembly', a
       } finally { userDeny() }
       assert.equal(await header(a), initialHeader)
     })
-    await t.test('the original thirteen-tool allowlist can directly create and archive', async () => {
+    await t.test('the original tool allowlist can directly create and archive', async () => {
       const legacy = createAgent('legacy-captain')
       host.emit('agent/session-start', { agent: legacy, source: 'startup' })
       const restore = legacy.ctx.tools.restrict({ allow: [...TEAM_TOOL_NAMES] })
@@ -172,7 +172,7 @@ test('stable tool presentation uses real scoped registry and prompt assembly', a
       host.emit('agent/session-start', { agent: child, source: 'resume' })
       assert.deepEqual((await names(child)).sort(), [...MEMBER_TOOL_NAMES].sort())
     })
-    await t.test('PTC and both modes keep the thirteen-operation SDK stable after status', async () => {
+    await t.test('PTC and both modes keep the operation SDK stable after status', async () => {
       for (const mode of ['ptc', 'both']) {
         const restore = a.ctx.tools.presentAs(mode)
         const assembly = await assemble(a)
@@ -202,11 +202,11 @@ test('stable tool presentation uses real scoped registry and prompt assembly', a
     await t.test('HMR removes old masks and restores persisted participants in existing scopes', async () => {
       await fiber.dispose()
       assert.equal(host.tools.get('agent_teams_open', b), undefined)
-      assert.equal((await names(b)).length, 13)
+      assert.equal((await names(b)).length, 14)
       assert.doesNotMatch(renderPrompt(await assemble(b)), /AgentTeams captain protocol/)
       fiber = host.plugin(plugin)
       await fiber.await()
-      assert.equal((await names(a)).length, 13)
+      assert.equal((await names(a)).length, 14)
       assert.deepEqual(await names(b), captainNames)
       assertCaptainProtocol(renderPrompt(await assemble(b)))
       assert.equal(await header(b), initialHeader)
@@ -217,7 +217,7 @@ test('stable tool presentation uses real scoped registry and prompt assembly', a
     await t.test('a cold captain loads its durable role before its first request', async () => {
       const cold = createAgent(a.id)
       host.emit('agent/session-start', { agent: cold, source: 'resume' })
-      assert.equal((await names(cold)).length, 13)
+      assert.equal((await names(cold)).length, 14)
       assert.equal(await header(cold), initialHeader)
       // This new Agent has no historical tool calls. Persisted work is
       // still directly addressable through the original business tools.
@@ -229,7 +229,7 @@ test('stable tool presentation uses real scoped registry and prompt assembly', a
     })
     await t.test('archive and idle preserve the original captain prefix', async () => {
       await archiveTeamDir(stateRoot, team.id)
-      assert.equal((await names(a)).length, 13)
+      assert.equal((await names(a)).length, 14)
       host.emit('agent/status', { agent: a, status: 'idle' })
       assert.deepEqual(await names(a), captainNames)
     })

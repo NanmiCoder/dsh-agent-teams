@@ -58,6 +58,16 @@ export interface AgentTeamsTaskUpdatedData {
   readonly round?: number
 }
 
+/** Records one captain-only contract amendment on a task. */
+export interface AgentTeamsTaskAmendedData {
+  readonly teamId: string
+  readonly taskId: string
+  /** Amended contract field names (`objective`, `inScope`, …). */
+  readonly fields: readonly string[]
+  /** Why the previous contract was wrong. */
+  readonly reason: string
+}
+
 /** Records a human halt from the captain chat. */
 export interface AgentTeamsTeamHaltedData {
   readonly teamId: string
@@ -120,6 +130,11 @@ declare module '@deepseek-ai/dsh-session/types' {
      */
     'agent-teams/task-updated': AgentTeamsTaskUpdatedData
     /**
+     * Records one captain-only contract amendment.
+     * @param data - team identity, task id, amended field names, and reason.
+     */
+    'agent-teams/task-amended': AgentTeamsTaskAmendedData
+    /**
      * Records one mailbox message.
      * @param data - team identity, sender, recipient, and content.
      */
@@ -154,6 +169,7 @@ export type AgentTeamsEventType =
   | 'agent-teams/member-removed'
   | 'agent-teams/task-created'
   | 'agent-teams/task-updated'
+  | 'agent-teams/task-amended'
   | 'agent-teams/message-sent'
   | 'agent-teams/team-halted'
   | 'agent-teams/team-resumed'

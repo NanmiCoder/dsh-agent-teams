@@ -16,6 +16,7 @@ import {
   type ReviewPolicy,
   type ReviewVerdict,
   type TaskKind,
+  type TaskRevision,
   type TaskStatus,
   type TeamState,
   type TeamTask,
@@ -546,6 +547,161 @@ function findingKey(ids: readonly string[]): string {
   return [...ids].sort().join(',')
 }
 
+/**
+ * Path-like tokens worth considering as repair-scope candidates. Two shapes:
+ * slash paths (`src/parser.ts`, `docs/guide.md`) and bare filenames with a
+ * known code/doc extension (`README.md`, `wc.js`). An optional `:line`
+ * suffix is tolerated and stripped. The extension allowlist keeps version
+ * tokens (`v0.1.17`), hex hashes, and prose out of the derived scope.
+ */
+const REPAIR_SCOPE_PATH_PATTERN = /(?:[A-Za-z0-9_.\-]+(?:\/[A-Za-z0-9_.\-]+)+|[\w.\-]+\.(?:tsx?|jsx?|mjs|cjs|json|md|txt|ya?ml|py|rs|go|java|html?|css|scss|sh|ps1|toml|xml|sql))(?::\d+)?/gu
+const REPAIR_SCOPE_LINE_SUFFIX = /:\d+$/
+
+/**
+ * Derive the repair round's inScope from the findings that caused it.
+ *
+ * `finding.file` records where the problem was OBSERVED, but the fix often
+ * targets a different file named in `requiredFix` (docs vs sample data,
+ * config vs code). Deriving the scope from both keeps the auto-generated
+ * repair contract satisfiable; deriving from `file` alone can produce a
+ * contract where the acceptance ("edit README.md") names a path the scope
+ * forbids, so no honest completion exists and the repair dead-locks.
+ *
+ * Absolute and otherwise illegal paths are dropped (they can never match
+ * workspace-relative scope patterns anyway); when nothing legal remains,
+ * the source task's own inScope is kept as the fallback. Over-inclusion is
+ * accepted: inScope is an audit upper bound, and the requiredFix text still
+ * tells the implementer what to touch.
+ */
+export function repairScopeFromFindings(
+  findings: readonly ReviewFinding[],
+  fallback: string[] | undefined,
+): string[] | undefined {
+  const derived: string[] = []
+  const push = (raw: string): void => {
+    const normalized = normalizeWorkspacePath(raw.replace(REPAIR_SCOPE_LINE_SUFFIX, ''))
+    if (normalized !== undefined && !derived.includes(normalized)) derived.push(normalized)
+  }
+  for (const finding of findings) {
+    if (nonemptyString(finding.file)) push(finding.file)
+    for (const match of finding.requiredFix.matchAll(REPAIR_SCOPE_PATH_PATTERN)) push(match[0])
+  }
+  return derived.length > 0 ? derived : fallback
+}
+
+/** Captain-only amendment payload: replacement values for contract fields. */
+export interface ContractAmendmentInput {
+  objective?: string
+  acceptance?: string[]
+  verify?: string[]
+  inScope?: string[]
+  outOfScope?: string[]
+}
+
+export interface AmendTaskContractResult {
+  ok: boolean
+  error?: string
+  task?: TeamTask
+  revision?: TaskRevision
+}
+
+const AMENDABLE_CONTRACT_FIELDS = ['objective', 'acceptance', 'verify', 'inScope', 'outOfScope'] as const
+
+/**
+ * Controlled contract amendment (the pure rule; tooling keeps it
+ * captain-only). When a quality contract is wrong — a verify command that
+ * cannot pass, an inScope that forbids the file the objective names — the
+ * worker has no honest completion and either dead-locks or games the gate.
+ * Instead the captain may fix the contract mid-flight: every amendment is
+ * recorded on the task as a {@link TaskRevision} (previous values + reason),
+ * and once a review/requirements task has passed judgment on this task the
+ * contract is frozen. Amendments replace whole fields (lists are full
+ * replacements, not deltas); the implementer re-reads the amended contract
+ * before its next quality gate. Completion gates need no special casing:
+ * they read the task's current fields, so they naturally evaluate the
+ * amended contract.
+ */
+export function amendTaskContract(
+  team: TeamState,
+  task: TeamTask,
+  input: ContractAmendmentInput,
+  by: string,
+  reason: string,
+): AmendTaskContractResult {
+  if (!nonemptyString(by)) return { ok: false, error: 'contract amendment requires a non-empty author identity' }
+  if (!nonemptyString(reason)) return { ok: false, error: 'contract amendment requires a non-empty reason' }
+  if (TERMINAL_TASK_STATUSES.includes(task.status)) {
+    return { ok: false, error: `task ${task.id} is ${task.status}; terminal contracts are immutable` }
+  }
+  if (taskKindOf(task) === 'work') {
+    return { ok: false, error: `task ${task.id} has kind=work and no contract to amend` }
+  }
+  if (!AMENDABLE_CONTRACT_FIELDS.some((field) => input[field] !== undefined)) {
+    return { ok: false, error: `amendment requires at least one of: ${AMENDABLE_CONTRACT_FIELDS.join(', ')}` }
+  }
+  const next: Record<string, unknown> = {}
+  const previous: Record<string, unknown> = {}
+  if (input.objective !== undefined) {
+    if (!nonemptyString(input.objective)) {
+      return { ok: false, error: 'amended objective must be a non-empty string' }
+    }
+    next['objective'] = input.objective
+    previous['objective'] = task.objective
+  }
+  for (const field of ['acceptance', 'verify'] as const) {
+    const value = input[field]
+    if (value === undefined) continue
+    if (!nonemptyStringList(value)) {
+      return { ok: false, error: `amended ${field} must be a non-empty list of non-empty strings` }
+    }
+    next[field] = value
+    previous[field] = task[field]
+  }
+  for (const field of ['inScope', 'outOfScope'] as const) {
+    const value = input[field]
+    if (value === undefined) continue
+    if (!nonemptyStringList(value)) {
+      return { ok: false, error: `amended ${field} must be a non-empty list of non-empty strings` }
+    }
+    for (const entry of value) {
+      if (normalizeWorkspacePath(entry) === undefined) {
+        return {
+          ok: false,
+          error: `amended ${field} entry "${entry}" is not a workspace-relative path (absolute paths and ".." can never match scope patterns)`,
+        }
+      }
+    }
+    next[field] = value
+    previous[field] = task[field]
+  }
+  const reviewPassed = team.tasks.some((item) => (
+    (taskKindOf(item) === 'review' || taskKindOf(item) === 'requirements')
+    && item.reviewedTaskId === task.id
+    && item.verdict === 'pass'
+  ))
+  if (reviewPassed) {
+    return { ok: false, error: `task ${task.id} already passed review; its contract is frozen` }
+  }
+  const revision: TaskRevision = {
+    at: Date.now(),
+    by,
+    reason,
+    fields: Object.keys(next),
+    previous,
+  }
+  return {
+    ok: true,
+    revision,
+    task: {
+      ...task,
+      ...next,
+      revisions: [...(task.revisions ?? []), revision],
+      updatedAt: Date.now(),
+    } as TeamTask,
+  }
+}
+
+
 const CAPTAIN_ASSIGNEE = 'captain'
 const OPEN_FOLLOW_UP_STATUSES: readonly TaskStatus[] = ['pending', 'claimed', 'in_progress']
 
@@ -615,7 +771,9 @@ export function planQualityFollowUp(team: TeamState, closed: TeamTask): PlanQual
   if (countRepairAttempts(team, sourceId, findingIds) >= policy.maxRepairAttempts) {
     return { ...empty, escalated: true, status: 'escalated' }
   }
-  const files = findings.map((finding) => finding.file).filter((file): file is string => nonemptyString(file))
+  // inScope is derived from the findings below: the observed file plus any
+  // workspace-relative paths referenced by the requiredFix instructions.
+
   const implementer = schedulableAssignee(source?.assignee, team)
   const repair: PlannedFollowUpTask = {
     id: `repair-round-${nextRound}`,
@@ -625,7 +783,7 @@ export function planQualityFollowUp(team: TeamState, closed: TeamTask): PlanQual
     dependencies: [sourceId],
     round: nextRound,
     objective: source?.objective ?? closed.objective ?? `Fix findings from ${sourceId}`,
-    inScope: files.length > 0 ? files : source?.inScope,
+    inScope: repairScopeFromFindings(findings, source?.inScope),
     outOfScope: source?.outOfScope,
     verify: source?.verify,
     acceptance: findings.map((finding) => finding.requiredFix),
@@ -763,6 +921,15 @@ export function isCommandResult(value: unknown): value is CommandResult {
     && (value['evidence'] === undefined || typeof value['evidence'] === 'string')
 }
 
+export function isTaskRevision(value: unknown): value is TaskRevision {
+  if (!isRecord(value)) return false
+  return Number.isSafeInteger(value['at'])
+    && nonemptyString(value['by'])
+    && nonemptyString(value['reason'])
+    && nonemptyStringList(value['fields'])
+    && isRecord(value['previous'])
+}
+
 // Optional fields whose persisted values must be non-empty when present
 // (mirrors the checks in hasValidQualityTaskFields). Some models materialize
 // optional tool parameters as "" instead of omitting them (e.g. GPT-5.6
@@ -830,6 +997,9 @@ export function hasValidQualityTaskFields(value: Record<string, unknown>): boole
   }
   if (value['commandsRun'] !== undefined) {
     if (!Array.isArray(value['commandsRun']) || !value['commandsRun'].every(isCommandResult)) return false
+  }
+  if (value['revisions'] !== undefined) {
+    if (!Array.isArray(value['revisions']) || !value['revisions'].every(isTaskRevision)) return false
   }
   return true
 }

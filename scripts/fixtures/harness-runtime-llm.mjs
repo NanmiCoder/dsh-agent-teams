@@ -1,5 +1,6 @@
 import { LlmAdapter, ToolCallId, LlmError } from '@deepseek-ai/dsh-llm';
-import { appendFileSync } from 'node:fs';
+import { appendFileSync, readFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 let seq = 0;
 let memberStarted = false;
@@ -136,7 +137,15 @@ class FixtureAdapter extends LlmAdapter {
         else if (process.env.LAB_SCENARIO === 'lifecycle' && !tools.some(t => t.name === 'agent_teams_send_message' && t.arguments.includes('FIFO_SECOND')))
             chunks = call('agent_teams_send_message', { to: 'worker', content: 'FIFO_SECOND' });
         else if (!(toolText + userText).includes('MEMBER_REPORT_OK')) {
-            await new Promise(r => setTimeout(r, 150));
+            // Wait inside the scripted response for the actual product task;
+            // repeated timed status calls can trip the host's loop guard.
+            const file = join(process.cwd(), '.agent-teams/runtime-lab/team.json');
+            const deadline = Date.now() + 20000;
+            while (Date.now() < deadline) {
+                options.signal?.throwIfAborted();
+                if (existsSync(file) && JSON.parse(readFileSync(file, 'utf8')).tasks.some(task => ['completed', 'failed'].includes(task.status))) break;
+                await new Promise(resolve => setTimeout(resolve, 10));
+            }
             chunks = call('agent_teams_status', {});
         }
         else if (!tools.some(t => t.name === 'agent_teams_send_message' && t.arguments.includes('SECOND_WAKE_FIXTURE')))

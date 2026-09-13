@@ -1,0 +1,1042 @@
+{
+  "timezone": "Asia/Shanghai",
+  "measurement": "step/start to assistant/message includes request preparation, transport and generation; overlapping durations are not wall time",
+  "sessions": [
+    {
+      "file": "session.v3.jsonl",
+      "sha256": "53aeac0a1e4d206c0e13f17aa3f54a93aa3745bf4993a3b6a848ac18a292e885",
+      "id": "session-0508476d-407d-4f99-8a87-fbba8c9142d5",
+      "parent": null,
+      "label": "captain",
+      "delegation_depth": 0,
+      "first_event": "2026-09-12T14:20:32.437+08:00",
+      "last_event": "2026-09-12T14:56:07.510+08:00",
+      "observed_span_seconds": 2135.073,
+      "configs": [
+        {
+          "provider": "deepseek-official",
+          "model": "deepseek-flash",
+          "reasoningEffort": "high",
+          "maxTokens": 256000
+        }
+      ],
+      "event_counts": {
+        "session": 1,
+        "permission/preset": 1,
+        "sandbox/mode": 1,
+        "approval/policy": 1,
+        "agent/inbox/spliced": 17,
+        "turn/start": 5,
+        "step/start": 29,
+        "system/message": 1,
+        "user/message": 12,
+        "request/header": 1,
+        "request/context": 1,
+        "session/title": 2,
+        "session/title-llm-request": 1,
+        "assistant/message": 29,
+        "tool/call": 43,
+        "tool/result": 43,
+        "step/end": 29,
+        "subagent/catalog": 5,
+        "turn/end": 5
+      },
+      "step_to_assistant": {
+        "count": 29,
+        "sum_seconds": 587.983,
+        "median_seconds": 6.601,
+        "max_seconds": 118.338
+      },
+      "step_to_first_stream_event": {
+        "count": 29,
+        "sum_seconds": 367.882,
+        "median_seconds": 2.701,
+        "max_seconds": 82.339
+      },
+      "tool_duration": {
+        "count": 43,
+        "sum_seconds": 2.436,
+        "median_seconds": 0.014,
+        "max_seconds": 0.409
+      },
+      "max_input_tokens_including_cache": 54612,
+      "usage_sum": {
+        "inputTokens": 38703,
+        "outputTokens": 17194,
+        "totalTokens": 1021913,
+        "cacheReadTokens": 966016,
+        "reasoningTokens": 4577
+      },
+      "queue_max": {
+        "next-turn": 1,
+        "next-step": 2
+      },
+      "pending_at_end": [],
+      "automatic_assignment_prompts_consumed": 0,
+      "tool_errors": [
+        {
+          "tool": "agent_teams_status",
+          "call_seq": 18,
+          "result_seq": 19,
+          "time": "2026-09-12T14:20:37.566+08:00"
+        },
+        {
+          "tool": "agent_teams_create_task",
+          "call_seq": 78,
+          "result_seq": 79,
+          "time": "2026-09-12T14:21:14.650+08:00"
+        },
+        {
+          "tool": "agent_teams_create_task",
+          "call_seq": 83,
+          "result_seq": 84,
+          "time": "2026-09-12T14:21:20.922+08:00"
+        },
+        {
+          "tool": "agent_teams_create_task",
+          "call_seq": 85,
+          "result_seq": 86,
+          "time": "2026-09-12T14:21:20.929+08:00"
+        },
+        {
+          "tool": "agent_teams_create_task",
+          "call_seq": 104,
+          "result_seq": 105,
+          "time": "2026-09-12T14:21:40.974+08:00"
+        }
+      ]
+    },
+    {
+      "file": "subagents/294d9067-a4ae-4fba-9bd3-7a6475e49ff2/session.v3.jsonl",
+      "sha256": "40ed126ad9916b4d8d564a137da4577e316f7828bdf28898f2dd7c5cd8c0e364",
+      "id": "294d9067-a4ae-4fba-9bd3-7a6475e49ff2",
+      "parent": "3484f46a-66c2-4879-bd86-86392da5ade9",
+      "label": "Perf audit computerUse REPL + ImageGen",
+      "delegation_depth": 2,
+      "first_event": "2026-09-12T14:28:59.162+08:00",
+      "last_event": "2026-09-12T15:01:02.342+08:00",
+      "observed_span_seconds": 1923.18,
+      "configs": [
+        {
+          "provider": "deepseek-official",
+          "model": "deepseek-flash",
+          "reasoningEffort": "high",
+          "maxTokens": 256000
+        }
+      ],
+      "event_counts": {
+        "session": 1,
+        "subagent/descriptor": 1,
+        "sandbox/mode": 1,
+        "approval/policy": 1,
+        "permission/preset": 1,
+        "agent/inbox/spliced": 4,
+        "turn/start": 1,
+        "step/start": 27,
+        "system/message": 1,
+        "user/message": 5,
+        "request/header": 1,
+        "request/context": 1,
+        "session/title": 1,
+        "assistant/message": 26,
+        "tool/call": 41,
+        "tool/result": 41,
+        "step/end": 26
+      },
+      "step_to_assistant": {
+        "count": 26,
+        "sum_seconds": 1910.475,
+        "median_seconds": 65.983,
+        "max_seconds": 327.385
+      },
+      "step_to_first_stream_event": {
+        "count": 26,
+        "sum_seconds": 1140.066,
+        "median_seconds": 42.971,
+        "max_seconds": 101.457
+      },
+      "tool_duration": {
+        "count": 41,
+        "sum_seconds": 12.272,
+        "median_seconds": 0.04,
+        "max_seconds": 10.406
+      },
+      "max_input_tokens_including_cache": 110857,
+      "usage_sum": {
+        "inputTokens": 84378,
+        "outputTokens": 16191,
+        "totalTokens": 1865817,
+        "cacheReadTokens": 1765248,
+        "reasoningTokens": 9750
+      },
+      "queue_max": {
+        "next-turn": 1,
+        "next-step": 1
+      },
+      "pending_at_end": [],
+      "automatic_assignment_prompts_consumed": 0,
+      "tool_errors": [
+        {
+          "tool": "read",
+          "call_seq": 42,
+          "result_seq": 44,
+          "time": "2026-09-12T14:32:19.406+08:00"
+        }
+      ]
+    },
+    {
+      "file": "subagents/3484f46a-66c2-4879-bd86-86392da5ade9/session.v3.jsonl",
+      "sha256": "5d9a333fdd0e187651d70b1073f7ee4f36490c4ca07dd4a4c334780b6665f50c",
+      "id": "3484f46a-66c2-4879-bd86-86392da5ade9",
+      "parent": "session-0508476d-407d-4f99-8a87-fbba8c9142d5",
+      "label": "agent-teams:weekly-change-review:perf-reviewer",
+      "delegation_depth": 1,
+      "first_event": "2026-09-12T14:21:48.184+08:00",
+      "last_event": "2026-09-12T15:01:02.584+08:00",
+      "observed_span_seconds": 2354.4,
+      "configs": [
+        {
+          "provider": "deepseek-official",
+          "model": "deepseek-flash",
+          "reasoningEffort": "high",
+          "maxTokens": 256000
+        }
+      ],
+      "event_counts": {
+        "session": 1,
+        "subagent/descriptor": 1,
+        "sandbox/mode": 1,
+        "approval/policy": 1,
+        "permission/preset": 1,
+        "agent/inbox/spliced": 9,
+        "turn/start": 1,
+        "step/start": 70,
+        "system/message": 1,
+        "user/message": 7,
+        "request/header": 1,
+        "request/context": 1,
+        "session/title": 1,
+        "assistant/message": 69,
+        "tool/call": 72,
+        "tool/result": 72,
+        "step/end": 69,
+        "todo/write": 1,
+        "subagent/catalog": 4,
+        "assistant/attempt": 1,
+        "llm/retry": 1,
+        "llm/retry-started": 1
+      },
+      "step_to_assistant": {
+        "count": 69,
+        "sum_seconds": 2274.277,
+        "median_seconds": 11.085,
+        "max_seconds": 151.612
+      },
+      "step_to_first_stream_event": {
+        "count": 69,
+        "sum_seconds": 1545.219,
+        "median_seconds": 9.268,
+        "max_seconds": 89.925
+      },
+      "tool_duration": {
+        "count": 72,
+        "sum_seconds": 5.387,
+        "median_seconds": 0.037,
+        "max_seconds": 1.061
+      },
+      "max_input_tokens_including_cache": 127920,
+      "usage_sum": {
+        "inputTokens": 98835,
+        "outputTokens": 35307,
+        "totalTokens": 5220350,
+        "cacheReadTokens": 5086208,
+        "reasoningTokens": 19736
+      },
+      "queue_max": {
+        "next-turn": 1,
+        "next-step": 1
+      },
+      "pending_at_end": [
+        {
+          "target": "next-turn",
+          "id": "240310a2-cb66-49f0-b804-e2ee7af55f7c",
+          "enqueued_at": "2026-09-12T14:22:57.501+08:00",
+          "age_at_last_event_seconds": 2285.083,
+          "consumed_as_user_message": false
+        }
+      ],
+      "automatic_assignment_prompts_consumed": 0,
+      "tool_errors": []
+    },
+    {
+      "file": "subagents/3ac1a01e-1631-407d-ab26-4ca31ca72986/session.v3.jsonl",
+      "sha256": "df363d3e7190a4dddb05aed6262285081db0d928215a48c395a7357f2acf47c4",
+      "id": "3ac1a01e-1631-407d-ab26-4ca31ca72986",
+      "parent": "3484f46a-66c2-4879-bd86-86392da5ade9",
+      "label": "Perf audit chat UI components",
+      "delegation_depth": 2,
+      "first_event": "2026-09-12T14:28:59.161+08:00",
+      "last_event": "2026-09-12T14:59:48.515+08:00",
+      "observed_span_seconds": 1849.354,
+      "configs": [
+        {
+          "provider": "deepseek-official",
+          "model": "deepseek-flash",
+          "reasoningEffort": "high",
+          "maxTokens": 256000
+        }
+      ],
+      "event_counts": {
+        "session": 1,
+        "subagent/descriptor": 1,
+        "sandbox/mode": 1,
+        "approval/policy": 1,
+        "permission/preset": 1,
+        "agent/inbox/spliced": 4,
+        "turn/start": 1,
+        "step/start": 31,
+        "system/message": 1,
+        "user/message": 5,
+        "request/header": 1,
+        "request/context": 1,
+        "session/title": 1,
+        "assistant/message": 30,
+        "tool/call": 44,
+        "tool/result": 44,
+        "step/end": 30
+      },
+      "step_to_assistant": {
+        "count": 30,
+        "sum_seconds": 1846.967,
+        "median_seconds": 60.51,
+        "max_seconds": 160.406
+      },
+      "step_to_first_stream_event": {
+        "count": 30,
+        "sum_seconds": 1299.802,
+        "median_seconds": 38.877,
+        "max_seconds": 78.34
+      },
+      "tool_duration": {
+        "count": 44,
+        "sum_seconds": 1.985,
+        "median_seconds": 0.028,
+        "max_seconds": 0.385
+      },
+      "max_input_tokens_including_cache": 80015,
+      "usage_sum": {
+        "inputTokens": 57278,
+        "outputTokens": 12687,
+        "totalTokens": 1604045,
+        "cacheReadTokens": 1534080,
+        "reasoningTokens": 7713
+      },
+      "queue_max": {
+        "next-turn": 1,
+        "next-step": 1
+      },
+      "pending_at_end": [],
+      "automatic_assignment_prompts_consumed": 0,
+      "tool_errors": []
+    },
+    {
+      "file": "subagents/6e5f8dc4-88c7-44c5-bdd4-e7f943904efb/session.v3.jsonl",
+      "sha256": "e978bfb2c6f42554504ed19ea9662b150ff7ff5169925d7246023164df5825ec",
+      "id": "6e5f8dc4-88c7-44c5-bdd4-e7f943904efb",
+      "parent": "session-0508476d-407d-4f99-8a87-fbba8c9142d5",
+      "label": "agent-teams:weekly-change-review:sec-proxy-reviewer",
+      "delegation_depth": 1,
+      "first_event": "2026-09-12T14:21:48.113+08:00",
+      "last_event": "2026-09-12T14:50:54.143+08:00",
+      "observed_span_seconds": 1746.03,
+      "configs": [
+        {
+          "provider": "deepseek-official",
+          "model": "deepseek-flash",
+          "reasoningEffort": "high",
+          "maxTokens": 256000
+        }
+      ],
+      "event_counts": {
+        "session": 1,
+        "subagent/descriptor": 1,
+        "sandbox/mode": 1,
+        "approval/policy": 1,
+        "permission/preset": 1,
+        "agent/inbox/spliced": 12,
+        "turn/start": 1,
+        "step/start": 62,
+        "system/message": 1,
+        "user/message": 8,
+        "request/header": 1,
+        "request/context": 1,
+        "session/title": 1,
+        "assistant/message": 62,
+        "tool/call": 61,
+        "tool/result": 61,
+        "step/end": 62,
+        "turn/end": 1
+      },
+      "step_to_assistant": {
+        "count": 62,
+        "sum_seconds": 1706.352,
+        "median_seconds": 9.87,
+        "max_seconds": 335.947
+      },
+      "step_to_first_stream_event": {
+        "count": 62,
+        "sum_seconds": 1114.665,
+        "median_seconds": 9.132,
+        "max_seconds": 61.821
+      },
+      "tool_duration": {
+        "count": 61,
+        "sum_seconds": 38.94,
+        "median_seconds": 0.028,
+        "max_seconds": 24.46
+      },
+      "max_input_tokens_including_cache": 103713,
+      "usage_sum": {
+        "inputTokens": 86586,
+        "outputTokens": 22346,
+        "totalTokens": 4200836,
+        "cacheReadTokens": 4091904,
+        "reasoningTokens": 6873
+      },
+      "queue_max": {
+        "next-turn": 1,
+        "next-step": 1
+      },
+      "pending_at_end": [],
+      "automatic_assignment_prompts_consumed": 0,
+      "tool_errors": []
+    },
+    {
+      "file": "subagents/97299518-0d6d-42d0-a040-78a26f418757/session.v3.jsonl",
+      "sha256": "045dad3a3ce58bba1d9fe1811b6ad10fce1da2043740a076c99ee35bea1ae4da",
+      "id": "97299518-0d6d-42d0-a040-78a26f418757",
+      "parent": "3484f46a-66c2-4879-bd86-86392da5ade9",
+      "label": "Perf audit AdapterSettings pages",
+      "delegation_depth": 2,
+      "first_event": "2026-09-12T14:28:59.162+08:00",
+      "last_event": "2026-09-12T14:59:10.221+08:00",
+      "observed_span_seconds": 1811.059,
+      "configs": [
+        {
+          "provider": "deepseek-official",
+          "model": "deepseek-flash",
+          "reasoningEffort": "high",
+          "maxTokens": 256000
+        }
+      ],
+      "event_counts": {
+        "session": 1,
+        "subagent/descriptor": 1,
+        "sandbox/mode": 1,
+        "approval/policy": 1,
+        "permission/preset": 1,
+        "agent/inbox/spliced": 4,
+        "turn/start": 1,
+        "step/start": 24,
+        "system/message": 1,
+        "user/message": 5,
+        "request/header": 1,
+        "request/context": 1,
+        "session/title": 1,
+        "assistant/message": 23,
+        "tool/call": 37,
+        "tool/result": 37,
+        "step/end": 23
+      },
+      "step_to_assistant": {
+        "count": 23,
+        "sum_seconds": 1807.694,
+        "median_seconds": 72.558,
+        "max_seconds": 184.451
+      },
+      "step_to_first_stream_event": {
+        "count": 23,
+        "sum_seconds": 1011.454,
+        "median_seconds": 41.92,
+        "max_seconds": 81.512
+      },
+      "tool_duration": {
+        "count": 37,
+        "sum_seconds": 3.135,
+        "median_seconds": 0.037,
+        "max_seconds": 0.699
+      },
+      "max_input_tokens_including_cache": 87234,
+      "usage_sum": {
+        "inputTokens": 61697,
+        "outputTokens": 15181,
+        "totalTokens": 1335118,
+        "cacheReadTokens": 1258240,
+        "reasoningTokens": 10102
+      },
+      "queue_max": {
+        "next-turn": 1,
+        "next-step": 1
+      },
+      "pending_at_end": [],
+      "automatic_assignment_prompts_consumed": 0,
+      "tool_errors": []
+    },
+    {
+      "file": "subagents/c5cfce70-3a8e-46cf-ad6e-f58c39729d95/session.v3.jsonl",
+      "sha256": "fab35f5fe77d867aea91c194efbdeb52c5e2a9fe89a322fc8fa75a04ed72008d",
+      "id": "c5cfce70-3a8e-46cf-ad6e-f58c39729d95",
+      "parent": "session-0508476d-407d-4f99-8a87-fbba8c9142d5",
+      "label": "agent-teams:weekly-change-review:sec-boundary-reviewer",
+      "delegation_depth": 1,
+      "first_event": "2026-09-12T14:21:48.151+08:00",
+      "last_event": "2026-09-12T15:01:03.765+08:00",
+      "observed_span_seconds": 2355.614,
+      "configs": [
+        {
+          "provider": "deepseek-official",
+          "model": "deepseek-flash",
+          "reasoningEffort": "high",
+          "maxTokens": 256000
+        }
+      ],
+      "event_counts": {
+        "session": 1,
+        "subagent/descriptor": 1,
+        "sandbox/mode": 1,
+        "approval/policy": 1,
+        "permission/preset": 1,
+        "agent/inbox/spliced": 4,
+        "turn/start": 1,
+        "step/start": 64,
+        "system/message": 1,
+        "user/message": 5,
+        "request/header": 1,
+        "request/context": 1,
+        "session/title": 1,
+        "assistant/message": 63,
+        "tool/call": 75,
+        "tool/result": 75,
+        "step/end": 63,
+        "todo/write": 1
+      },
+      "step_to_assistant": {
+        "count": 63,
+        "sum_seconds": 2284.526,
+        "median_seconds": 12.609,
+        "max_seconds": 221.801
+      },
+      "step_to_first_stream_event": {
+        "count": 63,
+        "sum_seconds": 1504.206,
+        "median_seconds": 10.4,
+        "max_seconds": 82.21
+      },
+      "tool_duration": {
+        "count": 75,
+        "sum_seconds": 70.486,
+        "median_seconds": 0.037,
+        "max_seconds": 60.014
+      },
+      "max_input_tokens_including_cache": 128315,
+      "usage_sum": {
+        "inputTokens": 103545,
+        "outputTokens": 29531,
+        "totalTokens": 5058388,
+        "cacheReadTokens": 4925312,
+        "reasoningTokens": 21434
+      },
+      "queue_max": {
+        "next-turn": 1,
+        "next-step": 1
+      },
+      "pending_at_end": [],
+      "automatic_assignment_prompts_consumed": 0,
+      "tool_errors": []
+    },
+    {
+      "file": "subagents/ca993f1e-b935-40e3-b3f4-012ea720587a/session.v3.jsonl",
+      "sha256": "d23d2416c2185793f07aa3f0e48c2a1a2b4a3aaa679873e7ed67211e9205c030",
+      "id": "ca993f1e-b935-40e3-b3f4-012ea720587a",
+      "parent": "session-0508476d-407d-4f99-8a87-fbba8c9142d5",
+      "label": "agent-teams:weekly-change-review:report-writer",
+      "delegation_depth": 1,
+      "first_event": "2026-09-12T14:21:48.254+08:00",
+      "last_event": "2026-09-12T14:22:01.876+08:00",
+      "observed_span_seconds": 13.622,
+      "configs": [
+        {
+          "provider": "deepseek-official",
+          "model": "deepseek-flash",
+          "reasoningEffort": "high",
+          "maxTokens": 256000
+        }
+      ],
+      "event_counts": {
+        "session": 1,
+        "subagent/descriptor": 1,
+        "sandbox/mode": 1,
+        "approval/policy": 1,
+        "permission/preset": 1,
+        "agent/inbox/spliced": 2,
+        "turn/start": 1,
+        "step/start": 2,
+        "system/message": 1,
+        "user/message": 4,
+        "request/header": 1,
+        "request/context": 1,
+        "session/title": 1,
+        "assistant/message": 2,
+        "tool/call": 1,
+        "tool/result": 1,
+        "step/end": 2,
+        "turn/end": 1
+      },
+      "step_to_assistant": {
+        "count": 2,
+        "sum_seconds": 13.527,
+        "median_seconds": 6.764,
+        "max_seconds": 8.093
+      },
+      "step_to_first_stream_event": {
+        "count": 2,
+        "sum_seconds": 11.289,
+        "median_seconds": 5.645,
+        "max_seconds": 7.033
+      },
+      "tool_duration": {
+        "count": 1,
+        "sum_seconds": 0.01,
+        "median_seconds": 0.01,
+        "max_seconds": 0.01
+      },
+      "max_input_tokens_including_cache": 17805,
+      "usage_sum": {
+        "inputTokens": 17686,
+        "outputTokens": 470,
+        "totalTokens": 35308,
+        "cacheReadTokens": 17152,
+        "reasoningTokens": 341
+      },
+      "queue_max": {
+        "next-turn": 1
+      },
+      "pending_at_end": [],
+      "automatic_assignment_prompts_consumed": 0,
+      "tool_errors": []
+    },
+    {
+      "file": "subagents/d2b1bb55-a527-453a-94f6-8e8a9c72e287/session.v3.jsonl",
+      "sha256": "e72b85be0a55b82752ec43da0cb7a7d14c80f27a2e7fd460cd3dfff233d8e39d",
+      "id": "d2b1bb55-a527-453a-94f6-8e8a9c72e287",
+      "parent": "3484f46a-66c2-4879-bd86-86392da5ade9",
+      "label": "Perf audit native cu-helper Swift",
+      "delegation_depth": 2,
+      "first_event": "2026-09-12T14:28:59.162+08:00",
+      "last_event": "2026-09-12T15:01:02.322+08:00",
+      "observed_span_seconds": 1923.16,
+      "configs": [
+        {
+          "provider": "deepseek-official",
+          "model": "deepseek-flash",
+          "reasoningEffort": "high",
+          "maxTokens": 256000
+        }
+      ],
+      "event_counts": {
+        "session": 1,
+        "subagent/descriptor": 1,
+        "sandbox/mode": 1,
+        "approval/policy": 1,
+        "permission/preset": 1,
+        "agent/inbox/spliced": 2,
+        "turn/start": 1,
+        "step/start": 23,
+        "system/message": 1,
+        "user/message": 4,
+        "request/header": 1,
+        "request/context": 1,
+        "session/title": 1,
+        "assistant/message": 22,
+        "tool/call": 42,
+        "tool/result": 42,
+        "step/end": 22
+      },
+      "step_to_assistant": {
+        "count": 22,
+        "sum_seconds": 1921.607,
+        "median_seconds": 79.671,
+        "max_seconds": 183.741
+      },
+      "step_to_first_stream_event": {
+        "count": 22,
+        "sum_seconds": 1020.517,
+        "median_seconds": 50.389,
+        "max_seconds": 82.195
+      },
+      "tool_duration": {
+        "count": 42,
+        "sum_seconds": 1.318,
+        "median_seconds": 0.028,
+        "max_seconds": 0.09
+      },
+      "max_input_tokens_including_cache": 95261,
+      "usage_sum": {
+        "inputTokens": 66798,
+        "outputTokens": 18112,
+        "totalTokens": 1454382,
+        "cacheReadTokens": 1369472,
+        "reasoningTokens": 12887
+      },
+      "queue_max": {
+        "next-turn": 1
+      },
+      "pending_at_end": [],
+      "automatic_assignment_prompts_consumed": 0,
+      "tool_errors": []
+    },
+    {
+      "file": "subagents/f0cf4ee1-9ff8-416d-bcac-51ac52f6b38c/session.v3.jsonl",
+      "sha256": "4e72796a2bd06529e44d270885a3b64aba10ab7bde9fba33ea529001a63a4ec7",
+      "id": "f0cf4ee1-9ff8-416d-bcac-51ac52f6b38c",
+      "parent": "session-0508476d-407d-4f99-8a87-fbba8c9142d5",
+      "label": "agent-teams:weekly-change-review:finding-verifier",
+      "delegation_depth": 1,
+      "first_event": "2026-09-12T14:21:48.222+08:00",
+      "last_event": "2026-09-12T14:23:45.967+08:00",
+      "observed_span_seconds": 117.745,
+      "configs": [
+        {
+          "provider": "deepseek-official",
+          "model": "deepseek-flash",
+          "reasoningEffort": "high",
+          "maxTokens": 256000
+        },
+        {
+          "provider": "deepseek-official",
+          "model": "deepseek-flash",
+          "reasoningEffort": "high",
+          "maxTokens": 256000
+        }
+      ],
+      "event_counts": {
+        "session": 1,
+        "subagent/descriptor": 1,
+        "sandbox/mode": 1,
+        "approval/policy": 1,
+        "permission/preset": 1,
+        "agent/inbox/spliced": 4,
+        "turn/start": 2,
+        "step/start": 13,
+        "system/message": 1,
+        "user/message": 5,
+        "request/header": 2,
+        "request/context": 1,
+        "session/title": 1,
+        "assistant/message": 13,
+        "tool/call": 12,
+        "tool/result": 12,
+        "step/end": 13,
+        "turn/end": 2,
+        "session/end-seed": 1
+      },
+      "step_to_assistant": {
+        "count": 13,
+        "sum_seconds": 96.541,
+        "median_seconds": 7.037,
+        "max_seconds": 12.567
+      },
+      "step_to_first_stream_event": {
+        "count": 13,
+        "sum_seconds": 75.017,
+        "median_seconds": 6.172,
+        "max_seconds": 10.582
+      },
+      "tool_duration": {
+        "count": 12,
+        "sum_seconds": 1.009,
+        "median_seconds": 0.049,
+        "max_seconds": 0.234
+      },
+      "max_input_tokens_including_cache": 30289,
+      "usage_sum": {
+        "inputTokens": 26822,
+        "outputTokens": 5096,
+        "totalTokens": 311982,
+        "cacheReadTokens": 280064,
+        "reasoningTokens": 2005
+      },
+      "queue_max": {
+        "next-turn": 1
+      },
+      "pending_at_end": [],
+      "automatic_assignment_prompts_consumed": 0,
+      "tool_errors": [
+        {
+          "tool": "agent_teams_claim_task",
+          "call_seq": 22,
+          "result_seq": 23,
+          "time": "2026-09-12T14:22:01.578+08:00"
+        }
+      ]
+    }
+  ],
+  "tool_timings": {
+    "agent_teams_add_member": {
+      "count": 5,
+      "sum_seconds": 0.043,
+      "median_seconds": 0.007,
+      "max_seconds": 0.014
+    },
+    "agent_teams_claim_task": {
+      "count": 4,
+      "sum_seconds": 0.04,
+      "median_seconds": 0.01,
+      "max_seconds": 0.012
+    },
+    "agent_teams_create": {
+      "count": 1,
+      "sum_seconds": 0.014,
+      "median_seconds": 0.014,
+      "max_seconds": 0.014
+    },
+    "agent_teams_create_task": {
+      "count": 10,
+      "sum_seconds": 0.103,
+      "median_seconds": 0.01,
+      "max_seconds": 0.015
+    },
+    "agent_teams_edit_plan": {
+      "count": 1,
+      "sum_seconds": 0.013,
+      "median_seconds": 0.013,
+      "max_seconds": 0.013
+    },
+    "agent_teams_send_message": {
+      "count": 3,
+      "sum_seconds": 0.08,
+      "median_seconds": 0.015,
+      "max_seconds": 0.053
+    },
+    "agent_teams_status": {
+      "count": 7,
+      "sum_seconds": 0.073,
+      "median_seconds": 0.01,
+      "max_seconds": 0.014
+    },
+    "agent_teams_update_task": {
+      "count": 4,
+      "sum_seconds": 0.093,
+      "median_seconds": 0.015,
+      "max_seconds": 0.056
+    },
+    "bash": {
+      "count": 283,
+      "sum_seconds": 123.376,
+      "median_seconds": 0.04,
+      "max_seconds": 60.014
+    },
+    "glob": {
+      "count": 1,
+      "sum_seconds": 10.406,
+      "median_seconds": 10.406,
+      "max_seconds": 10.406
+    },
+    "job_output": {
+      "count": 2,
+      "sum_seconds": 0.014,
+      "median_seconds": 0.007,
+      "max_seconds": 0.008
+    },
+    "read": {
+      "count": 98,
+      "sum_seconds": 2.439,
+      "median_seconds": 0.022,
+      "max_seconds": 0.076
+    },
+    "send_message": {
+      "count": 2,
+      "sum_seconds": 0.029,
+      "median_seconds": 0.014,
+      "max_seconds": 0.016
+    },
+    "subagent": {
+      "count": 4,
+      "sum_seconds": 0.216,
+      "median_seconds": 0.054,
+      "max_seconds": 0.06
+    },
+    "todo_write": {
+      "count": 2,
+      "sum_seconds": 0.02,
+      "median_seconds": 0.01,
+      "max_seconds": 0.014
+    },
+    "write": {
+      "count": 1,
+      "sum_seconds": 0.019,
+      "median_seconds": 0.019,
+      "max_seconds": 0.019
+    }
+  },
+  "five_minute_windows_by_step_start": {
+    "2026-09-12T14:20:00+08:00": {
+      "steps": 118,
+      "median_step_seconds": 6.828,
+      "median_first_stream_seconds": 5.431
+    },
+    "2026-09-12T14:25:00+08:00": {
+      "steps": 63,
+      "median_step_seconds": 11.779,
+      "median_first_stream_seconds": 10.241
+    },
+    "2026-09-12T14:30:00+08:00": {
+      "steps": 35,
+      "median_step_seconds": 51.299,
+      "median_first_stream_seconds": 37.068
+    },
+    "2026-09-12T14:35:00+08:00": {
+      "steps": 30,
+      "median_step_seconds": 70.053,
+      "median_first_stream_seconds": 38.765
+    },
+    "2026-09-12T14:40:00+08:00": {
+      "steps": 25,
+      "median_step_seconds": 75.43,
+      "median_first_stream_seconds": 45.471
+    },
+    "2026-09-12T14:45:00+08:00": {
+      "steps": 27,
+      "median_step_seconds": 66.977,
+      "median_first_stream_seconds": 47.564
+    },
+    "2026-09-12T14:50:00+08:00": {
+      "steps": 22,
+      "median_step_seconds": 84.999,
+      "median_first_stream_seconds": 57.557
+    },
+    "2026-09-12T14:55:00+08:00": {
+      "steps": 19,
+      "median_step_seconds": 89.102,
+      "median_first_stream_seconds": 56.066
+    }
+  },
+  "task_creation_results": [
+    {
+      "call_seq": 78,
+      "time": "2026-09-12T14:21:14.650+08:00",
+      "error": true,
+      "seconds": 0.011
+    },
+    {
+      "call_seq": 83,
+      "time": "2026-09-12T14:21:20.922+08:00",
+      "error": true,
+      "seconds": 0.01
+    },
+    {
+      "call_seq": 85,
+      "time": "2026-09-12T14:21:20.929+08:00",
+      "error": true,
+      "seconds": 0.006
+    },
+    {
+      "call_seq": 90,
+      "time": "2026-09-12T14:21:27.139+08:00",
+      "error": false,
+      "seconds": 0.011
+    },
+    {
+      "call_seq": 92,
+      "time": "2026-09-12T14:21:27.148+08:00",
+      "error": false,
+      "seconds": 0.009
+    },
+    {
+      "call_seq": 97,
+      "time": "2026-09-12T14:21:34.133+08:00",
+      "error": false,
+      "seconds": 0.011
+    },
+    {
+      "call_seq": 99,
+      "time": "2026-09-12T14:21:34.141+08:00",
+      "error": false,
+      "seconds": 0.008
+    },
+    {
+      "call_seq": 104,
+      "time": "2026-09-12T14:21:40.974+08:00",
+      "error": true,
+      "seconds": 0.013
+    },
+    {
+      "call_seq": 106,
+      "time": "2026-09-12T14:21:40.984+08:00",
+      "error": false,
+      "seconds": 0.009
+    },
+    {
+      "call_seq": 111,
+      "time": "2026-09-12T14:21:44.817+08:00",
+      "error": false,
+      "seconds": 0.015
+    }
+  ],
+  "child_catalog_events": [
+    {
+      "time": "2026-09-12T14:21:48.143+08:00",
+      "parent": "session-0508476d-407d-4f99-8a87-fbba8c9142d5",
+      "child": "6e5f8dc4-88c7-44c5-bdd4-e7f943904efb",
+      "label": "agent-teams:weekly-change-review:sec-proxy-reviewer"
+    },
+    {
+      "time": "2026-09-12T14:21:48.181+08:00",
+      "parent": "session-0508476d-407d-4f99-8a87-fbba8c9142d5",
+      "child": "c5cfce70-3a8e-46cf-ad6e-f58c39729d95",
+      "label": "agent-teams:weekly-change-review:sec-boundary-reviewer"
+    },
+    {
+      "time": "2026-09-12T14:21:48.218+08:00",
+      "parent": "session-0508476d-407d-4f99-8a87-fbba8c9142d5",
+      "child": "3484f46a-66c2-4879-bd86-86392da5ade9",
+      "label": "agent-teams:weekly-change-review:perf-reviewer"
+    },
+    {
+      "time": "2026-09-12T14:21:48.251+08:00",
+      "parent": "session-0508476d-407d-4f99-8a87-fbba8c9142d5",
+      "child": "f0cf4ee1-9ff8-416d-bcac-51ac52f6b38c",
+      "label": "agent-teams:weekly-change-review:finding-verifier"
+    },
+    {
+      "time": "2026-09-12T14:21:48.288+08:00",
+      "parent": "session-0508476d-407d-4f99-8a87-fbba8c9142d5",
+      "child": "ca993f1e-b935-40e3-b3f4-012ea720587a",
+      "label": "agent-teams:weekly-change-review:report-writer"
+    },
+    {
+      "time": "2026-09-12T14:28:59.188+08:00",
+      "parent": "3484f46a-66c2-4879-bd86-86392da5ade9",
+      "child": "97299518-0d6d-42d0-a040-78a26f418757",
+      "label": "Perf audit AdapterSettings pages"
+    },
+    {
+      "time": "2026-09-12T14:28:59.193+08:00",
+      "parent": "3484f46a-66c2-4879-bd86-86392da5ade9",
+      "child": "3ac1a01e-1631-407d-ab26-4ca31ca72986",
+      "label": "Perf audit chat UI components"
+    },
+    {
+      "time": "2026-09-12T14:28:59.198+08:00",
+      "parent": "3484f46a-66c2-4879-bd86-86392da5ade9",
+      "child": "d2b1bb55-a527-453a-94f6-8e8a9c72e287",
+      "label": "Perf audit native cu-helper Swift"
+    },
+    {
+      "time": "2026-09-12T14:28:59.203+08:00",
+      "parent": "3484f46a-66c2-4879-bd86-86392da5ade9",
+      "child": "294d9067-a4ae-4fba-9bd3-7a6475e49ff2",
+      "label": "Perf audit computerUse REPL + ImageGen"
+    }
+  ]
+}

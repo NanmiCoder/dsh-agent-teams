@@ -1,0 +1,43 @@
+[
+  {
+    "event": "model-request",
+    "request": 1,
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "adba5678d76e18557462500d63a11f279dbfe46ab0d218b6b477c309c51e8936",
+    "systemBytes": 8887,
+    "toolsSha256": "1cf856ccbb783a28f786a4934422ed5979f64871eb0e062dff1644b860625b76",
+    "teamTools": [
+      "agent_teams_add_member",
+      "agent_teams_approve",
+      "agent_teams_claim_task",
+      "agent_teams_create",
+      "agent_teams_create_task",
+      "agent_teams_delete",
+      "agent_teams_edit_plan",
+      "agent_teams_reassign_task",
+      "agent_teams_remove_member",
+      "agent_teams_resume",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 0,
+    "elapsedMs": 71
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 1,
+    "latencyMs": 2415,
+    "order": 1,
+    "elapsedMs": 2488
+  },
+  {
+    "event": "stream-cancel-requested",
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "order": 2,
+    "elapsedMs": 2489
+  }
+]

@@ -1,0 +1,99 @@
+{
+  "passed": true,
+  "version": "0.1.2-rc.1",
+  "artifactSha256": "b9add40be3c82be7799633055b6ee62668a662164e57c2e21629788b7d784b42",
+  "pluginVersion": "0.1.17",
+  "testFiles": {
+    "harness-runtime-verify.mjs": "3bddaa1b96462444f8e844ce1f486d73d8997e6f6d7489547be8ef3e99a23d37",
+    "fixtures/harness-runtime-llm.mjs": "7fe9272c5f63f24dc4ff652817823a03abeeb1741fa9ce3ffff9682e4d4a029b",
+    "fixtures/harness-runtime-resume.mjs": "35587f7947360a37813c274d1274f4222830a84b4ffb2eafdb0f945707bce01b",
+    "fixtures/harness-runtime-idle.mjs": "ecc9e00a1ed9f94ddf4041f3ec6eded1a7c2b6b63958451b33a04a1cb6fff7cf",
+    "fixtures/harness-runtime-entry.mjs": "2c655ddac20fba0af358f88b829f07af973afb02a39821647a2c83389de1d1fd",
+    "fixtures/harness-runtime-web-approval.mjs": "2e55d1993ad3b84a1409bbd08820790334d937748f6efd4cbdc223cb56e545f8",
+    "fixtures/harness-runtime-protocol.mjs": "c3ad840a33006dfdcc091fbf9637ac56dd7bf65f5311839a53a61f7131a531cb",
+    "fixtures/harness-runtime-stability.mjs": "b1e660d7f9a0b414cb4e7492c7ceba6b4cc8e4311909b4fb2b2094967ff2a57e"
+  },
+  "node": "v26.7.0",
+  "platform": "darwin",
+  "arch": "arm64",
+  "cohortCount": 214,
+  "runs": [
+    {
+      "scenario": "stability",
+      "passed": true,
+      "assertions": {
+        "exit0": true,
+        "productMarker": true,
+        "lazy-start": true,
+        "running-plan-correction": true,
+        "steering": true,
+        "read-receipt-continuation": true,
+        "reassign": true,
+        "archive": true,
+        "batch-plan": true
+      },
+      "evidence": [
+        {
+          "event": "stability-lazy-start-passed",
+          "readyRequests": 1,
+          "blockedRequests": 0,
+          "welcomeRequests": 0,
+          "time": 1789236003304
+        },
+        {
+          "event": "stability-running-plan-correction-passed",
+          "pendingEdit": true,
+          "captainCancellation": true,
+          "blockedRequests": 0,
+          "time": 1789236003368
+        },
+        {
+          "event": "stability-steering-passed",
+          "queuedMessages": 32,
+          "modelStepsUntilConsumed": 1,
+          "time": 1789236004315
+        },
+        {
+          "event": "stability-read-receipt-continuation-passed",
+          "modelContinued": true,
+          "time": 1789236004406
+        },
+        {
+          "event": "stability-reassign-passed",
+          "sameMember": true,
+          "staleInputExcluded": true,
+          "time": 1789236004567
+        },
+        {
+          "event": "stability-archive-passed",
+          "pendingMessagesCleared": 32,
+          "descendantsStopped": true,
+          "siblingPreserved": true,
+          "retiredResumeRejected": true,
+          "time": 1789236005746
+        },
+        {
+          "event": "stability-batch-plan-passed",
+          "members": 5,
+          "tasks": 6,
+          "setupToolCalls": 1,
+          "previousEquivalentToolCalls": 12,
+          "memberModelRequests": 0,
+          "time": 1789236005817
+        }
+      ],
+      "exit": {
+        "code": 0,
+        "signal": null,
+        "timedOut": false
+      }
+    }
+  ],
+  "unverified": [
+    "real provider APIs and credentials",
+    "browser interaction",
+    "other operating systems",
+    "native terminal execution",
+    "live user-data migration"
+  ]
+}

@@ -21,7 +21,7 @@ for (let i = 2; i < process.argv.length; i++) {
     else
         throw Error('Invalid argument ' + arg);
 }
-const scenarios = ['lifecycle', 'fallback', 'failure', 'captain-idle-wakeup', 'progressive-entry', 'web-approval', 'protocol-compatibility'];
+const scenarios = ['lifecycle', 'fallback', 'failure', 'captain-idle-wakeup', 'progressive-entry', 'web-approval', 'protocol-compatibility', 'stability'];
 if (flags.has('--scenario') && !scenarios.includes(flags.get('--scenario'))) throw Error('Unknown scenario');
 const version = flags.get('--host-version');
 if (typeof version !== 'string' || !/^\d+\.\d+\.\d+(?:-[\w.]+)?$/.test(version))
@@ -93,7 +93,7 @@ function verifyCohort() {
     json(join(report, 'cohort.json'), result);
     return result;
 }
-const testFiles = Object.fromEntries(['harness-runtime-verify.mjs', 'fixtures/harness-runtime-llm.mjs', 'fixtures/harness-runtime-resume.mjs', 'fixtures/harness-runtime-idle.mjs', 'fixtures/harness-runtime-entry.mjs', 'fixtures/harness-runtime-web-approval.mjs', 'fixtures/harness-runtime-protocol.mjs'].map(path => [path, hash(join(dirname(fileURLToPath(import.meta.url)), path))]));
+const testFiles = Object.fromEntries(['harness-runtime-verify.mjs', 'fixtures/harness-runtime-llm.mjs', 'fixtures/harness-runtime-resume.mjs', 'fixtures/harness-runtime-idle.mjs', 'fixtures/harness-runtime-entry.mjs', 'fixtures/harness-runtime-web-approval.mjs', 'fixtures/harness-runtime-protocol.mjs', 'fixtures/harness-runtime-stability.mjs'].map(path => [path, hash(join(dirname(fileURLToPath(import.meta.url)), path))]));
 let artifactSha;
 const manifestPath = join(runtime, 'package.json');
 let manifest = existsSync(manifestPath) ? JSON.parse(readFileSync(manifestPath, 'utf8')) : undefined;
@@ -219,9 +219,31 @@ for (const scenario of (flags.has('--scenario') ? [flags.get('--scenario')] : sc
       name: ./fixture-protocol.mjs
 `);
     }
+    if (scenario === 'stability') {
+        copyFileSync(join(dirname(fileURLToPath(import.meta.url)), 'fixtures/harness-runtime-stability.mjs'), join(profile, 'fixture-stability.mjs'));
+        writeFileSync(join(profile, 'cordis.patch.yml'), readFileSync(join(profile, 'cordis.patch.yml'), 'utf8') + `- id: runtime-lab-fixture
+  disabled: true
+- id: headless-startup
+  disabled: true
+- id: headless-runner
+  disabled: true
+- id: agent-teams
+  config:
+    memberMaxDepth: 1
+- insert:
+    - id: runtime-lab-stability
+      name: ./fixture-stability.mjs
+`);
+    }
     const tracePath = join(report, scenario, 'trace.jsonl');
     const result = await command([process.execPath, join(runtime, 'node_modules/@deepseek-ai/dsh/lib/bin.js'), '--profile', 'headless', 'Run the authorized deterministic AgentTeams fixture immediately.'], workspace, environment({ DSH_HOME: home, DSH_PERMISSION_MODE: 'danger-full-access', DSH_TELEMETRY_DISABLED: '1', LAB_TRACE: tracePath, LAB_TEAMS: '1', LAB_SCENARIO: scenario }), scenario, 90000);
     const trace = existsSync(tracePath) ? readFileSync(tracePath, 'utf8').trim().split('\n').filter(Boolean).map(s => JSON.parse(s)) : [];
+    if (scenario === 'stability') {
+        const checks = ['lazy-start', 'running-plan-correction', 'steering', 'read-receipt-continuation', 'reassign', 'archive', 'batch-plan', 'settlement-dedup'];
+        const assertions = { exit0: result.code === 0 && !result.timedOut, productMarker: result.stdout.includes('STABILITY_OK'), ...Object.fromEntries(checks.map(check => [check, trace.some(x => x.event === `stability-${check}-passed`)])) };
+        runs.push({ scenario, passed: Object.values(assertions).every(Boolean), assertions, evidence: trace.filter(x => checks.some(check => x.event === `stability-${check}-passed`)), exit: { code: result.code, signal: result.signal, timedOut: result.timedOut } });
+        continue;
+    }
     if (scenario === 'protocol-compatibility') {
         const cases = trace.filter(x => x.event === 'protocol-case-passed');
         const assertions = { exit0: result.code === 0 && !result.timedOut, productMarker: result.stdout.includes('PROTOCOL_COMPATIBILITY_OK'), legacyAllowlistAndColdRestore: cases.some(x => x.label === 'legacy-allowlist-cold-compact') && trace.some(x => x.event === 'protocol-cold-restored'), legacyProfileDirectory: trace.some(x => x.event === 'protocol-legacy-profile-directory' && x.onlyOriginalTools === true && x.northPurposeVisible && x.southPurposeVisible) && cases.some(x => x.label === 'legacy-allowlist-cold-compact' && x.profile === 'north'), actualPtcDiscard: cases.some(x => x.label === 'ptc-discard-and-compact') && trace.some(x => x.event === 'protocol-ptc-output-discarded' && x.tool === 'agent_teams_status'), actualPruning: trace.some(x => x.event === 'protocol-pruned'), actualCompaction: trace.filter(x => x.event === 'protocol-compacted').length === 2, existingPlanRevised: cases.length === 2 && cases.every(x => x.persistedSubject === 'Recovered task'), lifecycleArchived: cases.length === 2 && cases.every(x => x.archived === true) };

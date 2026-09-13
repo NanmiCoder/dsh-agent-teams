@@ -1,0 +1,38 @@
+{
+  "agentCwd": "/tmp",
+  "hostVersion": "0.1.5-rc.1",
+  "cohortCount": 231,
+  "runtime": "/tmp/agentteams-stability/runtime-0.1.5-rc.1",
+  "model": {
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max"
+  },
+  "testFiles": {
+    "harness-model-benchmark.mjs": "bc8443f954fa0d6446e4e0bbd78b7a73222f8c678d7d84734992b2ea22ea25f1",
+    "fixtures/harness-model-case.mjs": "5036cc52b5b6bae997a400828c4bc341068c0c9e261b73aafe728a8463faeb4e",
+    "fixtures/harness-model-driver.mjs": "2abb5436199338d6a07dfb5e8ff3552622ef0ea82267a5c58f93615114de8cd1"
+  },
+  "artifacts": {
+    "baseline": {
+      "path": "/tmp/agentteams-stability/baseline-source/nanmicoder-dsh-agent-teams-0.1.17.tgz",
+      "sha256": "cef5a0b6cd0c83b8259ae9410d488c06bcb3deb43edc7489324f5f89a17f68eb"
+    },
+    "candidate": {
+      "path": "/tmp/agentteams-stability/nanmicoder-dsh-agent-teams-0.1.17.tgz",
+      "sha256": "49c22d22de82831aab2d19418ad46a2355648e0965568411548431103ef4a51b"
+    }
+  },
+  "timeoutMs": 300000,
+  "maxRequests": 40,
+  "seedSha256": {
+    "app/orders.mjs": "437ebb9e258f51ae043c84aed195e5d7ce53a89b56c487a002a018bf97f3a8a6",
+    "app/comments.mjs": "7f5cec1d0b7eec9248c43fbdb8f1151cf6ae52ee37a0e649a39579a289a2c198",
+    "app/signup.mjs": "f28019ae6905f30beae40491a3d73298c853b370aea6740cdbd81679262207b8"
+  },
+  "inputs": {
+    "fresh": "请使用 AgentTeams 立即执行这项审查；我明确授权跳过计划审批，不需要再次确认。\n安排三位成员，名字分别为 performance、security、interaction，各自独立只读审查 app/ 中的小应用。给每人创建一项明确的审查任务，合计三项独立任务；不要增加其他成员。performance 检查性能和数据规模增长，security 检查不可信输入，interaction 检查正常用户流程能否完成。\n不要修改 app/ 或其他已有文件。每位成员只新增自己的 reports/<成员名>.json，格式为 {\"reviewer\":\"成员名\",\"findings\":[{\"path\":\"app/文件名\",\"symbol\":\"函数名\",\"problem\":\"具体问题\",\"evidence\":\"可复现输入、操作及错误结果\",\"recommendation\":\"最小修复建议\"}]}。报告至少提供一个有源码依据的真实问题；没有发现时如实报告空 findings，不要编造。允许读代码和运行临时内存探针，禁止访问工作区外文件、网络、Harness 配置或插件源代码。\n队长负责委派与汇总，不代写成员报告。等待三位成员完成审查任务并回报后，新增 reports/summary.json，格式为 {\"reports\":[\"reports/performance.json\",\"reports/security.json\",\"reports/interaction.json\"],\"summary\":\"基于三份报告的结论\"}。完成后保留团队和任务以便我继续复核，不要删除或归档。结束当前轮，成员报告会自动唤醒你。",
+    "cold": "继续当前已有 AgentTeams 团队，不要重建团队、添加或替换成员，也不要覆盖先前报告。我现在要求一次后续复核：为原 security 成员新增且仅新增一项任务，确认 app/comments.mjs 原问题是否仍存在。不要修复代码。\n请让原 security 成员读取当前文件，独立执行或描述具体输入与结果，写 reports/security-followup.json，沿用之前报告 JSON 格式。队长等待该任务完成和成员回报后，写 reports/cold-summary.json，格式为 {\"reports\":[\"reports/security-followup.json\"],\"summary\":\"复核结论\"}。只写这些新报告，禁止工作区外读取或网络请求，完成后继续保留当前团队。"
+  },
+  "scope": "Real configured DeepSeek adapter; exact published Harness CLI/Loader. External acceptance checks files, task status and member tool provenance. No model call order is preprogrammed."
+}

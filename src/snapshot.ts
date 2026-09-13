@@ -154,7 +154,7 @@ export async function assembleTeamSnapshot(
               : activity.get(member.id) === 'idle' || activity.get(member.id) === 'ready'
                 ? 'idle'
                 : 'unknown')
-          : state.phase === 'staged' ? 'idle' : 'unknown',
+          : 'idle',
       progress: owned.length === 0 ? 0 : Math.round((done / owned.length) * 100),
       done,
       total: owned.length,

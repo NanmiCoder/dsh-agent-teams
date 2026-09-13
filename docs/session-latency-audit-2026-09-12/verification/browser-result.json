@@ -1,0 +1,16 @@
+{
+  "passed": true,
+  "dormantClickNavigations": 0,
+  "errors": [],
+  "navigations": [
+    [
+      "captain",
+      "research-session"
+    ]
+  ],
+  "members": [
+    "验证员",
+    "研究员",
+    "开发者"
+  ]
+}

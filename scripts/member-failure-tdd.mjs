@@ -50,6 +50,7 @@ async function fixture(t, { captainStatus = 'idle', fallback, captainOffline = f
   const idle = new Promise(resolve => { resolveIdle = resolve })
   const child = {
     id: 'worker-session', status: 'running',
+    steer(message) { deliveries.push({ id: this.id, content: message.content }) },
     whenIdle: () => child.status === 'idle' ? Promise.resolve() : idle,
     session: {
       header: { cwd: workspace, parentSession: captain.id, seedLength: 0 },
@@ -87,10 +88,10 @@ async function fixture(t, { captainStatus = 'idle', fallback, captainOffline = f
     delete ctx.subagents.followup
     delete ctx.subagents.registerContinuableSetup
     ctx.subagents[hostQueue] = function (parent, id, content, source, signal, delivery) {
-      if (deliveryHarness && delivery !== 'queue') throw new Error('recovery must queue a distinct turn')
+      if (deliveryHarness) assert.ok(['queue', 'steer'].includes(delivery))
       return followup.call(this, parent, id, content, { source, signal })
     }
-    ctx.subagents.sendMessage = () => { throw new Error('failure recovery must not steer a job') }
+    ctx.subagents.sendMessage = (parent, id, content) => followup.call(ctx.subagents, parent, id, content)
     setup = childCtx => {
       child.ctx = childCtx
       if (deliveryHarness) delete childCtx.agent
@@ -198,9 +199,10 @@ for (const captainStatus of ['idle', 'running']) {
     assert.equal((await h.state()).members[0].status, 'idle')
     assert.match(JSON.stringify(h.steers[0]), /t1/)
     assert.match(JSON.stringify(h.steers[0]), /STREAM_CLOSED/)
-    await eventually(async () => (await h.unread()).length === 0)
+    await eventually(async () => (await h.mailbox())[0]?.deliveredAt !== undefined)
+    assert.equal((await h.unread()).length, 1, 'delivery alone does not prove consumption')
     assert.equal((await h.mailbox()).length, 1)
-    assert.equal((await readUnreadMailbox(h.stateRoot, 'team', 'worker')).length, 0)
+    assert.equal((await readUnreadMailbox(h.stateRoot, 'team', 'worker')).length, 1)
     assert.equal(h.warnings.length, 0)
   })
 }

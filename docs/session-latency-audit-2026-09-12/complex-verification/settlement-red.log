@@ -1,0 +1,35 @@
+✔ work, empty, staged, halted and escalated teams cannot falsely declare delivery (0.489292ms)
+✔ inbox acceptance leaves 32 messages unread; one admitted step consumes them exactly once (21.535917ms)
+✔ old-generation guidance is discarded while current mail survives the same batch (3.970041ms)
+✖ reported completion suppresses only redundant native success settlements (4.295334ms)
+✔ next-step steering preserves the native delivery modes across all three contracts (0.57325ms)
+✔ internal wakeups and cold admission are rejected for stopped or retired members (8.796667ms)
+✔ member-relative delegation limit covers raw runtime calls and preserves unrelated siblings (1.673459ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 6
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 44.102708
+
+✖ failing tests:
+
+test at scripts/stability-tdd.mjs:71:7
+✖ reported completion suppresses only redundant native success settlements (4.295334ms)
+  AssertionError [ERR_ASSERTION]: duplicate settlement must spend no model request
+  
+  'enter' !== 'reject'
+  
+      at TestContext.<anonymous> (file:///Users/nanmi/.codex/worktrees/b3c1/dsh-agent-teams/scripts/stability-tdd.mjs:85:10)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+      at async file:///Users/nanmi/.codex/worktrees/b3c1/dsh-agent-teams/scripts/stability-tdd.mjs:71:1 {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'enter',
+    expected: 'reject',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

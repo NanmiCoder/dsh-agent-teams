@@ -109,6 +109,8 @@ export interface TeamTask {
   attemptId?: string
   /** Opaque generation for a revocation/handoff that has not started its next attempt yet. */
   handoffId?: string
+  /** Previous activation retained until a handoff drain succeeds (retryable). */
+  handoffFromMemberId?: string
   /** A handoff is quiescing the old owner; the scheduler must not dispatch it yet. */
   reassigning?: boolean
   /** Quality-gate kind. Missing values are treated as `work`. */
@@ -166,6 +168,8 @@ export interface TeamMember {
   fallbackActive?: boolean
   joinedAt: number
   status: MemberStatus
+  /** Execution admission is closed while a failed/pending handoff is drained. */
+  stopping?: boolean
 }
 
 /** One mailbox message. */
@@ -183,6 +187,11 @@ export interface TeamMessage {
   deliveredAt?: number
   /** Set once the recipient has consumed or been shown the durable fallback. */
   readAt?: number
+  /** Guidance is scoped to the recipient's execution generation, when present. */
+  taskId?: string
+  attemptId?: string
+  /** Cancelled delivery is retained for audit but must not wake the recipient. */
+  discardedAt?: number
 }
 
 /** Snapshot of the named profile used to seed a team. */

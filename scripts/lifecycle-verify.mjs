@@ -24,12 +24,14 @@ const hostQueue = Symbol.for(deliveryHarness ? 'dsh.subagent.deliverPrompt' : 'd
 const workspace = await mkdtemp(join(tmpdir(), 'dsh-agent-teams-lifecycle-'))
 const definitions = new Map()
 const liveAgents = new Map()
+const disposedAgents = new Map()
 const children = []
 const deliveries = []
 const listeners = new Map()
 const childListeners = new Map()
 const continuableSetups = []
 const failNextDelivery = new Set()
+const failNextDrain = new Set()
 const failures = []
 let childSeq = 0
 let messageSeq = 0
@@ -64,7 +66,11 @@ function makeAgent(id, parentSession) {
     followup(message) {
       this.followups.push(message)
     },
-    steer(message) { this.steers.push(message) },
+    steer(message) {
+      if (failNextDelivery.delete(this.id)) throw new Error('injected steering failure')
+      this.steers.push(message)
+      if (this.id !== captain.id) { deliveries.push({ childId: this.id, content: message.content, mode: 'steer' }); this.status = 'running' }
+    },
     inject(message) {
       this.injections.push(message)
     },
@@ -206,7 +212,8 @@ const ctx = {
       } else {
         for (const setup of continuableSetups) setup(child.ctx)
       }
-      return { childId: id, messageId: `welcome-${childSeq}` }
+      deliveries.push({ childId: id, content: spec.request.prompt, mode: 'initial' })
+      return { childId: id, messageId: `initial-${childSeq}` }
     },
     async listChildren(parentId) {
       if (parentId !== captain.id) return []
@@ -225,7 +232,8 @@ const ctx = {
       if (failNextDelivery.delete(childId)) throw new Error('injected delivery failure')
       if (deliveryDelayMs > 0) await new Promise(resolve => setTimeout(resolve, deliveryDelayMs))
       deliveries.push({ childId, content })
-      const child = liveAgents.get(childId)
+      const child = liveAgents.get(childId) ?? disposedAgents.get(childId)
+      if (child) liveAgents.set(childId, child)
       if (child) child.status = 'running'
       return `message-${++messageSeq}`
     },
@@ -238,10 +246,12 @@ const ctx = {
     },
     async drainContinuableChildren(parent, childIds) {
       for (const childId of childIds) {
+        if (failNextDrain.delete(childId)) throw new Error('injected drain failure')
         const child = liveAgents.get(childId)
         if (child) {
           child.drainCount = (child.drainCount ?? 0) + 1
           publishStatus(child, 'idle')
+          disposedAgents.set(childId, child)
           liveAgents.delete(childId)
         }
       }
@@ -258,10 +268,10 @@ if (modernHarness) {
   delete ctx.subagents.followup
   delete ctx.subagents.registerContinuableSetup
   ctx.subagents[hostQueue] = function (parent, childId, content, source, signal, delivery) {
-    if (deliveryHarness && delivery !== 'queue') throw new Error('team tasks must queue a distinct turn')
+    if (deliveryHarness && !['queue', 'steer'].includes(delivery)) throw new Error('invalid delivery mode')
     return followup.call(this, parent, childId, content, { source, signal })
   }
-  ctx.subagents.sendMessage = async function () { throw new Error('team jobs must use FIFO, not steer') }
+  ctx.subagents.sendMessage = (parent, id, content) => followup.call(ctx.subagents, parent, id, content)
 }
 
 function directPrompt(parent, childId, content, options) {
@@ -453,16 +463,15 @@ try {
       && profileTeam.tasks[1]?.dependencies.join(',') === 't1'
       && profileTeam.tasks[1]?.assignee === 'implementer')
   const analyst = liveAgents.get(createdProfile.members[0].member_id)
-  const implementer = liveAgents.get(createdProfile.members[1].member_id)
-  analyst.status = 'idle'
-  implementer.status = 'idle'
+  let implementer
+  check('dependency-blocked roster does not spawn a model session', createdProfile.members[1].member_id === '')
   await call('agent_teams_status', {})
   const afterKick = await readTeam(stateRoot, 'profile-demo')
   const firstSeed = afterKick?.tasks[0]
   check('first-stage seed is assigned only to the configured member',
     firstSeed?.status === 'claimed' && firstSeed.assignee === 'analyst'
       && deliveries.some(delivery => delivery.childId === analyst.id)
-      && !deliveries.some(delivery => delivery.childId === implementer.id && String(delivery.content?.[0]?.text ?? '').includes('Implement')))
+      && !deliveries.some(delivery => delivery.childId === implementer?.id && String(delivery.content?.[0]?.text ?? '').includes('Implement')))
   const firstAssignment = deliveries.find(delivery => delivery.childId === analyst.id)
   const assignmentText = Array.isArray(firstAssignment?.content)
     ? firstAssignment.content.map(block => block.text ?? '').join('\n')
@@ -479,10 +488,10 @@ try {
     output: 'Need a user decision before design.',
   }, analyst)
   publishStatus(analyst, 'idle')
-  publishStatus(implementer, 'idle')
+  if (implementer) publishStatus(implementer, 'idle')
   check('failed upstream does not unlock the next configured stage',
     (await readTeam(stateRoot, 'profile-demo'))?.tasks[1]?.status === 'pending'
-      && !deliveries.some(delivery => delivery.childId === implementer.id && String(delivery.content?.[0]?.text ?? '').includes('Implement')))
+      && !deliveries.some(delivery => delivery.childId === implementer?.id && String(delivery.content?.[0]?.text ?? '').includes('Implement')))
   await call('agent_teams_reassign_task', { task_id: firstSeed.id, assignee: 'analyst', reason: 'retry after user answer' })
   const retryClaim = await call('agent_teams_claim_task', { task_id: firstSeed.id }, analyst)
   await call('agent_teams_update_task', { task_id: firstSeed.id, status: 'in_progress', attempt_id: retryClaim.attempt_id }, analyst)
@@ -493,7 +502,9 @@ try {
     output: 'Scope confirmed: ship the tiny demo.',
   }, analyst)
   publishStatus(analyst, 'idle')
-  publishStatus(implementer, 'idle')
+  if (implementer) publishStatus(implementer, 'idle')
+  await call('agent_teams_status', {})
+  implementer = liveAgents.get((await readTeam(stateRoot, 'profile-demo')).members.find(m => m.name === 'implementer').id)
   const secondSeed = (await readTeam(stateRoot, 'profile-demo'))?.tasks[1]
   check('completed upstream dispatches the configured downstream assignee',
     secondSeed?.status === 'claimed' && secondSeed.assignee === 'implementer')
@@ -663,14 +674,31 @@ try {
       && deliveries.length === deliveriesBeforePlan)
   const approvedDynamic = await call('agent_teams_approve', { confirmation: 'user clicked Approve & Run' })
   const dynamicTeam = await readTeam(stateRoot, 'dynamic-demo')
-  check('approval atomically spawns the final roster before dispatch',
+  const correctedRunning = await call('agent_teams_edit_plan', { operations: [{ action: 'update_task', task_id: dynamicSecond.task_id, description: 'Corrected pending task context', dependencies: [dynamicFirst.task_id] }] })
+  check('running never-started tasks can be corrected without replacing the DAG', correctedRunning.status === 'running' && (await readTeam(stateRoot, 'dynamic-demo')).tasks.find(t => t.id === dynamicSecond.task_id).description === 'Corrected pending task context')
+  let rejectedRunningBatch = false
+  try {
+    await call('agent_teams_edit_plan', { operations: [
+      { action: 'update_task', task_id: dynamicSecond.task_id, description: 'must not persist' },
+      { action: 'update_task', task_id: dynamicFirst.task_id, subject: 'must not overwrite active work' },
+    ] })
+  } catch { rejectedRunningBatch = true }
+  check('invalid running plan batches preserve the entire previous graph', rejectedRunningBatch && (await readTeam(stateRoot, 'dynamic-demo')).tasks.find(t => t.id === dynamicSecond.task_id).description === 'Corrected pending task context')
+  for (const operation of [{ action: 'update_task', task_id: dynamicFirst.task_id, subject: 'do not overwrite active work' }, { action: 'update_task', task_id: dynamicSecond.task_id, dependencies: [dynamicSecond.task_id] }, { action: 'remove_member', member_name: 'implementer' }]) {
+    let rejected = false; try { await call('agent_teams_edit_plan', { operations: [operation] }) } catch { rejected = true }
+    check('running edits reject active attempts, cycles and roster changes: ' + JSON.stringify(operation), rejected)
+  }
+  const abandoned = await call('agent_teams_create_task', { subject: 'Cancelled planning mistake', assignee: 'implementer', dependencies: [dynamicFirst.task_id] })
+  const cancelledPending = await call('agent_teams_update_task', { task_id: abandoned.task_id, status: 'cancelled', output: 'No execution began; captain corrected the plan.' })
+  check('captain can cancel dependency-blocked member work before its first attempt', cancelledPending.status === 'cancelled' && cancelledPending.attempt === 0)
+  check('approval starts only dependency-ready members',
     approvedDynamic.status === 'running'
       && dynamicTeam?.phase === 'running'
       && typeof dynamicTeam.approvedAt === 'number'
-      && dynamicTeam.members.every(member => member.id !== '')
-      && dynamicTeam.tasks[0]?.status === 'pending'
+      && dynamicTeam.members.filter(member => member.id !== '').length === 1
+      && dynamicTeam.tasks[0]?.status === 'claimed'
       && dynamicTeam.tasks[1]?.status === 'pending')
-  for (const member of dynamicTeam.members) publishStatus(liveAgents.get(member.id), 'idle')
+  for (const member of dynamicTeam.members) if (member.id !== '') publishStatus(liveAgents.get(member.id), 'idle')
   await call('agent_teams_status', {})
   const dispatchedDynamic = await readTeam(stateRoot, 'dynamic-demo')
   check('approved plan dispatches only after a spawned member becomes idle',
@@ -678,7 +706,7 @@ try {
       && dispatchedDynamic.tasks[1]?.status === 'pending')
   const dynamicAnalyst = liveAgents.get(dynamicTeam.members.find(member => member.name === 'analyst')?.id)
   const dynamicImplementer = liveAgents.get(dynamicTeam.members.find(member => member.name === 'implementer')?.id)
-  const interruptedBeforeHalt = dynamicAnalyst.interruptCount ?? 0
+  const drainedBeforeHalt = dynamicAnalyst.drainCount ?? 0
   const captainCancelsBeforeHalt = captain.cancelCount ?? 0
   const halt = await haltTeamWork({
     ctx,
@@ -697,13 +725,9 @@ try {
     captain.cancelCount === captainCancelsBeforeHalt + 2
       && captain.lastCancel?.cause?.kind === 'user'
       && captain.lastCancel?.options?.keepInbox === true)
-  check('captain halt interrupts and drains graph members',
-    (dynamicAnalyst.interruptCount ?? 0) > interruptedBeforeHalt
-      && (dynamicImplementer.interruptCount ?? 0) > 0
-      && (dynamicAnalyst.drainCount ?? 0) > 0
-      && (dynamicImplementer.drainCount ?? 0) > 0
-      && !liveAgents.has(dynamicAnalyst.id)
-      && !liveAgents.has(dynamicImplementer.id))
+  check('captain halt drains active members and leaves blocked members unspawned',
+    (dynamicAnalyst.drainCount ?? 0) > drainedBeforeHalt && dynamicImplementer === undefined
+      && !liveAgents.has(dynamicAnalyst.id))
   const deliveriesAfterHalt = deliveries.length
   await call('agent_teams_status', {})
   check('halted team does not redispatch cancelled graph',
@@ -726,7 +750,7 @@ try {
   await call('agent_teams_delete', {})
   const haltedArchive = await readArchivedTeam(stateRoot, 'dynamic-demo')
   check('shutdown preserves cancelled task history in the archive',
-    haltedArchive?.tasks.length === 2
+    haltedArchive?.tasks.length === 3
       && haltedArchive.tasks.every(item => item.status === 'cancelled'))
 
   await call('agent_teams_create', { name: 'Quality Loop', description: 'review loop' })
@@ -750,8 +774,16 @@ try {
   check('quality implementation without contract is rejected', missingContractRejected)
   const qualityTeam = await readTeam(stateRoot, 'quality-loop')
   const builder = [...liveAgents.values()].find(agent => qualityTeam?.members.some(member => member.id === agent.id && member.name === 'builder'))
-  const criticMember = [...liveAgents.values()].find(agent => qualityTeam?.members.some(member => member.id === agent.id && member.name === 'critic'))
+  let criticMember
   const implClaim = await call('agent_teams_claim_task', { task_id: impl.task_id }, builder)
+  for (const attempt_id of [undefined, '']) {
+    let missingAttemptError = ''
+    try { await call('agent_teams_update_task', { task_id: impl.task_id, status: 'in_progress', ...(attempt_id === undefined ? {} : { attempt_id }) }, builder) }
+    catch (error) { missingAttemptError = String(error.message) }
+    check('missing attempt_id is a correctable parameter error, not a revoked attempt',
+      missingAttemptError.includes('missing attempt_id') && missingAttemptError.includes(implClaim.attempt_id)
+        && (await readTeam(stateRoot, 'quality-loop')).tasks.find(t => t.id === impl.task_id).attemptId === implClaim.attempt_id)
+  }
   await call('agent_teams_update_task', { task_id: impl.task_id, status: 'in_progress', attempt_id: implClaim.attempt_id }, builder)
   let illegalCompleteRejected = false
   try {
@@ -782,6 +814,7 @@ try {
     acceptance: ['no blocker or high findings'],
     reviewedTaskId: impl.task_id,
   })
+  criticMember = liveAgents.get((await readTeam(stateRoot, 'quality-loop')).members.find(m => m.name === 'critic').id)
   const reviewClaim = await call('agent_teams_claim_task', { task_id: review.task_id }, criticMember)
   await call('agent_teams_update_task', { task_id: review.task_id, status: 'in_progress', attempt_id: reviewClaim.attempt_id }, criticMember)
   let needsRevisionCompleteRejected = false
@@ -819,9 +852,12 @@ try {
   const addedAlpha = await call('agent_teams_add_member', { name: 'alpha', role: 'slow implementer' })
   const addedBeta = await call('agent_teams_add_member', { name: 'beta', role: 'researcher' })
   const addedGamma = await call('agent_teams_add_member', { name: 'gamma', role: 'reviewer' })
-  const alpha = liveAgents.get(addedAlpha.member_id)
-  const beta = liveAgents.get(addedBeta.member_id)
-  const gamma = liveAgents.get(addedGamma.member_id)
+  check('adding members alone creates no child sessions', [addedAlpha, addedBeta, addedGamma].every(m => m.member_id === ''))
+  for (const name of ['alpha', 'beta', 'gamma']) await call('agent_teams_send_message', { to: name, content: 'Prepare for the concurrency regression and wait for assignment.' })
+  const roster = (await state()).members
+  const alpha = liveAgents.get(roster.find(m => m.name === 'alpha').id)
+  const beta = liveAgents.get(roster.find(m => m.name === 'beta').id)
+  const gamma = liveAgents.get(roster.find(m => m.name === 'gamma').id)
   check('manually added members persist the global fallback for later activations',
     (await state())?.members.every(member => member.fallback?.provider === 'backup'
       && member.fallback?.model === 'backup-model'))
@@ -1132,13 +1168,18 @@ try {
     }, owner)
   }
 
+  await call('agent_teams_status', {}, gamma)
   gamma.status = 'idle'
   failNextDelivery.add(gamma.id)
   const fallback = await call('agent_teams_send_message', { to: 'gamma', content: 'durable fallback' })
   check('failed live message remains one unread durable fallback',
     fallback.delivered === 'mailbox' && (await readUnreadMailbox(stateRoot, teamId, 'gamma')).length === 1)
   await call('agent_teams_status', {})
-  check('status kick redelivers and acknowledges fallback exactly once',
+  check('status kick accepts fallback without inventing consumption',
+    (await readUnreadMailbox(stateRoot, teamId, 'gamma')).length === 1
+      && (await readMailbox(stateRoot, teamId, 'gamma')).at(-1)?.deliveredAt !== undefined)
+  await call('agent_teams_status', {}, gamma)
+  check('recipient status acknowledges the complete fallback actually displayed',
     (await readUnreadMailbox(stateRoot, teamId, 'gamma')).length === 0)
 
   beta.status = 'running'
@@ -1363,10 +1404,9 @@ try {
   // retried by Harness, and must not close the task prematurely.
   await call('agent_teams_create', { name: 'Failure Bridge', description: 'turn failures must surface' })
   await call('agent_teams_add_member', { name: 'flake', role: 'streaming worker' })
-  const flakeTeam = await readTeam(stateRoot, 'failure-bridge')
-  const flake = liveAgents.get(flakeTeam?.members.find(member => member.name === 'flake')?.id)
-  publishStatus(flake, 'idle')
   const flakeTask = await call('agent_teams_create_task', { subject: 'streaming work', assignee: 'flake' })
+  const flakeTeam = await readTeam(stateRoot, 'failure-bridge')
+  const flake = liveAgents.get(flakeTeam.members.find(member => member.name === 'flake').id)
   const flakeClaim = await call('agent_teams_claim_task', { task_id: flakeTask.task_id }, flake)
   await call('agent_teams_update_task', {
     task_id: flakeTask.task_id, status: 'in_progress', attempt_id: flakeClaim.attempt_id,
@@ -1407,7 +1447,7 @@ try {
   const bridgeTask = async () => (await bridgeState())?.tasks.find(candidate => candidate.id === flakeTask.task_id)
   for (let waited = 0; waited < 2000; waited += 20) {
     if ((await bridgeTask())?.status === 'failed' && captain.steers.length > captainSteersBeforeFailure
-      && deliveries.length > deliveriesBeforeFailure
+      && deliveries.length === deliveriesBeforeFailure
       && (await readUnreadMailbox(stateRoot, 'failure-bridge', 'flake')).length === 0) break
     await new Promise(resolve => setTimeout(resolve, 20))
   }
@@ -1425,11 +1465,45 @@ try {
       && captainMail.at(-1)?.content.includes('STREAM_CLOSED') === true
       && captainMail.at(-1)?.content.includes(flakeTask.task_id)
       && captainSteersBeforeFailure + 1 === captain.steers.length)
-  check('settled member flushes the question without idle events or manual scheduler kicks',
-    deliveries.length === deliveriesBeforeFailure + 1
+  check('settled member discards failed-attempt guidance without another model turn',
+    deliveries.length === deliveriesBeforeFailure
       && (await readUnreadMailbox(stateRoot, 'failure-bridge', 'flake')).length === 0
       && (await bridgeTask())?.status === 'failed')
   await call('agent_teams_delete', {})
+
+  const batchPlan = { members: [{ name: 'worker' }, { name: 'verifier' }], tasks: [
+    { id: 'verify', subject: 'Validate output', assignee: 'verifier', dependencies: ['work'] },
+    { id: 'work', subject: 'Actual task', description: 'FULL_CONTRACT_BODY', assignee: 'worker' },
+  ] }
+  const beforeBadPlan = children.length
+  let badPlanRejected = false
+  try { await call('agent_teams_create', { name: 'Atomic Invalid', plan: { ...batchPlan, tasks: [{ id: 'x', subject: 'cycle', dependencies: ['x'] }] } }) } catch { badPlanRejected = true }
+  check('invalid batch plan is rejected without any state or session side effect', badPlanRejected && children.length === beforeBadPlan && await readTeam(stateRoot, 'atomic-invalid') === undefined)
+  const batch = await call('agent_teams_create', { name: 'Batch Plan', description: 'One call builds roster and DAG', plan: batchPlan, approval: 'required' })
+  const stagedBatch = await readTeam(stateRoot, 'batch-plan')
+  check('one atomic call creates the full roster and resolves forward dependency references', batch.members.length === 2 && batch.tasks.length === 2 && stagedBatch.members.every(m => m.id === '') && stagedBatch.tasks[1].dependencies[0] === stagedBatch.tasks[0].id)
+  const deliveryBeforeWork = await call('agent_teams_status', {})
+  check('ordinary pending work cannot be reported deliverable', !deliveryBeforeWork.deliverable && !deliveryBeforeWork.delivery.ok)
+  await call('agent_teams_approve', { confirmation: 'Run the accepted batch' })
+  const workingBatch = await readTeam(stateRoot, 'batch-plan')
+  const batchWorker = liveAgents.get(workingBatch.members.find(m => m.name === 'worker').id)
+  const batchTask = workingBatch.tasks[0]
+  const details = await call('agent_teams_claim_task', { task_id: batchTask.id }, batchWorker)
+  check('claim exposes the complete task contract without reading team files', details.task_details.includes('FULL_CONTRACT_BODY'))
+  failNextDrain.add(batchWorker.id)
+  let drainRejected = false
+  try { await call('agent_teams_reassign_task', { task_id: batchTask.id, assignee: 'worker' }) } catch { drainRejected = true }
+  const failedHandoff = await readTeam(stateRoot, 'batch-plan')
+  check('failed teardown keeps reassignment fenced and does not launch a new generation', drainRejected && failedHandoff.tasks[0].reassigning && failedHandoff.members.find(m => m.name === 'worker').stopping)
+  await call('agent_teams_reassign_task', { task_id: batchTask.id, assignee: 'worker' })
+  const retriedHandoff = await readTeam(stateRoot, 'batch-plan')
+  check('the same failed handoff can be retried safely', !retriedHandoff.tasks[0].reassigning && !retriedHandoff.members.find(m => m.name === 'worker').stopping && retriedHandoff.tasks[0].status === 'claimed')
+  failNextDrain.add(batchWorker.id)
+  let archiveRejected = false
+  try { await call('agent_teams_delete', {}) } catch { archiveRejected = true }
+  check('failed member drain never reports a successful archive', archiveRejected && await readTeam(stateRoot, 'batch-plan') !== undefined && await readArchivedTeam(stateRoot, 'batch-plan') === undefined)
+  await call('agent_teams_delete', {})
+  check('archive retries drain previously removed roster rows', await readTeam(stateRoot, 'batch-plan') === undefined && !liveAgents.has(batchWorker.id))
 } finally {
   await rm(workspace, { recursive: true, force: true })
 }

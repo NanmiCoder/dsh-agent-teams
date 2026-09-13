@@ -1,0 +1,4115 @@
+[
+  {
+    "event": "model-request",
+    "request": 1,
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "order": 2,
+    "elapsedMs": 85
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 1,
+    "latencyMs": 2589,
+    "order": 3,
+    "elapsedMs": 2674
+  },
+  {
+    "event": "model-usage",
+    "request": 1,
+    "usage": {
+      "inputTokens": 104212,
+      "outputTokens": 693,
+      "totalTokens": 110025,
+      "cacheReadTokens": 5120,
+      "reasoningTokens": 644
+    },
+    "order": 5,
+    "elapsedMs": 5876
+  },
+  {
+    "event": "model-finish",
+    "request": 1,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 6,
+    "elapsedMs": 5877
+  },
+  {
+    "event": "model-response",
+    "request": 1,
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "durationMs": 5797,
+    "order": 7,
+    "elapsedMs": 5882
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "name": "agent_teams_status",
+    "isError": false,
+    "order": 8,
+    "elapsedMs": 5952
+  },
+  {
+    "event": "model-request",
+    "request": 2,
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "order": 9,
+    "elapsedMs": 5964
+  },
+  {
+    "event": "model-request",
+    "request": 3,
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "order": 10,
+    "elapsedMs": 5967
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 2,
+    "latencyMs": 894,
+    "order": 12,
+    "elapsedMs": 6859
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 3,
+    "latencyMs": 3219,
+    "order": 13,
+    "elapsedMs": 9188
+  },
+  {
+    "event": "model-usage",
+    "request": 2,
+    "usage": {
+      "inputTokens": 2141,
+      "outputTokens": 2488,
+      "totalTokens": 114581,
+      "cacheReadTokens": 109952,
+      "reasoningTokens": 2009
+    },
+    "order": 15,
+    "elapsedMs": 18528
+  },
+  {
+    "event": "model-finish",
+    "request": 2,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 16,
+    "elapsedMs": 18528
+  },
+  {
+    "event": "model-response",
+    "request": 2,
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "durationMs": 12564,
+    "order": 17,
+    "elapsedMs": 18529
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "name": "agent_teams_send_message",
+    "isError": false,
+    "order": 18,
+    "elapsedMs": 18543
+  },
+  {
+    "event": "model-request",
+    "request": 4,
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "order": 19,
+    "elapsedMs": 18551
+  },
+  {
+    "event": "model-usage",
+    "request": 3,
+    "usage": {
+      "inputTokens": 181555,
+      "outputTokens": 2400,
+      "totalTokens": 186515,
+      "cacheReadTokens": 2560,
+      "reasoningTokens": 2254
+    },
+    "order": 22,
+    "elapsedMs": 19004
+  },
+  {
+    "event": "model-finish",
+    "request": 3,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 23,
+    "elapsedMs": 19004
+  },
+  {
+    "event": "model-response",
+    "request": 3,
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "durationMs": 13036,
+    "order": 24,
+    "elapsedMs": 19005
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "name": "agent_teams_claim_task",
+    "isError": false,
+    "order": 25,
+    "elapsedMs": 19019
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "name": "read",
+    "isError": false,
+    "order": 26,
+    "elapsedMs": 19024
+  },
+  {
+    "event": "model-request",
+    "request": 5,
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "order": 27,
+    "elapsedMs": 19034
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 5,
+    "latencyMs": 1008,
+    "order": 28,
+    "elapsedMs": 20042
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 4,
+    "latencyMs": 1956,
+    "order": 29,
+    "elapsedMs": 20507
+  },
+  {
+    "event": "model-usage",
+    "request": 4,
+    "usage": {
+      "inputTokens": 190,
+      "outputTokens": 404,
+      "totalTokens": 115026,
+      "cacheReadTokens": 114432,
+      "reasoningTokens": 225
+    },
+    "order": 30,
+    "elapsedMs": 22460
+  },
+  {
+    "event": "model-finish",
+    "request": 4,
+    "reason": {
+      "kind": "stop"
+    },
+    "order": 31,
+    "elapsedMs": 22460
+  },
+  {
+    "event": "model-response",
+    "request": 4,
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "durationMs": 3910,
+    "order": 32,
+    "elapsedMs": 22461
+  },
+  {
+    "event": "model-usage",
+    "request": 5,
+    "usage": {
+      "inputTokens": 1219,
+      "outputTokens": 2512,
+      "totalTokens": 190227,
+      "cacheReadTokens": 186496,
+      "reasoningTokens": 1336
+    },
+    "order": 36,
+    "elapsedMs": 27822
+  },
+  {
+    "event": "model-finish",
+    "request": 5,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 37,
+    "elapsedMs": 27822
+  },
+  {
+    "event": "model-response",
+    "request": 5,
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "durationMs": 8789,
+    "order": 38,
+    "elapsedMs": 27823
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "name": "agent_teams_update_task",
+    "isError": false,
+    "order": 39,
+    "elapsedMs": 27844
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "name": "bash",
+    "isError": false,
+    "order": 40,
+    "elapsedMs": 27937
+  },
+  {
+    "event": "model-request",
+    "request": 6,
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "order": 41,
+    "elapsedMs": 27945
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 6,
+    "latencyMs": 1322,
+    "order": 43,
+    "elapsedMs": 29267
+  },
+  {
+    "event": "model-usage",
+    "request": 6,
+    "usage": {
+      "inputTokens": 467,
+      "outputTokens": 891,
+      "totalTokens": 191566,
+      "cacheReadTokens": 190208,
+      "reasoningTokens": 662
+    },
+    "order": 45,
+    "elapsedMs": 32787
+  },
+  {
+    "event": "model-finish",
+    "request": 6,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 46,
+    "elapsedMs": 32788
+  },
+  {
+    "event": "model-response",
+    "request": 6,
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "durationMs": 4843,
+    "order": 47,
+    "elapsedMs": 32788
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "name": "bash",
+    "isError": false,
+    "order": 48,
+    "elapsedMs": 34336
+  },
+  {
+    "event": "model-request",
+    "request": 7,
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "order": 49,
+    "elapsedMs": 34344
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 7,
+    "latencyMs": 1482,
+    "order": 50,
+    "elapsedMs": 35827
+  },
+  {
+    "event": "model-usage",
+    "request": 7,
+    "usage": {
+      "inputTokens": 544,
+      "outputTokens": 2782,
+      "totalTokens": 194814,
+      "cacheReadTokens": 191488,
+      "reasoningTokens": 455
+    },
+    "order": 52,
+    "elapsedMs": 45702
+  },
+  {
+    "event": "model-finish",
+    "request": 7,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 53,
+    "elapsedMs": 45702
+  },
+  {
+    "event": "model-response",
+    "request": 7,
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "durationMs": 11357,
+    "order": 54,
+    "elapsedMs": 45702
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "name": "agent_teams_update_task",
+    "isError": true,
+    "order": 55,
+    "elapsedMs": 45718
+  },
+  {
+    "event": "model-request",
+    "request": 8,
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "order": 56,
+    "elapsedMs": 45729
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 8,
+    "latencyMs": 888,
+    "order": 57,
+    "elapsedMs": 46617
+  },
+  {
+    "event": "model-usage",
+    "request": 8,
+    "usage": {
+      "inputTokens": 207,
+      "outputTokens": 2603,
+      "totalTokens": 197498,
+      "cacheReadTokens": 194688,
+      "reasoningTokens": 234
+    },
+    "order": 59,
+    "elapsedMs": 53928
+  },
+  {
+    "event": "model-finish",
+    "request": 8,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 60,
+    "elapsedMs": 53928
+  },
+  {
+    "event": "model-response",
+    "request": 8,
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "durationMs": 8199,
+    "order": 61,
+    "elapsedMs": 53928
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "name": "agent_teams_update_task",
+    "isError": false,
+    "order": 62,
+    "elapsedMs": 53991
+  },
+  {
+    "event": "model-request",
+    "request": 9,
+    "sessionId": "89e57833-bbe5-48f1-a458-6bfd7848968e",
+    "order": 63,
+    "elapsedMs": 54004
+  },
+  {
+    "event": "model-request",
+    "request": 10,
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "order": 64,
+    "elapsedMs": 54007
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 10,
+    "latencyMs": 1619,
+    "order": 66,
+    "elapsedMs": 55628
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 9,
+    "latencyMs": 2520,
+    "order": 67,
+    "elapsedMs": 56525
+  },
+  {
+    "event": "model-usage",
+    "request": 10,
+    "usage": {
+      "inputTokens": 689,
+      "outputTokens": 822,
+      "totalTokens": 198887,
+      "cacheReadTokens": 197376,
+      "reasoningTokens": 210
+    },
+    "order": 69,
+    "elapsedMs": 58850
+  },
+  {
+    "event": "model-finish",
+    "request": 10,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 70,
+    "elapsedMs": 58850
+  },
+  {
+    "event": "model-response",
+    "request": 10,
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "durationMs": 4841,
+    "order": 71,
+    "elapsedMs": 58850
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "name": "agent_teams_send_message",
+    "isError": false,
+    "order": 72,
+    "elapsedMs": 58872
+  },
+  {
+    "event": "model-request",
+    "request": 11,
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "order": 73,
+    "elapsedMs": 58879
+  },
+  {
+    "event": "model-request",
+    "request": 12,
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "order": 74,
+    "elapsedMs": 58882
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 11,
+    "latencyMs": 767,
+    "order": 76,
+    "elapsedMs": 59647
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 12,
+    "latencyMs": 1412,
+    "order": 77,
+    "elapsedMs": 60296
+  },
+  {
+    "event": "model-usage",
+    "request": 11,
+    "usage": {
+      "inputTokens": 634,
+      "outputTokens": 535,
+      "totalTokens": 116113,
+      "cacheReadTokens": 114944,
+      "reasoningTokens": 329
+    },
+    "order": 79,
+    "elapsedMs": 62097
+  },
+  {
+    "event": "model-finish",
+    "request": 11,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 80,
+    "elapsedMs": 62100
+  },
+  {
+    "event": "model-response",
+    "request": 11,
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "durationMs": 3221,
+    "order": 81,
+    "elapsedMs": 62101
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "name": "agent_teams_reassign_task",
+    "isError": false,
+    "order": 82,
+    "elapsedMs": 62172
+  },
+  {
+    "event": "model-usage",
+    "request": 12,
+    "usage": {
+      "inputTokens": 144,
+      "outputTokens": 531,
+      "totalTokens": 199459,
+      "cacheReadTokens": 198784,
+      "reasoningTokens": 0
+    },
+    "order": 83,
+    "elapsedMs": 62176
+  },
+  {
+    "event": "model-finish",
+    "request": 12,
+    "reason": {
+      "kind": "stop"
+    },
+    "order": 84,
+    "elapsedMs": 62180
+  },
+  {
+    "event": "model-response",
+    "request": 12,
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "durationMs": 3304,
+    "order": 85,
+    "elapsedMs": 62188
+  },
+  {
+    "event": "model-request",
+    "request": 13,
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "order": 86,
+    "elapsedMs": 62206
+  },
+  {
+    "event": "model-request",
+    "request": 14,
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "order": 87,
+    "elapsedMs": 62313
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 13,
+    "latencyMs": 584,
+    "order": 89,
+    "elapsedMs": 62791
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 14,
+    "latencyMs": 1540,
+    "order": 90,
+    "elapsedMs": 63854
+  },
+  {
+    "event": "model-usage",
+    "request": 13,
+    "usage": {
+      "inputTokens": 173,
+      "outputTokens": 653,
+      "totalTokens": 116794,
+      "cacheReadTokens": 115968,
+      "reasoningTokens": 226
+    },
+    "order": 92,
+    "elapsedMs": 65586
+  },
+  {
+    "event": "model-finish",
+    "request": 13,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 93,
+    "elapsedMs": 65586
+  },
+  {
+    "event": "model-response",
+    "request": 13,
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "durationMs": 3380,
+    "order": 94,
+    "elapsedMs": 65587
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "name": "agent_teams_send_message",
+    "isError": false,
+    "order": 95,
+    "elapsedMs": 65653
+  },
+  {
+    "event": "model-request",
+    "request": 15,
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "order": 96,
+    "elapsedMs": 65668
+  },
+  {
+    "event": "model-usage",
+    "request": 14,
+    "usage": {
+      "inputTokens": 952,
+      "outputTokens": 570,
+      "totalTokens": 200946,
+      "cacheReadTokens": 199424,
+      "reasoningTokens": 274
+    },
+    "order": 99,
+    "elapsedMs": 65977
+  },
+  {
+    "event": "model-finish",
+    "request": 14,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 100,
+    "elapsedMs": 65977
+  },
+  {
+    "event": "model-response",
+    "request": 14,
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "durationMs": 3664,
+    "order": 101,
+    "elapsedMs": 65978
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "name": "agent_teams_claim_task",
+    "isError": false,
+    "order": 102,
+    "elapsedMs": 65986
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 15,
+    "latencyMs": 864,
+    "order": 103,
+    "elapsedMs": 66534
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "name": "bash",
+    "isError": false,
+    "order": 104,
+    "elapsedMs": 66860
+  },
+  {
+    "event": "model-request",
+    "request": 16,
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "order": 105,
+    "elapsedMs": 66913
+  },
+  {
+    "event": "model-usage",
+    "request": 15,
+    "usage": {
+      "inputTokens": 679,
+      "outputTokens": 205,
+      "totalTokens": 117620,
+      "cacheReadTokens": 116736,
+      "reasoningTokens": 100
+    },
+    "order": 106,
+    "elapsedMs": 67554
+  },
+  {
+    "event": "model-finish",
+    "request": 15,
+    "reason": {
+      "kind": "stop"
+    },
+    "order": 107,
+    "elapsedMs": 67556
+  },
+  {
+    "event": "model-response",
+    "request": 15,
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "durationMs": 1891,
+    "order": 108,
+    "elapsedMs": 67561
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 16,
+    "latencyMs": 1237,
+    "order": 110,
+    "elapsedMs": 68152
+  },
+  {
+    "event": "model-usage",
+    "request": 16,
+    "usage": {
+      "inputTokens": 1226,
+      "outputTokens": 507,
+      "totalTokens": 202565,
+      "cacheReadTokens": 200832,
+      "reasoningTokens": 335
+    },
+    "order": 112,
+    "elapsedMs": 70119
+  },
+  {
+    "event": "model-finish",
+    "request": 16,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 113,
+    "elapsedMs": 70119
+  },
+  {
+    "event": "model-response",
+    "request": 16,
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "durationMs": 3205,
+    "order": 114,
+    "elapsedMs": 70120
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "name": "agent_teams_update_task",
+    "isError": false,
+    "order": 115,
+    "elapsedMs": 70155
+  },
+  {
+    "event": "model-request",
+    "request": 17,
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "order": 116,
+    "elapsedMs": 70171
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 17,
+    "latencyMs": 1376,
+    "order": 118,
+    "elapsedMs": 71549
+  },
+  {
+    "event": "model-usage",
+    "request": 17,
+    "usage": {
+      "inputTokens": 219,
+      "outputTokens": 2310,
+      "totalTokens": 204897,
+      "cacheReadTokens": 202368,
+      "reasoningTokens": 0
+    },
+    "order": 120,
+    "elapsedMs": 77910
+  },
+  {
+    "event": "model-finish",
+    "request": 17,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 121,
+    "elapsedMs": 77914
+  },
+  {
+    "event": "model-response",
+    "request": 17,
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "durationMs": 7741,
+    "order": 122,
+    "elapsedMs": 77914
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "name": "agent_teams_update_task",
+    "isError": false,
+    "order": 123,
+    "elapsedMs": 78009
+  },
+  {
+    "event": "model-request",
+    "request": 18,
+    "sessionId": "c5411f4b-f832-4933-8f22-cb555a4e3c08",
+    "order": 124,
+    "elapsedMs": 78033
+  },
+  {
+    "event": "model-request",
+    "request": 19,
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "order": 125,
+    "elapsedMs": 78041
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 18,
+    "latencyMs": 934,
+    "order": 127,
+    "elapsedMs": 78972
+  },
+  {
+    "event": "model-usage",
+    "request": 18,
+    "usage": {
+      "inputTokens": 45787,
+      "outputTokens": 197,
+      "totalTokens": 48544,
+      "cacheReadTokens": 2560,
+      "reasoningTokens": 101
+    },
+    "order": 130,
+    "elapsedMs": 79597
+  },
+  {
+    "event": "model-finish",
+    "request": 18,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 131,
+    "elapsedMs": 79600
+  },
+  {
+    "event": "model-response",
+    "request": 18,
+    "sessionId": "c5411f4b-f832-4933-8f22-cb555a4e3c08",
+    "durationMs": 1563,
+    "order": 132,
+    "elapsedMs": 79601
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "c5411f4b-f832-4933-8f22-cb555a4e3c08",
+    "name": "agent_teams_claim_task",
+    "isError": false,
+    "order": 133,
+    "elapsedMs": 79617
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "c5411f4b-f832-4933-8f22-cb555a4e3c08",
+    "name": "read",
+    "isError": false,
+    "order": 134,
+    "elapsedMs": 79633
+  },
+  {
+    "event": "model-request",
+    "request": 20,
+    "sessionId": "c5411f4b-f832-4933-8f22-cb555a4e3c08",
+    "order": 135,
+    "elapsedMs": 79651
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 19,
+    "latencyMs": 1775,
+    "order": 136,
+    "elapsedMs": 79817
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 20,
+    "latencyMs": 438,
+    "order": 137,
+    "elapsedMs": 80090
+  },
+  {
+    "event": "model-usage",
+    "request": 9,
+    "usage": {
+      "inputTokens": 158365,
+      "outputTokens": 5776,
+      "totalTokens": 166701,
+      "cacheReadTokens": 2560,
+      "reasoningTokens": 5602
+    },
+    "order": 140,
+    "elapsedMs": 80911
+  },
+  {
+    "event": "model-finish",
+    "request": 9,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 141,
+    "elapsedMs": 80912
+  },
+  {
+    "event": "model-response",
+    "request": 9,
+    "sessionId": "89e57833-bbe5-48f1-a458-6bfd7848968e",
+    "durationMs": 26907,
+    "order": 142,
+    "elapsedMs": 80912
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "89e57833-bbe5-48f1-a458-6bfd7848968e",
+    "name": "agent_teams_claim_task",
+    "isError": false,
+    "order": 143,
+    "elapsedMs": 80942
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "89e57833-bbe5-48f1-a458-6bfd7848968e",
+    "name": "read",
+    "isError": false,
+    "order": 144,
+    "elapsedMs": 80962
+  },
+  {
+    "event": "model-request",
+    "request": 21,
+    "sessionId": "89e57833-bbe5-48f1-a458-6bfd7848968e",
+    "order": 145,
+    "elapsedMs": 80980
+  },
+  {
+    "event": "model-usage",
+    "request": 19,
+    "usage": {
+      "inputTokens": 733,
+      "outputTokens": 540,
+      "totalTokens": 206073,
+      "cacheReadTokens": 204800,
+      "reasoningTokens": 58
+    },
+    "order": 147,
+    "elapsedMs": 81974
+  },
+  {
+    "event": "model-finish",
+    "request": 19,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 148,
+    "elapsedMs": 81974
+  },
+  {
+    "event": "model-response",
+    "request": 19,
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "durationMs": 3932,
+    "order": 149,
+    "elapsedMs": 81974
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "name": "agent_teams_send_message",
+    "isError": false,
+    "order": 150,
+    "elapsedMs": 82013
+  },
+  {
+    "event": "model-request",
+    "request": 22,
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "order": 151,
+    "elapsedMs": 82038
+  },
+  {
+    "event": "model-request",
+    "request": 23,
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "order": 152,
+    "elapsedMs": 82044
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 21,
+    "latencyMs": 1074,
+    "order": 153,
+    "elapsedMs": 82055
+  },
+  {
+    "event": "model-usage",
+    "request": 21,
+    "usage": {
+      "inputTokens": 2276,
+      "outputTokens": 105,
+      "totalTokens": 169037,
+      "cacheReadTokens": 166656,
+      "reasoningTokens": 0
+    },
+    "order": 156,
+    "elapsedMs": 82362
+  },
+  {
+    "event": "model-finish",
+    "request": 21,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 157,
+    "elapsedMs": 82367
+  },
+  {
+    "event": "model-response",
+    "request": 21,
+    "sessionId": "89e57833-bbe5-48f1-a458-6bfd7848968e",
+    "durationMs": 1390,
+    "order": 158,
+    "elapsedMs": 82371
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "89e57833-bbe5-48f1-a458-6bfd7848968e",
+    "name": "agent_teams_update_task",
+    "isError": false,
+    "order": 159,
+    "elapsedMs": 82415
+  },
+  {
+    "event": "model-request",
+    "request": 24,
+    "sessionId": "89e57833-bbe5-48f1-a458-6bfd7848968e",
+    "order": 160,
+    "elapsedMs": 82432
+  },
+  {
+    "event": "model-usage",
+    "request": 20,
+    "usage": {
+      "inputTokens": 1419,
+      "outputTokens": 727,
+      "totalTokens": 50658,
+      "cacheReadTokens": 48512,
+      "reasoningTokens": 590
+    },
+    "order": 163,
+    "elapsedMs": 83010
+  },
+  {
+    "event": "model-finish",
+    "request": 20,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 164,
+    "elapsedMs": 83011
+  },
+  {
+    "event": "model-response",
+    "request": 20,
+    "sessionId": "c5411f4b-f832-4933-8f22-cb555a4e3c08",
+    "durationMs": 3359,
+    "order": 165,
+    "elapsedMs": 83011
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "c5411f4b-f832-4933-8f22-cb555a4e3c08",
+    "name": "bash",
+    "isError": false,
+    "order": 166,
+    "elapsedMs": 83054
+  },
+  {
+    "event": "model-request",
+    "request": 25,
+    "sessionId": "c5411f4b-f832-4933-8f22-cb555a4e3c08",
+    "order": 167,
+    "elapsedMs": 83068
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 22,
+    "latencyMs": 1225,
+    "order": 168,
+    "elapsedMs": 83268
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 23,
+    "latencyMs": 1286,
+    "order": 169,
+    "elapsedMs": 83332
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 24,
+    "latencyMs": 1130,
+    "order": 170,
+    "elapsedMs": 83564
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 25,
+    "latencyMs": 1014,
+    "order": 171,
+    "elapsedMs": 84085
+  },
+  {
+    "event": "model-usage",
+    "request": 22,
+    "usage": {
+      "inputTokens": 539,
+      "outputTokens": 306,
+      "totalTokens": 118349,
+      "cacheReadTokens": 117504,
+      "reasoningTokens": 226
+    },
+    "order": 173,
+    "elapsedMs": 84651
+  },
+  {
+    "event": "model-finish",
+    "request": 22,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 174,
+    "elapsedMs": 84651
+  },
+  {
+    "event": "model-response",
+    "request": 22,
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "durationMs": 2610,
+    "order": 175,
+    "elapsedMs": 84653
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "name": "agent_teams_status",
+    "isError": false,
+    "order": 176,
+    "elapsedMs": 84675
+  },
+  {
+    "event": "model-request",
+    "request": 26,
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "order": 177,
+    "elapsedMs": 84685
+  },
+  {
+    "event": "model-usage",
+    "request": 23,
+    "usage": {
+      "inputTokens": 168,
+      "outputTokens": 480,
+      "totalTokens": 206600,
+      "cacheReadTokens": 205952,
+      "reasoningTokens": 0
+    },
+    "order": 178,
+    "elapsedMs": 84869
+  },
+  {
+    "event": "model-finish",
+    "request": 23,
+    "reason": {
+      "kind": "stop"
+    },
+    "order": 179,
+    "elapsedMs": 84869
+  },
+  {
+    "event": "model-response",
+    "request": 23,
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "durationMs": 2824,
+    "order": 180,
+    "elapsedMs": 84870
+  },
+  {
+    "event": "model-usage",
+    "request": 25,
+    "usage": {
+      "inputTokens": 839,
+      "outputTokens": 206,
+      "totalTokens": 51605,
+      "cacheReadTokens": 50560,
+      "reasoningTokens": 60
+    },
+    "order": 182,
+    "elapsedMs": 84904
+  },
+  {
+    "event": "model-finish",
+    "request": 25,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 183,
+    "elapsedMs": 84904
+  },
+  {
+    "event": "model-response",
+    "request": 25,
+    "sessionId": "c5411f4b-f832-4933-8f22-cb555a4e3c08",
+    "durationMs": 1834,
+    "order": 184,
+    "elapsedMs": 84905
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "c5411f4b-f832-4933-8f22-cb555a4e3c08",
+    "name": "bash",
+    "isError": false,
+    "order": 185,
+    "elapsedMs": 84934
+  },
+  {
+    "event": "model-request",
+    "request": 27,
+    "sessionId": "c5411f4b-f832-4933-8f22-cb555a4e3c08",
+    "order": 186,
+    "elapsedMs": 84942
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 26,
+    "latencyMs": 806,
+    "order": 188,
+    "elapsedMs": 85491
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 27,
+    "latencyMs": 721,
+    "order": 189,
+    "elapsedMs": 85663
+  },
+  {
+    "event": "model-usage",
+    "request": 24,
+    "usage": {
+      "inputTokens": 227,
+      "outputTokens": 850,
+      "totalTokens": 169909,
+      "cacheReadTokens": 168832,
+      "reasoningTokens": 306
+    },
+    "order": 191,
+    "elapsedMs": 86229
+  },
+  {
+    "event": "model-finish",
+    "request": 24,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 192,
+    "elapsedMs": 86229
+  },
+  {
+    "event": "model-response",
+    "request": 24,
+    "sessionId": "89e57833-bbe5-48f1-a458-6bfd7848968e",
+    "durationMs": 3796,
+    "order": 193,
+    "elapsedMs": 86230
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "89e57833-bbe5-48f1-a458-6bfd7848968e",
+    "name": "edit",
+    "isError": false,
+    "order": 194,
+    "elapsedMs": 86253
+  },
+  {
+    "event": "model-request",
+    "request": 28,
+    "sessionId": "89e57833-bbe5-48f1-a458-6bfd7848968e",
+    "order": 195,
+    "elapsedMs": 86265
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 28,
+    "latencyMs": 964,
+    "order": 196,
+    "elapsedMs": 87229
+  },
+  {
+    "event": "model-usage",
+    "request": 26,
+    "usage": {
+      "inputTokens": 2366,
+      "outputTokens": 1699,
+      "totalTokens": 122337,
+      "cacheReadTokens": 118272,
+      "reasoningTokens": 554
+    },
+    "order": 199,
+    "elapsedMs": 92566
+  },
+  {
+    "event": "model-finish",
+    "request": 26,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 200,
+    "elapsedMs": 92566
+  },
+  {
+    "event": "model-response",
+    "request": 26,
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "durationMs": 7882,
+    "order": 201,
+    "elapsedMs": 92567
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "name": "agent_teams_send_message",
+    "isError": false,
+    "order": 202,
+    "elapsedMs": 92580
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "name": "agent_teams_send_message",
+    "isError": false,
+    "order": 203,
+    "elapsedMs": 92590
+  },
+  {
+    "event": "model-request",
+    "request": 29,
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "order": 204,
+    "elapsedMs": 92602
+  },
+  {
+    "event": "model-usage",
+    "request": 27,
+    "usage": {
+      "inputTokens": 641,
+      "outputTokens": 2741,
+      "totalTokens": 54966,
+      "cacheReadTokens": 51584,
+      "reasoningTokens": 686
+    },
+    "order": 207,
+    "elapsedMs": 93598
+  },
+  {
+    "event": "model-finish",
+    "request": 27,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 208,
+    "elapsedMs": 93599
+  },
+  {
+    "event": "model-response",
+    "request": 27,
+    "sessionId": "c5411f4b-f832-4933-8f22-cb555a4e3c08",
+    "durationMs": 8657,
+    "order": 209,
+    "elapsedMs": 93599
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "c5411f4b-f832-4933-8f22-cb555a4e3c08",
+    "name": "agent_teams_update_task",
+    "isError": false,
+    "order": 210,
+    "elapsedMs": 93628
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "c5411f4b-f832-4933-8f22-cb555a4e3c08",
+    "name": "write",
+    "isError": false,
+    "order": 211,
+    "elapsedMs": 93641
+  },
+  {
+    "event": "model-request",
+    "request": 30,
+    "sessionId": "c5411f4b-f832-4933-8f22-cb555a4e3c08",
+    "order": 212,
+    "elapsedMs": 93651
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 29,
+    "latencyMs": 1589,
+    "order": 214,
+    "elapsedMs": 94191
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 30,
+    "latencyMs": 729,
+    "order": 215,
+    "elapsedMs": 94380
+  },
+  {
+    "event": "model-usage",
+    "request": 30,
+    "usage": {
+      "inputTokens": 653,
+      "outputTokens": 337,
+      "totalTokens": 55902,
+      "cacheReadTokens": 54912,
+      "reasoningTokens": 108
+    },
+    "order": 217,
+    "elapsedMs": 95626
+  },
+  {
+    "event": "model-finish",
+    "request": 30,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 218,
+    "elapsedMs": 95626
+  },
+  {
+    "event": "model-response",
+    "request": 30,
+    "sessionId": "c5411f4b-f832-4933-8f22-cb555a4e3c08",
+    "durationMs": 1975,
+    "order": 219,
+    "elapsedMs": 95626
+  },
+  {
+    "event": "model-usage",
+    "request": 29,
+    "usage": {
+      "inputTokens": 703,
+      "outputTokens": 284,
+      "totalTokens": 123227,
+      "cacheReadTokens": 122240,
+      "reasoningTokens": 74
+    },
+    "order": 220,
+    "elapsedMs": 95732
+  },
+  {
+    "event": "model-finish",
+    "request": 29,
+    "reason": {
+      "kind": "stop"
+    },
+    "order": 221,
+    "elapsedMs": 95732
+  },
+  {
+    "event": "model-response",
+    "request": 29,
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "durationMs": 3130,
+    "order": 222,
+    "elapsedMs": 95732
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "c5411f4b-f832-4933-8f22-cb555a4e3c08",
+    "name": "bash",
+    "isError": false,
+    "order": 223,
+    "elapsedMs": 95743
+  },
+  {
+    "event": "model-request",
+    "request": 31,
+    "sessionId": "c5411f4b-f832-4933-8f22-cb555a4e3c08",
+    "order": 224,
+    "elapsedMs": 95753
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 31,
+    "latencyMs": 578,
+    "order": 226,
+    "elapsedMs": 96331
+  },
+  {
+    "event": "model-usage",
+    "request": 28,
+    "usage": {
+      "inputTokens": 221,
+      "outputTokens": 3160,
+      "totalTokens": 173109,
+      "cacheReadTokens": 169728,
+      "reasoningTokens": 904
+    },
+    "order": 228,
+    "elapsedMs": 97113
+  },
+  {
+    "event": "model-finish",
+    "request": 28,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 229,
+    "elapsedMs": 97113
+  },
+  {
+    "event": "model-response",
+    "request": 28,
+    "sessionId": "89e57833-bbe5-48f1-a458-6bfd7848968e",
+    "durationMs": 10849,
+    "order": 230,
+    "elapsedMs": 97114
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "89e57833-bbe5-48f1-a458-6bfd7848968e",
+    "name": "bash",
+    "isError": false,
+    "order": 231,
+    "elapsedMs": 97256
+  },
+  {
+    "event": "model-request",
+    "request": 32,
+    "sessionId": "89e57833-bbe5-48f1-a458-6bfd7848968e",
+    "order": 232,
+    "elapsedMs": 97265
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 32,
+    "latencyMs": 878,
+    "order": 233,
+    "elapsedMs": 98143
+  },
+  {
+    "event": "model-usage",
+    "request": 31,
+    "usage": {
+      "inputTokens": 225,
+      "outputTokens": 919,
+      "totalTokens": 56952,
+      "cacheReadTokens": 55808,
+      "reasoningTokens": 42
+    },
+    "order": 236,
+    "elapsedMs": 98937
+  },
+  {
+    "event": "model-finish",
+    "request": 31,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 237,
+    "elapsedMs": 98937
+  },
+  {
+    "event": "model-response",
+    "request": 31,
+    "sessionId": "c5411f4b-f832-4933-8f22-cb555a4e3c08",
+    "durationMs": 3185,
+    "order": 238,
+    "elapsedMs": 98938
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "c5411f4b-f832-4933-8f22-cb555a4e3c08",
+    "name": "bash",
+    "isError": false,
+    "order": 239,
+    "elapsedMs": 99001
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "c5411f4b-f832-4933-8f22-cb555a4e3c08",
+    "name": "bash",
+    "isError": false,
+    "order": 240,
+    "elapsedMs": 99782
+  },
+  {
+    "event": "model-request",
+    "request": 33,
+    "sessionId": "c5411f4b-f832-4933-8f22-cb555a4e3c08",
+    "order": 241,
+    "elapsedMs": 99790
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 33,
+    "latencyMs": 672,
+    "order": 242,
+    "elapsedMs": 100462
+  },
+  {
+    "event": "model-usage",
+    "request": 33,
+    "usage": {
+      "inputTokens": 467,
+      "outputTokens": 350,
+      "totalTokens": 57649,
+      "cacheReadTokens": 56832,
+      "reasoningTokens": 111
+    },
+    "order": 244,
+    "elapsedMs": 101875
+  },
+  {
+    "event": "model-finish",
+    "request": 33,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 245,
+    "elapsedMs": 101875
+  },
+  {
+    "event": "model-response",
+    "request": 33,
+    "sessionId": "c5411f4b-f832-4933-8f22-cb555a4e3c08",
+    "durationMs": 2086,
+    "order": 246,
+    "elapsedMs": 101876
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "c5411f4b-f832-4933-8f22-cb555a4e3c08",
+    "name": "bash",
+    "isError": false,
+    "order": 247,
+    "elapsedMs": 102693
+  },
+  {
+    "event": "model-request",
+    "request": 34,
+    "sessionId": "c5411f4b-f832-4933-8f22-cb555a4e3c08",
+    "order": 248,
+    "elapsedMs": 102702
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 34,
+    "latencyMs": 546,
+    "order": 249,
+    "elapsedMs": 103248
+  },
+  {
+    "event": "model-usage",
+    "request": 34,
+    "usage": {
+      "inputTokens": 491,
+      "outputTokens": 1345,
+      "totalTokens": 59436,
+      "cacheReadTokens": 57600,
+      "reasoningTokens": 332
+    },
+    "order": 251,
+    "elapsedMs": 107956
+  },
+  {
+    "event": "model-finish",
+    "request": 34,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 252,
+    "elapsedMs": 107957
+  },
+  {
+    "event": "model-response",
+    "request": 34,
+    "sessionId": "c5411f4b-f832-4933-8f22-cb555a4e3c08",
+    "durationMs": 5255,
+    "order": 253,
+    "elapsedMs": 107957
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "c5411f4b-f832-4933-8f22-cb555a4e3c08",
+    "name": "agent_teams_update_task",
+    "isError": false,
+    "order": 254,
+    "elapsedMs": 108024
+  },
+  {
+    "event": "model-request",
+    "request": 35,
+    "sessionId": "c5411f4b-f832-4933-8f22-cb555a4e3c08",
+    "order": 255,
+    "elapsedMs": 108039
+  },
+  {
+    "event": "model-request",
+    "request": 36,
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "order": 256,
+    "elapsedMs": 108041
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 35,
+    "latencyMs": 734,
+    "order": 258,
+    "elapsedMs": 108773
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 36,
+    "latencyMs": 854,
+    "order": 259,
+    "elapsedMs": 108897
+  },
+  {
+    "event": "model-usage",
+    "request": 32,
+    "usage": {
+      "inputTokens": 675,
+      "outputTokens": 3448,
+      "totalTokens": 177179,
+      "cacheReadTokens": 173056,
+      "reasoningTokens": 1716
+    },
+    "order": 261,
+    "elapsedMs": 110013
+  },
+  {
+    "event": "model-finish",
+    "request": 32,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 262,
+    "elapsedMs": 110014
+  },
+  {
+    "event": "model-response",
+    "request": 32,
+    "sessionId": "89e57833-bbe5-48f1-a458-6bfd7848968e",
+    "durationMs": 12749,
+    "order": 263,
+    "elapsedMs": 110014
+  },
+  {
+    "event": "model-usage",
+    "request": 35,
+    "usage": {
+      "inputTokens": 373,
+      "outputTokens": 483,
+      "totalTokens": 60248,
+      "cacheReadTokens": 59392,
+      "reasoningTokens": 0
+    },
+    "order": 265,
+    "elapsedMs": 110111
+  },
+  {
+    "event": "model-finish",
+    "request": 35,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 266,
+    "elapsedMs": 110111
+  },
+  {
+    "event": "model-response",
+    "request": 35,
+    "sessionId": "c5411f4b-f832-4933-8f22-cb555a4e3c08",
+    "durationMs": 2072,
+    "order": 267,
+    "elapsedMs": 110111
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "89e57833-bbe5-48f1-a458-6bfd7848968e",
+    "name": "bash",
+    "isError": false,
+    "order": 268,
+    "elapsedMs": 110121
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "c5411f4b-f832-4933-8f22-cb555a4e3c08",
+    "name": "agent_teams_send_message",
+    "isError": false,
+    "order": 269,
+    "elapsedMs": 110127
+  },
+  {
+    "event": "model-request",
+    "request": 37,
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "order": 270,
+    "elapsedMs": 110134
+  },
+  {
+    "event": "model-request",
+    "request": 38,
+    "sessionId": "89e57833-bbe5-48f1-a458-6bfd7848968e",
+    "order": 271,
+    "elapsedMs": 110137
+  },
+  {
+    "event": "model-request",
+    "request": 39,
+    "sessionId": "c5411f4b-f832-4933-8f22-cb555a4e3c08",
+    "order": 272,
+    "elapsedMs": 110139
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 38,
+    "latencyMs": 1015,
+    "order": 274,
+    "elapsedMs": 111152
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 37,
+    "latencyMs": 1034,
+    "order": 275,
+    "elapsedMs": 111170
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 39,
+    "latencyMs": 1126,
+    "order": 276,
+    "elapsedMs": 111267
+  },
+  {
+    "event": "model-usage",
+    "request": 36,
+    "usage": {
+      "inputTokens": 2214,
+      "outputTokens": 791,
+      "totalTokens": 209597,
+      "cacheReadTokens": 206592,
+      "reasoningTokens": 509
+    },
+    "order": 279,
+    "elapsedMs": 112102
+  },
+  {
+    "event": "model-finish",
+    "request": 36,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 280,
+    "elapsedMs": 112102
+  },
+  {
+    "event": "model-response",
+    "request": 36,
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "durationMs": 4059,
+    "order": 281,
+    "elapsedMs": 112102
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "name": "agent_teams_claim_task",
+    "isError": false,
+    "order": 282,
+    "elapsedMs": 112115
+  },
+  {
+    "event": "model-usage",
+    "request": 39,
+    "usage": {
+      "inputTokens": 255,
+      "outputTokens": 378,
+      "totalTokens": 60665,
+      "cacheReadTokens": 60032,
+      "reasoningTokens": 0
+    },
+    "order": 283,
+    "elapsedMs": 112486
+  },
+  {
+    "event": "model-finish",
+    "request": 39,
+    "reason": {
+      "kind": "stop"
+    },
+    "order": 284,
+    "elapsedMs": 112486
+  },
+  {
+    "event": "model-response",
+    "request": 39,
+    "sessionId": "c5411f4b-f832-4933-8f22-cb555a4e3c08",
+    "durationMs": 2346,
+    "order": 285,
+    "elapsedMs": 112487
+  },
+  {
+    "event": "model-usage",
+    "request": 37,
+    "usage": {
+      "inputTokens": 526,
+      "outputTokens": 259,
+      "totalTokens": 123921,
+      "cacheReadTokens": 123136,
+      "reasoningTokens": 133
+    },
+    "order": 286,
+    "elapsedMs": 112489
+  },
+  {
+    "event": "model-finish",
+    "request": 37,
+    "reason": {
+      "kind": "stop"
+    },
+    "order": 287,
+    "elapsedMs": 112490
+  },
+  {
+    "event": "model-response",
+    "request": 37,
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "durationMs": 2354,
+    "order": 288,
+    "elapsedMs": 112490
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "name": "bash",
+    "isError": false,
+    "order": 290,
+    "elapsedMs": 112933
+  },
+  {
+    "event": "model-request",
+    "request": 40,
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "order": 291,
+    "elapsedMs": 112942
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 40,
+    "latencyMs": 1787,
+    "order": 292,
+    "elapsedMs": 114729
+  },
+  {
+    "event": "model-usage",
+    "request": 38,
+    "usage": {
+      "inputTokens": 304,
+      "outputTokens": 2998,
+      "totalTokens": 180454,
+      "cacheReadTokens": 177152,
+      "reasoningTokens": 2107
+    },
+    "order": 294,
+    "elapsedMs": 121630
+  },
+  {
+    "event": "model-finish",
+    "request": 38,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 295,
+    "elapsedMs": 121631
+  },
+  {
+    "event": "model-response",
+    "request": 38,
+    "sessionId": "89e57833-bbe5-48f1-a458-6bfd7848968e",
+    "durationMs": 11495,
+    "order": 296,
+    "elapsedMs": 121632
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "89e57833-bbe5-48f1-a458-6bfd7848968e",
+    "name": "bash",
+    "isError": false,
+    "order": 297,
+    "elapsedMs": 121709
+  },
+  {
+    "event": "model-request",
+    "request": 41,
+    "sessionId": "89e57833-bbe5-48f1-a458-6bfd7848968e",
+    "order": 298,
+    "elapsedMs": 121717
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 41,
+    "latencyMs": 1100,
+    "order": 299,
+    "elapsedMs": 122817
+  },
+  {
+    "event": "model-usage",
+    "request": 41,
+    "usage": {
+      "inputTokens": 180,
+      "outputTokens": 406,
+      "totalTokens": 180938,
+      "cacheReadTokens": 180352,
+      "reasoningTokens": 293
+    },
+    "order": 301,
+    "elapsedMs": 124313
+  },
+  {
+    "event": "model-finish",
+    "request": 41,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 302,
+    "elapsedMs": 124313
+  },
+  {
+    "event": "model-response",
+    "request": 41,
+    "sessionId": "89e57833-bbe5-48f1-a458-6bfd7848968e",
+    "durationMs": 2597,
+    "order": 303,
+    "elapsedMs": 124314
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "89e57833-bbe5-48f1-a458-6bfd7848968e",
+    "name": "bash",
+    "isError": false,
+    "order": 304,
+    "elapsedMs": 125121
+  },
+  {
+    "event": "model-request",
+    "request": 42,
+    "sessionId": "89e57833-bbe5-48f1-a458-6bfd7848968e",
+    "order": 305,
+    "elapsedMs": 125128
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 42,
+    "latencyMs": 925,
+    "order": 306,
+    "elapsedMs": 126053
+  },
+  {
+    "event": "model-usage",
+    "request": 40,
+    "usage": {
+      "inputTokens": 2203,
+      "outputTokens": 4321,
+      "totalTokens": 216060,
+      "cacheReadTokens": 209536,
+      "reasoningTokens": 2209
+    },
+    "order": 309,
+    "elapsedMs": 127013
+  },
+  {
+    "event": "model-finish",
+    "request": 40,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 310,
+    "elapsedMs": 127013
+  },
+  {
+    "event": "model-response",
+    "request": 40,
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "durationMs": 14071,
+    "order": 311,
+    "elapsedMs": 127013
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "name": "agent_teams_update_task",
+    "isError": false,
+    "order": 312,
+    "elapsedMs": 127042
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "name": "bash",
+    "isError": false,
+    "order": 314,
+    "elapsedMs": 127155
+  },
+  {
+    "event": "model-request",
+    "request": 43,
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "order": 315,
+    "elapsedMs": 127162
+  },
+  {
+    "event": "model-usage",
+    "request": 42,
+    "usage": {
+      "inputTokens": 866,
+      "outputTokens": 414,
+      "totalTokens": 182144,
+      "cacheReadTokens": 180864,
+      "reasoningTokens": 187
+    },
+    "order": 317,
+    "elapsedMs": 127547
+  },
+  {
+    "event": "model-finish",
+    "request": 42,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 318,
+    "elapsedMs": 127548
+  },
+  {
+    "event": "model-response",
+    "request": 42,
+    "sessionId": "89e57833-bbe5-48f1-a458-6bfd7848968e",
+    "durationMs": 2420,
+    "order": 319,
+    "elapsedMs": 127548
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 43,
+    "latencyMs": 1063,
+    "order": 320,
+    "elapsedMs": 128225
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "89e57833-bbe5-48f1-a458-6bfd7848968e",
+    "name": "bash",
+    "isError": false,
+    "order": 321,
+    "elapsedMs": 128388
+  },
+  {
+    "event": "model-request",
+    "request": 44,
+    "sessionId": "89e57833-bbe5-48f1-a458-6bfd7848968e",
+    "order": 322,
+    "elapsedMs": 128395
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 44,
+    "latencyMs": 1274,
+    "order": 323,
+    "elapsedMs": 129669
+  },
+  {
+    "event": "model-usage",
+    "request": 44,
+    "usage": {
+      "inputTokens": 438,
+      "outputTokens": 418,
+      "totalTokens": 183000,
+      "cacheReadTokens": 182144,
+      "reasoningTokens": 170
+    },
+    "order": 325,
+    "elapsedMs": 131229
+  },
+  {
+    "event": "model-finish",
+    "request": 44,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 326,
+    "elapsedMs": 131229
+  },
+  {
+    "event": "model-response",
+    "request": 44,
+    "sessionId": "89e57833-bbe5-48f1-a458-6bfd7848968e",
+    "durationMs": 2835,
+    "order": 327,
+    "elapsedMs": 131230
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "89e57833-bbe5-48f1-a458-6bfd7848968e",
+    "name": "bash",
+    "isError": false,
+    "order": 328,
+    "elapsedMs": 131357
+  },
+  {
+    "event": "model-request",
+    "request": 45,
+    "sessionId": "89e57833-bbe5-48f1-a458-6bfd7848968e",
+    "order": 329,
+    "elapsedMs": 131364
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 45,
+    "latencyMs": 969,
+    "order": 330,
+    "elapsedMs": 132333
+  },
+  {
+    "event": "model-usage",
+    "request": 45,
+    "usage": {
+      "inputTokens": 1037,
+      "outputTokens": 691,
+      "totalTokens": 184640,
+      "cacheReadTokens": 182912,
+      "reasoningTokens": 543
+    },
+    "order": 332,
+    "elapsedMs": 135309
+  },
+  {
+    "event": "model-finish",
+    "request": 45,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 333,
+    "elapsedMs": 135309
+  },
+  {
+    "event": "model-response",
+    "request": 45,
+    "sessionId": "89e57833-bbe5-48f1-a458-6bfd7848968e",
+    "durationMs": 3946,
+    "order": 334,
+    "elapsedMs": 135310
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "89e57833-bbe5-48f1-a458-6bfd7848968e",
+    "name": "bash",
+    "isError": false,
+    "order": 335,
+    "elapsedMs": 135345
+  },
+  {
+    "event": "model-request",
+    "request": 46,
+    "sessionId": "89e57833-bbe5-48f1-a458-6bfd7848968e",
+    "order": 336,
+    "elapsedMs": 135353
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 46,
+    "latencyMs": 1063,
+    "order": 337,
+    "elapsedMs": 136416
+  },
+  {
+    "event": "model-usage",
+    "request": 43,
+    "usage": {
+      "inputTokens": 648,
+      "outputTokens": 2423,
+      "totalTokens": 219007,
+      "cacheReadTokens": 215936,
+      "reasoningTokens": 377
+    },
+    "order": 339,
+    "elapsedMs": 136602
+  },
+  {
+    "event": "model-finish",
+    "request": 43,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 340,
+    "elapsedMs": 136602
+  },
+  {
+    "event": "model-response",
+    "request": 43,
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "durationMs": 9441,
+    "order": 341,
+    "elapsedMs": 136603
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "name": "agent_teams_update_task",
+    "isError": false,
+    "order": 342,
+    "elapsedMs": 136628
+  },
+  {
+    "event": "model-request",
+    "request": 47,
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "order": 343,
+    "elapsedMs": 136637
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 47,
+    "latencyMs": 950,
+    "order": 345,
+    "elapsedMs": 137587
+  },
+  {
+    "event": "model-usage",
+    "request": 47,
+    "usage": {
+      "inputTokens": 750,
+      "outputTokens": 527,
+      "totalTokens": 220157,
+      "cacheReadTokens": 218880,
+      "reasoningTokens": 0
+    },
+    "order": 347,
+    "elapsedMs": 139583
+  },
+  {
+    "event": "model-finish",
+    "request": 47,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 348,
+    "elapsedMs": 139583
+  },
+  {
+    "event": "model-response",
+    "request": 47,
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "durationMs": 2947,
+    "order": 349,
+    "elapsedMs": 139584
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "name": "agent_teams_send_message",
+    "isError": false,
+    "order": 350,
+    "elapsedMs": 139598
+  },
+  {
+    "event": "model-request",
+    "request": 48,
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "order": 351,
+    "elapsedMs": 139610
+  },
+  {
+    "event": "model-request",
+    "request": 49,
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "order": 352,
+    "elapsedMs": 139611
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 48,
+    "latencyMs": 724,
+    "order": 354,
+    "elapsedMs": 140334
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 49,
+    "latencyMs": 1588,
+    "order": 355,
+    "elapsedMs": 141199
+  },
+  {
+    "event": "model-usage",
+    "request": 48,
+    "usage": {
+      "inputTokens": 497,
+      "outputTokens": 182,
+      "totalTokens": 124583,
+      "cacheReadTokens": 123904,
+      "reasoningTokens": 57
+    },
+    "order": 356,
+    "elapsedMs": 141253
+  },
+  {
+    "event": "model-finish",
+    "request": 48,
+    "reason": {
+      "kind": "stop"
+    },
+    "order": 357,
+    "elapsedMs": 141253
+  },
+  {
+    "event": "model-response",
+    "request": 48,
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "durationMs": 1644,
+    "order": 358,
+    "elapsedMs": 141254
+  },
+  {
+    "event": "model-usage",
+    "request": 46,
+    "usage": {
+      "inputTokens": 365,
+      "outputTokens": 1441,
+      "totalTokens": 186382,
+      "cacheReadTokens": 184576,
+      "reasoningTokens": 467
+    },
+    "order": 361,
+    "elapsedMs": 142107
+  },
+  {
+    "event": "model-finish",
+    "request": 46,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 362,
+    "elapsedMs": 142108
+  },
+  {
+    "event": "model-response",
+    "request": 46,
+    "sessionId": "89e57833-bbe5-48f1-a458-6bfd7848968e",
+    "durationMs": 6755,
+    "order": 363,
+    "elapsedMs": 142108
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "89e57833-bbe5-48f1-a458-6bfd7848968e",
+    "name": "agent_teams_update_task",
+    "isError": false,
+    "order": 364,
+    "elapsedMs": 142130
+  },
+  {
+    "event": "model-request",
+    "request": 50,
+    "sessionId": "89e57833-bbe5-48f1-a458-6bfd7848968e",
+    "order": 365,
+    "elapsedMs": 142140
+  },
+  {
+    "event": "model-usage",
+    "request": 49,
+    "usage": {
+      "inputTokens": 168,
+      "outputTokens": 540,
+      "totalTokens": 220740,
+      "cacheReadTokens": 220032,
+      "reasoningTokens": 0
+    },
+    "order": 367,
+    "elapsedMs": 142925
+  },
+  {
+    "event": "model-finish",
+    "request": 49,
+    "reason": {
+      "kind": "stop"
+    },
+    "order": 368,
+    "elapsedMs": 142926
+  },
+  {
+    "event": "model-response",
+    "request": 49,
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "durationMs": 3315,
+    "order": 369,
+    "elapsedMs": 142926
+  },
+  {
+    "event": "model-request",
+    "request": 51,
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "order": 371,
+    "elapsedMs": 142992
+  },
+  {
+    "event": "model-request",
+    "request": 52,
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "order": 372,
+    "elapsedMs": 143001
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 50,
+    "latencyMs": 1086,
+    "order": 373,
+    "elapsedMs": 143226
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 51,
+    "latencyMs": 792,
+    "order": 375,
+    "elapsedMs": 143786
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 52,
+    "latencyMs": 1247,
+    "order": 376,
+    "elapsedMs": 144249
+  },
+  {
+    "event": "model-usage",
+    "request": 51,
+    "usage": {
+      "inputTokens": 627,
+      "outputTokens": 93,
+      "totalTokens": 125264,
+      "cacheReadTokens": 124544,
+      "reasoningTokens": 27
+    },
+    "order": 377,
+    "elapsedMs": 144424
+  },
+  {
+    "event": "model-finish",
+    "request": 51,
+    "reason": {
+      "kind": "stop"
+    },
+    "order": 378,
+    "elapsedMs": 144424
+  },
+  {
+    "event": "model-response",
+    "request": 51,
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "durationMs": 1431,
+    "order": 379,
+    "elapsedMs": 144425
+  },
+  {
+    "event": "model-usage",
+    "request": 50,
+    "usage": {
+      "inputTokens": 162,
+      "outputTokens": 601,
+      "totalTokens": 187003,
+      "cacheReadTokens": 186240,
+      "reasoningTokens": 0
+    },
+    "order": 382,
+    "elapsedMs": 145278
+  },
+  {
+    "event": "model-finish",
+    "request": 50,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 383,
+    "elapsedMs": 145278
+  },
+  {
+    "event": "model-response",
+    "request": 50,
+    "sessionId": "89e57833-bbe5-48f1-a458-6bfd7848968e",
+    "durationMs": 3139,
+    "order": 384,
+    "elapsedMs": 145279
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "89e57833-bbe5-48f1-a458-6bfd7848968e",
+    "name": "agent_teams_send_message",
+    "isError": false,
+    "order": 385,
+    "elapsedMs": 145297
+  },
+  {
+    "event": "model-request",
+    "request": 53,
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "order": 386,
+    "elapsedMs": 145312
+  },
+  {
+    "event": "model-request",
+    "request": 54,
+    "sessionId": "89e57833-bbe5-48f1-a458-6bfd7848968e",
+    "order": 387,
+    "elapsedMs": 145314
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 53,
+    "latencyMs": 759,
+    "order": 389,
+    "elapsedMs": 146071
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 54,
+    "latencyMs": 1643,
+    "order": 390,
+    "elapsedMs": 146957
+  },
+  {
+    "event": "model-usage",
+    "request": 53,
+    "usage": {
+      "inputTokens": 634,
+      "outputTokens": 258,
+      "totalTokens": 126076,
+      "cacheReadTokens": 125184,
+      "reasoningTokens": 79
+    },
+    "order": 391,
+    "elapsedMs": 147264
+  },
+  {
+    "event": "model-finish",
+    "request": 53,
+    "reason": {
+      "kind": "stop"
+    },
+    "order": 392,
+    "elapsedMs": 147264
+  },
+  {
+    "event": "model-response",
+    "request": 53,
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "durationMs": 1952,
+    "order": 393,
+    "elapsedMs": 147264
+  },
+  {
+    "event": "model-usage",
+    "request": 52,
+    "usage": {
+      "inputTokens": 2522,
+      "outputTokens": 1002,
+      "totalTokens": 224196,
+      "cacheReadTokens": 220672,
+      "reasoningTokens": 764
+    },
+    "order": 397,
+    "elapsedMs": 148452
+  },
+  {
+    "event": "model-finish",
+    "request": 52,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 398,
+    "elapsedMs": 148452
+  },
+  {
+    "event": "model-response",
+    "request": 52,
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "durationMs": 5450,
+    "order": 399,
+    "elapsedMs": 148452
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "name": "agent_teams_claim_task",
+    "isError": false,
+    "order": 400,
+    "elapsedMs": 148463
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "name": "bash",
+    "isError": false,
+    "order": 401,
+    "elapsedMs": 148504
+  },
+  {
+    "event": "model-request",
+    "request": 55,
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "order": 402,
+    "elapsedMs": 148513
+  },
+  {
+    "event": "model-usage",
+    "request": 54,
+    "usage": {
+      "inputTokens": 164,
+      "outputTokens": 498,
+      "totalTokens": 187542,
+      "cacheReadTokens": 186880,
+      "reasoningTokens": 0
+    },
+    "order": 403,
+    "elapsedMs": 148692
+  },
+  {
+    "event": "model-finish",
+    "request": 54,
+    "reason": {
+      "kind": "stop"
+    },
+    "order": 404,
+    "elapsedMs": 148692
+  },
+  {
+    "event": "model-response",
+    "request": 54,
+    "sessionId": "89e57833-bbe5-48f1-a458-6bfd7848968e",
+    "durationMs": 3379,
+    "order": 405,
+    "elapsedMs": 148693
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 55,
+    "latencyMs": 1189,
+    "order": 407,
+    "elapsedMs": 149702
+  },
+  {
+    "event": "model-usage",
+    "request": 55,
+    "usage": {
+      "inputTokens": 3076,
+      "outputTokens": 3262,
+      "totalTokens": 230466,
+      "cacheReadTokens": 224128,
+      "reasoningTokens": 1525
+    },
+    "order": 410,
+    "elapsedMs": 161787
+  },
+  {
+    "event": "model-finish",
+    "request": 55,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 411,
+    "elapsedMs": 161787
+  },
+  {
+    "event": "model-response",
+    "request": 55,
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "durationMs": 13275,
+    "order": 412,
+    "elapsedMs": 161788
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "name": "agent_teams_update_task",
+    "isError": false,
+    "order": 413,
+    "elapsedMs": 161817
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "name": "bash",
+    "isError": false,
+    "order": 415,
+    "elapsedMs": 162686
+  },
+  {
+    "event": "model-request",
+    "request": 56,
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "order": 416,
+    "elapsedMs": 162695
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 56,
+    "latencyMs": 849,
+    "order": 417,
+    "elapsedMs": 163544
+  },
+  {
+    "event": "model-usage",
+    "request": 56,
+    "usage": {
+      "inputTokens": 3047,
+      "outputTokens": 3626,
+      "totalTokens": 234769,
+      "cacheReadTokens": 228096,
+      "reasoningTokens": 1630
+    },
+    "order": 419,
+    "elapsedMs": 177893
+  },
+  {
+    "event": "model-finish",
+    "request": 56,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 420,
+    "elapsedMs": 177894
+  },
+  {
+    "event": "model-response",
+    "request": 56,
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "durationMs": 15200,
+    "order": 421,
+    "elapsedMs": 177895
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "name": "agent_teams_update_task",
+    "isError": false,
+    "order": 422,
+    "elapsedMs": 177948
+  },
+  {
+    "event": "model-request",
+    "request": 57,
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "order": 423,
+    "elapsedMs": 177961
+  },
+  {
+    "event": "model-request",
+    "request": 58,
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "order": 424,
+    "elapsedMs": 177968
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 58,
+    "latencyMs": 1157,
+    "order": 426,
+    "elapsedMs": 179127
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 57,
+    "latencyMs": 2657,
+    "order": 427,
+    "elapsedMs": 180621
+  },
+  {
+    "event": "model-usage",
+    "request": 58,
+    "usage": {
+      "inputTokens": 561,
+      "outputTokens": 495,
+      "totalTokens": 235808,
+      "cacheReadTokens": 234752,
+      "reasoningTokens": 0
+    },
+    "order": 429,
+    "elapsedMs": 180806
+  },
+  {
+    "event": "model-finish",
+    "request": 58,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 430,
+    "elapsedMs": 180806
+  },
+  {
+    "event": "model-response",
+    "request": 58,
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "durationMs": 2837,
+    "order": 431,
+    "elapsedMs": 180807
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "name": "agent_teams_send_message",
+    "isError": false,
+    "order": 432,
+    "elapsedMs": 180824
+  },
+  {
+    "event": "model-request",
+    "request": 59,
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "order": 433,
+    "elapsedMs": 180839
+  },
+  {
+    "event": "model-request",
+    "request": 60,
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "order": 434,
+    "elapsedMs": 180841
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 59,
+    "latencyMs": 892,
+    "order": 436,
+    "elapsedMs": 181731
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 60,
+    "latencyMs": 1526,
+    "order": 437,
+    "elapsedMs": 182367
+  },
+  {
+    "event": "model-usage",
+    "request": 60,
+    "usage": {
+      "inputTokens": 201,
+      "outputTokens": 481,
+      "totalTokens": 236330,
+      "cacheReadTokens": 235648,
+      "reasoningTokens": 0
+    },
+    "order": 438,
+    "elapsedMs": 183871
+  },
+  {
+    "event": "model-finish",
+    "request": 60,
+    "reason": {
+      "kind": "stop"
+    },
+    "order": 439,
+    "elapsedMs": 183871
+  },
+  {
+    "event": "model-response",
+    "request": 60,
+    "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+    "durationMs": 3031,
+    "order": 440,
+    "elapsedMs": 183872
+  },
+  {
+    "event": "model-usage",
+    "request": 59,
+    "usage": {
+      "inputTokens": 572,
+      "outputTokens": 1065,
+      "totalTokens": 127589,
+      "cacheReadTokens": 125952,
+      "reasoningTokens": 327
+    },
+    "order": 444,
+    "elapsedMs": 186029
+  },
+  {
+    "event": "model-finish",
+    "request": 59,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 445,
+    "elapsedMs": 186029
+  },
+  {
+    "event": "model-response",
+    "request": 59,
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "durationMs": 5191,
+    "order": 446,
+    "elapsedMs": 186030
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "name": "agent_teams_send_message",
+    "isError": false,
+    "order": 447,
+    "elapsedMs": 186048
+  },
+  {
+    "event": "model-request",
+    "request": 61,
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "order": 448,
+    "elapsedMs": 186060
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 61,
+    "latencyMs": 1005,
+    "order": 449,
+    "elapsedMs": 187065
+  },
+  {
+    "event": "model-usage",
+    "request": 61,
+    "usage": {
+      "inputTokens": 145,
+      "outputTokens": 155,
+      "totalTokens": 127788,
+      "cacheReadTokens": 127488,
+      "reasoningTokens": 35
+    },
+    "order": 450,
+    "elapsedMs": 187868
+  },
+  {
+    "event": "model-finish",
+    "request": 61,
+    "reason": {
+      "kind": "stop"
+    },
+    "order": 451,
+    "elapsedMs": 187868
+  },
+  {
+    "event": "model-response",
+    "request": 61,
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "durationMs": 1809,
+    "order": 452,
+    "elapsedMs": 187869
+  },
+  {
+    "event": "model-usage",
+    "request": 57,
+    "usage": {
+      "inputTokens": 172150,
+      "outputTokens": 3861,
+      "totalTokens": 178571,
+      "cacheReadTokens": 2560,
+      "reasoningTokens": 3616
+    },
+    "order": 456,
+    "elapsedMs": 194516
+  },
+  {
+    "event": "model-finish",
+    "request": 57,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 457,
+    "elapsedMs": 194516
+  },
+  {
+    "event": "model-response",
+    "request": 57,
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "durationMs": 16553,
+    "order": 458,
+    "elapsedMs": 194517
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "name": "agent_teams_claim_task",
+    "isError": false,
+    "order": 459,
+    "elapsedMs": 194533
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "name": "bash",
+    "isError": false,
+    "order": 460,
+    "elapsedMs": 194571
+  },
+  {
+    "event": "model-request",
+    "request": 62,
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "order": 461,
+    "elapsedMs": 194581
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 62,
+    "latencyMs": 1005,
+    "order": 462,
+    "elapsedMs": 195586
+  },
+  {
+    "event": "model-usage",
+    "request": 62,
+    "usage": {
+      "inputTokens": 5150,
+      "outputTokens": 2608,
+      "totalTokens": 186318,
+      "cacheReadTokens": 178560,
+      "reasoningTokens": 2355
+    },
+    "order": 465,
+    "elapsedMs": 204145
+  },
+  {
+    "event": "model-finish",
+    "request": 62,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 466,
+    "elapsedMs": 204146
+  },
+  {
+    "event": "model-response",
+    "request": 62,
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "durationMs": 9566,
+    "order": 467,
+    "elapsedMs": 204147
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "name": "agent_teams_update_task",
+    "isError": false,
+    "order": 468,
+    "elapsedMs": 204176
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "name": "bash",
+    "isError": false,
+    "order": 469,
+    "elapsedMs": 204206
+  },
+  {
+    "event": "model-request",
+    "request": 63,
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "order": 470,
+    "elapsedMs": 204215
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 63,
+    "latencyMs": 1229,
+    "order": 472,
+    "elapsedMs": 205444
+  },
+  {
+    "event": "model-usage",
+    "request": 63,
+    "usage": {
+      "inputTokens": 162,
+      "outputTokens": 1815,
+      "totalTokens": 188217,
+      "cacheReadTokens": 186240,
+      "reasoningTokens": 0
+    },
+    "order": 474,
+    "elapsedMs": 209956
+  },
+  {
+    "event": "model-finish",
+    "request": 63,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 475,
+    "elapsedMs": 209956
+  },
+  {
+    "event": "model-response",
+    "request": 63,
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "durationMs": 5742,
+    "order": 476,
+    "elapsedMs": 209957
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "name": "write",
+    "isError": false,
+    "order": 477,
+    "elapsedMs": 209974
+  },
+  {
+    "event": "model-request",
+    "request": 64,
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "order": 478,
+    "elapsedMs": 209983
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 64,
+    "latencyMs": 1209,
+    "order": 479,
+    "elapsedMs": 211192
+  },
+  {
+    "event": "model-usage",
+    "request": 64,
+    "usage": {
+      "inputTokens": 247,
+      "outputTokens": 1214,
+      "totalTokens": 189493,
+      "cacheReadTokens": 188032,
+      "reasoningTokens": 541
+    },
+    "order": 482,
+    "elapsedMs": 214788
+  },
+  {
+    "event": "model-finish",
+    "request": 64,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 483,
+    "elapsedMs": 214788
+  },
+  {
+    "event": "model-response",
+    "request": 64,
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "durationMs": 4806,
+    "order": 484,
+    "elapsedMs": 214789
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "name": "bash",
+    "isError": false,
+    "order": 485,
+    "elapsedMs": 214857
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "name": "bash",
+    "isError": false,
+    "order": 486,
+    "elapsedMs": 214944
+  },
+  {
+    "event": "model-request",
+    "request": 65,
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "order": 487,
+    "elapsedMs": 214952
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 65,
+    "latencyMs": 1182,
+    "order": 488,
+    "elapsedMs": 216134
+  },
+  {
+    "event": "model-usage",
+    "request": 65,
+    "usage": {
+      "inputTokens": 678,
+      "outputTokens": 458,
+      "totalTokens": 190576,
+      "cacheReadTokens": 189440,
+      "reasoningTokens": 300
+    },
+    "order": 490,
+    "elapsedMs": 218164
+  },
+  {
+    "event": "model-finish",
+    "request": 65,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 491,
+    "elapsedMs": 218165
+  },
+  {
+    "event": "model-response",
+    "request": 65,
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "durationMs": 3213,
+    "order": 492,
+    "elapsedMs": 218165
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "name": "bash",
+    "isError": false,
+    "order": 493,
+    "elapsedMs": 218968
+  },
+  {
+    "event": "model-request",
+    "request": 66,
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "order": 494,
+    "elapsedMs": 218976
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 66,
+    "latencyMs": 853,
+    "order": 495,
+    "elapsedMs": 219829
+  },
+  {
+    "event": "model-usage",
+    "request": 66,
+    "usage": {
+      "inputTokens": 291,
+      "outputTokens": 731,
+      "totalTokens": 191486,
+      "cacheReadTokens": 190464,
+      "reasoningTokens": 605
+    },
+    "order": 497,
+    "elapsedMs": 222277
+  },
+  {
+    "event": "model-finish",
+    "request": 66,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 498,
+    "elapsedMs": 222277
+  },
+  {
+    "event": "model-response",
+    "request": 66,
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "durationMs": 3302,
+    "order": 499,
+    "elapsedMs": 222278
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "name": "bash",
+    "isError": false,
+    "order": 500,
+    "elapsedMs": 222335
+  },
+  {
+    "event": "model-request",
+    "request": 67,
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "order": 501,
+    "elapsedMs": 222343
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 67,
+    "latencyMs": 1930,
+    "order": 502,
+    "elapsedMs": 224273
+  },
+  {
+    "event": "model-usage",
+    "request": 67,
+    "usage": {
+      "inputTokens": 261,
+      "outputTokens": 1605,
+      "totalTokens": 193226,
+      "cacheReadTokens": 191360,
+      "reasoningTokens": 0
+    },
+    "order": 504,
+    "elapsedMs": 229149
+  },
+  {
+    "event": "model-finish",
+    "request": 67,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 505,
+    "elapsedMs": 229149
+  },
+  {
+    "event": "model-response",
+    "request": 67,
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "durationMs": 6807,
+    "order": 506,
+    "elapsedMs": 229150
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "name": "write",
+    "isError": false,
+    "order": 507,
+    "elapsedMs": 229169
+  },
+  {
+    "event": "model-request",
+    "request": 68,
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "order": 508,
+    "elapsedMs": 229180
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 68,
+    "latencyMs": 1135,
+    "order": 509,
+    "elapsedMs": 230315
+  },
+  {
+    "event": "model-usage",
+    "request": 68,
+    "usage": {
+      "inputTokens": 259,
+      "outputTokens": 1674,
+      "totalTokens": 194957,
+      "cacheReadTokens": 193024,
+      "reasoningTokens": 1520
+    },
+    "order": 511,
+    "elapsedMs": 236886
+  },
+  {
+    "event": "model-finish",
+    "request": 68,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 512,
+    "elapsedMs": 236886
+  },
+  {
+    "event": "model-response",
+    "request": 68,
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "durationMs": 7707,
+    "order": 513,
+    "elapsedMs": 236887
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "name": "edit",
+    "isError": false,
+    "order": 514,
+    "elapsedMs": 236905
+  },
+  {
+    "event": "model-request",
+    "request": 69,
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "order": 515,
+    "elapsedMs": 236917
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 69,
+    "latencyMs": 2010,
+    "order": 516,
+    "elapsedMs": 238927
+  },
+  {
+    "event": "model-usage",
+    "request": 69,
+    "usage": {
+      "inputTokens": 184,
+      "outputTokens": 349,
+      "totalTokens": 195349,
+      "cacheReadTokens": 194816,
+      "reasoningTokens": 0
+    },
+    "order": 518,
+    "elapsedMs": 239712
+  },
+  {
+    "event": "model-finish",
+    "request": 69,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 519,
+    "elapsedMs": 239712
+  },
+  {
+    "event": "model-response",
+    "request": 69,
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "durationMs": 2795,
+    "order": 520,
+    "elapsedMs": 239712
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "name": "edit",
+    "isError": false,
+    "order": 521,
+    "elapsedMs": 239729
+  },
+  {
+    "event": "model-request",
+    "request": 70,
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "order": 522,
+    "elapsedMs": 239743
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 70,
+    "latencyMs": 1097,
+    "order": 523,
+    "elapsedMs": 240840
+  },
+  {
+    "event": "model-usage",
+    "request": 70,
+    "usage": {
+      "inputTokens": 192,
+      "outputTokens": 265,
+      "totalTokens": 195657,
+      "cacheReadTokens": 195200,
+      "reasoningTokens": 102
+    },
+    "order": 525,
+    "elapsedMs": 241698
+  },
+  {
+    "event": "model-finish",
+    "request": 70,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 526,
+    "elapsedMs": 241698
+  },
+  {
+    "event": "model-response",
+    "request": 70,
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "durationMs": 1956,
+    "order": 527,
+    "elapsedMs": 241699
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "name": "edit",
+    "isError": false,
+    "order": 528,
+    "elapsedMs": 241715
+  },
+  {
+    "event": "model-request",
+    "request": 71,
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "order": 529,
+    "elapsedMs": 241727
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 71,
+    "latencyMs": 969,
+    "order": 530,
+    "elapsedMs": 242697
+  },
+  {
+    "event": "model-usage",
+    "request": 71,
+    "usage": {
+      "inputTokens": 244,
+      "outputTokens": 526,
+      "totalTokens": 196226,
+      "cacheReadTokens": 195456,
+      "reasoningTokens": 0
+    },
+    "order": 532,
+    "elapsedMs": 244145
+  },
+  {
+    "event": "model-finish",
+    "request": 71,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 533,
+    "elapsedMs": 244146
+  },
+  {
+    "event": "model-response",
+    "request": 71,
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "durationMs": 2418,
+    "order": 534,
+    "elapsedMs": 244146
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "name": "bash",
+    "isError": false,
+    "order": 535,
+    "elapsedMs": 244982
+  },
+  {
+    "event": "model-request",
+    "request": 72,
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "order": 536,
+    "elapsedMs": 244990
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 72,
+    "latencyMs": 1207,
+    "order": 537,
+    "elapsedMs": 246197
+  },
+  {
+    "event": "model-usage",
+    "request": 72,
+    "usage": {
+      "inputTokens": 1204,
+      "outputTokens": 1363,
+      "totalTokens": 198791,
+      "cacheReadTokens": 196224,
+      "reasoningTokens": 1093
+    },
+    "order": 539,
+    "elapsedMs": 251783
+  },
+  {
+    "event": "model-finish",
+    "request": 72,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 540,
+    "elapsedMs": 251784
+  },
+  {
+    "event": "model-response",
+    "request": 72,
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "durationMs": 6795,
+    "order": 541,
+    "elapsedMs": 251785
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "name": "edit",
+    "isError": false,
+    "order": 542,
+    "elapsedMs": 251802
+  },
+  {
+    "event": "model-request",
+    "request": 73,
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "order": 543,
+    "elapsedMs": 251814
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 73,
+    "latencyMs": 1289,
+    "order": 544,
+    "elapsedMs": 253103
+  },
+  {
+    "event": "model-usage",
+    "request": 73,
+    "usage": {
+      "inputTokens": 178,
+      "outputTokens": 429,
+      "totalTokens": 199263,
+      "cacheReadTokens": 198656,
+      "reasoningTokens": 0
+    },
+    "order": 546,
+    "elapsedMs": 254323
+  },
+  {
+    "event": "model-finish",
+    "request": 73,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 547,
+    "elapsedMs": 254323
+  },
+  {
+    "event": "model-response",
+    "request": 73,
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "durationMs": 2510,
+    "order": 548,
+    "elapsedMs": 254324
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "name": "bash",
+    "isError": false,
+    "order": 549,
+    "elapsedMs": 254404
+  },
+  {
+    "event": "model-request",
+    "request": 74,
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "order": 550,
+    "elapsedMs": 254411
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 74,
+    "latencyMs": 1089,
+    "order": 551,
+    "elapsedMs": 255501
+  },
+  {
+    "event": "model-usage",
+    "request": 74,
+    "usage": {
+      "inputTokens": 478,
+      "outputTokens": 3735,
+      "totalTokens": 203381,
+      "cacheReadTokens": 199168,
+      "reasoningTokens": 655
+    },
+    "order": 553,
+    "elapsedMs": 268102
+  },
+  {
+    "event": "model-finish",
+    "request": 74,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 554,
+    "elapsedMs": 268102
+  },
+  {
+    "event": "model-response",
+    "request": 74,
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "durationMs": 13691,
+    "order": 555,
+    "elapsedMs": 268103
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "name": "agent_teams_update_task",
+    "isError": false,
+    "order": 556,
+    "elapsedMs": 268133
+  },
+  {
+    "event": "model-request",
+    "request": 75,
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "order": 557,
+    "elapsedMs": 268143
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 75,
+    "latencyMs": 899,
+    "order": 559,
+    "elapsedMs": 269042
+  },
+  {
+    "event": "model-usage",
+    "request": 75,
+    "usage": {
+      "inputTokens": 657,
+      "outputTokens": 659,
+      "totalTokens": 204580,
+      "cacheReadTokens": 203264,
+      "reasoningTokens": 0
+    },
+    "order": 561,
+    "elapsedMs": 271283
+  },
+  {
+    "event": "model-finish",
+    "request": 75,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 562,
+    "elapsedMs": 271284
+  },
+  {
+    "event": "model-response",
+    "request": 75,
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "durationMs": 3142,
+    "order": 563,
+    "elapsedMs": 271285
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "name": "agent_teams_send_message",
+    "isError": false,
+    "order": 564,
+    "elapsedMs": 271303
+  },
+  {
+    "event": "model-request",
+    "request": 76,
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "order": 565,
+    "elapsedMs": 271319
+  },
+  {
+    "event": "model-request",
+    "request": 77,
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "order": 566,
+    "elapsedMs": 271321
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 76,
+    "latencyMs": 853,
+    "order": 568,
+    "elapsedMs": 272172
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 77,
+    "latencyMs": 1617,
+    "order": 569,
+    "elapsedMs": 272938
+  },
+  {
+    "event": "model-usage",
+    "request": 77,
+    "usage": {
+      "inputTokens": 204,
+      "outputTokens": 550,
+      "totalTokens": 205170,
+      "cacheReadTokens": 204416,
+      "reasoningTokens": 0
+    },
+    "order": 570,
+    "elapsedMs": 274627
+  },
+  {
+    "event": "model-finish",
+    "request": 77,
+    "reason": {
+      "kind": "stop"
+    },
+    "order": 571,
+    "elapsedMs": 274627
+  },
+  {
+    "event": "model-response",
+    "request": 77,
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "durationMs": 3308,
+    "order": 572,
+    "elapsedMs": 274629
+  },
+  {
+    "event": "model-usage",
+    "request": 76,
+    "usage": {
+      "inputTokens": 656,
+      "outputTokens": 2498,
+      "totalTokens": 130898,
+      "cacheReadTokens": 127744,
+      "reasoningTokens": 1569
+    },
+    "order": 576,
+    "elapsedMs": 280457
+  },
+  {
+    "event": "model-finish",
+    "request": 76,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 577,
+    "elapsedMs": 280458
+  },
+  {
+    "event": "model-response",
+    "request": 76,
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "durationMs": 9139,
+    "order": 578,
+    "elapsedMs": 280458
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "name": "bash",
+    "isError": false,
+    "order": 579,
+    "elapsedMs": 281327
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "name": "bash",
+    "isError": false,
+    "order": 580,
+    "elapsedMs": 281409
+  },
+  {
+    "event": "model-request",
+    "request": 78,
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "order": 581,
+    "elapsedMs": 281418
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 78,
+    "latencyMs": 1310,
+    "order": 582,
+    "elapsedMs": 282728
+  },
+  {
+    "event": "model-usage",
+    "request": 78,
+    "usage": {
+      "inputTokens": 1202,
+      "outputTokens": 246,
+      "totalTokens": 132264,
+      "cacheReadTokens": 130816,
+      "reasoningTokens": 204
+    },
+    "order": 584,
+    "elapsedMs": 283767
+  },
+  {
+    "event": "model-finish",
+    "request": 78,
+    "reason": {
+      "kind": "tool-calls"
+    },
+    "order": 585,
+    "elapsedMs": 283767
+  },
+  {
+    "event": "model-response",
+    "request": 78,
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "durationMs": 2349,
+    "order": 586,
+    "elapsedMs": 283767
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "name": "agent_teams_status",
+    "isError": false,
+    "order": 587,
+    "elapsedMs": 283791
+  },
+  {
+    "event": "model-request",
+    "request": 79,
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "order": 588,
+    "elapsedMs": 283798
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 79,
+    "latencyMs": 1560,
+    "order": 589,
+    "elapsedMs": 285358
+  },
+  {
+    "event": "model-usage",
+    "request": 79,
+    "usage": {
+      "inputTokens": 2632,
+      "outputTokens": 1209,
+      "totalTokens": 136065,
+      "cacheReadTokens": 132224,
+      "reasoningTokens": 331
+    },
+    "order": 590,
+    "elapsedMs": 290364
+  },
+  {
+    "event": "model-finish",
+    "request": 79,
+    "reason": {
+      "kind": "stop"
+    },
+    "order": 591,
+    "elapsedMs": 290365
+  },
+  {
+    "event": "model-response",
+    "request": 79,
+    "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "durationMs": 6567,
+    "order": 592,
+    "elapsedMs": 290365
+  },
+  {
+    "event": "benchmark-finished",
+    "order": 594,
+    "elapsedMs": 291994
+  }
+]

@@ -1,0 +1,35 @@
+{
+  "hostVersion": "0.1.5-rc.1",
+  "observations": [
+    {
+      "package": "dsh-subagent",
+      "version": "0.1.5-rc.1",
+      "sha256": "b8ea0e37bd6f1d9c4bd870c4ca03839f6d0e42f648a83578e31a448f6dffe4ef"
+    },
+    {
+      "package": "dsh-agent-loop",
+      "version": "0.1.5-rc.1",
+      "sha256": "257eb83c00a05ee068e9f4ba80ca71ab94e3a1275d24b7a0cf5038ff23dd0fd8"
+    },
+    {
+      "check": "installed plugin declares delivery while ordinary work remains pending",
+      "passed": true
+    },
+    {
+      "check": "installed plugin queues current-task guidance into next-turn",
+      "passed": true
+    },
+    {
+      "check": "native interrupt preserves queued input and does not stop grandchild",
+      "passed": true
+    },
+    {
+      "check": "native child settlement wakes retired parent behind public delivery guard",
+      "passed": true
+    },
+    {
+      "check": "native selected drain clears inbox and recursively disposes owned children, preserving sibling",
+      "passed": true
+    }
+  ]
+}

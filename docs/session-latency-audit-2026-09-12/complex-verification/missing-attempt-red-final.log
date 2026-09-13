@@ -1,0 +1,120 @@
+dsh-agent-teams lifecycle verification
+  PASS  slash command registers as /agent-teams
+  PASS  slash command advertises an input hint for the menu placeholder
+  PASS  configured profile registers a concise dedicated slash command
+  PASS  unsafe profile names do not generate ambiguous commands
+  PASS  bare /agent-teams reports usage instead of activating
+  PASS  argued /agent-teams queues one visible user turn
+  PASS  slash command preserves the exact submitted line as user-authored chat
+  PASS  preserved slash command still activates through the gesture boundary
+  PASS  activation directive names the protocol
+  PASS  profile command queues a visible profile-specific user turn
+  PASS  gesture recognizes a leading /agent-teams token
+  PASS  profile command gesture selects its configured profile and goal
+  PASS  bare profile command gesture asks for the goal
+  PASS  unknown profile command stays ordinary prose
+  PASS  bare gesture yields an empty goal
+  PASS  mid-sentence mention stays ordinary prose
+  PASS  non-user sources cannot forge the gesture
+  PASS  latest user gesture wins in a batch
+  PASS  slash --profile without a goal still activates
+  PASS  profile-only activation asks for the goal
+  PASS  captain-planning activation requires a staged user-reviewed graph
+  PASS  unknown slash profile reports error and does not followup
+  PASS  leading ordinary token is never treated as a profile
+  PASS  command getter sees HMR profile names
+  PASS  create(profile) returns profile members tasks and seed ids
+  PASS  create(profile) persists snapshot members and mapped dependencies
+  PASS  dependency-blocked roster does not spawn a model session
+  PASS  first-stage seed is assigned only to the configured member
+  PASS  first assignment includes team goal and protocol
+  PASS  failed upstream does not unlock the next configured stage
+  PASS  completed upstream dispatches the configured downstream assignee
+  PASS  downstream assignment includes dependency output and seed id
+  PASS  unread mailbox prevents a same-kick new assignment
+  PASS  status exposes profile snapshot and task seed ids
+  PASS  discarding a staged plan archives it without spawning or dispatching
+  PASS  discard aborts the active Captain turn and parks an authoritative no-recreate context
+  PASS  captain-planning create stages only the configured roster
+  PASS  staged roster and DAG are editable without spawning or dispatching
+  PASS  invalid staged plan batches fail atomically without a partial write
+  PASS  return-to-chat cancels the planning turn and asks one question without recreating the team
+  PASS  return-to-chat is idempotent while feedback is already pending
+  PASS  captain can revise the staged DAG and roster through one model-facing atomic tool
+  PASS  running never-started tasks can be corrected without replacing the DAG
+  PASS  invalid running plan batches preserve the entire previous graph
+  PASS  running edits reject active attempts, cycles and roster changes: {"action":"update_task","task_id":"t1","subject":"do not overwrite active work"}
+  PASS  running edits reject active attempts, cycles and roster changes: {"action":"update_task","task_id":"t2","dependencies":["t2"]}
+  PASS  running edits reject active attempts, cycles and roster changes: {"action":"remove_member","member_name":"implementer"}
+  PASS  captain can cancel dependency-blocked member work before its first attempt
+  PASS  approval starts only dependency-ready members
+  PASS  approved plan dispatches only after a spawned member becomes idle
+  PASS  captain halt cancels the approved graph and keeps the team
+  PASS  team halt cancels the captain turn while preserving queued user input
+  PASS  captain halt drains active members and leaves blocked members unspawned
+  PASS  halted team does not redispatch cancelled graph
+  PASS  halted create_task does not silently resume
+  PASS  explicit resume clears halt and keeps cancelled tasks cancelled
+  PASS  shutdown preserves cancelled task history in the archive
+  PASS  quality implementation without contract is rejected
+  FAIL  missing attempt_id is a correctable parameter error, not a revoked attempt
+  FAIL  missing attempt_id is a correctable parameter error, not a revoked attempt
+  PASS  illegal completed without acceptance evidence is rejected
+  PASS  review needs_revision cannot complete
+  PASS  needs_revision opens repair and next review
+  PASS  adding members alone creates no child sessions
+  PASS  manually added members persist the global fallback for later activations
+  PASS  idle assigned member is claimed and woken automatically
+  PASS  captain cannot mint a claim capability for a member; use reassign_task
+  PASS  member observes the scheduler attempt idempotently
+  PASS  dependency gate stays pending before both branches complete
+  PASS  rate-limited idle owner does not enter an unbounded retry loop (#66)
+  PASS  disposed settled owner keeps its parked attempt across repeated scheduler kicks
+  PASS  idle assigned gamma is claimed for the recovery-failure fixture
+  PASS  failed unobserved recovery restores the original capability and later kicks do not recast it
+  PASS  restored capability remains usable after a failed recovery delivery
+  PASS  unobserved missing owner recovers once and repeated kicks do not rotate it again
+  PASS  captain message resumes a parked owner without rotating its attempt
+  PASS  captain cannot bypass the safe takeover protocol
+  PASS  reassignment quiesces recovered owner and creates a new attempt
+  PASS  old member cannot publish a late takeover result
+  PASS  resumed recovered member completes with its throttled capability
+  PASS  completing dependencies dispatches the downstream task before member execution
+  PASS  previously interrupted member is reused in a later round
+  PASS  a member cannot claim a second unfinished task
+  PASS  removing a member revokes and redispatches its unfinished task
+  PASS  removing a member preserves its catalog entry for transcript history
+  PASS  removing a member blocks direct followup before resume
+  PASS  removed member loses participant authorization
+  PASS  failed live message remains one unread durable fallback
+  PASS  status kick accepts fallback without inventing consumption
+  PASS  recipient status acknowledges the complete fallback actually displayed
+  PASS  concurrent claims serialize to exactly one owner
+  PASS  terminal output is immutable against late overwrite
+  PASS  captain takeover owns a fresh attempt and rejects the old member
+  PASS  parallel captain takeovers allow exactly one active captain task
+  PASS  unfinished captain takeover returns to a member when the captain becomes idle
+  PASS  activity refines residency through the live Agent registry
+  PASS  team shutdown archives the complete durable record
+  PASS  archived activity keeps every member after shutdown
+  PASS  archived activity projects each member model onto assigned tasks
+  PASS  team shutdown keeps retired members catalog-visible for historical transcripts
+  PASS  team shutdown blocks storage-only member cold resume
+  PASS  team shutdown leaves unrelated continuable subagents untouched
+  PASS  team shutdown leaves unrelated continuable followup untouched
+  PASS  invalid roster approval rejects before any member session is created
+  PASS  same-name team can be recreated and archived again
+  PASS  request failure alone leaves the attempt open for Harness recovery
+  PASS  turn failure fails the open attempt, releases the member, and owns no retry
+  PASS  turn failure notifies the captain mailbox with the error code
+  PASS  settled member discards failed-attempt guidance without another model turn
+  PASS  invalid batch plan is rejected without any state or session side effect
+  PASS  one atomic call creates the full roster and resolves forward dependency references
+  PASS  ordinary pending work cannot be reported deliverable
+  PASS  claim exposes the complete task contract without reading team files
+  PASS  failed teardown keeps reassignment fenced and does not launch a new generation
+  PASS  the same failed handoff can be retried safely
+  PASS  failed member drain never reports a successful archive
+  PASS  archive retries drain previously removed roster rows
+
+2 lifecycle check(s) FAILED: missing attempt_id is a correctable parameter error, not a revoked attempt, missing attempt_id is a correctable parameter error, not a revoked attempt

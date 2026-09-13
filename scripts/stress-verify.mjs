@@ -51,7 +51,12 @@ function makeAgent(id, parentSession) {
     status: 'idle',
     options: { provider: 'stress', model: 'stress-model' },
     session: session(parentSession),
-    steer() {},
+    steer(message) {
+      const remaining = failDeliveryCount.get(this.id) ?? 0
+      if (remaining > 0) { failDeliveryCount.set(this.id, remaining - 1); throw new Error('injected steering failure') }
+      deliveries.push({ childId: this.id, content: message.content })
+      this.status = 'running'
+    },
     cancel() {},
     whenIdle() {
       return this.status === 'idle' ? Promise.resolve() : new Promise(resolve => { this._idle = resolve })
@@ -118,7 +123,8 @@ function mountRuntime() {
         child.status = 'running'
         liveAgents.set(id, child)
         children.push({ id, label: spec.label, mode: 'continuable' })
-        return { childId: id, messageId: `welcome-${childSeq}` }
+        deliveries.push({ childId: id, content: spec.request.prompt })
+        return { childId: id, messageId: `initial-${childSeq}` }
       },
       async listChildren(parentId) {
         if (parentId !== captain.id) return []
@@ -147,6 +153,9 @@ function mountRuntime() {
         child.status = 'running'
         deliveries.push({ childId, content, runtime: runtime?.generation ?? 0 })
         return `message-${++messageSeq}`
+      },
+      async drainContinuableChildren(_parent, ids) {
+        for (const id of ids) { const child = liveAgents.get(id); if (child) { publishStatus(child, 'idle'); liveAgents.delete(id) } }
       },
       interrupt(childId) {
         const child = liveAgents.get(childId)
@@ -291,17 +300,11 @@ function dagSpecs() {
 console.log('dsh-agent-teams complex stress verification')
 runtime = mountRuntime()
 try {
-  await call('agent_teams_create', { name: 'Stress Matrix', description: '8 members, 31-node DAG, injected failures and cold restart' })
+  await call('agent_teams_create', { name: 'Stress Matrix', description: '8 members, 31-node DAG, injected failures and cold restart', approval: 'required' })
   for (const name of memberNames) {
     await call('agent_teams_add_member', { name, role: `${name}-specialist` })
   }
 
-  // Keep every member unavailable while the complete graph is created. This
-  // separates graph construction from the first scheduler wave.
-  for (const name of memberNames) {
-    const agent = await liveMember(name)
-    agent.status = 'running'
-  }
   for (const spec of dagSpecs()) {
     await call('agent_teams_create_task', {
       subject: spec.subject,
@@ -310,6 +313,7 @@ try {
     })
   }
 
+  await call('agent_teams_approve', { confirmation: 'Run the prepared stress graph' })
   await Promise.all(memberNames.map(async name => idle(await liveMember(name))))
   let snapshot = await state()
   let roots = snapshot.tasks.slice(0, 8)
@@ -506,6 +510,7 @@ try {
   }
   await call('agent_teams_status', {})
   await settle()
+  for (const name of activeNames) await call('agent_teams_status', {}, await liveMember(name))
   const unreadCounts = await Promise.all(activeNames.map(name => readUnreadMailbox(stateRoot, teamId, name)))
   check('all failed message fallbacks are redelivered and acknowledged exactly once',
     unreadCounts.every(messages => messages.length === 0))

@@ -1,0 +1,966 @@
+[
+  {
+    "event": "benchmark-user-input",
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "phase": "cold",
+    "order": 0,
+    "elapsedMs": 52
+  },
+  {
+    "event": "model-request",
+    "request": 1,
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "adba5678d76e18557462500d63a11f279dbfe46ab0d218b6b477c309c51e8936",
+    "systemBytes": 8887,
+    "toolsSha256": "1cf856ccbb783a28f786a4934422ed5979f64871eb0e062dff1644b860625b76",
+    "teamTools": [
+      "agent_teams_add_member",
+      "agent_teams_approve",
+      "agent_teams_claim_task",
+      "agent_teams_create",
+      "agent_teams_create_task",
+      "agent_teams_delete",
+      "agent_teams_edit_plan",
+      "agent_teams_reassign_task",
+      "agent_teams_remove_member",
+      "agent_teams_resume",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 1,
+    "elapsedMs": 71
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 1,
+    "latencyMs": 764,
+    "order": 2,
+    "elapsedMs": 835
+  },
+  {
+    "event": "model-usage",
+    "request": 1,
+    "usage": {
+      "inputTokens": 350,
+      "outputTokens": 1627,
+      "totalTokens": 32825,
+      "cacheReadTokens": 30848,
+      "reasoningTokens": 781
+    },
+    "order": 3,
+    "elapsedMs": 8001
+  },
+  {
+    "event": "model-response",
+    "request": 1,
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "durationMs": 7937,
+    "order": 4,
+    "elapsedMs": 8008
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "name": "agent_teams_create_task",
+    "isError": false,
+    "order": 5,
+    "elapsedMs": 8051
+  },
+  {
+    "event": "model-request",
+    "request": 2,
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "5efe0a56081a98e38bb1a6e7a4940597a3b8d0bf37a8bdc83d193c268830b7db",
+    "systemBytes": 8173,
+    "toolsSha256": "e6bf881a628808a931a5d46f6583913bdd179787df1684ec30f6eb249c6ef833",
+    "teamTools": [
+      "agent_teams_claim_task",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 6,
+    "elapsedMs": 8062
+  },
+  {
+    "event": "model-request",
+    "request": 3,
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "adba5678d76e18557462500d63a11f279dbfe46ab0d218b6b477c309c51e8936",
+    "systemBytes": 8887,
+    "toolsSha256": "1cf856ccbb783a28f786a4934422ed5979f64871eb0e062dff1644b860625b76",
+    "teamTools": [
+      "agent_teams_add_member",
+      "agent_teams_approve",
+      "agent_teams_claim_task",
+      "agent_teams_create",
+      "agent_teams_create_task",
+      "agent_teams_delete",
+      "agent_teams_edit_plan",
+      "agent_teams_reassign_task",
+      "agent_teams_remove_member",
+      "agent_teams_resume",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 7,
+    "elapsedMs": 8069
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 2,
+    "latencyMs": 780,
+    "order": 8,
+    "elapsedMs": 8842
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 3,
+    "latencyMs": 1079,
+    "order": 9,
+    "elapsedMs": 9148
+  },
+  {
+    "event": "model-usage",
+    "request": 3,
+    "usage": {
+      "inputTokens": 232,
+      "outputTokens": 43,
+      "totalTokens": 32915,
+      "cacheReadTokens": 32640,
+      "reasoningTokens": 18
+    },
+    "order": 10,
+    "elapsedMs": 9551
+  },
+  {
+    "event": "model-response",
+    "request": 3,
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "durationMs": 1484,
+    "order": 11,
+    "elapsedMs": 9553
+  },
+  {
+    "event": "model-usage",
+    "request": 2,
+    "usage": {
+      "inputTokens": 1310,
+      "outputTokens": 155,
+      "totalTokens": 22969,
+      "cacheReadTokens": 21504,
+      "reasoningTokens": 62
+    },
+    "order": 12,
+    "elapsedMs": 9556
+  },
+  {
+    "event": "model-response",
+    "request": 2,
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "durationMs": 1494,
+    "order": 13,
+    "elapsedMs": 9556
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "name": "agent_teams_claim_task",
+    "isError": false,
+    "order": 14,
+    "elapsedMs": 9568
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "name": "agent_teams_status",
+    "isError": false,
+    "order": 15,
+    "elapsedMs": 9572
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "name": "read",
+    "isError": false,
+    "order": 16,
+    "elapsedMs": 9579
+  },
+  {
+    "event": "model-request",
+    "request": 4,
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "adba5678d76e18557462500d63a11f279dbfe46ab0d218b6b477c309c51e8936",
+    "systemBytes": 8887,
+    "toolsSha256": "1cf856ccbb783a28f786a4934422ed5979f64871eb0e062dff1644b860625b76",
+    "teamTools": [
+      "agent_teams_add_member",
+      "agent_teams_approve",
+      "agent_teams_claim_task",
+      "agent_teams_create",
+      "agent_teams_create_task",
+      "agent_teams_delete",
+      "agent_teams_edit_plan",
+      "agent_teams_reassign_task",
+      "agent_teams_remove_member",
+      "agent_teams_resume",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 17,
+    "elapsedMs": 9588
+  },
+  {
+    "event": "model-request",
+    "request": 5,
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "5efe0a56081a98e38bb1a6e7a4940597a3b8d0bf37a8bdc83d193c268830b7db",
+    "systemBytes": 8173,
+    "toolsSha256": "e6bf881a628808a931a5d46f6583913bdd179787df1684ec30f6eb249c6ef833",
+    "teamTools": [
+      "agent_teams_claim_task",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 18,
+    "elapsedMs": 9595
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 5,
+    "latencyMs": 646,
+    "order": 19,
+    "elapsedMs": 10242
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 4,
+    "latencyMs": 814,
+    "order": 20,
+    "elapsedMs": 10404
+  },
+  {
+    "event": "model-usage",
+    "request": 4,
+    "usage": {
+      "inputTokens": 762,
+      "outputTokens": 206,
+      "totalTokens": 33864,
+      "cacheReadTokens": 32896,
+      "reasoningTokens": 24
+    },
+    "order": 21,
+    "elapsedMs": 11355
+  },
+  {
+    "event": "model-response",
+    "request": 4,
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "durationMs": 1766,
+    "order": 22,
+    "elapsedMs": 11356
+  },
+  {
+    "event": "model-usage",
+    "request": 5,
+    "usage": {
+      "inputTokens": 941,
+      "outputTokens": 578,
+      "totalTokens": 24431,
+      "cacheReadTokens": 22912,
+      "reasoningTokens": 204
+    },
+    "order": 23,
+    "elapsedMs": 12360
+  },
+  {
+    "event": "model-response",
+    "request": 5,
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "durationMs": 2765,
+    "order": 24,
+    "elapsedMs": 12361
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "name": "agent_teams_update_task",
+    "isError": false,
+    "order": 25,
+    "elapsedMs": 12377
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "name": "bash",
+    "isError": false,
+    "order": 26,
+    "elapsedMs": 12456
+  },
+  {
+    "event": "model-request",
+    "request": 6,
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "5efe0a56081a98e38bb1a6e7a4940597a3b8d0bf37a8bdc83d193c268830b7db",
+    "systemBytes": 8173,
+    "toolsSha256": "e6bf881a628808a931a5d46f6583913bdd179787df1684ec30f6eb249c6ef833",
+    "teamTools": [
+      "agent_teams_claim_task",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 27,
+    "elapsedMs": 12463
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 6,
+    "latencyMs": 833,
+    "order": 28,
+    "elapsedMs": 13296
+  },
+  {
+    "event": "model-usage",
+    "request": 6,
+    "usage": {
+      "inputTokens": 543,
+      "outputTokens": 365,
+      "totalTokens": 25228,
+      "cacheReadTokens": 24320,
+      "reasoningTokens": 250
+    },
+    "order": 29,
+    "elapsedMs": 14907
+  },
+  {
+    "event": "model-response",
+    "request": 6,
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "durationMs": 2445,
+    "order": 30,
+    "elapsedMs": 14908
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "name": "bash",
+    "isError": false,
+    "order": 31,
+    "elapsedMs": 14951
+  },
+  {
+    "event": "model-request",
+    "request": 7,
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "5efe0a56081a98e38bb1a6e7a4940597a3b8d0bf37a8bdc83d193c268830b7db",
+    "systemBytes": 8173,
+    "toolsSha256": "e6bf881a628808a931a5d46f6583913bdd179787df1684ec30f6eb249c6ef833",
+    "teamTools": [
+      "agent_teams_claim_task",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 32,
+    "elapsedMs": 14960
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 7,
+    "latencyMs": 779,
+    "order": 33,
+    "elapsedMs": 15739
+  },
+  {
+    "event": "model-usage",
+    "request": 7,
+    "usage": {
+      "inputTokens": 198,
+      "outputTokens": 955,
+      "totalTokens": 26369,
+      "cacheReadTokens": 25216,
+      "reasoningTokens": 0
+    },
+    "order": 34,
+    "elapsedMs": 18831
+  },
+  {
+    "event": "model-response",
+    "request": 7,
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "durationMs": 3872,
+    "order": 35,
+    "elapsedMs": 18832
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "name": "write",
+    "isError": false,
+    "order": 36,
+    "elapsedMs": 18851
+  },
+  {
+    "event": "model-request",
+    "request": 8,
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "5efe0a56081a98e38bb1a6e7a4940597a3b8d0bf37a8bdc83d193c268830b7db",
+    "systemBytes": 8173,
+    "toolsSha256": "e6bf881a628808a931a5d46f6583913bdd179787df1684ec30f6eb249c6ef833",
+    "teamTools": [
+      "agent_teams_claim_task",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 37,
+    "elapsedMs": 18862
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 8,
+    "latencyMs": 865,
+    "order": 38,
+    "elapsedMs": 19727
+  },
+  {
+    "event": "model-usage",
+    "request": 8,
+    "usage": {
+      "inputTokens": 184,
+      "outputTokens": 221,
+      "totalTokens": 26645,
+      "cacheReadTokens": 26240,
+      "reasoningTokens": 87
+    },
+    "order": 39,
+    "elapsedMs": 20624
+  },
+  {
+    "event": "model-response",
+    "request": 8,
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "durationMs": 1764,
+    "order": 40,
+    "elapsedMs": 20626
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "name": "edit",
+    "isError": false,
+    "order": 41,
+    "elapsedMs": 20644
+  },
+  {
+    "event": "model-request",
+    "request": 9,
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "5efe0a56081a98e38bb1a6e7a4940597a3b8d0bf37a8bdc83d193c268830b7db",
+    "systemBytes": 8173,
+    "toolsSha256": "e6bf881a628808a931a5d46f6583913bdd179787df1684ec30f6eb249c6ef833",
+    "teamTools": [
+      "agent_teams_claim_task",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 42,
+    "elapsedMs": 20656
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 9,
+    "latencyMs": 587,
+    "order": 43,
+    "elapsedMs": 21243
+  },
+  {
+    "event": "model-usage",
+    "request": 9,
+    "usage": {
+      "inputTokens": 190,
+      "outputTokens": 297,
+      "totalTokens": 26983,
+      "cacheReadTokens": 26496,
+      "reasoningTokens": 0
+    },
+    "order": 44,
+    "elapsedMs": 21989
+  },
+  {
+    "event": "model-response",
+    "request": 9,
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "durationMs": 1334,
+    "order": 45,
+    "elapsedMs": 21990
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "name": "bash",
+    "isError": false,
+    "order": 46,
+    "elapsedMs": 22076
+  },
+  {
+    "event": "model-request",
+    "request": 10,
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "5efe0a56081a98e38bb1a6e7a4940597a3b8d0bf37a8bdc83d193c268830b7db",
+    "systemBytes": 8173,
+    "toolsSha256": "e6bf881a628808a931a5d46f6583913bdd179787df1684ec30f6eb249c6ef833",
+    "teamTools": [
+      "agent_teams_claim_task",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 47,
+    "elapsedMs": 22083
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 10,
+    "latencyMs": 834,
+    "order": 48,
+    "elapsedMs": 22917
+  },
+  {
+    "event": "model-usage",
+    "request": 10,
+    "usage": {
+      "inputTokens": 663,
+      "outputTokens": 525,
+      "totalTokens": 28068,
+      "cacheReadTokens": 26880,
+      "reasoningTokens": 72
+    },
+    "order": 49,
+    "elapsedMs": 24695
+  },
+  {
+    "event": "model-response",
+    "request": 10,
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "durationMs": 2614,
+    "order": 50,
+    "elapsedMs": 24697
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "name": "agent_teams_update_task",
+    "isError": false,
+    "order": 51,
+    "elapsedMs": 24713
+  },
+  {
+    "event": "model-request",
+    "request": 11,
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "5efe0a56081a98e38bb1a6e7a4940597a3b8d0bf37a8bdc83d193c268830b7db",
+    "systemBytes": 8173,
+    "toolsSha256": "e6bf881a628808a931a5d46f6583913bdd179787df1684ec30f6eb249c6ef833",
+    "teamTools": [
+      "agent_teams_claim_task",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 52,
+    "elapsedMs": 24724
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 11,
+    "latencyMs": 835,
+    "order": 53,
+    "elapsedMs": 25559
+  },
+  {
+    "event": "model-usage",
+    "request": 11,
+    "usage": {
+      "inputTokens": 389,
+      "outputTokens": 399,
+      "totalTokens": 28820,
+      "cacheReadTokens": 28032,
+      "reasoningTokens": 0
+    },
+    "order": 54,
+    "elapsedMs": 26759
+  },
+  {
+    "event": "model-response",
+    "request": 11,
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "durationMs": 2036,
+    "order": 55,
+    "elapsedMs": 26760
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "name": "agent_teams_send_message",
+    "isError": false,
+    "order": 56,
+    "elapsedMs": 26775
+  },
+  {
+    "event": "model-request",
+    "request": 12,
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "adba5678d76e18557462500d63a11f279dbfe46ab0d218b6b477c309c51e8936",
+    "systemBytes": 8887,
+    "toolsSha256": "1cf856ccbb783a28f786a4934422ed5979f64871eb0e062dff1644b860625b76",
+    "teamTools": [
+      "agent_teams_add_member",
+      "agent_teams_approve",
+      "agent_teams_claim_task",
+      "agent_teams_create",
+      "agent_teams_create_task",
+      "agent_teams_delete",
+      "agent_teams_edit_plan",
+      "agent_teams_reassign_task",
+      "agent_teams_remove_member",
+      "agent_teams_resume",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 57,
+    "elapsedMs": 26783
+  },
+  {
+    "event": "model-request",
+    "request": 13,
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "5efe0a56081a98e38bb1a6e7a4940597a3b8d0bf37a8bdc83d193c268830b7db",
+    "systemBytes": 8173,
+    "toolsSha256": "e6bf881a628808a931a5d46f6583913bdd179787df1684ec30f6eb249c6ef833",
+    "teamTools": [
+      "agent_teams_claim_task",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 58,
+    "elapsedMs": 26787
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 13,
+    "latencyMs": 630,
+    "order": 59,
+    "elapsedMs": 27419
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 12,
+    "latencyMs": 833,
+    "order": 60,
+    "elapsedMs": 27617
+  },
+  {
+    "event": "model-usage",
+    "request": 12,
+    "usage": {
+      "inputTokens": 424,
+      "outputTokens": 375,
+      "totalTokens": 34591,
+      "cacheReadTokens": 33792,
+      "reasoningTokens": 95
+    },
+    "order": 61,
+    "elapsedMs": 28783
+  },
+  {
+    "event": "model-response",
+    "request": 12,
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "durationMs": 2000,
+    "order": 62,
+    "elapsedMs": 28784
+  },
+  {
+    "event": "model-usage",
+    "request": 13,
+    "usage": {
+      "inputTokens": 193,
+      "outputTokens": 418,
+      "totalTokens": 29283,
+      "cacheReadTokens": 28672,
+      "reasoningTokens": 0
+    },
+    "order": 63,
+    "elapsedMs": 28791
+  },
+  {
+    "event": "model-response",
+    "request": 13,
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "durationMs": 2004,
+    "order": 64,
+    "elapsedMs": 28793
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "name": "read",
+    "isError": false,
+    "order": 65,
+    "elapsedMs": 28799
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "name": "bash",
+    "isError": false,
+    "order": 66,
+    "elapsedMs": 28870
+  },
+  {
+    "event": "model-request",
+    "request": 14,
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "adba5678d76e18557462500d63a11f279dbfe46ab0d218b6b477c309c51e8936",
+    "systemBytes": 8887,
+    "toolsSha256": "1cf856ccbb783a28f786a4934422ed5979f64871eb0e062dff1644b860625b76",
+    "teamTools": [
+      "agent_teams_add_member",
+      "agent_teams_approve",
+      "agent_teams_claim_task",
+      "agent_teams_create",
+      "agent_teams_create_task",
+      "agent_teams_delete",
+      "agent_teams_edit_plan",
+      "agent_teams_reassign_task",
+      "agent_teams_remove_member",
+      "agent_teams_resume",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 67,
+    "elapsedMs": 28878
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 14,
+    "latencyMs": 876,
+    "order": 68,
+    "elapsedMs": 29755
+  },
+  {
+    "event": "model-usage",
+    "request": 14,
+    "usage": {
+      "inputTokens": 2032,
+      "outputTokens": 623,
+      "totalTokens": 37215,
+      "cacheReadTokens": 34560,
+      "reasoningTokens": 132
+    },
+    "order": 69,
+    "elapsedMs": 32082
+  },
+  {
+    "event": "model-response",
+    "request": 14,
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "durationMs": 3204,
+    "order": 70,
+    "elapsedMs": 32083
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "name": "write",
+    "isError": false,
+    "order": 71,
+    "elapsedMs": 32101
+  },
+  {
+    "event": "model-request",
+    "request": 15,
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "adba5678d76e18557462500d63a11f279dbfe46ab0d218b6b477c309c51e8936",
+    "systemBytes": 8887,
+    "toolsSha256": "1cf856ccbb783a28f786a4934422ed5979f64871eb0e062dff1644b860625b76",
+    "teamTools": [
+      "agent_teams_add_member",
+      "agent_teams_approve",
+      "agent_teams_claim_task",
+      "agent_teams_create",
+      "agent_teams_create_task",
+      "agent_teams_delete",
+      "agent_teams_edit_plan",
+      "agent_teams_reassign_task",
+      "agent_teams_remove_member",
+      "agent_teams_resume",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 72,
+    "elapsedMs": 32112
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 15,
+    "latencyMs": 360,
+    "order": 73,
+    "elapsedMs": 32472
+  },
+  {
+    "event": "model-usage",
+    "request": 15,
+    "usage": {
+      "inputTokens": 149,
+      "outputTokens": 242,
+      "totalTokens": 37511,
+      "cacheReadTokens": 37120,
+      "reasoningTokens": 28
+    },
+    "order": 74,
+    "elapsedMs": 33217
+  },
+  {
+    "event": "model-response",
+    "request": 15,
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "durationMs": 1107,
+    "order": 75,
+    "elapsedMs": 33219
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "name": "bash",
+    "isError": false,
+    "order": 76,
+    "elapsedMs": 33291
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "name": "agent_teams_status",
+    "isError": false,
+    "order": 77,
+    "elapsedMs": 33298
+  },
+  {
+    "event": "model-request",
+    "request": 16,
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "adba5678d76e18557462500d63a11f279dbfe46ab0d218b6b477c309c51e8936",
+    "systemBytes": 8887,
+    "toolsSha256": "1cf856ccbb783a28f786a4934422ed5979f64871eb0e062dff1644b860625b76",
+    "teamTools": [
+      "agent_teams_add_member",
+      "agent_teams_approve",
+      "agent_teams_claim_task",
+      "agent_teams_create",
+      "agent_teams_create_task",
+      "agent_teams_delete",
+      "agent_teams_edit_plan",
+      "agent_teams_reassign_task",
+      "agent_teams_remove_member",
+      "agent_teams_resume",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 78,
+    "elapsedMs": 33306
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 16,
+    "latencyMs": 760,
+    "order": 79,
+    "elapsedMs": 34066
+  },
+  {
+    "event": "model-usage",
+    "request": 16,
+    "usage": {
+      "inputTokens": 1186,
+      "outputTokens": 700,
+      "totalTokens": 39390,
+      "cacheReadTokens": 37504,
+      "reasoningTokens": 129
+    },
+    "order": 80,
+    "elapsedMs": 36809
+  },
+  {
+    "event": "model-response",
+    "request": 16,
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "durationMs": 3504,
+    "order": 81,
+    "elapsedMs": 36810
+  },
+  {
+    "event": "benchmark-finished",
+    "passed": true,
+    "order": 82,
+    "elapsedMs": 37442
+  }
+]

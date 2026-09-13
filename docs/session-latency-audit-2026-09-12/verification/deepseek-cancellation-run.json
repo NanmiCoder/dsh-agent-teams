@@ -1,0 +1,26 @@
+{
+  "label": "cancellation",
+  "packageDir": "/tmp/agentteams-stability/real-final/cancellation-artifact/package",
+  "artifactSha256": "49c22d22de82831aab2d19418ad46a2355648e0965568411548431103ef4a51b",
+  "pluginVersion": "0.1.17",
+  "sourceArtifact": "/tmp/agentteams-stability/nanmicoder-dsh-agent-teams-0.1.17.tgz",
+  "workspace": "/tmp/agentteams-stability/real-final/candidate/workspace",
+  "agentCwd": "/tmp",
+  "home": "/tmp/agentteams-stability/real-final/candidate/home",
+  "passed": true,
+  "phase": "cancel",
+  "provider": "deepseek-official",
+  "model": "deepseek-flash",
+  "elapsedMs": 2505,
+  "requests": 1,
+  "checks": {
+    "realProviderChunkObserved": true,
+    "cancelledWhileStreaming": true,
+    "captainIdle": true
+  },
+  "exit": {
+    "code": 0,
+    "signal": null,
+    "timedOut": false
+  }
+}

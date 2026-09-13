@@ -344,6 +344,8 @@ rejectCreate('tdd.create.implementation-blocked-until-requirements-pass', team({
     dependencies: ['t1'],
   })
   check('tdd.create.staged-implementation-can-follow-pending-requirements', result?.ok === true)
+  const runningResult = api.validateCreateTask?.(team({ phase: 'running', tasks: [requirements], taskSeq: 1 }), { subject: 'planned automatic implementation', ...implContract(), dependencies: ['t1'] })
+  check('tdd.create.running-implementation-can-follow-pending-requirements', runningResult?.ok === true)
 }
 
 rejectCreate('tdd.create.staged-implementation-must-depend-on-requirements', team({
@@ -1024,6 +1026,7 @@ console.log('quality-gates TDD — tool-level closed loop')
       async listDescendants() { return children },
       async followup() { return `message-${childSeq}` },
       interrupt() {},
+      async drainContinuableChildren(_parent, ids) { for (const id of ids) liveAgents.delete(id) },
     },
     logger: { debug() {}, warn() {} },
   }

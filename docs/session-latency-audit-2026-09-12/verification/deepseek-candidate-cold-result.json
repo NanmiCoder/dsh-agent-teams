@@ -1,0 +1,231 @@
+{
+  "passed": true,
+  "phase": "cold",
+  "provider": "deepseek-official",
+  "model": "deepseek-flash",
+  "reasoningEffort": "max",
+  "elapsedMs": 37441,
+  "requests": 16,
+  "checks": {
+    "source:app/orders.mjs": true,
+    "source:app/comments.mjs": true,
+    "source:app/signup.mjs": true,
+    "oneCurrentTeam": true,
+    "exactRoster": true,
+    "running": true,
+    "groundedReport:security": true,
+    "memberWroteReport:security": true,
+    "taskCompleted:security": true,
+    "summary": true,
+    "captainSummarizedAfterCompletion": true,
+    "sameTeam": true,
+    "sameMembers": true,
+    "exactlyOneNewTask": true
+  },
+  "team": {
+    "teamId": "app-readonly-review",
+    "captainId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "memberIds": {
+      "performance": "928c9cdc-fb6e-48c4-81c5-193ab572ddfa",
+      "security": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+      "interaction": "6c65d607-a28a-4c25-b13f-b092250cb012"
+    },
+    "taskIds": [
+      "t1",
+      "t2",
+      "t3",
+      "t4"
+    ],
+    "tasks": [
+      {
+        "id": "t1",
+        "assignee": "performance",
+        "status": "completed"
+      },
+      {
+        "id": "t2",
+        "assignee": "security",
+        "status": "completed"
+      },
+      {
+        "id": "t3",
+        "assignee": "interaction",
+        "status": "completed"
+      },
+      {
+        "id": "t4",
+        "assignee": "security",
+        "status": "completed"
+      }
+    ]
+  },
+  "external": {
+    "sourceUnchanged": true,
+    "hashes": {
+      "app/orders.mjs": "437ebb9e258f51ae043c84aed195e5d7ce53a89b56c487a002a018bf97f3a8a6",
+      "app/comments.mjs": "7f5cec1d0b7eec9248c43fbdb8f1151cf6ae52ee37a0e649a39579a289a2c198",
+      "app/signup.mjs": "f28019ae6905f30beae40491a3d73298c853b370aea6740cdbd81679262207b8"
+    },
+    "repeatedProductScans": true,
+    "productIdReads": 20100,
+    "unsafeHtmlEcho": true,
+    "validInputStillDisabled": true
+  },
+  "fixtureHashes": {
+    "driver": "2abb5436199338d6a07dfb5e8ff3552622ef0ea82267a5c58f93615114de8cd1",
+    "case": "5036cc52b5b6bae997a400828c4bc341068c0c9e261b73aafe728a8463faeb4e"
+  },
+  "metrics": {
+    "sessionHeaders": [
+      {
+        "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+        "role": "captain",
+        "requests": 7,
+        "systemHashes": [
+          "adba5678d76e18557462500d63a11f279dbfe46ab0d218b6b477c309c51e8936"
+        ],
+        "toolsHashes": [
+          "1cf856ccbb783a28f786a4934422ed5979f64871eb0e062dff1644b860625b76"
+        ]
+      },
+      {
+        "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+        "role": "member",
+        "requests": 9,
+        "systemHashes": [
+          "5efe0a56081a98e38bb1a6e7a4940597a3b8d0bf37a8bdc83d193c268830b7db"
+        ],
+        "toolsHashes": [
+          "e6bf881a628808a931a5d46f6583913bdd179787df1684ec30f6eb249c6ef833"
+        ]
+      }
+    ],
+    "stableSessionHeaders": true,
+    "openCalls": 0,
+    "usageRequests": 16,
+    "requestsWithoutUsage": [],
+    "usage": {
+      "uncachedInputTokens": 9746,
+      "cacheReadTokens": 469632,
+      "cacheWriteTokens": null,
+      "outputTokens": 7729,
+      "reasoningTokens": 1882
+    },
+    "usageSemantics": "Harness Usage counts inputTokens as uncached input; cacheRead/cacheWrite are separate. Last usage per request; unavailable fields remain null. Requests without usage are listed and excluded from sums. No price inference."
+  },
+  "modelErrors": [],
+  "actualUsage": [
+    {
+      "inputTokens": 350,
+      "outputTokens": 1627,
+      "totalTokens": 32825,
+      "cacheReadTokens": 30848,
+      "reasoningTokens": 781
+    },
+    {
+      "inputTokens": 232,
+      "outputTokens": 43,
+      "totalTokens": 32915,
+      "cacheReadTokens": 32640,
+      "reasoningTokens": 18
+    },
+    {
+      "inputTokens": 1310,
+      "outputTokens": 155,
+      "totalTokens": 22969,
+      "cacheReadTokens": 21504,
+      "reasoningTokens": 62
+    },
+    {
+      "inputTokens": 762,
+      "outputTokens": 206,
+      "totalTokens": 33864,
+      "cacheReadTokens": 32896,
+      "reasoningTokens": 24
+    },
+    {
+      "inputTokens": 941,
+      "outputTokens": 578,
+      "totalTokens": 24431,
+      "cacheReadTokens": 22912,
+      "reasoningTokens": 204
+    },
+    {
+      "inputTokens": 543,
+      "outputTokens": 365,
+      "totalTokens": 25228,
+      "cacheReadTokens": 24320,
+      "reasoningTokens": 250
+    },
+    {
+      "inputTokens": 198,
+      "outputTokens": 955,
+      "totalTokens": 26369,
+      "cacheReadTokens": 25216,
+      "reasoningTokens": 0
+    },
+    {
+      "inputTokens": 184,
+      "outputTokens": 221,
+      "totalTokens": 26645,
+      "cacheReadTokens": 26240,
+      "reasoningTokens": 87
+    },
+    {
+      "inputTokens": 190,
+      "outputTokens": 297,
+      "totalTokens": 26983,
+      "cacheReadTokens": 26496,
+      "reasoningTokens": 0
+    },
+    {
+      "inputTokens": 663,
+      "outputTokens": 525,
+      "totalTokens": 28068,
+      "cacheReadTokens": 26880,
+      "reasoningTokens": 72
+    },
+    {
+      "inputTokens": 389,
+      "outputTokens": 399,
+      "totalTokens": 28820,
+      "cacheReadTokens": 28032,
+      "reasoningTokens": 0
+    },
+    {
+      "inputTokens": 424,
+      "outputTokens": 375,
+      "totalTokens": 34591,
+      "cacheReadTokens": 33792,
+      "reasoningTokens": 95
+    },
+    {
+      "inputTokens": 193,
+      "outputTokens": 418,
+      "totalTokens": 29283,
+      "cacheReadTokens": 28672,
+      "reasoningTokens": 0
+    },
+    {
+      "inputTokens": 2032,
+      "outputTokens": 623,
+      "totalTokens": 37215,
+      "cacheReadTokens": 34560,
+      "reasoningTokens": 132
+    },
+    {
+      "inputTokens": 149,
+      "outputTokens": 242,
+      "totalTokens": 37511,
+      "cacheReadTokens": 37120,
+      "reasoningTokens": 28
+    },
+    {
+      "inputTokens": 1186,
+      "outputTokens": 700,
+      "totalTokens": 39390,
+      "cacheReadTokens": 37504,
+      "reasoningTokens": 129
+    }
+  ]
+}

@@ -8,19 +8,27 @@
  */
 import { spawn } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, symlinkSync, rmSync } from 'node:fs';
-import { resolve, join, dirname } from 'node:path';
+import { resolve, join, dirname, relative } from 'node:path';
 import { homedir } from 'node:os';
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { sources, freshPrompt, coldPrompt } from './fixtures/harness-model-case.mjs';
 
-const args = new Map(), allowed = new Set(['--runtime-dir','--baseline-artifact','--candidate-artifact','--report-dir','--settings','--credential-file','--only','--timeout-ms','--max-requests']);
+const args = new Map(), allowed = new Set(['--runtime-dir','--baseline-artifact','--candidate-artifact','--report-dir','--settings','--credential-file','--only','--timeout-ms','--max-requests','--agent-cwd','--case']);
 for (let i=2;i<process.argv.length;i++) { const flag=process.argv[i]; if(!allowed.has(flag)||args.has(flag)||!process.argv[i+1]) throw Error('Invalid argument '+flag); args.set(flag,process.argv[++i]); }
 for(const flag of ['--runtime-dir','--report-dir','--baseline-artifact']) if(!args.has(flag))throw Error(flag+' required');
-const only=args.get('--only'); if(only&&!['baseline','candidate','upgrade'].includes(only))throw Error('Invalid --only');
+const only=args.get('--only'); if(only&&!['baseline','candidate','upgrade','candidate-finish','candidate-cold','candidate-cold-resume','cancellation'].includes(only))throw Error('Invalid --only');
 if(only!=='baseline'&&!args.has('--candidate-artifact'))throw Error('--candidate-artifact required');
+const caseName=args.get('--case')??'review';
+if(!['review','complex'].includes(caseName))throw Error('Unknown benchmark case');
+const caseFile=caseName==='complex'?'fixtures/harness-complex-case.mjs':'fixtures/harness-model-case.mjs';
+const caseDefinition=await import('./'+caseFile);
+if(only==='candidate-finish'&&!caseDefinition.finishPrompt)throw Error('Selected case does not support interrupted-work continuation');
+if(only==='candidate-cold-resume'&&!caseDefinition.resumeColdPrompt)throw Error('Selected case does not support interrupted regression continuation');
+const {sources,freshPrompt,coldPrompt}=caseDefinition;
 const runtime=resolve(args.get('--runtime-dir')), report=resolve(args.get('--report-dir'));
+const requestedAgentCwd=args.has('--agent-cwd')?resolve(args.get('--agent-cwd')):undefined;
+if(requestedAgentCwd&&!existsSync(requestedAgentCwd))throw Error('--agent-cwd must already exist');
 mkdirSync(report,{recursive:true});
 const req=createRequire(join(runtime,'package.json')), yaml=req('yaml');
 const credentialFile=resolve(args.get('--credential-file')??join(homedir(),'.dsh','.credentials.yaml'));
@@ -44,7 +52,7 @@ const json=(path,value)=>writeFileSync(path,JSON.stringify(value,null,2)+'\n');
 if(!credentialAvailable) { json(join(report,'result.json'),{passed:false,blocked:'Configured model credential unavailable',provider:model.provider,model:model.model});process.exit(2); }
 // A URL containing a credential is never copied into a generated profile.
 if(configured.baseURL) {const url=new URL(configured.baseURL);if(url.username||url.password||url.search)throw Error('Credential-bearing adapter URL cannot be persisted by benchmark');}
-const adapter={apiKeyEnv:credentialRef,maxTokens:16384,...configured.baseURL?{baseURL:configured.baseURL}:{},...configured.models?{models:configured.models}:{}};
+const adapter={apiKeyEnv:credentialRef,...configured.maxTokens?{maxTokens:configured.maxTokens}:{},...configured.baseURL?{baseURL:configured.baseURL}:{},...configured.models?{models:configured.models}:{}};
 const lock=JSON.parse(readFileSync(join(runtime,'package-lock.json'),'utf8'));
 const cohort=Object.entries(lock.packages).filter(([path])=>/node_modules\/@deepseek-ai\/dsh(?:-[^/]+)?$/.test(path)).map(([path,entry])=>({path,version:entry.version,disk:JSON.parse(readFileSync(join(runtime,path,'package.json'),'utf8')).version}));
 const hostVersion=JSON.parse(readFileSync(join(runtime,'node_modules/@deepseek-ai/dsh/package.json'),'utf8')).version;
@@ -54,15 +62,15 @@ if(!Number.isFinite(timeoutMs)||timeoutMs<1000||!Number.isInteger(maxRequests)||
 const fixtures=dirname(fileURLToPath(import.meta.url));
 // Freeze inputs before the first provider call: later builds or edits cannot
 // silently change a subsequent phase of the same paid comparison.
-const testContents=Object.fromEntries(['harness-model-benchmark.mjs','fixtures/harness-model-case.mjs','fixtures/harness-model-driver.mjs'].map(path=>[path,readFileSync(join(fixtures,path))]));
+const testContents=Object.fromEntries([...new Set(['harness-model-benchmark.mjs','fixtures/harness-model-case.mjs','fixtures/harness-model-driver.mjs','fixtures/harness-benchmark-scope.mjs',caseFile,...caseName==='complex'?['fixtures/harness-complex-oracle.mjs']:[]])].map(path=>[path,readFileSync(join(fixtures,path))]));
 const testFiles=Object.fromEntries(Object.entries(testContents).map(([path,bytes])=>[path,createHash('sha256').update(bytes).digest('hex')]));
 const artifacts=Object.fromEntries(['baseline','candidate'].filter(label=>args.has('--'+label+'-artifact')).map(label=>[label,{path:resolve(args.get('--'+label+'-artifact')),bytes:readFileSync(resolve(args.get('--'+label+'-artifact')))}]));
 const manifestPath=join(report,only?'manifest-'+only+'.json':'manifest.json');
 if(existsSync(manifestPath))throw Error('Benchmark manifest exists; use a fresh report directory');
-json(manifestPath,{hostVersion,cohortCount:cohort.length,runtime,model,testFiles,artifacts:Object.fromEntries(Object.entries(artifacts).map(([label,item])=>[label,{path:item.path,sha256:createHash('sha256').update(item.bytes).digest('hex')}])),timeoutMs,maxRequests,seedSha256:Object.fromEntries(Object.entries(sources).map(([path,text])=>[path,createHash('sha256').update(text).digest('hex')])),inputs:{fresh:freshPrompt,cold:coldPrompt},scope:'Real configured DeepSeek adapter; exact published Harness CLI/Loader. External acceptance checks files, task status and member tool provenance. No model call order is preprogrammed.'});
+json(manifestPath,{caseName,agentCwd:requestedAgentCwd,hostVersion,cohortCount:cohort.length,runtime,model,testFiles,artifacts:Object.fromEntries(Object.entries(artifacts).map(([label,item])=>[label,{path:item.path,sha256:createHash('sha256').update(item.bytes).digest('hex')}])),timeoutMs,maxRequests,seedSha256:Object.fromEntries(Object.entries(sources).map(([path,text])=>[path,createHash('sha256').update(text).digest('hex')])),inputs:{fresh:freshPrompt,cold:coldPrompt},scope:'Real configured DeepSeek adapter; exact published Harness CLI/Loader. External acceptance checks files, task status and member tool provenance. No model call order is preprogrammed.'});
 const environment={PATH:process.env.PATH,LANG:process.env.LANG??'en_US.UTF-8',HOME:join(report,'user-home'),DSH_TELEMETRY_DISABLED:'1',DSH_PERMISSION_MODE:'workspace-write',...process.env[credentialRef]?{[credentialRef]:process.env[credentialRef]}:{}};
 mkdirSync(environment.HOME,{recursive:true});
-async function command(argv,cwd,env,label,limit=timeoutMs+30000) {
+async function command(argv,cwd,env,label,limit=timeoutMs+90000) {
     const child=spawn(argv[0],argv.slice(1),{cwd,env,stdio:['ignore','pipe','pipe']});
     let stdout='',stderr='',timedOut=false;
     child.stdout.on('data',data=>stdout+=data);child.stderr.on('data',data=>stderr+=data);
@@ -92,6 +100,7 @@ async function run(label,phase,artifact,existing) {
         mkdirSync(join(profile,'node_modules/@nanmicoder'),{recursive:true});
         symlinkSync(join(runtime,'node_modules/@deepseek-ai'),join(profile,'node_modules/@deepseek-ai'),'dir');
     }
+    const agentCwd=requestedAgentCwd??workspace;
     const artifactSnapshot=join(runDir,'artifact.tgz');
     if(existsSync(artifactSnapshot))throw Error('Run artifact already exists; never overwrite benchmark evidence');
     writeFileSync(artifactSnapshot,artifact.bytes);
@@ -101,17 +110,18 @@ async function run(label,phase,artifact,existing) {
     symlinkSync(extracted.packageDir,pluginLink,'dir');
     json(join(profile,'package.json'),{name:'agentteams-real-model-profile',version:'0.0.0',private:true,type:'module',dsh:{profile:{bundles:['@deepseek-ai/dsh-base','@deepseek-ai/dsh-headless','@nanmicoder/dsh-agent-teams'],patchReload:'startup'}}});
     mkdirSync(join(runDir,'executed-fixtures'),{recursive:true});
-    for(const [source,target] of [['fixtures/harness-model-driver.mjs','fixture-model-driver.mjs'],['fixtures/harness-model-case.mjs','fixture-model-case.mjs']]) {
+    for(const [source,target] of [['fixtures/harness-model-driver.mjs','fixture-model-driver.mjs'],['fixtures/harness-benchmark-scope.mjs','fixture-benchmark-scope.mjs'],[caseFile,'fixture-model-case.mjs'],...caseName==='complex'?[['fixtures/harness-model-case.mjs','harness-model-case.mjs'],['fixtures/harness-complex-oracle.mjs','harness-complex-oracle.mjs']]:[]]) {
         writeFileSync(join(profile,target),testContents[source]);
         writeFileSync(join(runDir,'executed-fixtures',target),testContents[source]);
     }
     const patch=[{id:'headless-startup',disabled:true},{id:'headless-runner',disabled:true},{id:'llm-pi-ai',disabled:true},{id:'session-title-llm',disabled:true},{id:'credentials',config:{path:credentialFile,watch:false}},{id:'llm-deepseek',config:adapter},{id:'agent-default-model',config:model},{id:'approval',config:{policy:'never'}},{id:'permission',config:{defaultPreset:'benchmark-workspace',presets:{'benchmark-workspace':{sandbox:'workspace-write',approval:'never'}}}},{insert:[{id:'agentteams-real-model-benchmark',name:'./fixture-model-driver.mjs'}]}];
+    if(requestedAgentCwd) patch.push({id:'agent-teams',config:{stateDir:relative(agentCwd,join(workspace,'.agent-teams'))}});
     writeFileSync(join(profile,'cordis.patch.yml'),yaml.stringify(patch));
     const trace=join(runDir,'trace.jsonl'),resultPath=join(runDir,'result.json'),configPath=join(runDir,'driver-config.json');
-    json(configPath,{phase,model,workspace,trace,result:resultPath,timeoutMs,maxRequests,...existing?.previous?{previous:existing.previous}:{}});
-    const exit=await command([process.execPath,join(runtime,'node_modules/@deepseek-ai/dsh/lib/bin.js'),'--profile','headless'],workspace,{...environment,DSH_HOME:home,AGENTTEAMS_BENCH_CONFIG:configPath},label);
+    json(configPath,{phase,caseName,model,workspace,agentCwd,trace,result:resultPath,timeoutMs,maxRequests,...existing?.previous?{previous:existing.previous}:{},...existing?.priorTrace?{priorTrace:existing.priorTrace}:{}});
+    const exit=await command([process.execPath,join(runtime,'node_modules/@deepseek-ai/dsh/lib/bin.js'),'--profile','headless'],agentCwd,{...environment,DSH_HOME:home,AGENTTEAMS_BENCH_CONFIG:configPath},label);
     const result=existsSync(resultPath)?JSON.parse(readFileSync(resultPath,'utf8')):{passed:false,error:'Driver did not produce a result'};
-    const outcome={label,...extracted,workspace,home,...result,exit};
+    const outcome={label,...extracted,workspace,agentCwd,home,...result,exit};
     outcome.passed=result.passed===true&&exit.code===0&&!exit.timedOut;
     json(join(runDir,'run.json'),outcome);
     console.log(JSON.stringify({label,passed:outcome.passed,provider:model.provider,model:model.model,requests:outcome.requests,elapsedMs:outcome.elapsedMs,checks:outcome.checks,error:outcome.error,modelErrors:outcome.modelErrors}));
@@ -120,12 +130,33 @@ async function run(label,phase,artifact,existing) {
 const runs=[];
 if(!only||only==='baseline')runs.push(await run('baseline','fresh',artifacts.baseline));
 if(!only||only==='candidate')runs.push(await run('candidate','fresh',artifacts.candidate));
+if(only==='candidate-finish') {
+    const previous=JSON.parse(readFileSync(join(report,'candidate/run.json'),'utf8'));
+    if(previous.passed||!previous.team)throw Error('Continuation requires an incomplete candidate with retained team evidence');
+    runs.push(await run(only,'finish',artifacts.candidate,{workspace:previous.workspace,home:previous.home,previous:previous.team,priorTrace:join(report,'candidate/trace.jsonl')}));
+}
+if(only==='candidate-cold-resume') {
+    const origin=JSON.parse(readFileSync(join(report,'candidate-cold/driver-config.json'),'utf8'));
+    const stopped=JSON.parse(readFileSync(join(report,'candidate-cold/run.json'),'utf8'));
+    if(stopped.passed)throw Error('Regression continuation requires an incomplete cold run');
+    runs.push(await run(only,'cold-resume',artifacts.candidate,{workspace:stopped.workspace,home:stopped.home,previous:origin.previous,priorTrace:join(report,'candidate-cold/trace.jsonl')}));
+}
+if(only==='candidate-cold'||only==='cancellation') {
+    const completedPath=existsSync(join(report,'candidate-finish/run.json'))?'candidate-finish/run.json':'candidate/run.json';
+    const previous=JSON.parse(readFileSync(join(report,completedPath),'utf8'));
+    if(!previous.passed||!previous.team)throw Error('Candidate must complete before follow-up verification');
+    const coldPlan=only==='candidate-cold'&&caseDefinition.prepareContinuation?await caseDefinition.prepareContinuation(previous.workspace):undefined;
+    runs.push(await run(only,only==='cancellation'?'cancel':'cold',artifacts.candidate,{workspace:previous.workspace,home:previous.home,previous:{...previous.team,...coldPlan?{coldPlan}:{}}}));
+}
 if(!only||only==='upgrade') {
     const baseline=runs.find(run=>run.label==='baseline')??(existsSync(join(report,'baseline/run.json'))?JSON.parse(readFileSync(join(report,'baseline/run.json'),'utf8')):undefined);
     if(baseline?.passed&&baseline.team)runs.push(await run('upgrade','cold',artifacts.candidate,{workspace:baseline.workspace,home:baseline.home,previous:baseline.team}));
     else runs.push({label:'upgrade',passed:false,blocked:'Baseline must complete and retain its team before old-team cold-resume validation'});
 }
-const combined=['baseline','candidate','upgrade'].flatMap(label=>existsSync(join(report,label,'run.json'))?[JSON.parse(readFileSync(join(report,label,'run.json'),'utf8'))]:runs.filter(run=>run.label===label));
+const combined=['baseline','candidate','candidate-finish','upgrade','candidate-cold','candidate-cold-resume','cancellation'].flatMap(label=>existsSync(join(report,label,'run.json'))?[JSON.parse(readFileSync(join(report,label,'run.json'),'utf8'))]:runs.filter(run=>run.label===label));
 const passed=combined.every(run=>run.passed);
-json(join(report,'result.json'),{passed,hostVersion,model,testFiles,runs:combined,unverified:['statistical success-rate equivalence from repeated independent trials','other providers/models','quality repair loop and mid-task pause/takeover','real browser interaction']});
-process.exitCode=passed?0:1;
+const completedAfterContinuation=combined.some(run=>run.label==='candidate-finish'&&run.passed);
+const regressionCompletedAfterContinuation=combined.some(run=>run.label==='candidate-cold-resume'&&run.passed);
+const workflowPassed=combined.every(run=>run.passed||(run.label==='candidate'&&completedAfterContinuation)||(run.label==='candidate-cold'&&regressionCompletedAfterContinuation));
+json(join(report,'result.json'),{passed,workflowPassed,completedAfterContinuation,regressionCompletedAfterContinuation,caseName,hostVersion,model,testFiles,runs:combined,unverified:['statistical success-rate equivalence from repeated independent trials','other providers/models',...caseName==='complex'&&combined.some(run=>['candidate-cold','candidate-cold-resume'].includes(run.label)&&run.passed)?[]:['real-provider quality repair loop'],...completedAfterContinuation?[]:['real-provider mid-task pause/resume'],'real-provider captain takeover','real browser interaction']});
+process.exitCode=workflowPassed?0:1;

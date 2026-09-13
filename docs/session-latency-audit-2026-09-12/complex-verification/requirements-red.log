@@ -1,0 +1,83 @@
+quality-gates TDD — A. create contract
+  PASS  tdd.create.work-kind-remains-compatible
+quality-gates TDD — A2. blank optional normalization (#99/#105)
+  PASS  tdd.normalize.blank-optional-fields-to-omitted
+  PASS  tdd.normalize.non-blank-values-untouched
+  PASS  tdd.normalize.retains-invalid-list-item.123
+  PASS  tdd.normalize.retains-invalid-list-item.null
+  PASS  tdd.normalize.retains-invalid-list-item.{"path":"src/private/"}
+  PASS  tdd.create.implementation-requires-objective
+  PASS  tdd.create.implementation-requires-acceptance
+  PASS  tdd.create.implementation-requires-inscope-and-verify
+  PASS  tdd.create.review-requires-reviewed-task
+  PASS  tdd.create.repair-requires-source-and-findings
+  PASS  tdd.create.repair-must-not-depend-on-failed-review
+  PASS  tdd.create.overlapping-inscope-rejects-parallel-ready-tasks
+  PASS  tdd.create.overlapping-inscope-allowed-when-serialized
+  PASS  tdd.create.implementation-blocked-until-requirements-pass
+  PASS  tdd.create.staged-implementation-can-follow-pending-requirements
+  FAIL  tdd.create.running-implementation-can-follow-pending-requirements
+  PASS  tdd.create.staged-implementation-must-depend-on-requirements
+quality-gates TDD — B. completion gates
+  PASS  tdd.complete.review-without-verdict-rejected
+  PASS  tdd.complete.review-needs-revision-cannot-complete
+  PASS  tdd.complete.review-pass-requires-no-open-high-findings
+  PASS  tdd.complete.implementation-requires-acceptance-results
+  PASS  tdd.complete.implementation-requires-all-verify-commands
+  PASS  tdd.complete.out-of-scope-path-cannot-complete
+  PASS  tdd.complete.undeclared-path-cannot-complete
+  PASS  tdd.complete.verify-failure-must-fail-task
+  PASS  tdd.complete.claimed-still-cannot-jump-to-completed
+  PASS  tdd.complete.work-kind-keeps-legacy-output-only-complete
+  PASS  tdd.complete.ordered-evidence-tolerates-model-paraphrase
+quality-gates TDD — C. path rules
+  PASS  tdd.scope.file-match
+  PASS  tdd.scope.directory-prefix-match
+  PASS  tdd.scope.out-of-scope-wins
+  PASS  tdd.scope.rejects-parent-escape
+  PASS  tdd.scope.rejects-absolute-path
+  PASS  tdd.scope.default-excludes-env-and-git
+quality-gates TDD — D. auto loop
+  PASS  tdd.loop.needs-revision-creates-repair-and-next-review
+  PASS  tdd.loop.repair-depends-on-source-not-failed-review
+  PASS  tdd.loop.next-review-assigned-to-original-reviewer
+  PASS  tdd.loop.next-review-cannot-be-implementer
+  PASS  tdd.loop.round-increments
+  PASS  tdd.loop.next-review-contract-is-not-a-gate-test
+  PASS  tdd.loop.stops-at-max-review-rounds
+  PASS  tdd.loop.reject-does-not-autoresume
+  PASS  tdd.loop.requirements-needs-revision-opens-next-requirements-round
+  PASS  tdd.loop.repair-skips-captain-assignee
+  PASS  tdd.loop.same-failed-review-does-not-duplicate-follow-up
+  PASS  tdd.plan.default-quality-graph-order
+  PASS  tdd.plan.prompt-explains-staged-full-dag-and-review-rewire
+  PASS  tdd.loop.pending-downstream-rewired-to-new-review-gate
+  PASS  tdd.plan.review-contract-strips-gate-tests
+  PASS  tdd.status.escalated-is-not-halted
+quality-gates TDD — E. halt / resume
+  PASS  tdd.resume.create-task-does-not-unhalt
+  PASS  tdd.resume.explicit-resume-clears-halt
+  PASS  tdd.resume.create-with-resume-reason-unhalts
+  PASS  tdd.resume.cancelled-tasks-stay-cancelled
+  PASS  tdd.resume.missing-reason-rejected
+quality-gates TDD — F. coverage / delivery
+  PASS  tdd.coverage.missing-item-blocks-delivery
+  PASS  tdd.coverage.passed-item-requires-completed-task
+  PASS  tdd.delivery.ok-only-when-all-gates-pass
+  PASS  tdd.delivery.failed-review-without-repair-blocks
+quality-gates TDD — G. persistence / prompts
+  PASS  tdd.state.old-team-json-without-new-fields-still-loads
+  PASS  tdd.state.invalid-verdict-rejected-at-durable-boundary
+  PASS  tdd.prompt.assignment-includes-kind-scope-acceptance
+  PASS  tdd.usage.mentions-explicit-resume-and-verdict
+quality-gates TDD — tool-level closed loop
+  PASS  tdd.create.work-kind-remains-compatible.tool
+  PASS  tdd.create.blank-optional-fields-normalized.tool
+  PASS  tdd.create.team-still-loadable-after-blank-optional.tool
+  PASS  tdd.create.review-blank-reviewedTaskId-rejected.tool
+  PASS  tdd.create.blank-profile-treated-as-omitted.tool
+  PASS  tdd.create.implementation-requires-objective.tool
+  PASS  tdd.resume.create-task-does-not-unhalt.tool
+  PASS  tdd.resume.explicit-resume-clears-halt.tool-exists
+  PASS  tdd.resume.explicit-resume-clears-halt.tool
+quality-gates TDD failed: 1 check(s)

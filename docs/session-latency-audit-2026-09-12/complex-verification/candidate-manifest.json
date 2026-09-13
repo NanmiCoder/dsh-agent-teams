@@ -1,0 +1,49 @@
+{
+  "caseName": "complex",
+  "agentCwd": "/tmp",
+  "hostVersion": "0.1.5-rc.1",
+  "cohortCount": 231,
+  "runtime": "/tmp/agentteams-stability/runtime-0.1.5-rc.1",
+  "model": {
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max"
+  },
+  "testFiles": {
+    "harness-model-benchmark.mjs": "a0fd3ba4457ee9184f65a67872b60014138b169aa6f0ed09b73d842204ec1037",
+    "fixtures/harness-model-case.mjs": "5036cc52b5b6bae997a400828c4bc341068c0c9e261b73aafe728a8463faeb4e",
+    "fixtures/harness-model-driver.mjs": "c35e610628752ce6a91e5ab32d3b8ced83c51a82f70ab315a00a6b38d91b1581",
+    "fixtures/harness-complex-case.mjs": "1fd2e9722491b5514a7580f26a407311997474d14b64d9acb1cb852376b9dbfb",
+    "fixtures/harness-complex-oracle.mjs": "a5b7b49a57fa8ced52199896797483e3e5f21618491c80c7d3caa999e1e051a8"
+  },
+  "artifacts": {
+    "baseline": {
+      "path": "/tmp/agentteams-stability/baseline-source/nanmicoder-dsh-agent-teams-0.1.17.tgz",
+      "sha256": "cef5a0b6cd0c83b8259ae9410d488c06bcb3deb43edc7489324f5f89a17f68eb"
+    },
+    "candidate": {
+      "path": "/tmp/agentteams-complex-fixes/artifact2/nanmicoder-dsh-agent-teams-0.1.17.tgz",
+      "sha256": "b9add40be3c82be7799633055b6ee62668a662164e57c2e21629788b7d784b42"
+    }
+  },
+  "timeoutMs": 1200000,
+  "maxRequests": 240,
+  "seedSha256": {
+    "SPEC.md": "3042c597d6f005d9f6111405bbd4a37d14fc3d8288835c73db95a6381e966ee6",
+    "package.json": "f34f8631bea8ec7867283fedf02127ae734025a8e0b5caf7b6028343d83cf1c7",
+    "fixtures/catalog.json": "35747e1e00902522e606849d3d751782a2c37a29f8609d21a33563e86ab9672a",
+    "fixtures/stock.json": "b76bbfa166e8255cd2aa7489bf3835674dfbfcff8dd9afd899142915af67424a",
+    "fixtures/lines.json": "b0035df54b7f425945b6eb55169b9ddbe8240cb933726d6a34bfc2a3a51dc7b8",
+    "src/pricing.mjs": "2ecd09e7627612cc841a6c185b12ad2f9f41ce8c349f6f665e1c42c5551796f7",
+    "src/inventory.mjs": "df2cf08feef9e5f05964c7fea600f5b28f0bf20c9178edd5bbb27a591801fa94",
+    "src/store.mjs": "6739d8b9fb3a86265479e390792e1466d57b98aec42e8e7126a6c99f2f790006",
+    "src/server.mjs": "c3b62a9637148af7edaadb3ce5b8d2c346f4a53a0ff1050146a64689c237d191",
+    "bin/orders.mjs": "36aef066283f0fb4cb00d4e245db270c87604ff927362bc7ecf0663cfaec0c3c",
+    "tests/public-contract.test.mjs": "f4bd38c1056807ffcb9c7390d7435a9ba0cdc64d84e0ed7717cbb47a24651b1d"
+  },
+  "inputs": {
+    "fresh": "请用 AgentTeams 真实实现 MiniFulfill 订单服务；我授权立即运行，不需计划审批。项目目录会在本消息开头给出。将完整项目路径传给每个成员，所有相对路径均基于该项目；先读 SPEC.md。\n不是只写报告：成员必须实现代码、运行测试并交付可启动的 HTTP 服务和 CLI。使用且仅使用六个成员：pricing、inventory、storage、api、verifier、reviewer。队长不要代写源码、测试或成员报告。\n一次规划以下10个初始任务，subject保留方括号标记，以后交接用实际 task_id，不能硬猜 ID：\n[SPEC] requirements，reviewer，根据现有 SPEC.md 输出明确验收；不修改 SPEC。所有实现依赖此任务。\n[PRICE] implementation，pricing，src/pricing.mjs。\n[STOCK] implementation，inventory，src/inventory.mjs。\n[STORE] implementation，storage，src/store.mjs。\n[API] implementation，api，src/server.mjs，依赖 PRICE、STOCK、STORE。\n[CLI] implementation，api，bin/orders.mjs，依赖 PRICE、STORE。\n[UNIT] verification，verifier，为三个基础模块新增单元测试，依赖 PRICE、STOCK、STORE。\n[E2E] verification，verifier，为HTTP并发、幂等、取消、重启、错误边界新增集成测试，依赖 API、CLI、UNIT。\n[REVIEW] review，reviewer，独立审查整体，reviewedTaskId指向API任务，依赖E2E和API；真实有阻断问题就 failed + needs_revision + findings，让自动repair/next review处理，禁止假装pass。\n[RELEASE] integration，storage，依赖REVIEW和E2E，运行完整npm test，写README.md和reports/release.json。\n每次create_task都显式传入上述kind和assignee，不能只写在subject或description中；本场景不使用无负责人的共享任务池。\n为quality任务提供所需objective、inScope、acceptance、verify等契约；各implementation的inScope只覆盖各自文件，避免并行写冲突。不要在已有基础模块未完成时要求单组件通过整个尚未实现的系统测试。\n所有成员遵守文件所有权；reviewer只读审查代码，verifier写tests，其他成员实现自己的模块。跨模块发现问题先通过团队消息协调。接口按SPEC精确实现，不增加依赖。\n每次完成使用真实测试证据与实际changedFiles，带attempt_id更新状态并报告。队长处理阻塞与汇总；等待成员时结束当前轮，消息会唤醒你，不要循环查询status或调用sleep空等。\n任务全部完成、成员空闲且验收通过后结束，保留这个团队供下一轮回归复核，不归档。",
+    "cold": "继续当前已有 MiniFulfill 团队，不重建或替换成员。项目目录会在本消息开头给出。将完整项目路径传给每个成员，所有相对路径均基于该项目；先读 SPEC.md。\n我在src/pricing.mjs注入了一个受控计价回归（属于测试场景中的外部改动），原实现快照在src/pricing.before-regression.mjs。原SPEC没有改变；不要修改验收标准或测试来迁就错误。队长和reviewer不得直接修源码。\n请创建一个新的review任务，subject为[REGRESSION-REVIEW]，assignee=reviewer，reviewedTaskId指向原[PRICE] implementation；独立运行具体输入确认现在的错误，若有阻断问题就failed + needs_revision，findings明确file=src/pricing.mjs、实际差异与requiredFix。\n在此review之后创建[REGRESSION-RELEASE] integration，assignee=storage，依赖新的review，验收为全部测试通过且写reports/regression-release.json {ready:true,summary:string}。可以提前建下游依赖，让插件自动重连它。\n不要手工创建repair或下一轮review；让插件自动生成，原pricing成员负责修复、reviewer再次验证，确认通过后storage交付。每项新任务提供完整quality契约。保留原团队/成员/旧任务记录，不新增无关任务。"
+  },
+  "scope": "Real configured DeepSeek adapter; exact published Harness CLI/Loader. External acceptance checks files, task status and member tool provenance. No model call order is preprogrammed."
+}

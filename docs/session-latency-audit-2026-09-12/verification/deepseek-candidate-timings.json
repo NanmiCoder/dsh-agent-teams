@@ -1,0 +1,2832 @@
+[
+  {
+    "event": "benchmark-user-input",
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "phase": "fresh",
+    "order": 0,
+    "elapsedMs": 41
+  },
+  {
+    "event": "model-request",
+    "request": 1,
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "adba5678d76e18557462500d63a11f279dbfe46ab0d218b6b477c309c51e8936",
+    "systemBytes": 8887,
+    "toolsSha256": "1cf856ccbb783a28f786a4934422ed5979f64871eb0e062dff1644b860625b76",
+    "teamTools": [
+      "agent_teams_add_member",
+      "agent_teams_approve",
+      "agent_teams_claim_task",
+      "agent_teams_create",
+      "agent_teams_create_task",
+      "agent_teams_delete",
+      "agent_teams_edit_plan",
+      "agent_teams_reassign_task",
+      "agent_teams_remove_member",
+      "agent_teams_resume",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 1,
+    "elapsedMs": 74
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 1,
+    "latencyMs": 912,
+    "order": 2,
+    "elapsedMs": 987
+  },
+  {
+    "event": "model-usage",
+    "request": 1,
+    "usage": {
+      "inputTokens": 700,
+      "outputTokens": 910,
+      "totalTokens": 13002,
+      "cacheReadTokens": 11392,
+      "reasoningTokens": 640
+    },
+    "order": 3,
+    "elapsedMs": 4701
+  },
+  {
+    "event": "model-response",
+    "request": 1,
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "durationMs": 4631,
+    "order": 4,
+    "elapsedMs": 4706
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "name": "bash",
+    "isError": false,
+    "order": 5,
+    "elapsedMs": 4741
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "name": "bash",
+    "isError": false,
+    "order": 6,
+    "elapsedMs": 4816
+  },
+  {
+    "event": "model-request",
+    "request": 2,
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "adba5678d76e18557462500d63a11f279dbfe46ab0d218b6b477c309c51e8936",
+    "systemBytes": 8887,
+    "toolsSha256": "1cf856ccbb783a28f786a4934422ed5979f64871eb0e062dff1644b860625b76",
+    "teamTools": [
+      "agent_teams_add_member",
+      "agent_teams_approve",
+      "agent_teams_claim_task",
+      "agent_teams_create",
+      "agent_teams_create_task",
+      "agent_teams_delete",
+      "agent_teams_edit_plan",
+      "agent_teams_reassign_task",
+      "agent_teams_remove_member",
+      "agent_teams_resume",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 7,
+    "elapsedMs": 4824
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 2,
+    "latencyMs": 548,
+    "order": 8,
+    "elapsedMs": 5372
+  },
+  {
+    "event": "model-usage",
+    "request": 2,
+    "usage": {
+      "inputTokens": 465,
+      "outputTokens": 177,
+      "totalTokens": 13570,
+      "cacheReadTokens": 12928,
+      "reasoningTokens": 22
+    },
+    "order": 9,
+    "elapsedMs": 5904
+  },
+  {
+    "event": "model-response",
+    "request": 2,
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "durationMs": 1081,
+    "order": 10,
+    "elapsedMs": 5905
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "name": "read",
+    "isError": false,
+    "order": 11,
+    "elapsedMs": 5918
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "name": "read",
+    "isError": false,
+    "order": 12,
+    "elapsedMs": 5919
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "name": "read",
+    "isError": false,
+    "order": 13,
+    "elapsedMs": 5920
+  },
+  {
+    "event": "model-request",
+    "request": 3,
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "adba5678d76e18557462500d63a11f279dbfe46ab0d218b6b477c309c51e8936",
+    "systemBytes": 8887,
+    "toolsSha256": "1cf856ccbb783a28f786a4934422ed5979f64871eb0e062dff1644b860625b76",
+    "teamTools": [
+      "agent_teams_add_member",
+      "agent_teams_approve",
+      "agent_teams_claim_task",
+      "agent_teams_create",
+      "agent_teams_create_task",
+      "agent_teams_delete",
+      "agent_teams_edit_plan",
+      "agent_teams_reassign_task",
+      "agent_teams_remove_member",
+      "agent_teams_resume",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 14,
+    "elapsedMs": 5932
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 3,
+    "latencyMs": 541,
+    "order": 15,
+    "elapsedMs": 6473
+  },
+  {
+    "event": "model-usage",
+    "request": 3,
+    "usage": {
+      "inputTokens": 311,
+      "outputTokens": 4069,
+      "totalTokens": 17948,
+      "cacheReadTokens": 13568,
+      "reasoningTokens": 1830
+    },
+    "order": 16,
+    "elapsedMs": 23924
+  },
+  {
+    "event": "model-response",
+    "request": 3,
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "durationMs": 17993,
+    "order": 17,
+    "elapsedMs": 23925
+  },
+  {
+    "event": "model-request",
+    "request": 4,
+    "sessionId": "928c9cdc-fb6e-48c4-81c5-193ab572ddfa",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "9b6bf4ef0a26ad609adb2a8d3b508113d8c79785f7c83456e69ed0b06a6b9c24",
+    "systemBytes": 8182,
+    "toolsSha256": "e6bf881a628808a931a5d46f6583913bdd179787df1684ec30f6eb249c6ef833",
+    "teamTools": [
+      "agent_teams_claim_task",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 18,
+    "elapsedMs": 23998
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "name": "agent_teams_create",
+    "isError": false,
+    "order": 19,
+    "elapsedMs": 24035
+  },
+  {
+    "event": "model-request",
+    "request": 5,
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "5efe0a56081a98e38bb1a6e7a4940597a3b8d0bf37a8bdc83d193c268830b7db",
+    "systemBytes": 8173,
+    "toolsSha256": "e6bf881a628808a931a5d46f6583913bdd179787df1684ec30f6eb249c6ef833",
+    "teamTools": [
+      "agent_teams_claim_task",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 20,
+    "elapsedMs": 24042
+  },
+  {
+    "event": "model-request",
+    "request": 6,
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "adba5678d76e18557462500d63a11f279dbfe46ab0d218b6b477c309c51e8936",
+    "systemBytes": 8887,
+    "toolsSha256": "1cf856ccbb783a28f786a4934422ed5979f64871eb0e062dff1644b860625b76",
+    "teamTools": [
+      "agent_teams_add_member",
+      "agent_teams_approve",
+      "agent_teams_claim_task",
+      "agent_teams_create",
+      "agent_teams_create_task",
+      "agent_teams_delete",
+      "agent_teams_edit_plan",
+      "agent_teams_reassign_task",
+      "agent_teams_remove_member",
+      "agent_teams_resume",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 21,
+    "elapsedMs": 24047
+  },
+  {
+    "event": "model-request",
+    "request": 7,
+    "sessionId": "6c65d607-a28a-4c25-b13f-b092250cb012",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "50626efdd3a5a33b8324df9a25b1b0f7015b51d066c0598de446bfb498745b47",
+    "systemBytes": 8182,
+    "toolsSha256": "e6bf881a628808a931a5d46f6583913bdd179787df1684ec30f6eb249c6ef833",
+    "teamTools": [
+      "agent_teams_claim_task",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 22,
+    "elapsedMs": 24050
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 6,
+    "latencyMs": 672,
+    "order": 23,
+    "elapsedMs": 24719
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 4,
+    "latencyMs": 779,
+    "order": 24,
+    "elapsedMs": 24777
+  },
+  {
+    "event": "model-usage",
+    "request": 4,
+    "usage": {
+      "inputTokens": 9680,
+      "outputTokens": 150,
+      "totalTokens": 9830,
+      "cacheReadTokens": 0,
+      "reasoningTokens": 0
+    },
+    "order": 25,
+    "elapsedMs": 25177
+  },
+  {
+    "event": "model-response",
+    "request": 4,
+    "sessionId": "928c9cdc-fb6e-48c4-81c5-193ab572ddfa",
+    "durationMs": 1180,
+    "order": 26,
+    "elapsedMs": 25178
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "928c9cdc-fb6e-48c4-81c5-193ab572ddfa",
+    "name": "agent_teams_claim_task",
+    "isError": false,
+    "order": 27,
+    "elapsedMs": 25189
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 7,
+    "latencyMs": 1144,
+    "order": 28,
+    "elapsedMs": 25200
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "928c9cdc-fb6e-48c4-81c5-193ab572ddfa",
+    "name": "bash",
+    "isError": false,
+    "order": 29,
+    "elapsedMs": 25215
+  },
+  {
+    "event": "model-request",
+    "request": 8,
+    "sessionId": "928c9cdc-fb6e-48c4-81c5-193ab572ddfa",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "9b6bf4ef0a26ad609adb2a8d3b508113d8c79785f7c83456e69ed0b06a6b9c24",
+    "systemBytes": 8182,
+    "toolsSha256": "e6bf881a628808a931a5d46f6583913bdd179787df1684ec30f6eb249c6ef833",
+    "teamTools": [
+      "agent_teams_claim_task",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 30,
+    "elapsedMs": 25223
+  },
+  {
+    "event": "model-usage",
+    "request": 6,
+    "usage": {
+      "inputTokens": 199,
+      "outputTokens": 93,
+      "totalTokens": 18212,
+      "cacheReadTokens": 17920,
+      "reasoningTokens": 68
+    },
+    "order": 31,
+    "elapsedMs": 25250
+  },
+  {
+    "event": "model-response",
+    "request": 6,
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "durationMs": 1203,
+    "order": 32,
+    "elapsedMs": 25250
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "name": "agent_teams_status",
+    "isError": false,
+    "order": 33,
+    "elapsedMs": 25258
+  },
+  {
+    "event": "model-request",
+    "request": 9,
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "adba5678d76e18557462500d63a11f279dbfe46ab0d218b6b477c309c51e8936",
+    "systemBytes": 8887,
+    "toolsSha256": "1cf856ccbb783a28f786a4934422ed5979f64871eb0e062dff1644b860625b76",
+    "teamTools": [
+      "agent_teams_add_member",
+      "agent_teams_approve",
+      "agent_teams_claim_task",
+      "agent_teams_create",
+      "agent_teams_create_task",
+      "agent_teams_delete",
+      "agent_teams_edit_plan",
+      "agent_teams_reassign_task",
+      "agent_teams_remove_member",
+      "agent_teams_resume",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 34,
+    "elapsedMs": 25265
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 5,
+    "latencyMs": 1256,
+    "order": 35,
+    "elapsedMs": 25300
+  },
+  {
+    "event": "model-usage",
+    "request": 7,
+    "usage": {
+      "inputTokens": 9697,
+      "outputTokens": 173,
+      "totalTokens": 9870,
+      "cacheReadTokens": 0,
+      "reasoningTokens": 0
+    },
+    "order": 36,
+    "elapsedMs": 25623
+  },
+  {
+    "event": "model-response",
+    "request": 7,
+    "sessionId": "6c65d607-a28a-4c25-b13f-b092250cb012",
+    "durationMs": 1569,
+    "order": 37,
+    "elapsedMs": 25625
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "6c65d607-a28a-4c25-b13f-b092250cb012",
+    "name": "agent_teams_claim_task",
+    "isError": false,
+    "order": 38,
+    "elapsedMs": 25634
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "6c65d607-a28a-4c25-b13f-b092250cb012",
+    "name": "bash",
+    "isError": false,
+    "order": 39,
+    "elapsedMs": 25667
+  },
+  {
+    "event": "model-request",
+    "request": 10,
+    "sessionId": "6c65d607-a28a-4c25-b13f-b092250cb012",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "50626efdd3a5a33b8324df9a25b1b0f7015b51d066c0598de446bfb498745b47",
+    "systemBytes": 8182,
+    "toolsSha256": "e6bf881a628808a931a5d46f6583913bdd179787df1684ec30f6eb249c6ef833",
+    "teamTools": [
+      "agent_teams_claim_task",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 40,
+    "elapsedMs": 25676
+  },
+  {
+    "event": "model-usage",
+    "request": 5,
+    "usage": {
+      "inputTokens": 9671,
+      "outputTokens": 183,
+      "totalTokens": 9854,
+      "cacheReadTokens": 0,
+      "reasoningTokens": 0
+    },
+    "order": 41,
+    "elapsedMs": 25781
+  },
+  {
+    "event": "model-response",
+    "request": 5,
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "durationMs": 1738,
+    "order": 42,
+    "elapsedMs": 25782
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "name": "agent_teams_claim_task",
+    "isError": false,
+    "order": 43,
+    "elapsedMs": 25789
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "name": "bash",
+    "isError": false,
+    "order": 44,
+    "elapsedMs": 25821
+  },
+  {
+    "event": "model-request",
+    "request": 11,
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "5efe0a56081a98e38bb1a6e7a4940597a3b8d0bf37a8bdc83d193c268830b7db",
+    "systemBytes": 8173,
+    "toolsSha256": "e6bf881a628808a931a5d46f6583913bdd179787df1684ec30f6eb249c6ef833",
+    "teamTools": [
+      "agent_teams_claim_task",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 45,
+    "elapsedMs": 25830
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 9,
+    "latencyMs": 673,
+    "order": 46,
+    "elapsedMs": 25938
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 8,
+    "latencyMs": 749,
+    "order": 47,
+    "elapsedMs": 25972
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 10,
+    "latencyMs": 700,
+    "order": 48,
+    "elapsedMs": 26376
+  },
+  {
+    "event": "model-usage",
+    "request": 8,
+    "usage": {
+      "inputTokens": 1024,
+      "outputTokens": 272,
+      "totalTokens": 11024,
+      "cacheReadTokens": 9728,
+      "reasoningTokens": 26
+    },
+    "order": 49,
+    "elapsedMs": 26723
+  },
+  {
+    "event": "model-response",
+    "request": 8,
+    "sessionId": "928c9cdc-fb6e-48c4-81c5-193ab572ddfa",
+    "durationMs": 1500,
+    "order": 50,
+    "elapsedMs": 26723
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "928c9cdc-fb6e-48c4-81c5-193ab572ddfa",
+    "name": "agent_teams_update_task",
+    "isError": false,
+    "order": 51,
+    "elapsedMs": 26733
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "928c9cdc-fb6e-48c4-81c5-193ab572ddfa",
+    "name": "read",
+    "isError": false,
+    "order": 52,
+    "elapsedMs": 26742
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "928c9cdc-fb6e-48c4-81c5-193ab572ddfa",
+    "name": "read",
+    "isError": false,
+    "order": 53,
+    "elapsedMs": 26743
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "928c9cdc-fb6e-48c4-81c5-193ab572ddfa",
+    "name": "read",
+    "isError": false,
+    "order": 54,
+    "elapsedMs": 26743
+  },
+  {
+    "event": "model-request",
+    "request": 12,
+    "sessionId": "928c9cdc-fb6e-48c4-81c5-193ab572ddfa",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "9b6bf4ef0a26ad609adb2a8d3b508113d8c79785f7c83456e69ed0b06a6b9c24",
+    "systemBytes": 8182,
+    "toolsSha256": "e6bf881a628808a931a5d46f6583913bdd179787df1684ec30f6eb249c6ef833",
+    "teamTools": [
+      "agent_teams_claim_task",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 55,
+    "elapsedMs": 26750
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 11,
+    "latencyMs": 1125,
+    "order": 56,
+    "elapsedMs": 26955
+  },
+  {
+    "event": "model-usage",
+    "request": 10,
+    "usage": {
+      "inputTokens": 1002,
+      "outputTokens": 161,
+      "totalTokens": 11019,
+      "cacheReadTokens": 9856,
+      "reasoningTokens": 6
+    },
+    "order": 57,
+    "elapsedMs": 27002
+  },
+  {
+    "event": "model-response",
+    "request": 10,
+    "sessionId": "6c65d607-a28a-4c25-b13f-b092250cb012",
+    "durationMs": 1326,
+    "order": 58,
+    "elapsedMs": 27002
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "6c65d607-a28a-4c25-b13f-b092250cb012",
+    "name": "read",
+    "isError": false,
+    "order": 59,
+    "elapsedMs": 27014
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "6c65d607-a28a-4c25-b13f-b092250cb012",
+    "name": "read",
+    "isError": false,
+    "order": 60,
+    "elapsedMs": 27014
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "6c65d607-a28a-4c25-b13f-b092250cb012",
+    "name": "read",
+    "isError": false,
+    "order": 61,
+    "elapsedMs": 27014
+  },
+  {
+    "event": "model-request",
+    "request": 13,
+    "sessionId": "6c65d607-a28a-4c25-b13f-b092250cb012",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "50626efdd3a5a33b8324df9a25b1b0f7015b51d066c0598de446bfb498745b47",
+    "systemBytes": 8182,
+    "toolsSha256": "e6bf881a628808a931a5d46f6583913bdd179787df1684ec30f6eb249c6ef833",
+    "teamTools": [
+      "agent_teams_claim_task",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 62,
+    "elapsedMs": 27022
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 12,
+    "latencyMs": 397,
+    "order": 63,
+    "elapsedMs": 27147
+  },
+  {
+    "event": "model-usage",
+    "request": 9,
+    "usage": {
+      "inputTokens": 388,
+      "outputTokens": 290,
+      "totalTokens": 18854,
+      "cacheReadTokens": 18176,
+      "reasoningTokens": 33
+    },
+    "order": 64,
+    "elapsedMs": 27216
+  },
+  {
+    "event": "model-response",
+    "request": 9,
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "durationMs": 1951,
+    "order": 65,
+    "elapsedMs": 27216
+  },
+  {
+    "event": "model-usage",
+    "request": 11,
+    "usage": {
+      "inputTokens": 1038,
+      "outputTokens": 260,
+      "totalTokens": 11026,
+      "cacheReadTokens": 9728,
+      "reasoningTokens": 12
+    },
+    "order": 66,
+    "elapsedMs": 27691
+  },
+  {
+    "event": "model-response",
+    "request": 11,
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "durationMs": 1862,
+    "order": 67,
+    "elapsedMs": 27692
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "name": "agent_teams_update_task",
+    "isError": false,
+    "order": 68,
+    "elapsedMs": 27699
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "name": "read",
+    "isError": false,
+    "order": 69,
+    "elapsedMs": 27712
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "name": "read",
+    "isError": false,
+    "order": 70,
+    "elapsedMs": 27712
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "name": "read",
+    "isError": false,
+    "order": 71,
+    "elapsedMs": 27712
+  },
+  {
+    "event": "model-request",
+    "request": 14,
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "5efe0a56081a98e38bb1a6e7a4940597a3b8d0bf37a8bdc83d193c268830b7db",
+    "systemBytes": 8173,
+    "toolsSha256": "e6bf881a628808a931a5d46f6583913bdd179787df1684ec30f6eb249c6ef833",
+    "teamTools": [
+      "agent_teams_claim_task",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 72,
+    "elapsedMs": 27723
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 13,
+    "latencyMs": 914,
+    "order": 73,
+    "elapsedMs": 27936
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 14,
+    "latencyMs": 641,
+    "order": 74,
+    "elapsedMs": 28366
+  },
+  {
+    "event": "model-usage",
+    "request": 12,
+    "usage": {
+      "inputTokens": 343,
+      "outputTokens": 1332,
+      "totalTokens": 12683,
+      "cacheReadTokens": 11008,
+      "reasoningTokens": 1056
+    },
+    "order": 75,
+    "elapsedMs": 32947
+  },
+  {
+    "event": "model-response",
+    "request": 12,
+    "sessionId": "928c9cdc-fb6e-48c4-81c5-193ab572ddfa",
+    "durationMs": 6197,
+    "order": 76,
+    "elapsedMs": 32947
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "928c9cdc-fb6e-48c4-81c5-193ab572ddfa",
+    "name": "bash",
+    "isError": false,
+    "order": 77,
+    "elapsedMs": 32989
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "928c9cdc-fb6e-48c4-81c5-193ab572ddfa",
+    "name": "bash",
+    "isError": false,
+    "order": 78,
+    "elapsedMs": 33030
+  },
+  {
+    "event": "model-request",
+    "request": 15,
+    "sessionId": "928c9cdc-fb6e-48c4-81c5-193ab572ddfa",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "9b6bf4ef0a26ad609adb2a8d3b508113d8c79785f7c83456e69ed0b06a6b9c24",
+    "systemBytes": 8182,
+    "toolsSha256": "e6bf881a628808a931a5d46f6583913bdd179787df1684ec30f6eb249c6ef833",
+    "teamTools": [
+      "agent_teams_claim_task",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 79,
+    "elapsedMs": 33038
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 15,
+    "latencyMs": 734,
+    "order": 80,
+    "elapsedMs": 33772
+  },
+  {
+    "event": "model-usage",
+    "request": 14,
+    "usage": {
+      "inputTokens": 345,
+      "outputTokens": 1588,
+      "totalTokens": 12941,
+      "cacheReadTokens": 11008,
+      "reasoningTokens": 1092
+    },
+    "order": 81,
+    "elapsedMs": 34498
+  },
+  {
+    "event": "model-response",
+    "request": 14,
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "durationMs": 6779,
+    "order": 82,
+    "elapsedMs": 34504
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "name": "bash",
+    "isError": false,
+    "order": 83,
+    "elapsedMs": 34552
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "name": "bash",
+    "isError": false,
+    "order": 84,
+    "elapsedMs": 34597
+  },
+  {
+    "event": "model-request",
+    "request": 16,
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "5efe0a56081a98e38bb1a6e7a4940597a3b8d0bf37a8bdc83d193c268830b7db",
+    "systemBytes": 8173,
+    "toolsSha256": "e6bf881a628808a931a5d46f6583913bdd179787df1684ec30f6eb249c6ef833",
+    "teamTools": [
+      "agent_teams_claim_task",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 85,
+    "elapsedMs": 34605
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 16,
+    "latencyMs": 773,
+    "order": 86,
+    "elapsedMs": 35380
+  },
+  {
+    "event": "model-usage",
+    "request": 16,
+    "usage": {
+      "inputTokens": 279,
+      "outputTokens": 435,
+      "totalTokens": 13642,
+      "cacheReadTokens": 12928,
+      "reasoningTokens": 88
+    },
+    "order": 87,
+    "elapsedMs": 36838
+  },
+  {
+    "event": "model-response",
+    "request": 16,
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "durationMs": 2231,
+    "order": 88,
+    "elapsedMs": 36838
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "name": "bash",
+    "isError": false,
+    "order": 89,
+    "elapsedMs": 36893
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "name": "glob",
+    "isError": false,
+    "order": 90,
+    "elapsedMs": 36902
+  },
+  {
+    "event": "model-request",
+    "request": 17,
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "5efe0a56081a98e38bb1a6e7a4940597a3b8d0bf37a8bdc83d193c268830b7db",
+    "systemBytes": 8173,
+    "toolsSha256": "e6bf881a628808a931a5d46f6583913bdd179787df1684ec30f6eb249c6ef833",
+    "teamTools": [
+      "agent_teams_claim_task",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 91,
+    "elapsedMs": 36910
+  },
+  {
+    "event": "model-usage",
+    "request": 15,
+    "usage": {
+      "inputTokens": 239,
+      "outputTokens": 1034,
+      "totalTokens": 13945,
+      "cacheReadTokens": 12672,
+      "reasoningTokens": 131
+    },
+    "order": 92,
+    "elapsedMs": 37049
+  },
+  {
+    "event": "model-response",
+    "request": 15,
+    "sessionId": "928c9cdc-fb6e-48c4-81c5-193ab572ddfa",
+    "durationMs": 4011,
+    "order": 93,
+    "elapsedMs": 37049
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 17,
+    "latencyMs": 696,
+    "order": 94,
+    "elapsedMs": 37606
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "928c9cdc-fb6e-48c4-81c5-193ab572ddfa",
+    "name": "bash",
+    "isError": false,
+    "order": 95,
+    "elapsedMs": 37736
+  },
+  {
+    "event": "model-usage",
+    "request": 13,
+    "usage": {
+      "inputTokens": 320,
+      "outputTokens": 2280,
+      "totalTokens": 13608,
+      "cacheReadTokens": 11008,
+      "reasoningTokens": 2086
+    },
+    "order": 96,
+    "elapsedMs": 38016
+  },
+  {
+    "event": "model-response",
+    "request": 13,
+    "sessionId": "6c65d607-a28a-4c25-b13f-b092250cb012",
+    "durationMs": 10994,
+    "order": 97,
+    "elapsedMs": 38016
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "6c65d607-a28a-4c25-b13f-b092250cb012",
+    "name": "bash",
+    "isError": false,
+    "order": 98,
+    "elapsedMs": 38037
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "6c65d607-a28a-4c25-b13f-b092250cb012",
+    "name": "grep",
+    "isError": false,
+    "order": 99,
+    "elapsedMs": 38047
+  },
+  {
+    "event": "model-request",
+    "request": 18,
+    "sessionId": "6c65d607-a28a-4c25-b13f-b092250cb012",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "50626efdd3a5a33b8324df9a25b1b0f7015b51d066c0598de446bfb498745b47",
+    "systemBytes": 8182,
+    "toolsSha256": "e6bf881a628808a931a5d46f6583913bdd179787df1684ec30f6eb249c6ef833",
+    "teamTools": [
+      "agent_teams_claim_task",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 100,
+    "elapsedMs": 38054
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "928c9cdc-fb6e-48c4-81c5-193ab572ddfa",
+    "name": "bash",
+    "isError": false,
+    "order": 101,
+    "elapsedMs": 38442
+  },
+  {
+    "event": "model-request",
+    "request": 19,
+    "sessionId": "928c9cdc-fb6e-48c4-81c5-193ab572ddfa",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "9b6bf4ef0a26ad609adb2a8d3b508113d8c79785f7c83456e69ed0b06a6b9c24",
+    "systemBytes": 8182,
+    "toolsSha256": "e6bf881a628808a931a5d46f6583913bdd179787df1684ec30f6eb249c6ef833",
+    "teamTools": [
+      "agent_teams_claim_task",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 102,
+    "elapsedMs": 38451
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 18,
+    "latencyMs": 768,
+    "order": 103,
+    "elapsedMs": 38822
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 19,
+    "latencyMs": 1208,
+    "order": 104,
+    "elapsedMs": 39661
+  },
+  {
+    "event": "model-usage",
+    "request": 18,
+    "usage": {
+      "inputTokens": 367,
+      "outputTokens": 562,
+      "totalTokens": 14497,
+      "cacheReadTokens": 13568,
+      "reasoningTokens": 38
+    },
+    "order": 105,
+    "elapsedMs": 40688
+  },
+  {
+    "event": "model-response",
+    "request": 18,
+    "sessionId": "6c65d607-a28a-4c25-b13f-b092250cb012",
+    "durationMs": 2636,
+    "order": 106,
+    "elapsedMs": 40690
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "6c65d607-a28a-4c25-b13f-b092250cb012",
+    "name": "bash",
+    "isError": false,
+    "order": 107,
+    "elapsedMs": 40742
+  },
+  {
+    "event": "model-request",
+    "request": 20,
+    "sessionId": "6c65d607-a28a-4c25-b13f-b092250cb012",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "50626efdd3a5a33b8324df9a25b1b0f7015b51d066c0598de446bfb498745b47",
+    "systemBytes": 8182,
+    "toolsSha256": "e6bf881a628808a931a5d46f6583913bdd179787df1684ec30f6eb249c6ef833",
+    "teamTools": [
+      "agent_teams_claim_task",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 108,
+    "elapsedMs": 40755
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 20,
+    "latencyMs": 1131,
+    "order": 109,
+    "elapsedMs": 41888
+  },
+  {
+    "event": "model-usage",
+    "request": 19,
+    "usage": {
+      "inputTokens": 457,
+      "outputTokens": 1654,
+      "totalTokens": 15935,
+      "cacheReadTokens": 13824,
+      "reasoningTokens": 447
+    },
+    "order": 110,
+    "elapsedMs": 45817
+  },
+  {
+    "event": "model-response",
+    "request": 19,
+    "sessionId": "928c9cdc-fb6e-48c4-81c5-193ab572ddfa",
+    "durationMs": 7364,
+    "order": 111,
+    "elapsedMs": 45817
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "928c9cdc-fb6e-48c4-81c5-193ab572ddfa",
+    "name": "bash",
+    "isError": false,
+    "order": 112,
+    "elapsedMs": 47437
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "928c9cdc-fb6e-48c4-81c5-193ab572ddfa",
+    "name": "bash",
+    "isError": false,
+    "order": 113,
+    "elapsedMs": 49374
+  },
+  {
+    "event": "model-request",
+    "request": 21,
+    "sessionId": "928c9cdc-fb6e-48c4-81c5-193ab572ddfa",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "9b6bf4ef0a26ad609adb2a8d3b508113d8c79785f7c83456e69ed0b06a6b9c24",
+    "systemBytes": 8182,
+    "toolsSha256": "e6bf881a628808a931a5d46f6583913bdd179787df1684ec30f6eb249c6ef833",
+    "teamTools": [
+      "agent_teams_claim_task",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 114,
+    "elapsedMs": 49387
+  },
+  {
+    "event": "model-usage",
+    "request": 20,
+    "usage": {
+      "inputTokens": 143,
+      "outputTokens": 1601,
+      "totalTokens": 16208,
+      "cacheReadTokens": 14464,
+      "reasoningTokens": 1324
+    },
+    "order": 115,
+    "elapsedMs": 49567
+  },
+  {
+    "event": "model-response",
+    "request": 20,
+    "sessionId": "6c65d607-a28a-4c25-b13f-b092250cb012",
+    "durationMs": 8812,
+    "order": 116,
+    "elapsedMs": 49569
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "6c65d607-a28a-4c25-b13f-b092250cb012",
+    "name": "bash",
+    "isError": false,
+    "order": 117,
+    "elapsedMs": 49642
+  },
+  {
+    "event": "model-request",
+    "request": 22,
+    "sessionId": "6c65d607-a28a-4c25-b13f-b092250cb012",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "50626efdd3a5a33b8324df9a25b1b0f7015b51d066c0598de446bfb498745b47",
+    "systemBytes": 8182,
+    "toolsSha256": "e6bf881a628808a931a5d46f6583913bdd179787df1684ec30f6eb249c6ef833",
+    "teamTools": [
+      "agent_teams_claim_task",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 118,
+    "elapsedMs": 49650
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 21,
+    "latencyMs": 751,
+    "order": 119,
+    "elapsedMs": 50139
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 22,
+    "latencyMs": 779,
+    "order": 120,
+    "elapsedMs": 50432
+  },
+  {
+    "event": "model-usage",
+    "request": 17,
+    "usage": {
+      "inputTokens": 210,
+      "outputTokens": 3004,
+      "totalTokens": 16782,
+      "cacheReadTokens": 13568,
+      "reasoningTokens": 2772
+    },
+    "order": 121,
+    "elapsedMs": 50646
+  },
+  {
+    "event": "model-response",
+    "request": 17,
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "durationMs": 13741,
+    "order": 122,
+    "elapsedMs": 50651
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "name": "bash",
+    "isError": false,
+    "order": 123,
+    "elapsedMs": 50715
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "name": "grep",
+    "isError": false,
+    "order": 124,
+    "elapsedMs": 50742
+  },
+  {
+    "event": "model-request",
+    "request": 23,
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "5efe0a56081a98e38bb1a6e7a4940597a3b8d0bf37a8bdc83d193c268830b7db",
+    "systemBytes": 8173,
+    "toolsSha256": "e6bf881a628808a931a5d46f6583913bdd179787df1684ec30f6eb249c6ef833",
+    "teamTools": [
+      "agent_teams_claim_task",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 125,
+    "elapsedMs": 50767
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 23,
+    "latencyMs": 389,
+    "order": 126,
+    "elapsedMs": 51158
+  },
+  {
+    "event": "model-usage",
+    "request": 23,
+    "usage": {
+      "inputTokens": 324,
+      "outputTokens": 1517,
+      "totalTokens": 18609,
+      "cacheReadTokens": 16768,
+      "reasoningTokens": 49
+    },
+    "order": 127,
+    "elapsedMs": 56920
+  },
+  {
+    "event": "model-response",
+    "request": 23,
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "durationMs": 6153,
+    "order": 128,
+    "elapsedMs": 56922
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "name": "write",
+    "isError": false,
+    "order": 129,
+    "elapsedMs": 56981
+  },
+  {
+    "event": "model-request",
+    "request": 24,
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "5efe0a56081a98e38bb1a6e7a4940597a3b8d0bf37a8bdc83d193c268830b7db",
+    "systemBytes": 8173,
+    "toolsSha256": "e6bf881a628808a931a5d46f6583913bdd179787df1684ec30f6eb249c6ef833",
+    "teamTools": [
+      "agent_teams_claim_task",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 130,
+    "elapsedMs": 57002
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 24,
+    "latencyMs": 598,
+    "order": 131,
+    "elapsedMs": 57603
+  },
+  {
+    "event": "model-usage",
+    "request": 24,
+    "usage": {
+      "inputTokens": 229,
+      "outputTokens": 553,
+      "totalTokens": 19214,
+      "cacheReadTokens": 18432,
+      "reasoningTokens": 88
+    },
+    "order": 132,
+    "elapsedMs": 59320
+  },
+  {
+    "event": "model-response",
+    "request": 24,
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "durationMs": 2317,
+    "order": 133,
+    "elapsedMs": 59322
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "name": "bash",
+    "isError": false,
+    "order": 134,
+    "elapsedMs": 59368
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "name": "bash",
+    "isError": false,
+    "order": 135,
+    "elapsedMs": 59431
+  },
+  {
+    "event": "model-request",
+    "request": 25,
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "5efe0a56081a98e38bb1a6e7a4940597a3b8d0bf37a8bdc83d193c268830b7db",
+    "systemBytes": 8173,
+    "toolsSha256": "e6bf881a628808a931a5d46f6583913bdd179787df1684ec30f6eb249c6ef833",
+    "teamTools": [
+      "agent_teams_claim_task",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 136,
+    "elapsedMs": 59448
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 25,
+    "latencyMs": 481,
+    "order": 137,
+    "elapsedMs": 59932
+  },
+  {
+    "event": "model-usage",
+    "request": 25,
+    "usage": {
+      "inputTokens": 476,
+      "outputTokens": 693,
+      "totalTokens": 20369,
+      "cacheReadTokens": 19200,
+      "reasoningTokens": 213
+    },
+    "order": 138,
+    "elapsedMs": 62794
+  },
+  {
+    "event": "model-response",
+    "request": 25,
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "durationMs": 3344,
+    "order": 139,
+    "elapsedMs": 62795
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "name": "agent_teams_update_task",
+    "isError": false,
+    "order": 140,
+    "elapsedMs": 62808
+  },
+  {
+    "event": "model-request",
+    "request": 26,
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "5efe0a56081a98e38bb1a6e7a4940597a3b8d0bf37a8bdc83d193c268830b7db",
+    "systemBytes": 8173,
+    "toolsSha256": "e6bf881a628808a931a5d46f6583913bdd179787df1684ec30f6eb249c6ef833",
+    "teamTools": [
+      "agent_teams_claim_task",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 141,
+    "elapsedMs": 62820
+  },
+  {
+    "event": "model-usage",
+    "request": 22,
+    "usage": {
+      "inputTokens": 177,
+      "outputTokens": 3047,
+      "totalTokens": 19352,
+      "cacheReadTokens": 16128,
+      "reasoningTokens": 1844
+    },
+    "order": 142,
+    "elapsedMs": 63238
+  },
+  {
+    "event": "model-response",
+    "request": 22,
+    "sessionId": "6c65d607-a28a-4c25-b13f-b092250cb012",
+    "durationMs": 13585,
+    "order": 143,
+    "elapsedMs": 63238
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "6c65d607-a28a-4c25-b13f-b092250cb012",
+    "name": "write",
+    "isError": false,
+    "order": 144,
+    "elapsedMs": 63255
+  },
+  {
+    "event": "model-request",
+    "request": 27,
+    "sessionId": "6c65d607-a28a-4c25-b13f-b092250cb012",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "50626efdd3a5a33b8324df9a25b1b0f7015b51d066c0598de446bfb498745b47",
+    "systemBytes": 8182,
+    "toolsSha256": "e6bf881a628808a931a5d46f6583913bdd179787df1684ec30f6eb249c6ef833",
+    "teamTools": [
+      "agent_teams_claim_task",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 145,
+    "elapsedMs": 63264
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 27,
+    "latencyMs": 287,
+    "order": 146,
+    "elapsedMs": 63551
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 26,
+    "latencyMs": 792,
+    "order": 147,
+    "elapsedMs": 63612
+  },
+  {
+    "event": "model-usage",
+    "request": 21,
+    "usage": {
+      "inputTokens": 419,
+      "outputTokens": 3223,
+      "totalTokens": 19514,
+      "cacheReadTokens": 15872,
+      "reasoningTokens": 2739
+    },
+    "order": 148,
+    "elapsedMs": 64032
+  },
+  {
+    "event": "model-response",
+    "request": 21,
+    "sessionId": "928c9cdc-fb6e-48c4-81c5-193ab572ddfa",
+    "durationMs": 14645,
+    "order": 149,
+    "elapsedMs": 64033
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "928c9cdc-fb6e-48c4-81c5-193ab572ddfa",
+    "name": "bash",
+    "isError": false,
+    "order": 150,
+    "elapsedMs": 64709
+  },
+  {
+    "event": "model-usage",
+    "request": 26,
+    "usage": {
+      "inputTokens": 378,
+      "outputTokens": 376,
+      "totalTokens": 21106,
+      "cacheReadTokens": 20352,
+      "reasoningTokens": 0
+    },
+    "order": 151,
+    "elapsedMs": 64886
+  },
+  {
+    "event": "model-response",
+    "request": 26,
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "durationMs": 2066,
+    "order": 152,
+    "elapsedMs": 64886
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "name": "agent_teams_send_message",
+    "isError": false,
+    "order": 153,
+    "elapsedMs": 64894
+  },
+  {
+    "event": "model-request",
+    "request": 28,
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "adba5678d76e18557462500d63a11f279dbfe46ab0d218b6b477c309c51e8936",
+    "systemBytes": 8887,
+    "toolsSha256": "1cf856ccbb783a28f786a4934422ed5979f64871eb0e062dff1644b860625b76",
+    "teamTools": [
+      "agent_teams_add_member",
+      "agent_teams_approve",
+      "agent_teams_claim_task",
+      "agent_teams_create",
+      "agent_teams_create_task",
+      "agent_teams_delete",
+      "agent_teams_edit_plan",
+      "agent_teams_reassign_task",
+      "agent_teams_remove_member",
+      "agent_teams_resume",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 154,
+    "elapsedMs": 64903
+  },
+  {
+    "event": "model-request",
+    "request": 29,
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "5efe0a56081a98e38bb1a6e7a4940597a3b8d0bf37a8bdc83d193c268830b7db",
+    "systemBytes": 8173,
+    "toolsSha256": "e6bf881a628808a931a5d46f6583913bdd179787df1684ec30f6eb249c6ef833",
+    "teamTools": [
+      "agent_teams_claim_task",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 155,
+    "elapsedMs": 64904
+  },
+  {
+    "event": "model-usage",
+    "request": 27,
+    "usage": {
+      "inputTokens": 204,
+      "outputTokens": 478,
+      "totalTokens": 19882,
+      "cacheReadTokens": 19200,
+      "reasoningTokens": 122
+    },
+    "order": 156,
+    "elapsedMs": 65268
+  },
+  {
+    "event": "model-response",
+    "request": 27,
+    "sessionId": "6c65d607-a28a-4c25-b13f-b092250cb012",
+    "durationMs": 2004,
+    "order": 157,
+    "elapsedMs": 65268
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "6c65d607-a28a-4c25-b13f-b092250cb012",
+    "name": "bash",
+    "isError": false,
+    "order": 158,
+    "elapsedMs": 65339
+  },
+  {
+    "event": "model-request",
+    "request": 30,
+    "sessionId": "6c65d607-a28a-4c25-b13f-b092250cb012",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "50626efdd3a5a33b8324df9a25b1b0f7015b51d066c0598de446bfb498745b47",
+    "systemBytes": 8182,
+    "toolsSha256": "e6bf881a628808a931a5d46f6583913bdd179787df1684ec30f6eb249c6ef833",
+    "teamTools": [
+      "agent_teams_claim_task",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 159,
+    "elapsedMs": 65345
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "928c9cdc-fb6e-48c4-81c5-193ab572ddfa",
+    "name": "bash",
+    "isError": false,
+    "order": 160,
+    "elapsedMs": 65532
+  },
+  {
+    "event": "model-request",
+    "request": 31,
+    "sessionId": "928c9cdc-fb6e-48c4-81c5-193ab572ddfa",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "9b6bf4ef0a26ad609adb2a8d3b508113d8c79785f7c83456e69ed0b06a6b9c24",
+    "systemBytes": 8182,
+    "toolsSha256": "e6bf881a628808a931a5d46f6583913bdd179787df1684ec30f6eb249c6ef833",
+    "teamTools": [
+      "agent_teams_claim_task",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 161,
+    "elapsedMs": 65539
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 28,
+    "latencyMs": 658,
+    "order": 162,
+    "elapsedMs": 65562
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 29,
+    "latencyMs": 1023,
+    "order": 163,
+    "elapsedMs": 65927
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 31,
+    "latencyMs": 477,
+    "order": 164,
+    "elapsedMs": 66016
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 30,
+    "latencyMs": 692,
+    "order": 165,
+    "elapsedMs": 66037
+  },
+  {
+    "event": "model-usage",
+    "request": 28,
+    "usage": {
+      "inputTokens": 367,
+      "outputTokens": 203,
+      "totalTokens": 19386,
+      "cacheReadTokens": 18816,
+      "reasoningTokens": 130
+    },
+    "order": 166,
+    "elapsedMs": 66504
+  },
+  {
+    "event": "model-response",
+    "request": 28,
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "durationMs": 1601,
+    "order": 167,
+    "elapsedMs": 66505
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "name": "agent_teams_status",
+    "isError": false,
+    "order": 168,
+    "elapsedMs": 66516
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "name": "read",
+    "isError": false,
+    "order": 169,
+    "elapsedMs": 66522
+  },
+  {
+    "event": "model-request",
+    "request": 32,
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "adba5678d76e18557462500d63a11f279dbfe46ab0d218b6b477c309c51e8936",
+    "systemBytes": 8887,
+    "toolsSha256": "1cf856ccbb783a28f786a4934422ed5979f64871eb0e062dff1644b860625b76",
+    "teamTools": [
+      "agent_teams_add_member",
+      "agent_teams_approve",
+      "agent_teams_claim_task",
+      "agent_teams_create",
+      "agent_teams_create_task",
+      "agent_teams_delete",
+      "agent_teams_edit_plan",
+      "agent_teams_reassign_task",
+      "agent_teams_remove_member",
+      "agent_teams_resume",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 170,
+    "elapsedMs": 66532
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 32,
+    "latencyMs": 776,
+    "order": 171,
+    "elapsedMs": 67308
+  },
+  {
+    "event": "model-usage",
+    "request": 29,
+    "usage": {
+      "inputTokens": 155,
+      "outputTokens": 452,
+      "totalTokens": 21599,
+      "cacheReadTokens": 20992,
+      "reasoningTokens": 0
+    },
+    "order": 172,
+    "elapsedMs": 67736
+  },
+  {
+    "event": "model-response",
+    "request": 29,
+    "sessionId": "ff6025b8-9cab-4a37-8c18-9173b82a368c",
+    "durationMs": 2833,
+    "order": 173,
+    "elapsedMs": 67737
+  },
+  {
+    "event": "model-usage",
+    "request": 30,
+    "usage": {
+      "inputTokens": 293,
+      "outputTokens": 538,
+      "totalTokens": 20671,
+      "cacheReadTokens": 19840,
+      "reasoningTokens": 395
+    },
+    "order": 174,
+    "elapsedMs": 68460
+  },
+  {
+    "event": "model-response",
+    "request": 30,
+    "sessionId": "6c65d607-a28a-4c25-b13f-b092250cb012",
+    "durationMs": 3116,
+    "order": 175,
+    "elapsedMs": 68461
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "6c65d607-a28a-4c25-b13f-b092250cb012",
+    "name": "agent_teams_update_task",
+    "isError": false,
+    "order": 176,
+    "elapsedMs": 68475
+  },
+  {
+    "event": "model-request",
+    "request": 33,
+    "sessionId": "6c65d607-a28a-4c25-b13f-b092250cb012",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "50626efdd3a5a33b8324df9a25b1b0f7015b51d066c0598de446bfb498745b47",
+    "systemBytes": 8182,
+    "toolsSha256": "e6bf881a628808a931a5d46f6583913bdd179787df1684ec30f6eb249c6ef833",
+    "teamTools": [
+      "agent_teams_claim_task",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 177,
+    "elapsedMs": 68485
+  },
+  {
+    "event": "model-usage",
+    "request": 32,
+    "usage": {
+      "inputTokens": 1982,
+      "outputTokens": 290,
+      "totalTokens": 21600,
+      "cacheReadTokens": 19328,
+      "reasoningTokens": 36
+    },
+    "order": 178,
+    "elapsedMs": 68607
+  },
+  {
+    "event": "model-response",
+    "request": 32,
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "durationMs": 2076,
+    "order": 179,
+    "elapsedMs": 68608
+  },
+  {
+    "event": "model-request",
+    "request": 34,
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "adba5678d76e18557462500d63a11f279dbfe46ab0d218b6b477c309c51e8936",
+    "systemBytes": 8887,
+    "toolsSha256": "1cf856ccbb783a28f786a4934422ed5979f64871eb0e062dff1644b860625b76",
+    "teamTools": [
+      "agent_teams_add_member",
+      "agent_teams_approve",
+      "agent_teams_claim_task",
+      "agent_teams_create",
+      "agent_teams_create_task",
+      "agent_teams_delete",
+      "agent_teams_edit_plan",
+      "agent_teams_reassign_task",
+      "agent_teams_remove_member",
+      "agent_teams_resume",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 180,
+    "elapsedMs": 68622
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 33,
+    "latencyMs": 643,
+    "order": 181,
+    "elapsedMs": 69128
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 34,
+    "latencyMs": 1294,
+    "order": 182,
+    "elapsedMs": 69917
+  },
+  {
+    "event": "model-usage",
+    "request": 33,
+    "usage": {
+      "inputTokens": 246,
+      "outputTokens": 366,
+      "totalTokens": 21092,
+      "cacheReadTokens": 20480,
+      "reasoningTokens": 0
+    },
+    "order": 183,
+    "elapsedMs": 70443
+  },
+  {
+    "event": "model-response",
+    "request": 33,
+    "sessionId": "6c65d607-a28a-4c25-b13f-b092250cb012",
+    "durationMs": 1959,
+    "order": 184,
+    "elapsedMs": 70444
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "6c65d607-a28a-4c25-b13f-b092250cb012",
+    "name": "agent_teams_update_task",
+    "isError": false,
+    "order": 185,
+    "elapsedMs": 70455
+  },
+  {
+    "event": "model-request",
+    "request": 35,
+    "sessionId": "6c65d607-a28a-4c25-b13f-b092250cb012",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "50626efdd3a5a33b8324df9a25b1b0f7015b51d066c0598de446bfb498745b47",
+    "systemBytes": 8182,
+    "toolsSha256": "e6bf881a628808a931a5d46f6583913bdd179787df1684ec30f6eb249c6ef833",
+    "teamTools": [
+      "agent_teams_claim_task",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 186,
+    "elapsedMs": 70466
+  },
+  {
+    "event": "model-usage",
+    "request": 34,
+    "usage": {
+      "inputTokens": 595,
+      "outputTokens": 213,
+      "totalTokens": 22312,
+      "cacheReadTokens": 21504,
+      "reasoningTokens": 125
+    },
+    "order": 187,
+    "elapsedMs": 71009
+  },
+  {
+    "event": "model-response",
+    "request": 34,
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "durationMs": 2388,
+    "order": 188,
+    "elapsedMs": 71011
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 35,
+    "latencyMs": 1250,
+    "order": 189,
+    "elapsedMs": 71716
+  },
+  {
+    "event": "model-usage",
+    "request": 35,
+    "usage": {
+      "inputTokens": 361,
+      "outputTokens": 337,
+      "totalTokens": 21690,
+      "cacheReadTokens": 20992,
+      "reasoningTokens": 0
+    },
+    "order": 190,
+    "elapsedMs": 72811
+  },
+  {
+    "event": "model-response",
+    "request": 35,
+    "sessionId": "6c65d607-a28a-4c25-b13f-b092250cb012",
+    "durationMs": 2347,
+    "order": 191,
+    "elapsedMs": 72813
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "6c65d607-a28a-4c25-b13f-b092250cb012",
+    "name": "agent_teams_send_message",
+    "isError": false,
+    "order": 192,
+    "elapsedMs": 72829
+  },
+  {
+    "event": "model-request",
+    "request": 36,
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "adba5678d76e18557462500d63a11f279dbfe46ab0d218b6b477c309c51e8936",
+    "systemBytes": 8887,
+    "toolsSha256": "1cf856ccbb783a28f786a4934422ed5979f64871eb0e062dff1644b860625b76",
+    "teamTools": [
+      "agent_teams_add_member",
+      "agent_teams_approve",
+      "agent_teams_claim_task",
+      "agent_teams_create",
+      "agent_teams_create_task",
+      "agent_teams_delete",
+      "agent_teams_edit_plan",
+      "agent_teams_reassign_task",
+      "agent_teams_remove_member",
+      "agent_teams_resume",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 193,
+    "elapsedMs": 72841
+  },
+  {
+    "event": "model-request",
+    "request": 37,
+    "sessionId": "6c65d607-a28a-4c25-b13f-b092250cb012",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "50626efdd3a5a33b8324df9a25b1b0f7015b51d066c0598de446bfb498745b47",
+    "systemBytes": 8182,
+    "toolsSha256": "e6bf881a628808a931a5d46f6583913bdd179787df1684ec30f6eb249c6ef833",
+    "teamTools": [
+      "agent_teams_claim_task",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 194,
+    "elapsedMs": 72842
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 37,
+    "latencyMs": 558,
+    "order": 195,
+    "elapsedMs": 73400
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 36,
+    "latencyMs": 561,
+    "order": 196,
+    "elapsedMs": 73402
+  },
+  {
+    "event": "model-usage",
+    "request": 36,
+    "usage": {
+      "inputTokens": 330,
+      "outputTokens": 107,
+      "totalTokens": 22709,
+      "cacheReadTokens": 22272,
+      "reasoningTokens": 34
+    },
+    "order": 197,
+    "elapsedMs": 73814
+  },
+  {
+    "event": "model-response",
+    "request": 36,
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "durationMs": 974,
+    "order": 198,
+    "elapsedMs": 73815
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "name": "agent_teams_status",
+    "isError": false,
+    "order": 199,
+    "elapsedMs": 73826
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "name": "read",
+    "isError": false,
+    "order": 200,
+    "elapsedMs": 73834
+  },
+  {
+    "event": "model-request",
+    "request": 38,
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "adba5678d76e18557462500d63a11f279dbfe46ab0d218b6b477c309c51e8936",
+    "systemBytes": 8887,
+    "toolsSha256": "1cf856ccbb783a28f786a4934422ed5979f64871eb0e062dff1644b860625b76",
+    "teamTools": [
+      "agent_teams_add_member",
+      "agent_teams_approve",
+      "agent_teams_claim_task",
+      "agent_teams_create",
+      "agent_teams_create_task",
+      "agent_teams_delete",
+      "agent_teams_edit_plan",
+      "agent_teams_reassign_task",
+      "agent_teams_remove_member",
+      "agent_teams_resume",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 201,
+    "elapsedMs": 73843
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 38,
+    "latencyMs": 746,
+    "order": 202,
+    "elapsedMs": 74589
+  },
+  {
+    "event": "model-usage",
+    "request": 31,
+    "usage": {
+      "inputTokens": 251,
+      "outputTokens": 2473,
+      "totalTokens": 22052,
+      "cacheReadTokens": 19328,
+      "reasoningTokens": 1451
+    },
+    "order": 203,
+    "elapsedMs": 74674
+  },
+  {
+    "event": "model-response",
+    "request": 31,
+    "sessionId": "928c9cdc-fb6e-48c4-81c5-193ab572ddfa",
+    "durationMs": 9136,
+    "order": 204,
+    "elapsedMs": 74675
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "928c9cdc-fb6e-48c4-81c5-193ab572ddfa",
+    "name": "write",
+    "isError": false,
+    "order": 205,
+    "elapsedMs": 74692
+  },
+  {
+    "event": "model-request",
+    "request": 39,
+    "sessionId": "928c9cdc-fb6e-48c4-81c5-193ab572ddfa",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "9b6bf4ef0a26ad609adb2a8d3b508113d8c79785f7c83456e69ed0b06a6b9c24",
+    "systemBytes": 8182,
+    "toolsSha256": "e6bf881a628808a931a5d46f6583913bdd179787df1684ec30f6eb249c6ef833",
+    "teamTools": [
+      "agent_teams_claim_task",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 206,
+    "elapsedMs": 74700
+  },
+  {
+    "event": "model-usage",
+    "request": 37,
+    "usage": {
+      "inputTokens": 230,
+      "outputTokens": 469,
+      "totalTokens": 22203,
+      "cacheReadTokens": 21504,
+      "reasoningTokens": 18
+    },
+    "order": 207,
+    "elapsedMs": 75230
+  },
+  {
+    "event": "model-response",
+    "request": 37,
+    "sessionId": "6c65d607-a28a-4c25-b13f-b092250cb012",
+    "durationMs": 2389,
+    "order": 208,
+    "elapsedMs": 75231
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 39,
+    "latencyMs": 801,
+    "order": 209,
+    "elapsedMs": 75501
+  },
+  {
+    "event": "model-usage",
+    "request": 38,
+    "usage": {
+      "inputTokens": 1867,
+      "outputTokens": 269,
+      "totalTokens": 24792,
+      "cacheReadTokens": 22656,
+      "reasoningTokens": 16
+    },
+    "order": 210,
+    "elapsedMs": 75610
+  },
+  {
+    "event": "model-response",
+    "request": 38,
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "durationMs": 1768,
+    "order": 211,
+    "elapsedMs": 75611
+  },
+  {
+    "event": "model-request",
+    "request": 40,
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "adba5678d76e18557462500d63a11f279dbfe46ab0d218b6b477c309c51e8936",
+    "systemBytes": 8887,
+    "toolsSha256": "1cf856ccbb783a28f786a4934422ed5979f64871eb0e062dff1644b860625b76",
+    "teamTools": [
+      "agent_teams_add_member",
+      "agent_teams_approve",
+      "agent_teams_claim_task",
+      "agent_teams_create",
+      "agent_teams_create_task",
+      "agent_teams_delete",
+      "agent_teams_edit_plan",
+      "agent_teams_reassign_task",
+      "agent_teams_remove_member",
+      "agent_teams_resume",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 212,
+    "elapsedMs": 75627
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 40,
+    "latencyMs": 682,
+    "order": 213,
+    "elapsedMs": 76310
+  },
+  {
+    "event": "model-usage",
+    "request": 40,
+    "usage": {
+      "inputTokens": 583,
+      "outputTokens": 64,
+      "totalTokens": 25351,
+      "cacheReadTokens": 24704,
+      "reasoningTokens": 22
+    },
+    "order": 214,
+    "elapsedMs": 76681
+  },
+  {
+    "event": "model-response",
+    "request": 40,
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "durationMs": 1055,
+    "order": 215,
+    "elapsedMs": 76683
+  },
+  {
+    "event": "model-usage",
+    "request": 39,
+    "usage": {
+      "inputTokens": 216,
+      "outputTokens": 485,
+      "totalTokens": 22589,
+      "cacheReadTokens": 21888,
+      "reasoningTokens": 180
+    },
+    "order": 216,
+    "elapsedMs": 77372
+  },
+  {
+    "event": "model-response",
+    "request": 39,
+    "sessionId": "928c9cdc-fb6e-48c4-81c5-193ab572ddfa",
+    "durationMs": 2673,
+    "order": 217,
+    "elapsedMs": 77373
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "928c9cdc-fb6e-48c4-81c5-193ab572ddfa",
+    "name": "bash",
+    "isError": false,
+    "order": 218,
+    "elapsedMs": 77435
+  },
+  {
+    "event": "model-request",
+    "request": 41,
+    "sessionId": "928c9cdc-fb6e-48c4-81c5-193ab572ddfa",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "9b6bf4ef0a26ad609adb2a8d3b508113d8c79785f7c83456e69ed0b06a6b9c24",
+    "systemBytes": 8182,
+    "toolsSha256": "e6bf881a628808a931a5d46f6583913bdd179787df1684ec30f6eb249c6ef833",
+    "teamTools": [
+      "agent_teams_claim_task",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 219,
+    "elapsedMs": 77443
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 41,
+    "latencyMs": 873,
+    "order": 220,
+    "elapsedMs": 78316
+  },
+  {
+    "event": "model-usage",
+    "request": 41,
+    "usage": {
+      "inputTokens": 371,
+      "outputTokens": 1123,
+      "totalTokens": 24022,
+      "cacheReadTokens": 22528,
+      "reasoningTokens": 452
+    },
+    "order": 221,
+    "elapsedMs": 82691
+  },
+  {
+    "event": "model-response",
+    "request": 41,
+    "sessionId": "928c9cdc-fb6e-48c4-81c5-193ab572ddfa",
+    "durationMs": 5249,
+    "order": 222,
+    "elapsedMs": 82692
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "928c9cdc-fb6e-48c4-81c5-193ab572ddfa",
+    "name": "agent_teams_update_task",
+    "isError": false,
+    "order": 223,
+    "elapsedMs": 82706
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "928c9cdc-fb6e-48c4-81c5-193ab572ddfa",
+    "name": "agent_teams_send_message",
+    "isError": false,
+    "order": 224,
+    "elapsedMs": 82719
+  },
+  {
+    "event": "model-request",
+    "request": 42,
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "adba5678d76e18557462500d63a11f279dbfe46ab0d218b6b477c309c51e8936",
+    "systemBytes": 8887,
+    "toolsSha256": "1cf856ccbb783a28f786a4934422ed5979f64871eb0e062dff1644b860625b76",
+    "teamTools": [
+      "agent_teams_add_member",
+      "agent_teams_approve",
+      "agent_teams_claim_task",
+      "agent_teams_create",
+      "agent_teams_create_task",
+      "agent_teams_delete",
+      "agent_teams_edit_plan",
+      "agent_teams_reassign_task",
+      "agent_teams_remove_member",
+      "agent_teams_resume",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 225,
+    "elapsedMs": 82732
+  },
+  {
+    "event": "model-request",
+    "request": 43,
+    "sessionId": "928c9cdc-fb6e-48c4-81c5-193ab572ddfa",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "9b6bf4ef0a26ad609adb2a8d3b508113d8c79785f7c83456e69ed0b06a6b9c24",
+    "systemBytes": 8182,
+    "toolsSha256": "e6bf881a628808a931a5d46f6583913bdd179787df1684ec30f6eb249c6ef833",
+    "teamTools": [
+      "agent_teams_claim_task",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 226,
+    "elapsedMs": 82733
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 42,
+    "latencyMs": 706,
+    "order": 227,
+    "elapsedMs": 83438
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 43,
+    "latencyMs": 1707,
+    "order": 228,
+    "elapsedMs": 84441
+  },
+  {
+    "event": "model-usage",
+    "request": 42,
+    "usage": {
+      "inputTokens": 226,
+      "outputTokens": 415,
+      "totalTokens": 25985,
+      "cacheReadTokens": 25344,
+      "reasoningTokens": 157
+    },
+    "order": 229,
+    "elapsedMs": 84949
+  },
+  {
+    "event": "model-response",
+    "request": 42,
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "durationMs": 2219,
+    "order": 230,
+    "elapsedMs": 84951
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "name": "read",
+    "isError": false,
+    "order": 231,
+    "elapsedMs": 84961
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "name": "bash",
+    "isError": false,
+    "order": 232,
+    "elapsedMs": 85083
+  },
+  {
+    "event": "model-request",
+    "request": 44,
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "adba5678d76e18557462500d63a11f279dbfe46ab0d218b6b477c309c51e8936",
+    "systemBytes": 8887,
+    "toolsSha256": "1cf856ccbb783a28f786a4934422ed5979f64871eb0e062dff1644b860625b76",
+    "teamTools": [
+      "agent_teams_add_member",
+      "agent_teams_approve",
+      "agent_teams_claim_task",
+      "agent_teams_create",
+      "agent_teams_create_task",
+      "agent_teams_delete",
+      "agent_teams_edit_plan",
+      "agent_teams_reassign_task",
+      "agent_teams_remove_member",
+      "agent_teams_resume",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 233,
+    "elapsedMs": 85091
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 44,
+    "latencyMs": 633,
+    "order": 234,
+    "elapsedMs": 85724
+  },
+  {
+    "event": "model-usage",
+    "request": 43,
+    "usage": {
+      "inputTokens": 430,
+      "outputTokens": 383,
+      "totalTokens": 24749,
+      "cacheReadTokens": 23936,
+      "reasoningTokens": 0
+    },
+    "order": 235,
+    "elapsedMs": 85858
+  },
+  {
+    "event": "model-response",
+    "request": 43,
+    "sessionId": "928c9cdc-fb6e-48c4-81c5-193ab572ddfa",
+    "durationMs": 3124,
+    "order": 236,
+    "elapsedMs": 85858
+  },
+  {
+    "event": "model-usage",
+    "request": 44,
+    "usage": {
+      "inputTokens": 1318,
+      "outputTokens": 1304,
+      "totalTokens": 28606,
+      "cacheReadTokens": 25984,
+      "reasoningTokens": 584
+    },
+    "order": 237,
+    "elapsedMs": 91320
+  },
+  {
+    "event": "model-response",
+    "request": 44,
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "durationMs": 6230,
+    "order": 238,
+    "elapsedMs": 91321
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "name": "write",
+    "isError": false,
+    "order": 239,
+    "elapsedMs": 91338
+  },
+  {
+    "event": "model-request",
+    "request": 45,
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "adba5678d76e18557462500d63a11f279dbfe46ab0d218b6b477c309c51e8936",
+    "systemBytes": 8887,
+    "toolsSha256": "1cf856ccbb783a28f786a4934422ed5979f64871eb0e062dff1644b860625b76",
+    "teamTools": [
+      "agent_teams_add_member",
+      "agent_teams_approve",
+      "agent_teams_claim_task",
+      "agent_teams_create",
+      "agent_teams_create_task",
+      "agent_teams_delete",
+      "agent_teams_edit_plan",
+      "agent_teams_reassign_task",
+      "agent_teams_remove_member",
+      "agent_teams_resume",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 240,
+    "elapsedMs": 91349
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 45,
+    "latencyMs": 440,
+    "order": 241,
+    "elapsedMs": 91789
+  },
+  {
+    "event": "model-usage",
+    "request": 45,
+    "usage": {
+      "inputTokens": 542,
+      "outputTokens": 278,
+      "totalTokens": 29364,
+      "cacheReadTokens": 28544,
+      "reasoningTokens": 89
+    },
+    "order": 242,
+    "elapsedMs": 92850
+  },
+  {
+    "event": "model-response",
+    "request": 45,
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "durationMs": 1503,
+    "order": 243,
+    "elapsedMs": 92852
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "name": "agent_teams_status",
+    "isError": false,
+    "order": 244,
+    "elapsedMs": 92864
+  },
+  {
+    "event": "tool-result",
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "name": "bash",
+    "isError": false,
+    "order": 245,
+    "elapsedMs": 92927
+  },
+  {
+    "event": "model-request",
+    "request": 46,
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "systemSha256": "adba5678d76e18557462500d63a11f279dbfe46ab0d218b6b477c309c51e8936",
+    "systemBytes": 8887,
+    "toolsSha256": "1cf856ccbb783a28f786a4934422ed5979f64871eb0e062dff1644b860625b76",
+    "teamTools": [
+      "agent_teams_add_member",
+      "agent_teams_approve",
+      "agent_teams_claim_task",
+      "agent_teams_create",
+      "agent_teams_create_task",
+      "agent_teams_delete",
+      "agent_teams_edit_plan",
+      "agent_teams_reassign_task",
+      "agent_teams_remove_member",
+      "agent_teams_resume",
+      "agent_teams_send_message",
+      "agent_teams_status",
+      "agent_teams_update_task"
+    ],
+    "order": 246,
+    "elapsedMs": 92935
+  },
+  {
+    "event": "model-first-chunk",
+    "request": 46,
+    "latencyMs": 682,
+    "order": 247,
+    "elapsedMs": 93617
+  },
+  {
+    "event": "model-usage",
+    "request": 46,
+    "usage": {
+      "inputTokens": 951,
+      "outputTokens": 693,
+      "totalTokens": 30956,
+      "cacheReadTokens": 29312,
+      "reasoningTokens": 78
+    },
+    "order": 248,
+    "elapsedMs": 96349
+  },
+  {
+    "event": "model-response",
+    "request": 46,
+    "sessionId": "session-d75285b6-ef4b-4da5-908b-9ce9ce9e410f",
+    "durationMs": 3415,
+    "order": 249,
+    "elapsedMs": 96350
+  },
+  {
+    "event": "benchmark-finished",
+    "passed": true,
+    "order": 250,
+    "elapsedMs": 96974
+  }
+]

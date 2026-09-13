@@ -282,11 +282,13 @@ await test('spawn explicitly passes reasoning effort, preserving persona and too
   const captain = { id: 'captain' }
   const team = { id: 'team', name: 'Team', captainSessionId: captain.id, members: [], tasks: [], createdAt: 1, taskSeq: 0 }
   const member = { id: '', name: 'worker', role: 'engineer', joinedAt: 1, status: 'idle' }
-  await spawnMember(ctx, { provider: 'spawn' }, { withPending: (_p, _l, _s, run) => run() },
+  await spawnMember(ctx, { provider: 'spawn', maxDepth: 0 }, { withPending: (_p, _l, _s, run) => run() },
     { provider: 'chosen', model: 'model', reasoningEffort: 'high' }, captain, team, member, '.agent-teams', signal)
   assert.deepEqual(received.request.agentOptions, { provider: 'chosen', model: 'model', reasoningEffort: 'high' })
   assert.match(received.request.persona, /engineer/)
   assert.ok(received.request.toolFilter.deny.includes('agent_teams_create'))
+  assert.ok(received.request.toolFilter.deny.includes('send_message'), 'default members have only one parent-report channel')
+  assert.ok(received.request.toolFilter.deny.includes('subagent'))
   assert.equal(member.id, 'child')
 })
 

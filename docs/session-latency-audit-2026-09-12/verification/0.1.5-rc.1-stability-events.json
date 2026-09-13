@@ -1,0 +1,43 @@
+[
+  {
+    "event": "stability-lazy-start-passed",
+    "readyRequests": 1,
+    "blockedRequests": 0,
+    "welcomeRequests": 0,
+    "time": 1789201072347
+  },
+  {
+    "event": "stability-steering-passed",
+    "queuedMessages": 32,
+    "modelStepsUntilConsumed": 1,
+    "time": 1789201073914
+  },
+  {
+    "event": "stability-read-receipt-continuation-passed",
+    "modelContinued": true,
+    "time": 1789201074031
+  },
+  {
+    "event": "stability-reassign-passed",
+    "sameMember": true,
+    "staleInputExcluded": true,
+    "time": 1789201074317
+  },
+  {
+    "event": "stability-archive-passed",
+    "pendingMessagesCleared": 32,
+    "descendantsStopped": true,
+    "siblingPreserved": true,
+    "retiredResumeRejected": true,
+    "time": 1789201075927
+  },
+  {
+    "event": "stability-batch-plan-passed",
+    "members": 5,
+    "tasks": 6,
+    "setupToolCalls": 1,
+    "previousEquivalentToolCalls": 12,
+    "memberModelRequests": 0,
+    "time": 1789201075983
+  }
+]

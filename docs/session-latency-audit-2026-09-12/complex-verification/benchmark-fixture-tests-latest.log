@@ -1,0 +1,13 @@
+✔ rejects the observed background-cd cleanup and broad process termination (0.544041ms)
+✔ allows foreground project commands and stderr redirection (0.086958ms)
+✔ planned, read and validation references are not summary writes (0.702ms)
+✔ successful native writes and exact shell mutation targets count (0.098167ms)
+✔ metrics keep missing usage explicit and exclude purpose requests from headers (0.37175ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 37.712541

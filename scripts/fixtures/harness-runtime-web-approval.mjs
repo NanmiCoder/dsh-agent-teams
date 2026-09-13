@@ -178,7 +178,7 @@ export function apply(ctx) {
         await waitFor(() => events.some(event => event.event === 'web-captain-report-wake'), 'A real member report must wake the idle captain');
         for (const agent of ctx.agents.list()) {
             await agent.whenIdle();
-            await ctx.sessions.flush(agent.session);
+            if (ctx.sessions.get(agent.id) === agent.session) await ctx.sessions.flush(agent.session);
         }
         await captain.whenIdle();
         const completed = readTeam();

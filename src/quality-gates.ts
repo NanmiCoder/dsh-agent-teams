@@ -400,15 +400,16 @@ export function validateCreateTask(team: TeamState, input: CreateTaskInput): Val
   if (kind === 'implementation') {
     const requirements = team.tasks.filter((item) => taskKindOf(item) === 'requirements')
     const passed = requirements.some((item) => item.status === 'completed' && item.verdict === 'pass')
-    const stagedBehindRequirements = team.phase === 'staged' && requirements.some((item) => (
+    const behindRequirements = requirements.some((item) => (
       dependencyClosureContains(team.tasks, dependencies, item.id)
     ))
-    if (requirements.length > 0 && !passed && !stagedBehindRequirements) {
+    // Planning an implementation is safe in either approval mode when its
+    // dependency chain fences execution behind requirements. Scheduling and
+    // claiming still wait for successful dependency completion.
+    if (requirements.length > 0 && !passed && !behindRequirements) {
       return {
         ok: false,
-        error: team.phase === 'staged'
-          ? 'implementation must depend on the staged requirements task; it will run only after requirements passes'
-          : 'implementation is blocked until a requirements task completes with verdict=pass',
+        error: 'implementation must depend on a requirements task until requirements completes with verdict=pass',
       }
     }
   }
@@ -668,6 +669,14 @@ export function buildCoverageMatrix(goalItems: readonly string[], tasks: readonl
 
 export function canDeclareDelivery(team: TeamState): DeliveryResult {
   const blockers: string[] = []
+  if (team.phase === 'staged') blockers.push('team plan is awaiting approval')
+  if (team.halted === true) blockers.push('team is halted')
+  if (team.escalated === true) blockers.push('team requires escalation resolution')
+  if (team.tasks.length === 0) blockers.push('team has no completed work')
+  for (const item of team.tasks.filter(item => !isQualityKind(taskKindOf(item)))) {
+    if (item.status !== 'completed' && item.status !== 'cancelled') blockers.push(`${item.id} (${taskKindOf(item)}) is not completed`)
+  }
+  if (team.tasks.length > 0 && team.tasks.every(item => item.status === 'cancelled')) blockers.push('all work was cancelled')
   const quality = team.tasks.filter((item) => isQualityKind(taskKindOf(item)))
   const implementations = quality.filter((item) => taskKindOf(item) === 'implementation' || taskKindOf(item) === 'repair')
   const reviews = quality.filter((item) => taskKindOf(item) === 'review')
@@ -960,7 +969,7 @@ export function describeQualityLoop(team: TeamState): QualityLoopSnapshot {
       halted: false,
       escalated: team.escalated === true,
       deliverable: true,
-      summary: 'All required quality gates passed. The captain may report delivery.',
+      summary: 'All required work and quality gates passed. The captain may report delivery.',
     }
   }
   if (team.escalated === true) {

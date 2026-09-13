@@ -10,6 +10,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { ContentBlock, MessageId, MessageSource } from '@deepseek-ai/dsh-llm'
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { Session, SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 import { SubagentError } from '@deepseek-ai/dsh-subagent'
 
@@ -131,6 +132,27 @@ export async function queueMemberPrompt(
   const queue = host[hostPromptQueue]
   if (typeof queue !== 'function') return unsupported('missing host FIFO delivery')
   return queue.call(runtime, parent, childId, content, source, signal)
+}
+
+/** Coordination joins the nearest step, including waking an idle/cold child. */
+export async function steerMemberPrompt(
+  runtime: Context['subagents'], parent: Agent, childId: SessionId,
+  content: ContentBlock[], signal: AbortSignal, live?: Agent,
+): Promise<MessageId> {
+  const host = boundary(runtime)
+  const source: MessageSource = { kind: 'plugin', plugin: 'dsh-agent-teams' }
+  const deliver = host[hostPromptDeliver]
+  if (typeof deliver === 'function') return deliver.call(runtime, parent, childId, content, source, signal, 'steer')
+  if (typeof host.sendMessage === 'function') return host.sendMessage.call(runtime, parent, childId, content, { signal })
+  if (typeof host.followup === 'function') {
+    if (live === undefined) return queueMemberPrompt(runtime, parent, childId, content, signal)
+    if (live.id !== childId || live.session.header.parentSession !== parent.id) throw new Error('invalid member steering authority')
+    signal.throwIfAborted()
+    const message = createUserMessage({ content, source })
+    live.steer(message)
+    return message.id
+  }
+  return unsupported('missing step-boundary message delivery')
 }
 
 /** Guard all resumable delivery paths, preserving the native service receiver. */

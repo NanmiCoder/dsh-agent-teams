@@ -1,0 +1,547 @@
+{
+  "reportDirectory": "/tmp/agentteams-complex-20260913-run3",
+  "artifact": "/tmp/agentteams-complex-fixes/artifact4/nanmicoder-dsh-agent-teams-0.1.17.tgz",
+  "artifactSha256": "d414f645ab91ce14008202b4556ed881542a2629d6e9018a1edad365b0b6e5b0",
+  "phases": [
+    {
+      "phase": "candidate",
+      "passed": false,
+      "artifactSha256": "b9add40be3c82be7799633055b6ee62668a662164e57c2e21629788b7d784b42",
+      "requests": 198,
+      "elapsedMs": 1201202,
+      "lastObservedEventMs": 1201203,
+      "traceSha256": "5f214f9bb2b4c91ca9ac7c16eebfc2ff4313a219fad4c0ea7590eb7182052702",
+      "firstChunkMedianMs": 766.5,
+      "responseMedianMs": 2688.0,
+      "toolErrors": {
+        "agent_teams_edit_plan": 1,
+        "bash": 1
+      },
+      "modelErrors": [],
+      "checks": {
+        "exactRoster": true,
+        "teamRunning": true,
+        "noUnfinishedTasks": false,
+        "noFailedWork": true,
+        "release": false,
+        "fullDag": true,
+        "memberWrote:src/pricing.mjs": true,
+        "memberWrote:src/inventory.mjs": true,
+        "memberWrote:src/store.mjs": true,
+        "memberWrote:src/server.mjs": true,
+        "memberWrote:bin/orders.mjs": true,
+        "captainDidNotImplement": true
+      },
+      "external": {
+        "passed": true,
+        "count": 31,
+        "checks": [
+          {
+            "name": "public module exports",
+            "passed": true
+          },
+          {
+            "name": "quote exact cents, sorting and no input mutation",
+            "passed": true
+          },
+          {
+            "name": "quote duplicate normalization and free products",
+            "passed": true
+          },
+          {
+            "name": "quote rejects quantity boundaries",
+            "passed": true
+          },
+          {
+            "name": "quote rejects malformed and merged overflow",
+            "passed": true
+          },
+          {
+            "name": "quote unknown SKU and invalid catalog",
+            "passed": true
+          },
+          {
+            "name": "quote rejects unsafe total arithmetic",
+            "passed": true
+          },
+          {
+            "name": "inventory reserve is atomic across lines",
+            "passed": true
+          },
+          {
+            "name": "inventory idempotency, conflict, release exactly once",
+            "passed": true
+          },
+          {
+            "name": "inventory rejects bad input without mutation, snapshots detached",
+            "passed": true
+          },
+          {
+            "name": "store concurrent transactions retain all writes",
+            "passed": true
+          },
+          {
+            "name": "store failed transaction rolls back and queue recovers",
+            "passed": true
+          },
+          {
+            "name": "store detaches reads and persists across reopen",
+            "passed": true
+          },
+          {
+            "name": "store never silently resets malformed saved JSON",
+            "passed": true
+          },
+          {
+            "name": "HTTP listens on loopback and health matches query",
+            "passed": true
+          },
+          {
+            "name": "HTTP creates exact priced persistent order",
+            "passed": true
+          },
+          {
+            "name": "HTTP duplicate key is idempotent with reordered normalized lines",
+            "passed": true
+          },
+          {
+            "name": "HTTP same key different intent is conflict",
+            "passed": true
+          },
+          {
+            "name": "HTTP order lookup is stable",
+            "passed": true
+          },
+          {
+            "name": "HTTP invalid key/body/unknown product status codes",
+            "passed": true
+          },
+          {
+            "name": "HTTP body limit enforced",
+            "passed": true
+          },
+          {
+            "name": "HTTP missing and path-like IDs are safe JSON errors",
+            "passed": true
+          },
+          {
+            "name": "HTTP cancellation restores inventory exactly once",
+            "passed": true
+          },
+          {
+            "name": "HTTP restart retains orders, idempotency and inventory",
+            "passed": true
+          },
+          {
+            "name": "32 concurrent purchases cannot oversell 20 units",
+            "passed": true
+          },
+          {
+            "name": "16 simultaneous identical keys create one order",
+            "passed": true
+          },
+          {
+            "name": "parallel cancellation and new requests remain consistent",
+            "passed": true
+          },
+          {
+            "name": "CLI quote exact JSON",
+            "passed": true
+          },
+          {
+            "name": "CLI audit counts confirmed orders only",
+            "passed": true
+          },
+          {
+            "name": "CLI malformed input exits nonzero with structured error",
+            "passed": true
+          },
+          {
+            "name": "member-created tests exist and entire npm test passes",
+            "passed": true
+          }
+        ],
+        "protectedFilesUnchanged": true
+      },
+      "usage": {
+        "uncachedInputTokens": 306397,
+        "cacheReadTokens": 11920640,
+        "cacheWriteTokens": null,
+        "outputTokens": 413168,
+        "reasoningTokens": 242417
+      },
+      "disposition": "20-minute driver window ended before release; business 31/31 passed, phase failed"
+    },
+    {
+      "phase": "candidate-finish",
+      "passed": true,
+      "artifactSha256": "73c2757025add0a5f2adc810ed4007c0c27ac920b4dd56af7d3baec182fd81dd",
+      "requests": 34,
+      "elapsedMs": 172847,
+      "lastObservedEventMs": 172849,
+      "traceSha256": "29057352e69ea4f4dc93d8dfdcb7f59830bf3109e3d5488d1650ae55991d19b7",
+      "firstChunkMedianMs": 878.5,
+      "responseMedianMs": 4672,
+      "toolErrors": {
+        "edit": 1,
+        "agent_teams_update_task": 1
+      },
+      "modelErrors": [],
+      "checks": {
+        "exactRoster": true,
+        "teamRunning": true,
+        "noUnfinishedTasks": true,
+        "noFailedWork": true,
+        "release": true,
+        "sameTeam": true,
+        "sameMembers": true,
+        "sameTasks": true,
+        "fullDag": true,
+        "memberWrote:src/pricing.mjs": true,
+        "memberWrote:src/inventory.mjs": true,
+        "memberWrote:src/store.mjs": true,
+        "memberWrote:src/server.mjs": true,
+        "memberWrote:bin/orders.mjs": true,
+        "captainDidNotImplement": true
+      },
+      "external": {
+        "passed": true,
+        "count": 31,
+        "checks": [
+          {
+            "name": "public module exports",
+            "passed": true
+          },
+          {
+            "name": "quote exact cents, sorting and no input mutation",
+            "passed": true
+          },
+          {
+            "name": "quote duplicate normalization and free products",
+            "passed": true
+          },
+          {
+            "name": "quote rejects quantity boundaries",
+            "passed": true
+          },
+          {
+            "name": "quote rejects malformed and merged overflow",
+            "passed": true
+          },
+          {
+            "name": "quote unknown SKU and invalid catalog",
+            "passed": true
+          },
+          {
+            "name": "quote rejects unsafe total arithmetic",
+            "passed": true
+          },
+          {
+            "name": "inventory reserve is atomic across lines",
+            "passed": true
+          },
+          {
+            "name": "inventory idempotency, conflict, release exactly once",
+            "passed": true
+          },
+          {
+            "name": "inventory rejects bad input without mutation, snapshots detached",
+            "passed": true
+          },
+          {
+            "name": "store concurrent transactions retain all writes",
+            "passed": true
+          },
+          {
+            "name": "store failed transaction rolls back and queue recovers",
+            "passed": true
+          },
+          {
+            "name": "store detaches reads and persists across reopen",
+            "passed": true
+          },
+          {
+            "name": "store never silently resets malformed saved JSON",
+            "passed": true
+          },
+          {
+            "name": "HTTP listens on loopback and health matches query",
+            "passed": true
+          },
+          {
+            "name": "HTTP creates exact priced persistent order",
+            "passed": true
+          },
+          {
+            "name": "HTTP duplicate key is idempotent with reordered normalized lines",
+            "passed": true
+          },
+          {
+            "name": "HTTP same key different intent is conflict",
+            "passed": true
+          },
+          {
+            "name": "HTTP order lookup is stable",
+            "passed": true
+          },
+          {
+            "name": "HTTP invalid key/body/unknown product status codes",
+            "passed": true
+          },
+          {
+            "name": "HTTP body limit enforced",
+            "passed": true
+          },
+          {
+            "name": "HTTP missing and path-like IDs are safe JSON errors",
+            "passed": true
+          },
+          {
+            "name": "HTTP cancellation restores inventory exactly once",
+            "passed": true
+          },
+          {
+            "name": "HTTP restart retains orders, idempotency and inventory",
+            "passed": true
+          },
+          {
+            "name": "32 concurrent purchases cannot oversell 20 units",
+            "passed": true
+          },
+          {
+            "name": "16 simultaneous identical keys create one order",
+            "passed": true
+          },
+          {
+            "name": "parallel cancellation and new requests remain consistent",
+            "passed": true
+          },
+          {
+            "name": "CLI quote exact JSON",
+            "passed": true
+          },
+          {
+            "name": "CLI audit counts confirmed orders only",
+            "passed": true
+          },
+          {
+            "name": "CLI malformed input exits nonzero with structured error",
+            "passed": true
+          },
+          {
+            "name": "member-created tests exist and entire npm test passes",
+            "passed": true
+          }
+        ],
+        "protectedFilesUnchanged": true
+      },
+      "usage": {
+        "uncachedInputTokens": 59141,
+        "cacheReadTokens": 3738112,
+        "cacheWriteTokens": null,
+        "outputTokens": 42131,
+        "reasoningTokens": 21032
+      },
+      "disposition": "Original incomplete team resumed and completed; 31/31 passed"
+    },
+    {
+      "phase": "candidate-cold",
+      "passed": false,
+      "artifactSha256": "73c2757025add0a5f2adc810ed4007c0c27ac920b4dd56af7d3baec182fd81dd",
+      "requests": 42,
+      "elapsedMs": null,
+      "lastObservedEventMs": 255669,
+      "traceSha256": "e646dd41d5365a5154b61cdeccbc4d74925fc16cbe318b6046f9b2b1f7b61c1d",
+      "firstChunkMedianMs": 949.0,
+      "responseMedianMs": 5078,
+      "toolErrors": {
+        "agent_teams_update_task": 4
+      },
+      "modelErrors": [],
+      "checks": null,
+      "external": null,
+      "disposition": "Stopped after reproducing missing attempt_id incorrectly classified as stale; not a passing phase"
+    },
+    {
+      "phase": "candidate-cold-resume",
+      "passed": true,
+      "artifactSha256": "d414f645ab91ce14008202b4556ed881542a2629d6e9018a1edad365b0b6e5b0",
+      "requests": 79,
+      "elapsedMs": 291994,
+      "lastObservedEventMs": 291994,
+      "traceSha256": "ff0843990b4dc1f7c9ae004c8fe221b3fa42769e52f7f0643b582baedfcbdd58",
+      "firstChunkMedianMs": 1089,
+      "responseMedianMs": 3380,
+      "toolErrors": {
+        "agent_teams_update_task": 1
+      },
+      "modelErrors": [],
+      "checks": {
+        "exactRoster": true,
+        "teamRunning": true,
+        "noUnfinishedTasks": true,
+        "noFailedWork": true,
+        "release": true,
+        "sameTeam": true,
+        "sameMembers": true,
+        "regressionDetected": true,
+        "automaticRepair": true,
+        "independentRereview": true,
+        "downstreamRewired": true,
+        "downstreamExistedBeforeFailure": true,
+        "noManualDependencyRewrite": true,
+        "naturalDefectReviewed": true,
+        "naturalDefectAutomaticallyRepaired": true,
+        "naturalDefectRereviewed": true,
+        "bothReviewDependenciesRewired": true
+      },
+      "external": {
+        "passed": true,
+        "count": 32,
+        "checks": [
+          {
+            "name": "public module exports",
+            "passed": true
+          },
+          {
+            "name": "quote exact cents, sorting and no input mutation",
+            "passed": true
+          },
+          {
+            "name": "quote duplicate normalization and free products",
+            "passed": true
+          },
+          {
+            "name": "quote rejects quantity boundaries",
+            "passed": true
+          },
+          {
+            "name": "quote rejects malformed and merged overflow",
+            "passed": true
+          },
+          {
+            "name": "quote unknown SKU and invalid catalog",
+            "passed": true
+          },
+          {
+            "name": "quote rejects unsafe total arithmetic",
+            "passed": true
+          },
+          {
+            "name": "inventory reserve is atomic across lines",
+            "passed": true
+          },
+          {
+            "name": "inventory idempotency, conflict, release exactly once",
+            "passed": true
+          },
+          {
+            "name": "inventory rejects bad input without mutation, snapshots detached",
+            "passed": true
+          },
+          {
+            "name": "store concurrent transactions retain all writes",
+            "passed": true
+          },
+          {
+            "name": "store failed transaction rolls back and queue recovers",
+            "passed": true
+          },
+          {
+            "name": "store detaches reads and persists across reopen",
+            "passed": true
+          },
+          {
+            "name": "store never silently resets malformed saved JSON",
+            "passed": true
+          },
+          {
+            "name": "HTTP listens on loopback and health matches query",
+            "passed": true
+          },
+          {
+            "name": "HTTP creates exact priced persistent order",
+            "passed": true
+          },
+          {
+            "name": "HTTP duplicate key is idempotent with reordered normalized lines",
+            "passed": true
+          },
+          {
+            "name": "HTTP same key different intent is conflict",
+            "passed": true
+          },
+          {
+            "name": "HTTP order lookup is stable",
+            "passed": true
+          },
+          {
+            "name": "HTTP invalid key/body/unknown product status codes",
+            "passed": true
+          },
+          {
+            "name": "HTTP body limit enforced",
+            "passed": true
+          },
+          {
+            "name": "HTTP missing and path-like IDs are safe JSON errors",
+            "passed": true
+          },
+          {
+            "name": "HTTP cancellation restores inventory exactly once",
+            "passed": true
+          },
+          {
+            "name": "HTTP restart retains orders, idempotency and inventory",
+            "passed": true
+          },
+          {
+            "name": "32 concurrent purchases cannot oversell 20 units",
+            "passed": true
+          },
+          {
+            "name": "16 simultaneous identical keys create one order",
+            "passed": true
+          },
+          {
+            "name": "parallel cancellation and new requests remain consistent",
+            "passed": true
+          },
+          {
+            "name": "failed cancellation persistence cannot release phantom inventory",
+            "passed": true
+          },
+          {
+            "name": "CLI quote exact JSON",
+            "passed": true
+          },
+          {
+            "name": "CLI audit counts confirmed orders only",
+            "passed": true
+          },
+          {
+            "name": "CLI malformed input exits nonzero with structured error",
+            "passed": true
+          },
+          {
+            "name": "member-created tests exist and entire npm test passes",
+            "passed": true
+          }
+        ],
+        "protectedFilesUnchanged": true
+      },
+      "usage": {
+        "uncachedInputTokens": 721610,
+        "cacheReadTokens": 12012032,
+        "cacheWriteTokens": null,
+        "outputTokens": 97979,
+        "reasoningTokens": 45093
+      },
+      "disposition": "Same regression flow resumed with corrected plugin; automatic repair/review and 32/32 passed"
+    }
+  ],
+  "passed": false,
+  "workflowPassed": true,
+  "completedAfterContinuation": true,
+  "regressionCompletedAfterContinuation": true
+}

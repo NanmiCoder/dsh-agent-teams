@@ -1,0 +1,13 @@
+{
+  "passed": true,
+  "phase": "cancel",
+  "provider": "deepseek-official",
+  "model": "deepseek-flash",
+  "elapsedMs": 2505,
+  "requests": 1,
+  "checks": {
+    "realProviderChunkObserved": true,
+    "cancelledWhileStreaming": true,
+    "captainIdle": true
+  }
+}

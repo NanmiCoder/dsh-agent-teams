@@ -1,0 +1,6 @@
+{
+  "passed": true,
+  "sameExecutedDualDefectPrompts": true,
+  "sameAcceptanceChecks": true,
+  "adaptivePricingOnlyBranch": "unit tests only; no additional real-model trial"
+}

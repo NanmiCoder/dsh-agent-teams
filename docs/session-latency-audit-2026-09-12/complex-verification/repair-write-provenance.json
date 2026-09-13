@@ -1,0 +1,28 @@
+{
+  "members": {
+    "pricing": "c5411f4b-f832-4933-8f22-cb555a4e3c08",
+    "inventory": "1ea8d4ba-7bd8-4aea-abdd-d925e9c24d2a",
+    "storage": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "api": "89e57833-bbe5-48f1-a458-6bfd7848968e",
+    "verifier": "35aa7d3a-219e-4f28-b5b3-b5916cb441c6",
+    "reviewer": "3084b867-220b-4f9b-b156-40f5b22c4f9b"
+  },
+  "mutations": [
+    {
+      "sessionId": "89e57833-bbe5-48f1-a458-6bfd7848968e",
+      "name": "edit",
+      "path": "/tmp/agentteams-complex-20260913-run3/candidate/workspace/src/server.mjs",
+      "isError": false,
+      "order": 194
+    },
+    {
+      "sessionId": "c5411f4b-f832-4933-8f22-cb555a4e3c08",
+      "name": "write",
+      "path": "/tmp/agentteams-complex-20260913-run3/candidate/workspace/src/pricing.mjs",
+      "isError": false,
+      "order": 211
+    }
+  ],
+  "captainId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+  "captainDirectSourceMutations": 0
+}

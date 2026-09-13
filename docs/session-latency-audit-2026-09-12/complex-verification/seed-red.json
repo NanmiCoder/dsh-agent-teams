@@ -1,0 +1,160 @@
+{
+  "passed": false,
+  "count": 31,
+  "checks": [
+    {
+      "name": "public module exports",
+      "passed": true
+    },
+    {
+      "name": "quote exact cents, sorting and no input mutation",
+      "passed": false,
+      "error": "TODO pricing"
+    },
+    {
+      "name": "quote duplicate normalization and free products",
+      "passed": false,
+      "error": "TODO pricing"
+    },
+    {
+      "name": "quote rejects quantity boundaries",
+      "passed": false,
+      "error": "The validation function is expected to return \"true\". Received false\n\nCaught error:\n\nError: TODO pricing"
+    },
+    {
+      "name": "quote rejects malformed and merged overflow",
+      "passed": false,
+      "error": "The validation function is expected to return \"true\". Received false\n\nCaught error:\n\nError: TODO pricing"
+    },
+    {
+      "name": "quote unknown SKU and invalid catalog",
+      "passed": false,
+      "error": "The validation function is expected to return \"true\". Received false\n\nCaught error:\n\nError: TODO pricing"
+    },
+    {
+      "name": "quote rejects unsafe total arithmetic",
+      "passed": false,
+      "error": "The validation function is expected to return \"true\". Received false\n\nCaught error:\n\nError: TODO pricing"
+    },
+    {
+      "name": "inventory reserve is atomic across lines",
+      "passed": false,
+      "error": "TODO inventory"
+    },
+    {
+      "name": "inventory idempotency, conflict, release exactly once",
+      "passed": false,
+      "error": "TODO inventory"
+    },
+    {
+      "name": "inventory rejects bad input without mutation, snapshots detached",
+      "passed": false,
+      "error": "TODO inventory"
+    },
+    {
+      "name": "store concurrent transactions retain all writes",
+      "passed": false,
+      "error": "TODO persistence"
+    },
+    {
+      "name": "store failed transaction rolls back and queue recovers",
+      "passed": false,
+      "error": "TODO persistence"
+    },
+    {
+      "name": "store detaches reads and persists across reopen",
+      "passed": false,
+      "error": "TODO persistence"
+    },
+    {
+      "name": "store never silently resets malformed saved JSON",
+      "passed": true
+    },
+    {
+      "name": "HTTP listens on loopback and health matches query",
+      "passed": false,
+      "error": "TODO HTTP service"
+    },
+    {
+      "name": "HTTP creates exact priced persistent order",
+      "passed": false,
+      "error": "Cannot read properties of undefined (reading 'url')"
+    },
+    {
+      "name": "HTTP duplicate key is idempotent with reordered normalized lines",
+      "passed": false,
+      "error": "Cannot read properties of undefined (reading 'url')"
+    },
+    {
+      "name": "HTTP same key different intent is conflict",
+      "passed": false,
+      "error": "Cannot read properties of undefined (reading 'url')"
+    },
+    {
+      "name": "HTTP order lookup is stable",
+      "passed": false,
+      "error": "Cannot read properties of undefined (reading 'id')"
+    },
+    {
+      "name": "HTTP invalid key/body/unknown product status codes",
+      "passed": false,
+      "error": "Cannot read properties of undefined (reading 'url')"
+    },
+    {
+      "name": "HTTP body limit enforced",
+      "passed": false,
+      "error": "Cannot read properties of undefined (reading 'url')"
+    },
+    {
+      "name": "HTTP missing and path-like IDs are safe JSON errors",
+      "passed": false,
+      "error": "Cannot read properties of undefined (reading 'url')"
+    },
+    {
+      "name": "HTTP cancellation restores inventory exactly once",
+      "passed": false,
+      "error": "Cannot read properties of undefined (reading 'id')"
+    },
+    {
+      "name": "HTTP restart retains orders, idempotency and inventory",
+      "passed": false,
+      "error": "Cannot read properties of undefined (reading 'close')"
+    },
+    {
+      "name": "32 concurrent purchases cannot oversell 20 units",
+      "passed": false,
+      "error": "TODO HTTP service"
+    },
+    {
+      "name": "16 simultaneous identical keys create one order",
+      "passed": false,
+      "error": "TODO HTTP service"
+    },
+    {
+      "name": "parallel cancellation and new requests remain consistent",
+      "passed": false,
+      "error": "TODO HTTP service"
+    },
+    {
+      "name": "CLI quote exact JSON",
+      "passed": false,
+      "error": "Command failed: /opt/homebrew/Cellar/node/26.7.0/bin/node /tmp/agentteams-complex-seed-red/project/bin/orders.mjs quote /tmp/agentteams-complex-seed-red/project/fixtures/catalog.json /tmp/agentteams-complex-seed-red/project/fixtures/lines.json\nTODO CLI\n"
+    },
+    {
+      "name": "CLI audit counts confirmed orders only",
+      "passed": false,
+      "error": "Command failed: /opt/homebrew/Cellar/node/26.7.0/bin/node /tmp/agentteams-complex-seed-red/project/bin/orders.mjs audit /tmp/agentteams-complex-seed-red/external-acceptance-Rl5q1l/audit.json\nTODO CLI\n"
+    },
+    {
+      "name": "CLI malformed input exits nonzero with structured error",
+      "passed": false,
+      "error": "Unexpected token 'T', \"TODO CLI\n\" is not valid JSON"
+    },
+    {
+      "name": "member-created tests exist and entire npm test passes",
+      "passed": false,
+      "error": "The expression evaluated to a falsy value:\n\n  assert.ok(files.filter(f=>f.endsWith('.test.mjs')&&f!=='public-contract.test.mjs').length>=2)\n"
+    }
+  ],
+  "protectedFilesUnchanged": true
+}

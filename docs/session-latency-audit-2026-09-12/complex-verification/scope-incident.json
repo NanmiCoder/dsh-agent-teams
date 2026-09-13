@@ -1,0 +1,22 @@
+{
+  "agentCwd": "/tmp",
+  "event": {
+    "event": "tool-result",
+    "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+    "name": "bash",
+    "arguments": {
+      "command": "cd /tmp/agentteams-complex-20260913-run3/candidate/workspace && mkdir -p .verify && ( node --input-type=module > .verify/server.log 2>&1 <<'EOF'\nimport {readFile} from 'node:fs/promises';\nimport {startServer} from './src/server.mjs';\n\nconst catalog = JSON.parse(await readFile('./fixtures/catalog.json', 'utf8'));\nconst stock = JSON.parse(await readFile('./fixtures/stock.json', 'utf8'));\n\nconst {url, close} = await startServer({catalog, stock, dataFile: './data/orders.json', port: 3000});\nconsole.log(`listening on ${url}`);\nEOF\n) & SERVER_PID=$!\nsleep 0.6\nfor i in $(seq 1 50); do curl -s -o /dev/null http://127.0.0.1:3000/health && break; sleep 0.1; done\necho \"=== documented server start (stdout) ===\" && cat .verify/server.log\necho \"=== GET /health ===\" && curl -s -w '\\nHTTP %{http_code}\\n' http://127.0.0.1:3000/health\nkill $SERVER_PID 2>/dev/null; wait $SERVER_PID 2>/dev/null; rm -rf .verify data\necho \"=== release.json ===\" && node -e \"const fs=require('node:fs');const r=JSON.parse(fs.readFileSync('reports/release.json','utf8'));console.log('valid JSON, ready='+r.ready, 'summary_nonempty='+(typeof r.summary==='string'&&r.summary.trim().length>0), 'summary_chars='+r.summary.length)\"\necho \"=== reports/ ===\" && ls -la reports\necho \"=== tree (excluding .agent-teams) ===\" && find . -path ./.agent-teams -prune -o -type f -print | sort\necho \"=== import specifiers across src/bin/tests ===\" && grep -rhoE \"from '[^']+\" src bin tests | sort -u\necho \"=== node_modules ===\" && (ls -d node_modules 2>&1 || true)\necho \"=== protected sha256 (baseline prefixes) ===\" && sha256sum SPEC.md package.json tests/public-contract.test.mjs fixtures/*.json | awk '{print substr($1,1,8), $2}'\necho \"=== FINAL npm test ===\" && npm test 2>&1 | tail -12; echo \"npm_test_exit=${PIPESTATUS[0]}\"",
+      "description": "Final release verification block",
+      "timeoutMs": 300000
+    },
+    "isError": false,
+    "order": 125,
+    "elapsedMs": 80768
+  },
+  "targetsFromShellSemantics": [
+    "/tmp/.verify",
+    "/tmp/data"
+  ],
+  "postcondition": "Both targets absent when checked after the command; no pre-command snapshot, so prior contents/impact cannot be established",
+  "subsequentGuard": "scripts/fixtures/harness-benchmark-scope.mjs; rejects background lists, broad process kills and missing project cd prefix; not a general sandbox"
+}

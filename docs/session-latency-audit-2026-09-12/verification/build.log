@@ -1,0 +1,19 @@
+
+> @nanmicoder/dsh-agent-teams@0.1.17 build /Users/nanmi/.codex/worktrees/b3c1/dsh-agent-teams
+> node scripts/clean-build.mjs && tsc -p tsconfig.json && tsc -p tsconfig.client.json && tsdown
+
+ℹ tsdown v0.22.2 powered by rolldown v1.1.5
+ℹ config file: /Users/nanmi/.codex/worktrees/b3c1/dsh-agent-teams/tsdown.config.ts 
+ℹ [@nanmicoder/dsh-agent-teams/client] entry: lib/client/index.js
+ℹ [@nanmicoder/dsh-agent-teams/client] target: node22.19.0
+ℹ [@nanmicoder/dsh-agent-teams/client] tsconfig: tsconfig.json
+ℹ Build start
+
+ WARN  We recommend using the ESM format instead of CommonJS.
+The ESM format is compatible with modern platforms and runtimes, and most new libraries are now distributed only in ESM format.
+Learn more at https://nodejs.org/en/learn/modules/publishing-a-package#how-did-we-get-here
+
+ℹ [@nanmicoder/dsh-agent-teams/client] lib/client.js      197.20 kB │ gzip: 42.58 kB
+ℹ [@nanmicoder/dsh-agent-teams/client] lib/client.js.map  224.76 kB │ gzip: 51.69 kB
+ℹ [@nanmicoder/dsh-agent-teams/client] 2 files, total: 421.96 kB
+✔ [@nanmicoder/dsh-agent-teams/client] Build complete in 27ms

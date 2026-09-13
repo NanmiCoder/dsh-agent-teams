@@ -1,0 +1,19 @@
+{
+  "agentCwd": "/tmp",
+  "model": "deepseek-official/deepseek-flash",
+  "reasoningEffort": "max",
+  "freshMs": 96972,
+  "coldMs": 37441,
+  "freshRequests": 46,
+  "coldRequests": 16,
+  "captainRequests": 15,
+  "memberRequests": 31,
+  "setupToolCalls": 1,
+  "teamReportCalls": 3,
+  "nativeMessageCalls": 0,
+  "toolErrors": 0,
+  "medianFirstContentMs": 720.0,
+  "medianResponseMs": 2388.5,
+  "cancellationPassed": true,
+  "scope": "Controlled local three-file review; not a same-task speed comparison against the original large user session."
+}

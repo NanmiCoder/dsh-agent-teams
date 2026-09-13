@@ -49,7 +49,7 @@ jobs:
           pnpm typecheck
           pnpm build
           pnpm verify
-          node --test scripts/fixtures/harness-model-case.test.mjs
+          node --test scripts/fixtures/harness-model-case.test.mjs scripts/fixtures/harness-complex-case.test.mjs scripts/fixtures/harness-benchmark-scope.test.mjs
       - name: Pack the actual candidate once
         id: artifact
         run: |
@@ -95,7 +95,7 @@ jobs:
           pnpm typecheck
           pnpm build
           pnpm verify
-          node --test scripts/fixtures/harness-model-case.test.mjs
+          node --test scripts/fixtures/harness-model-case.test.mjs scripts/fixtures/harness-complex-case.test.mjs scripts/fixtures/harness-benchmark-scope.test.mjs
 
   harness:
     name: Real Harness (${{ matrix.host }})
@@ -206,7 +206,7 @@ jobs:
             assert.equal(report.pluginVersion, pkg.version)
             assert.equal(report.artifactSha256, process.env.EXPECTED_SHA256)
             assert.ok(report.runs.length > 0 && report.runs.every(run => run.passed), `Host ${version} lacks successful functional evidence`)
-            for (const scenario of ['lifecycle', 'lifecycle-cold-restore', 'fallback', 'fallback-cold-restore', 'failure', 'captain-idle-wakeup', 'progressive-entry', 'web-approval', 'protocol-compatibility']) {
+            for (const scenario of ['lifecycle', 'lifecycle-cold-restore', 'fallback', 'fallback-cold-restore', 'failure', 'captain-idle-wakeup', 'progressive-entry', 'web-approval', 'protocol-compatibility', 'stability']) {
               assert.ok(report.runs.some(run => run.scenario === scenario && run.passed), `Host ${version} did not exercise ${scenario}`)
             }
           }

@@ -1,0 +1,48 @@
+{
+  "passed": false,
+  "version": "0.1.5-rc.1",
+  "artifactSha256": "cef5a0b6cd0c83b8259ae9410d488c06bcb3deb43edc7489324f5f89a17f68eb",
+  "pluginVersion": "0.1.17",
+  "testFiles": {
+    "harness-runtime-verify.mjs": "c62b8c97745f06690133ce815cb86de8cddf85a27dc4133f225dd918c04ae8d7",
+    "fixtures/harness-runtime-llm.mjs": "7fe9272c5f63f24dc4ff652817823a03abeeb1741fa9ce3ffff9682e4d4a029b",
+    "fixtures/harness-runtime-resume.mjs": "35587f7947360a37813c274d1274f4222830a84b4ffb2eafdb0f945707bce01b",
+    "fixtures/harness-runtime-idle.mjs": "ecc9e00a1ed9f94ddf4041f3ec6eded1a7c2b6b63958451b33a04a1cb6fff7cf",
+    "fixtures/harness-runtime-entry.mjs": "2c655ddac20fba0af358f88b829f07af973afb02a39821647a2c83389de1d1fd",
+    "fixtures/harness-runtime-web-approval.mjs": "2e55d1993ad3b84a1409bbd08820790334d937748f6efd4cbdc223cb56e545f8",
+    "fixtures/harness-runtime-protocol.mjs": "c3ad840a33006dfdcc091fbf9637ac56dd7bf65f5311839a53a61f7131a531cb",
+    "fixtures/harness-runtime-stability.mjs": "56e3e1525a3d2ed7fa019eb3c024821810c9a94c6902ccfea1a48c868c89d2e1"
+  },
+  "node": "v26.7.0",
+  "platform": "darwin",
+  "arch": "arm64",
+  "cohortCount": 231,
+  "runs": [
+    {
+      "scenario": "stability",
+      "passed": false,
+      "assertions": {
+        "exit0": false,
+        "productMarker": false,
+        "lazy-start": false,
+        "steering": false,
+        "reassign": false,
+        "archive": false,
+        "batch-plan": false
+      },
+      "evidence": [],
+      "exit": {
+        "code": 1,
+        "signal": null,
+        "timedOut": false
+      }
+    }
+  ],
+  "unverified": [
+    "real provider APIs and credentials",
+    "browser interaction",
+    "other operating systems",
+    "native terminal execution",
+    "live user-data migration"
+  ]
+}

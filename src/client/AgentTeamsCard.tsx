@@ -92,7 +92,7 @@ export function AgentTeamsCard({ node, openMember, sessionId, t }: AgentTeamsCar
           {resolved.members.map((member) => (
             <button
               type="button"
-              key={member.id}
+              key={member.id || member.name}
               className={css.member}
               onClick={() => {
                 if (member.id !== '') openMember(owner as SessionId, member.id as SessionId)

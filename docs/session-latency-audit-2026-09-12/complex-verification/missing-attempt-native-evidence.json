@@ -1,0 +1,106 @@
+{
+  "session": "/tmp/agentteams-complex-20260913-run3/candidate/home/sessions/--tmp--/3084b867-220b-4f9b-b156-40f5b22c4f9b/session.v3.jsonl.zstd",
+  "sha256": "f826fb511b4a5b9b0bdfecab6a1d8befdd7efb38a54ead827d27a9c9db826d74",
+  "errors": [
+    {
+      "time": 1789237696438,
+      "seq": 218,
+      "tool": "agent_teams_update_task",
+      "task_id": "t11",
+      "argumentKeys": [
+        "acceptanceResults",
+        "commandsRun",
+        "findings",
+        "output",
+        "status",
+        "task_id",
+        "verdict"
+      ],
+      "attemptIdPresent": false,
+      "attempt_id": null,
+      "status": "failed",
+      "verdict": "needs_revision",
+      "error": "Error: stale attempt for task t11: expected the current attempt_id; stop work and request fresh assignment"
+    },
+    {
+      "time": 1789237736625,
+      "seq": 260,
+      "tool": "agent_teams_update_task",
+      "task_id": "t11",
+      "argumentKeys": [
+        "acceptanceResults",
+        "commandsRun",
+        "findings",
+        "output",
+        "status",
+        "task_id",
+        "verdict"
+      ],
+      "attemptIdPresent": false,
+      "attempt_id": null,
+      "status": "failed",
+      "verdict": "needs_revision",
+      "error": "Error: stale attempt for task t11: expected the current attempt_id; stop work and request fresh assignment"
+    },
+    {
+      "time": 1789237760966,
+      "seq": 275,
+      "tool": "agent_teams_update_task",
+      "task_id": "t11",
+      "argumentKeys": [
+        "acceptanceResults",
+        "commandsRun",
+        "findings",
+        "output",
+        "status",
+        "task_id",
+        "verdict"
+      ],
+      "attemptIdPresent": false,
+      "attempt_id": null,
+      "status": "failed",
+      "verdict": "needs_revision",
+      "error": "Error: stale attempt for task t11: expected the current attempt_id; stop work and request fresh assignment"
+    },
+    {
+      "time": 1789237803139,
+      "seq": 307,
+      "tool": "agent_teams_update_task",
+      "task_id": "t11",
+      "argumentKeys": [
+        "acceptanceResults",
+        "commandsRun",
+        "findings",
+        "output",
+        "status",
+        "task_id",
+        "verdict"
+      ],
+      "attemptIdPresent": false,
+      "attempt_id": null,
+      "status": "failed",
+      "verdict": "needs_revision",
+      "error": "Error: stale attempt for task t11: expected the current attempt_id; stop work and request fresh assignment"
+    },
+    {
+      "time": 1789238062278,
+      "seq": 368,
+      "tool": "agent_teams_update_task",
+      "task_id": "t12",
+      "argumentKeys": [
+        "acceptanceResults",
+        "commandsRun",
+        "findings",
+        "output",
+        "status",
+        "task_id",
+        "verdict"
+      ],
+      "attemptIdPresent": false,
+      "attempt_id": null,
+      "status": "failed",
+      "verdict": "needs_revision",
+      "error": "Error: missing attempt_id for task t12. Retry this update with attempt_id=\"9750a355-af2a-4e8d-85a1-c6bec0e47e07\" from your current assignment. This is a missing parameter, not a revoked attempt; do not restart the work or request reassignment."
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+AssertionError [ERR_ASSERTION]: dependency-blocked member must stay dormant
++ actual - expected
+
++ 'be1d3ac5-3853-4b49-9f0d-6d1d16c38fdf'
+- ''
+
+    at file:///private/tmp/agentteams-stability/baseline-red/stability/home/profiles/headless/fixture-stability.mjs:70:12

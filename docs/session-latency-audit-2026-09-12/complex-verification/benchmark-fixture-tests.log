@@ -1,0 +1,11 @@
+✔ planned, read and validation references are not summary writes (0.642708ms)
+✔ successful native writes and exact shell mutation targets count (0.093834ms)
+✔ metrics keep missing usage explicit and exclude purpose requests from headers (0.34625ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 38.318458

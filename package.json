@@ -1,6 +1,6 @@
 {
   "name": "@nanmicoder/dsh-agent-teams",
-  "version": "0.1.17",
+  "version": "0.1.18",
   "description": "AgentTeams for DeepSeek Harness: multi-agent team collaboration (captain, members, tasks with dependencies, messaging) driven by natural language, with a tree monitor in the web GUI",
   "type": "module",
   "main": "lib/index.js",
@@ -90,7 +90,7 @@
     "prepublishOnly": "pnpm build && pnpm verify",
     "verify:web-routes": "node scripts/web-routes-verify.mjs",
     "verify:release": "node --test scripts/release-metadata.test.mjs",
-    "verify:harness-contract": "node scripts/harness-compat-tdd.mjs && node scripts/lifecycle-verify.mjs --modern-harness && node scripts/member-failure-tdd.mjs --modern-harness && node scripts/lifecycle-verify.mjs --delivery-harness && node scripts/member-failure-tdd.mjs --delivery-harness",
+    "verify:harness-contract": "node scripts/harness-compat-tdd.mjs && node scripts/stability-tdd.mjs && node scripts/lifecycle-verify.mjs --modern-harness && node scripts/member-failure-tdd.mjs --modern-harness && node scripts/lifecycle-verify.mjs --delivery-harness && node scripts/member-failure-tdd.mjs --delivery-harness",
     "verify:compatibility": "node scripts/compatibility.mjs && node --test scripts/compatibility.test.mjs && node scripts/doctor.mjs",
     "verify:http-body": "node --test scripts/http-body.test.mjs",
     "doctor": "node scripts/doctor.mjs",

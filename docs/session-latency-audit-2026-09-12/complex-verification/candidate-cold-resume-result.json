@@ -1,0 +1,1019 @@
+{
+  "passed": true,
+  "phase": "cold-resume",
+  "provider": "deepseek-official",
+  "model": "deepseek-flash",
+  "reasoningEffort": "max",
+  "elapsedMs": 291994,
+  "requests": 79,
+  "checks": {
+    "exactRoster": true,
+    "teamRunning": true,
+    "noUnfinishedTasks": true,
+    "noFailedWork": true,
+    "release": true,
+    "sameTeam": true,
+    "sameMembers": true,
+    "regressionDetected": true,
+    "automaticRepair": true,
+    "independentRereview": true,
+    "downstreamRewired": true,
+    "downstreamExistedBeforeFailure": true,
+    "noManualDependencyRewrite": true,
+    "naturalDefectReviewed": true,
+    "naturalDefectAutomaticallyRepaired": true,
+    "naturalDefectRereviewed": true,
+    "bothReviewDependenciesRewired": true
+  },
+  "team": {
+    "teamId": "minifulfill-run3",
+    "captainId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+    "memberIds": {
+      "pricing": "c5411f4b-f832-4933-8f22-cb555a4e3c08",
+      "inventory": "1ea8d4ba-7bd8-4aea-abdd-d925e9c24d2a",
+      "storage": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+      "api": "89e57833-bbe5-48f1-a458-6bfd7848968e",
+      "verifier": "35aa7d3a-219e-4f28-b5b3-b5916cb441c6",
+      "reviewer": "3084b867-220b-4f9b-b156-40f5b22c4f9b"
+    },
+    "taskIds": [
+      "t1",
+      "t2",
+      "t3",
+      "t4",
+      "t5",
+      "t6",
+      "t7",
+      "t8",
+      "t9",
+      "t10",
+      "t11",
+      "t12",
+      "t13",
+      "t14",
+      "t15",
+      "t16",
+      "t17"
+    ],
+    "tasks": [
+      {
+        "id": "t1",
+        "subject": "[SPEC] requirements: derive explicit acceptance criteria from SPEC.md (no SPEC edits)",
+        "kind": "requirements",
+        "assignee": "reviewer",
+        "status": "completed",
+        "dependencies": [],
+        "verdict": "pass"
+      },
+      {
+        "id": "t2",
+        "subject": "[PRICE] implementation: src/pricing.mjs quoteOrder per SPEC",
+        "kind": "implementation",
+        "assignee": "pricing",
+        "status": "completed",
+        "dependencies": [
+          "t1"
+        ]
+      },
+      {
+        "id": "t3",
+        "subject": "[STOCK] implementation: src/inventory.mjs createInventory per SPEC",
+        "kind": "implementation",
+        "assignee": "inventory",
+        "status": "completed",
+        "dependencies": [
+          "t1"
+        ]
+      },
+      {
+        "id": "t4",
+        "subject": "[STORE] implementation: src/store.mjs openStore per SPEC",
+        "kind": "implementation",
+        "assignee": "storage",
+        "status": "completed",
+        "dependencies": [
+          "t1"
+        ]
+      },
+      {
+        "id": "t5",
+        "subject": "[API] implementation: src/server.mjs startServer per SPEC",
+        "kind": "implementation",
+        "assignee": "api",
+        "status": "completed",
+        "dependencies": [
+          "t2",
+          "t3",
+          "t4"
+        ]
+      },
+      {
+        "id": "t6",
+        "subject": "[CLI] implementation: bin/orders.mjs quote and audit per SPEC",
+        "kind": "implementation",
+        "assignee": "api",
+        "status": "completed",
+        "dependencies": [
+          "t2",
+          "t4"
+        ]
+      },
+      {
+        "id": "t7",
+        "subject": "[UNIT] verification: unit tests for pricing, inventory and store",
+        "kind": "verification",
+        "assignee": "verifier",
+        "status": "completed",
+        "dependencies": [
+          "t2",
+          "t3",
+          "t4"
+        ]
+      },
+      {
+        "id": "t8",
+        "subject": "[E2E] verification: HTTP concurrency, idempotency, cancel, restart and error-boundary integration tests",
+        "kind": "verification",
+        "assignee": "verifier",
+        "status": "completed",
+        "dependencies": [
+          "t5",
+          "t6",
+          "t7"
+        ]
+      },
+      {
+        "id": "t9",
+        "subject": "[REVIEW] review: independent SPEC audit of the HTTP service implementation",
+        "kind": "review",
+        "assignee": "reviewer",
+        "status": "completed",
+        "dependencies": [
+          "t8",
+          "t5"
+        ],
+        "verdict": "pass",
+        "reviewedTaskId": "t5"
+      },
+      {
+        "id": "t10",
+        "subject": "[RELEASE] integration: full npm test, README.md and reports/release.json",
+        "kind": "integration",
+        "assignee": "storage",
+        "status": "completed",
+        "dependencies": [
+          "t9",
+          "t8"
+        ]
+      },
+      {
+        "id": "t11",
+        "subject": "[REGRESSION-REVIEW] review: independently confirm the injected pricing regression (reviewedTaskId=t2)",
+        "kind": "review",
+        "assignee": "reviewer",
+        "status": "failed",
+        "dependencies": [],
+        "verdict": "needs_revision",
+        "reviewedTaskId": "t2"
+      },
+      {
+        "id": "t12",
+        "subject": "[ATOMIC-REVIEW] review: reproduce and block on the F1 cancel-persistence data-consistency defect (reviewedTaskId=t5)",
+        "kind": "review",
+        "assignee": "reviewer",
+        "status": "failed",
+        "dependencies": [],
+        "verdict": "needs_revision",
+        "reviewedTaskId": "t5"
+      },
+      {
+        "id": "t13",
+        "subject": "[REGRESSION-RELEASE] integration: full suite green after pricing and F1 repairs, write reports/regression-release.json",
+        "kind": "integration",
+        "assignee": "storage",
+        "status": "completed",
+        "dependencies": [
+          "t17",
+          "t15"
+        ]
+      },
+      {
+        "id": "t14",
+        "subject": "repair-round-3",
+        "kind": "repair",
+        "assignee": "api",
+        "status": "completed",
+        "dependencies": [
+          "t5"
+        ],
+        "sourceTaskId": "t5"
+      },
+      {
+        "id": "t15",
+        "subject": "review-round-3",
+        "kind": "review",
+        "assignee": "reviewer",
+        "status": "completed",
+        "dependencies": [
+          "t14"
+        ],
+        "verdict": "pass",
+        "reviewedTaskId": "t14"
+      },
+      {
+        "id": "t16",
+        "subject": "repair-round-2",
+        "kind": "repair",
+        "assignee": "pricing",
+        "status": "completed",
+        "dependencies": [
+          "t2"
+        ],
+        "sourceTaskId": "t2"
+      },
+      {
+        "id": "t17",
+        "subject": "review-round-2",
+        "kind": "review",
+        "assignee": "reviewer",
+        "status": "completed",
+        "dependencies": [
+          "t16"
+        ],
+        "verdict": "pass",
+        "reviewedTaskId": "t16"
+      }
+    ]
+  },
+  "external": {
+    "passed": true,
+    "count": 32,
+    "checks": [
+      {
+        "name": "public module exports",
+        "passed": true
+      },
+      {
+        "name": "quote exact cents, sorting and no input mutation",
+        "passed": true
+      },
+      {
+        "name": "quote duplicate normalization and free products",
+        "passed": true
+      },
+      {
+        "name": "quote rejects quantity boundaries",
+        "passed": true
+      },
+      {
+        "name": "quote rejects malformed and merged overflow",
+        "passed": true
+      },
+      {
+        "name": "quote unknown SKU and invalid catalog",
+        "passed": true
+      },
+      {
+        "name": "quote rejects unsafe total arithmetic",
+        "passed": true
+      },
+      {
+        "name": "inventory reserve is atomic across lines",
+        "passed": true
+      },
+      {
+        "name": "inventory idempotency, conflict, release exactly once",
+        "passed": true
+      },
+      {
+        "name": "inventory rejects bad input without mutation, snapshots detached",
+        "passed": true
+      },
+      {
+        "name": "store concurrent transactions retain all writes",
+        "passed": true
+      },
+      {
+        "name": "store failed transaction rolls back and queue recovers",
+        "passed": true
+      },
+      {
+        "name": "store detaches reads and persists across reopen",
+        "passed": true
+      },
+      {
+        "name": "store never silently resets malformed saved JSON",
+        "passed": true
+      },
+      {
+        "name": "HTTP listens on loopback and health matches query",
+        "passed": true
+      },
+      {
+        "name": "HTTP creates exact priced persistent order",
+        "passed": true
+      },
+      {
+        "name": "HTTP duplicate key is idempotent with reordered normalized lines",
+        "passed": true
+      },
+      {
+        "name": "HTTP same key different intent is conflict",
+        "passed": true
+      },
+      {
+        "name": "HTTP order lookup is stable",
+        "passed": true
+      },
+      {
+        "name": "HTTP invalid key/body/unknown product status codes",
+        "passed": true
+      },
+      {
+        "name": "HTTP body limit enforced",
+        "passed": true
+      },
+      {
+        "name": "HTTP missing and path-like IDs are safe JSON errors",
+        "passed": true
+      },
+      {
+        "name": "HTTP cancellation restores inventory exactly once",
+        "passed": true
+      },
+      {
+        "name": "HTTP restart retains orders, idempotency and inventory",
+        "passed": true
+      },
+      {
+        "name": "32 concurrent purchases cannot oversell 20 units",
+        "passed": true
+      },
+      {
+        "name": "16 simultaneous identical keys create one order",
+        "passed": true
+      },
+      {
+        "name": "parallel cancellation and new requests remain consistent",
+        "passed": true
+      },
+      {
+        "name": "failed cancellation persistence cannot release phantom inventory",
+        "passed": true
+      },
+      {
+        "name": "CLI quote exact JSON",
+        "passed": true
+      },
+      {
+        "name": "CLI audit counts confirmed orders only",
+        "passed": true
+      },
+      {
+        "name": "CLI malformed input exits nonzero with structured error",
+        "passed": true
+      },
+      {
+        "name": "member-created tests exist and entire npm test passes",
+        "passed": true
+      }
+    ],
+    "protectedFilesUnchanged": true
+  },
+  "fixtureHashes": {
+    "driver": "0437dba37b446f20a2c589359027552b661c71bba6bfdcefc64ea472a7ce2eed",
+    "case": "b5e67f2318b85d746e4e5296808410cf86977642a689c532cf2e9eb533c02cd6"
+  },
+  "priorEvidence": {
+    "path": "/tmp/agentteams-complex-20260913-run3/candidate-cold/trace.jsonl",
+    "sha256": "e646dd41d5365a5154b61cdeccbc4d74925fc16cbe318b6046f9b2b1f7b61c1d",
+    "events": 314
+  },
+  "metrics": {
+    "sessionHeaders": [
+      {
+        "sessionId": "session-0aea0acc-8b23-4089-b846-75e61eff12ea",
+        "role": "captain",
+        "requests": 18,
+        "systemHashes": [
+          "9f18376feeeb64c34bcba16a1fc23974cc51a3ce0de2894f5ca46b3bd418311a"
+        ],
+        "toolsHashes": [
+          "876b3317788162e7b1ab4488c200026b52f47f191cb14037c491eb2e65f40044"
+        ]
+      },
+      {
+        "sessionId": "3084b867-220b-4f9b-b156-40f5b22c4f9b",
+        "role": "member",
+        "requests": 22,
+        "systemHashes": [
+          "e8f9f47646a1ea618e9d631f75d6cbde986cfc64f80fa099ba78d01fdbdf14b4"
+        ],
+        "toolsHashes": [
+          "d0306d233de01cdc95afa9dd53521e927908e9beb265697abe8bf93fd5cf5e88"
+        ]
+      },
+      {
+        "sessionId": "89e57833-bbe5-48f1-a458-6bfd7848968e",
+        "role": "member",
+        "requests": 13,
+        "systemHashes": [
+          "6395e20b7bd39727c2ab27c866009ce6f1b8034fd0fdabb456cbe6944a980d7f"
+        ],
+        "toolsHashes": [
+          "d0306d233de01cdc95afa9dd53521e927908e9beb265697abe8bf93fd5cf5e88"
+        ]
+      },
+      {
+        "sessionId": "c5411f4b-f832-4933-8f22-cb555a4e3c08",
+        "role": "member",
+        "requests": 10,
+        "systemHashes": [
+          "7da095656f4d9469ae465d08122959879a1987dab9f26eaa16ed955a916b7caa"
+        ],
+        "toolsHashes": [
+          "d0306d233de01cdc95afa9dd53521e927908e9beb265697abe8bf93fd5cf5e88"
+        ]
+      },
+      {
+        "sessionId": "1cfd904c-0b70-45e6-8bb9-017426ce5051",
+        "role": "member",
+        "requests": 16,
+        "systemHashes": [
+          "48c74a3c47d6f5a6faaf6f80c0b9a7eae05aee715e2eba69b5e4d7946fe4568e"
+        ],
+        "toolsHashes": [
+          "d0306d233de01cdc95afa9dd53521e927908e9beb265697abe8bf93fd5cf5e88"
+        ]
+      }
+    ],
+    "stableSessionHeaders": true,
+    "openCalls": 0,
+    "usageRequests": 79,
+    "requestsWithoutUsage": [],
+    "usage": {
+      "uncachedInputTokens": 721610,
+      "cacheReadTokens": 12012032,
+      "cacheWriteTokens": null,
+      "outputTokens": 97979,
+      "reasoningTokens": 45093
+    },
+    "usageSemantics": "Harness Usage counts inputTokens as uncached input; cacheRead/cacheWrite are separate. Last usage per request; unavailable fields remain null. Requests without usage are listed and excluded from sums. No price inference."
+  },
+  "modelErrors": [],
+  "actualUsage": [
+    {
+      "inputTokens": 104212,
+      "outputTokens": 693,
+      "totalTokens": 110025,
+      "cacheReadTokens": 5120,
+      "reasoningTokens": 644
+    },
+    {
+      "inputTokens": 2141,
+      "outputTokens": 2488,
+      "totalTokens": 114581,
+      "cacheReadTokens": 109952,
+      "reasoningTokens": 2009
+    },
+    {
+      "inputTokens": 181555,
+      "outputTokens": 2400,
+      "totalTokens": 186515,
+      "cacheReadTokens": 2560,
+      "reasoningTokens": 2254
+    },
+    {
+      "inputTokens": 190,
+      "outputTokens": 404,
+      "totalTokens": 115026,
+      "cacheReadTokens": 114432,
+      "reasoningTokens": 225
+    },
+    {
+      "inputTokens": 1219,
+      "outputTokens": 2512,
+      "totalTokens": 190227,
+      "cacheReadTokens": 186496,
+      "reasoningTokens": 1336
+    },
+    {
+      "inputTokens": 467,
+      "outputTokens": 891,
+      "totalTokens": 191566,
+      "cacheReadTokens": 190208,
+      "reasoningTokens": 662
+    },
+    {
+      "inputTokens": 544,
+      "outputTokens": 2782,
+      "totalTokens": 194814,
+      "cacheReadTokens": 191488,
+      "reasoningTokens": 455
+    },
+    {
+      "inputTokens": 207,
+      "outputTokens": 2603,
+      "totalTokens": 197498,
+      "cacheReadTokens": 194688,
+      "reasoningTokens": 234
+    },
+    {
+      "inputTokens": 689,
+      "outputTokens": 822,
+      "totalTokens": 198887,
+      "cacheReadTokens": 197376,
+      "reasoningTokens": 210
+    },
+    {
+      "inputTokens": 634,
+      "outputTokens": 535,
+      "totalTokens": 116113,
+      "cacheReadTokens": 114944,
+      "reasoningTokens": 329
+    },
+    {
+      "inputTokens": 144,
+      "outputTokens": 531,
+      "totalTokens": 199459,
+      "cacheReadTokens": 198784,
+      "reasoningTokens": 0
+    },
+    {
+      "inputTokens": 173,
+      "outputTokens": 653,
+      "totalTokens": 116794,
+      "cacheReadTokens": 115968,
+      "reasoningTokens": 226
+    },
+    {
+      "inputTokens": 952,
+      "outputTokens": 570,
+      "totalTokens": 200946,
+      "cacheReadTokens": 199424,
+      "reasoningTokens": 274
+    },
+    {
+      "inputTokens": 679,
+      "outputTokens": 205,
+      "totalTokens": 117620,
+      "cacheReadTokens": 116736,
+      "reasoningTokens": 100
+    },
+    {
+      "inputTokens": 1226,
+      "outputTokens": 507,
+      "totalTokens": 202565,
+      "cacheReadTokens": 200832,
+      "reasoningTokens": 335
+    },
+    {
+      "inputTokens": 219,
+      "outputTokens": 2310,
+      "totalTokens": 204897,
+      "cacheReadTokens": 202368,
+      "reasoningTokens": 0
+    },
+    {
+      "inputTokens": 45787,
+      "outputTokens": 197,
+      "totalTokens": 48544,
+      "cacheReadTokens": 2560,
+      "reasoningTokens": 101
+    },
+    {
+      "inputTokens": 158365,
+      "outputTokens": 5776,
+      "totalTokens": 166701,
+      "cacheReadTokens": 2560,
+      "reasoningTokens": 5602
+    },
+    {
+      "inputTokens": 733,
+      "outputTokens": 540,
+      "totalTokens": 206073,
+      "cacheReadTokens": 204800,
+      "reasoningTokens": 58
+    },
+    {
+      "inputTokens": 2276,
+      "outputTokens": 105,
+      "totalTokens": 169037,
+      "cacheReadTokens": 166656,
+      "reasoningTokens": 0
+    },
+    {
+      "inputTokens": 1419,
+      "outputTokens": 727,
+      "totalTokens": 50658,
+      "cacheReadTokens": 48512,
+      "reasoningTokens": 590
+    },
+    {
+      "inputTokens": 539,
+      "outputTokens": 306,
+      "totalTokens": 118349,
+      "cacheReadTokens": 117504,
+      "reasoningTokens": 226
+    },
+    {
+      "inputTokens": 168,
+      "outputTokens": 480,
+      "totalTokens": 206600,
+      "cacheReadTokens": 205952,
+      "reasoningTokens": 0
+    },
+    {
+      "inputTokens": 839,
+      "outputTokens": 206,
+      "totalTokens": 51605,
+      "cacheReadTokens": 50560,
+      "reasoningTokens": 60
+    },
+    {
+      "inputTokens": 227,
+      "outputTokens": 850,
+      "totalTokens": 169909,
+      "cacheReadTokens": 168832,
+      "reasoningTokens": 306
+    },
+    {
+      "inputTokens": 2366,
+      "outputTokens": 1699,
+      "totalTokens": 122337,
+      "cacheReadTokens": 118272,
+      "reasoningTokens": 554
+    },
+    {
+      "inputTokens": 641,
+      "outputTokens": 2741,
+      "totalTokens": 54966,
+      "cacheReadTokens": 51584,
+      "reasoningTokens": 686
+    },
+    {
+      "inputTokens": 653,
+      "outputTokens": 337,
+      "totalTokens": 55902,
+      "cacheReadTokens": 54912,
+      "reasoningTokens": 108
+    },
+    {
+      "inputTokens": 703,
+      "outputTokens": 284,
+      "totalTokens": 123227,
+      "cacheReadTokens": 122240,
+      "reasoningTokens": 74
+    },
+    {
+      "inputTokens": 221,
+      "outputTokens": 3160,
+      "totalTokens": 173109,
+      "cacheReadTokens": 169728,
+      "reasoningTokens": 904
+    },
+    {
+      "inputTokens": 225,
+      "outputTokens": 919,
+      "totalTokens": 56952,
+      "cacheReadTokens": 55808,
+      "reasoningTokens": 42
+    },
+    {
+      "inputTokens": 467,
+      "outputTokens": 350,
+      "totalTokens": 57649,
+      "cacheReadTokens": 56832,
+      "reasoningTokens": 111
+    },
+    {
+      "inputTokens": 491,
+      "outputTokens": 1345,
+      "totalTokens": 59436,
+      "cacheReadTokens": 57600,
+      "reasoningTokens": 332
+    },
+    {
+      "inputTokens": 675,
+      "outputTokens": 3448,
+      "totalTokens": 177179,
+      "cacheReadTokens": 173056,
+      "reasoningTokens": 1716
+    },
+    {
+      "inputTokens": 373,
+      "outputTokens": 483,
+      "totalTokens": 60248,
+      "cacheReadTokens": 59392,
+      "reasoningTokens": 0
+    },
+    {
+      "inputTokens": 2214,
+      "outputTokens": 791,
+      "totalTokens": 209597,
+      "cacheReadTokens": 206592,
+      "reasoningTokens": 509
+    },
+    {
+      "inputTokens": 255,
+      "outputTokens": 378,
+      "totalTokens": 60665,
+      "cacheReadTokens": 60032,
+      "reasoningTokens": 0
+    },
+    {
+      "inputTokens": 526,
+      "outputTokens": 259,
+      "totalTokens": 123921,
+      "cacheReadTokens": 123136,
+      "reasoningTokens": 133
+    },
+    {
+      "inputTokens": 304,
+      "outputTokens": 2998,
+      "totalTokens": 180454,
+      "cacheReadTokens": 177152,
+      "reasoningTokens": 2107
+    },
+    {
+      "inputTokens": 180,
+      "outputTokens": 406,
+      "totalTokens": 180938,
+      "cacheReadTokens": 180352,
+      "reasoningTokens": 293
+    },
+    {
+      "inputTokens": 2203,
+      "outputTokens": 4321,
+      "totalTokens": 216060,
+      "cacheReadTokens": 209536,
+      "reasoningTokens": 2209
+    },
+    {
+      "inputTokens": 866,
+      "outputTokens": 414,
+      "totalTokens": 182144,
+      "cacheReadTokens": 180864,
+      "reasoningTokens": 187
+    },
+    {
+      "inputTokens": 438,
+      "outputTokens": 418,
+      "totalTokens": 183000,
+      "cacheReadTokens": 182144,
+      "reasoningTokens": 170
+    },
+    {
+      "inputTokens": 1037,
+      "outputTokens": 691,
+      "totalTokens": 184640,
+      "cacheReadTokens": 182912,
+      "reasoningTokens": 543
+    },
+    {
+      "inputTokens": 648,
+      "outputTokens": 2423,
+      "totalTokens": 219007,
+      "cacheReadTokens": 215936,
+      "reasoningTokens": 377
+    },
+    {
+      "inputTokens": 750,
+      "outputTokens": 527,
+      "totalTokens": 220157,
+      "cacheReadTokens": 218880,
+      "reasoningTokens": 0
+    },
+    {
+      "inputTokens": 497,
+      "outputTokens": 182,
+      "totalTokens": 124583,
+      "cacheReadTokens": 123904,
+      "reasoningTokens": 57
+    },
+    {
+      "inputTokens": 365,
+      "outputTokens": 1441,
+      "totalTokens": 186382,
+      "cacheReadTokens": 184576,
+      "reasoningTokens": 467
+    },
+    {
+      "inputTokens": 168,
+      "outputTokens": 540,
+      "totalTokens": 220740,
+      "cacheReadTokens": 220032,
+      "reasoningTokens": 0
+    },
+    {
+      "inputTokens": 627,
+      "outputTokens": 93,
+      "totalTokens": 125264,
+      "cacheReadTokens": 124544,
+      "reasoningTokens": 27
+    },
+    {
+      "inputTokens": 162,
+      "outputTokens": 601,
+      "totalTokens": 187003,
+      "cacheReadTokens": 186240,
+      "reasoningTokens": 0
+    },
+    {
+      "inputTokens": 634,
+      "outputTokens": 258,
+      "totalTokens": 126076,
+      "cacheReadTokens": 125184,
+      "reasoningTokens": 79
+    },
+    {
+      "inputTokens": 2522,
+      "outputTokens": 1002,
+      "totalTokens": 224196,
+      "cacheReadTokens": 220672,
+      "reasoningTokens": 764
+    },
+    {
+      "inputTokens": 164,
+      "outputTokens": 498,
+      "totalTokens": 187542,
+      "cacheReadTokens": 186880,
+      "reasoningTokens": 0
+    },
+    {
+      "inputTokens": 3076,
+      "outputTokens": 3262,
+      "totalTokens": 230466,
+      "cacheReadTokens": 224128,
+      "reasoningTokens": 1525
+    },
+    {
+      "inputTokens": 3047,
+      "outputTokens": 3626,
+      "totalTokens": 234769,
+      "cacheReadTokens": 228096,
+      "reasoningTokens": 1630
+    },
+    {
+      "inputTokens": 561,
+      "outputTokens": 495,
+      "totalTokens": 235808,
+      "cacheReadTokens": 234752,
+      "reasoningTokens": 0
+    },
+    {
+      "inputTokens": 201,
+      "outputTokens": 481,
+      "totalTokens": 236330,
+      "cacheReadTokens": 235648,
+      "reasoningTokens": 0
+    },
+    {
+      "inputTokens": 572,
+      "outputTokens": 1065,
+      "totalTokens": 127589,
+      "cacheReadTokens": 125952,
+      "reasoningTokens": 327
+    },
+    {
+      "inputTokens": 145,
+      "outputTokens": 155,
+      "totalTokens": 127788,
+      "cacheReadTokens": 127488,
+      "reasoningTokens": 35
+    },
+    {
+      "inputTokens": 172150,
+      "outputTokens": 3861,
+      "totalTokens": 178571,
+      "cacheReadTokens": 2560,
+      "reasoningTokens": 3616
+    },
+    {
+      "inputTokens": 5150,
+      "outputTokens": 2608,
+      "totalTokens": 186318,
+      "cacheReadTokens": 178560,
+      "reasoningTokens": 2355
+    },
+    {
+      "inputTokens": 162,
+      "outputTokens": 1815,
+      "totalTokens": 188217,
+      "cacheReadTokens": 186240,
+      "reasoningTokens": 0
+    },
+    {
+      "inputTokens": 247,
+      "outputTokens": 1214,
+      "totalTokens": 189493,
+      "cacheReadTokens": 188032,
+      "reasoningTokens": 541
+    },
+    {
+      "inputTokens": 678,
+      "outputTokens": 458,
+      "totalTokens": 190576,
+      "cacheReadTokens": 189440,
+      "reasoningTokens": 300
+    },
+    {
+      "inputTokens": 291,
+      "outputTokens": 731,
+      "totalTokens": 191486,
+      "cacheReadTokens": 190464,
+      "reasoningTokens": 605
+    },
+    {
+      "inputTokens": 261,
+      "outputTokens": 1605,
+      "totalTokens": 193226,
+      "cacheReadTokens": 191360,
+      "reasoningTokens": 0
+    },
+    {
+      "inputTokens": 259,
+      "outputTokens": 1674,
+      "totalTokens": 194957,
+      "cacheReadTokens": 193024,
+      "reasoningTokens": 1520
+    },
+    {
+      "inputTokens": 184,
+      "outputTokens": 349,
+      "totalTokens": 195349,
+      "cacheReadTokens": 194816,
+      "reasoningTokens": 0
+    },
+    {
+      "inputTokens": 192,
+      "outputTokens": 265,
+      "totalTokens": 195657,
+      "cacheReadTokens": 195200,
+      "reasoningTokens": 102
+    },
+    {
+      "inputTokens": 244,
+      "outputTokens": 526,
+      "totalTokens": 196226,
+      "cacheReadTokens": 195456,
+      "reasoningTokens": 0
+    },
+    {
+      "inputTokens": 1204,
+      "outputTokens": 1363,
+      "totalTokens": 198791,
+      "cacheReadTokens": 196224,
+      "reasoningTokens": 1093
+    },
+    {
+      "inputTokens": 178,
+      "outputTokens": 429,
+      "totalTokens": 199263,
+      "cacheReadTokens": 198656,
+      "reasoningTokens": 0
+    },
+    {
+      "inputTokens": 478,
+      "outputTokens": 3735,
+      "totalTokens": 203381,
+      "cacheReadTokens": 199168,
+      "reasoningTokens": 655
+    },
+    {
+      "inputTokens": 657,
+      "outputTokens": 659,
+      "totalTokens": 204580,
+      "cacheReadTokens": 203264,
+      "reasoningTokens": 0
+    },
+    {
+      "inputTokens": 204,
+      "outputTokens": 550,
+      "totalTokens": 205170,
+      "cacheReadTokens": 204416,
+      "reasoningTokens": 0
+    },
+    {
+      "inputTokens": 656,
+      "outputTokens": 2498,
+      "totalTokens": 130898,
+      "cacheReadTokens": 127744,
+      "reasoningTokens": 1569
+    },
+    {
+      "inputTokens": 1202,
+      "outputTokens": 246,
+      "totalTokens": 132264,
+      "cacheReadTokens": 130816,
+      "reasoningTokens": 204
+    },
+    {
+      "inputTokens": 2632,
+      "outputTokens": 1209,
+      "totalTokens": 136065,
+      "cacheReadTokens": 132224,
+      "reasoningTokens": 331
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "version": "0.1.18",
+  "dist": {
+    "integrity": "sha512-K0D1OWZB0/EKk153mndPsoh2Gbx9u1TAIj7DUBRnuJyOZ+ycZMRXqoDhore0qcnqd9qU3fKbxWOOGnxVrJKFsQ==",
+    "shasum": "7de6286967c8dd630428349d8dd4b2b07bddefd5",
+    "tarball": "https://registry.npmjs.org/@nanmicoder/dsh-agent-teams/-/dsh-agent-teams-0.1.18.tgz",
+    "fileCount": 96,
+    "unpackedSize": 2893688,
+    "attestations": {
+      "url": "https://registry.npmjs.org/-/npm/v1/attestations/@nanmicoder%2fdsh-agent-teams@0.1.18",
+      "provenance": {
+        "predicateType": "https://slsa.dev/provenance/v1"
+      }
+    },
+    "signatures": [
+      {
+        "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+        "sig": "MEUCIQCp5lh7UDRkV0m0LM/ls0+hob4CV1CNIVbcwXIIFrqXaAIgEhfnnAjXVOFFFsNRtvpeijvXBHbnQ12OQDINP6xmpW8="
+      }
+    ]
+  },
+  "dist-tags": {
+    "alpha": "0.1.15-alpha.1",
+    "next": "0.1.17-rc.1",
+    "latest": "0.1.18"
+  }
+}

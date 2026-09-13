@@ -1,0 +1,8 @@
+SessionHandleClosedError: session "cd76614b-fb9f-4f63-8f23-9f3372c33cca": flush on a closed handle
+    at JsonlSessionHandle.assertOpen (file:///private/tmp/agentteams-stability/runtime-0.1.5-rc.1/node_modules/@deepseek-ai/dsh-session-persistence-jsonl/lib/index.js:265:38)
+    at JsonlSessionHandle.run (file:///private/tmp/agentteams-stability/runtime-0.1.5-rc.1/node_modules/@deepseek-ai/dsh-session-persistence-jsonl/lib/index.js:258:8)
+    at JsonlSessionHandle.flush (file:///private/tmp/agentteams-stability/runtime-0.1.5-rc.1/node_modules/@deepseek-ai/dsh-session-persistence-jsonl/lib/index.js:129:15)
+    at file:///private/tmp/agentteams-stability/runtime-0.1.5-rc.1/node_modules/@deepseek-ai/dsh-session-persistence-jsonl/lib/index.js:417:18
+    at async Promise.allSettled (index 0)
+    at async Proxy.flush (file:///private/tmp/agentteams-stability/runtime-0.1.5-rc.1/node_modules/@deepseek-ai/dsh-session/lib/index.js:1534:20)
+    at async file:///private/tmp/agentteams-release-018/consumer/web-approval/home/profiles/headless/fixture-web-approval.mjs:181:63

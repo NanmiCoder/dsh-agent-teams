@@ -86,6 +86,26 @@ export interface ReviewPolicy {
   requiredReviewers?: string[]
 }
 
+/**
+ * Why the scheduler's most recent dispatch of a member did not start it.
+ *
+ * Rejections used to be silent end to end: a guard returned `false`, the
+ * scheduler rolled the task back to `pending`, and nothing anywhere named a
+ * cause. A member stuck at `unspawned` next to a climbing `attempt` was the
+ * only trace, which is not a diagnosis — three separate reports (#166, #168,
+ * #170) each had to patch this plugin before they could see what was wrong.
+ * Recording the reason in durable team state lets `agent_teams_status` answer
+ * "why is nobody starting?" without a log, a debugger, or a patch.
+ */
+export interface DispatchFailure {
+  /** Epoch ms of the rejection. */
+  at: number
+  /** Member whose dispatch was rejected. */
+  member: string
+  /** The guard that rejected it, or the error a spawn attempt threw. */
+  reason: string
+}
+
 /** One task of a team's task list. */
 export interface TeamTask {
   /** Stable task id from the profile template; absent for ad-hoc tasks. */
@@ -230,6 +250,11 @@ export interface TeamState {
   tasks: TeamTask[]
   /** Monotonic task id counter. */
   taskSeq: number
+  /**
+   * Most recent rejected member dispatch, cleared by the next successful one.
+   * Absent while dispatches succeed, so its mere presence is the signal.
+   */
+  lastDispatchError?: DispatchFailure
   /**
    * Two-phase execution lifecycle. Missing means `running` for durable
    * compatibility with teams created before staging existed.

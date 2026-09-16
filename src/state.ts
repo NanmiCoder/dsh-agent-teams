@@ -17,7 +17,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { TERMINAL_TASK_STATUSES, type TaskStatus, type TeamMember, type TeamMessage, type TeamProfileSnapshot, type TeamState, type TeamTask } from './types.ts'
+import { TERMINAL_TASK_STATUSES, type DispatchFailure, type TaskStatus, type TeamMember, type TeamMessage, type TeamProfileSnapshot, type TeamState, type TeamTask } from './types.ts'
 import { hasValidQualityTaskFields, isReviewPolicy, normalizeBlankOptionalTaskFields } from './quality-gates.ts'
 
 export {
@@ -210,6 +210,36 @@ export function invalidateTaskAttempt(
   task.reassigning = reassigning
   task.output = undefined
   task.updatedAt = Date.now()
+}
+
+/**
+ * Record why a member dispatch was rejected, on the durable team record.
+ *
+ * This is the only trace that survives a rejection: the scheduler rolls the
+ * task back to `pending` and clears its `attemptId`, so without it the captain
+ * sees a member that never starts and an `attempt` counter that only climbs.
+ * @param team - the team record to mutate.
+ * @param member - the member whose dispatch was rejected.
+ * @param reason - the guard that rejected it, or the error a spawn attempt threw.
+ * @param at - epoch ms of the rejection; injectable for deterministic tests.
+ */
+export function recordDispatchFailure(
+  team: TeamState,
+  member: string,
+  reason: string,
+  at: number = Date.now(),
+): void {
+  const failure: DispatchFailure = { at, member, reason }
+  team.lastDispatchError = failure
+}
+
+/**
+ * Clear the recorded dispatch failure once a dispatch succeeds, so the field
+ * always describes the latest dispatch rather than the last bad one.
+ * @param team - the team record to mutate.
+ */
+export function clearDispatchFailure(team: TeamState): void {
+  team.lastDispatchError = undefined
 }
 
 /**
@@ -821,6 +851,17 @@ export function isTeamTask(value: unknown): value is TeamTask {
     && hasValidQualityTaskFields(value)
 }
 
+/**
+ * Validate a recorded dispatch failure so status rendering cannot crash on an
+ * empty or partially written `{}`.
+ */
+function isDispatchFailure(value: unknown): value is DispatchFailure {
+  return isRecord(value)
+    && isFiniteNumber(value['at'])
+    && typeof value['member'] === 'string'
+    && typeof value['reason'] === 'string'
+}
+
 /** Validate the full team record before it can participate in authorization. */
 function isTeamState(value: unknown, expectedId: string): value is TeamState {
   if (!isRecord(value)) return false
@@ -847,6 +888,7 @@ function isTeamState(value: unknown, expectedId: string): value is TeamState {
     && (value['haltedAt'] === undefined || isFiniteNumber(value['haltedAt']))
     && (value['reviewPolicy'] === undefined || isReviewPolicy(value['reviewPolicy']))
     && (value['escalated'] === undefined || typeof value['escalated'] === 'boolean')
+    && (value['lastDispatchError'] === undefined || isDispatchFailure(value['lastDispatchError']))
   if (!validShape) return false
 
   const members = value['members'] as TeamMember[]

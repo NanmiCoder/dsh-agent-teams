@@ -8,7 +8,7 @@
 
 | DSH 能力 | AgentTeams 用法 |
 |---|---|
-| `ctx.tools` 注册表 | 注册原有 13 个业务工具；按会话身份限制模型可见工具 |
+| `ctx.tools` 注册表 | 注册原有 14 个业务工具；按会话身份限制模型可见工具 |
 | `ctx.subagents.startContinuable()` | 创建成员：durable 可续聊子代理，带成员 persona |
 | `ctx.subagents.followup()` | 唤醒收件成员（消息进入其下一轮次） |
 | 持久化团队成员表 + `ctx.agents` | 前者保存 durable 成员身份，后者提供真实 `running / idle / ready` 活动状态（不依赖易变的子代理目录投影） |
@@ -55,6 +55,7 @@
 | `agent_teams_reassign_task` | 原子重试/转派任务；`assignee=captain` 表示队长安全接管 |
 | `agent_teams_claim_task` | 领取任务（校验依赖；队长可代领，成员只能领自己的/未指派的） |
 | `agent_teams_update_task` | 携带当前 `attempt_id` 推进任务；质量 kind 按 verdict / acceptanceResults / commandsRun / changedPaths 拒绝非法 completed |
+| `agent_teams_amend_task` | 队长专属：改写非终态质量任务的 objective/acceptance/verify/inScope/outOfScope（合同本身写错导致无法诚实完成时）；写入 revisions ledger，审查通过后冻结。成员不可用 |
 | `agent_teams_send_message` | 任意成员→任意成员/队长：消息直达对方邮箱并唤醒对方（无队长转发；拒绝冒名 `from`） |
 | `agent_teams_status` | 团队全景：kind/round/verdict、coverage matrix、escalated、halt/resume 状态 |
 | `agent_teams_resume` | 显式恢复 halted 团队，必须带非空 reason；不重建已取消任务 |

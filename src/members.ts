@@ -19,7 +19,7 @@ import { foldSubagentDescriptor } from '@deepseek-ai/dsh-subagent'
 import { createUserMessage, LlmError, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { Session, SessionId } from '@deepseek-ai/dsh-session'
 import { join } from 'node:path'
-import { guardSubagentDelivery, installContinuableMemberSetup, memberToolFilter, queueMemberPrompt, restrictableToolNames, steerMemberPrompt, sessionOwnEvents } from './harness-compat.ts'
+import { guardSubagentDelivery, installContinuableMemberSetup, memberToolFilter, queueMemberPrompt, restrictableToolNames, startMemberWithLenientFilter, steerMemberPrompt, sessionOwnEvents } from './harness-compat.ts'
 import { markMailboxDelivered, appendMailbox, CAPTAIN_KEY, createMessage, readRetiredMemberIds, readTeamSync, readTeam, releaseMailboxDelivery, withTeamLock, writeTeam } from './state.ts'
 import { mailboxPrompt } from './mailbox.ts'
 import { appendTeamEvent, captainSessionOf } from './events.ts'
@@ -624,31 +624,35 @@ export async function spawnMember(
   }
   const label = `${MEMBER_LABEL_PREFIX}${team.id}:${member.name}`
   const start = await selections.withPending(captain.id, label, llmSelection, () => (
-    ctx.subagents.startContinuable({
-      provider: config.provider,
-      label,
-      request: {
-        prompt: [{ type: 'text', text: initialPrompt ?? memberWelcome(team, member.name) }],
-        parent: captain,
-        persona: memberPersona(team, member, stateDir, config.executionPrompt),
-        // Depth deny entries name host tools; resolve them against the
-        // running host's registry so a renamed delegation tool cannot abort
-        // the spawn (see memberToolFilter). Depth is still enforced by the
-        // parent-chain guard installed at plugin mount.
-        toolFilter: memberToolFilter(config.maxDepth, restrictableToolNames(captain)),
-        agentOptions: {
-          provider: llmSelection.provider,
-          model: llmSelection.model,
-          ...llmSelection.reasoningEffort === undefined
-            ? {}
-            : { reasoningEffort: ReasoningEffortId(llmSelection.reasoningEffort) },
+    startMemberWithLenientFilter(
+      toolFilter => ctx.subagents.startContinuable({
+        provider: config.provider,
+        label,
+        request: {
+          prompt: [{ type: 'text', text: initialPrompt ?? memberWelcome(team, member.name) }],
+          parent: captain,
+          persona: memberPersona(team, member, stateDir, config.executionPrompt),
+          // Depth deny entries name host tools; resolve them against the
+          // running host's registry so a renamed delegation tool cannot abort
+          // the spawn (see memberToolFilter). Depth is still enforced by the
+          // parent-chain guard installed at plugin mount. A filter the host
+          // still rejects is retried without the names it reported.
+          toolFilter,
+          agentOptions: {
+            provider: llmSelection.provider,
+            model: llmSelection.model,
+            ...llmSelection.reasoningEffort === undefined
+              ? {}
+              : { reasoningEffort: ReasoningEffortId(llmSelection.reasoningEffort) },
+          },
+          // Harness request.maxDepth caps the absolute depth of THIS creation;
+          // it is not inherited by later delegations. The guard below enforces
+          // the configured member-relative descendant budget instead.
         },
-        // Harness request.maxDepth caps the absolute depth of THIS creation;
-        // it is not inherited by later delegations. The guard below enforces
-        // the configured member-relative descendant budget instead.
-      },
-      signal,
-    })
+        signal,
+      }),
+      memberToolFilter(config.maxDepth, restrictableToolNames(captain)),
+    )
   ))
   member.id = start.childId
 }

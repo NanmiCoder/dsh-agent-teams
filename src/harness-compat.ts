@@ -264,3 +264,48 @@ export function memberToolFilter(maxDepth: number | undefined, knownTools: Reado
     ],
   }
 }
+
+/**
+ * Names a `tools.restrict()` rejection reported as unknown, or an empty list
+ * for every other failure. The host names the offenders verbatim
+ * (`tools.restrict() names unknown global tool "x"; known global tools: …`);
+ * only that report may relax a filter (#164, #166).
+ */
+function unknownToolNames(error: unknown): string[] {
+  const message = error instanceof Error ? error.message : String(error)
+  if (!message.includes('unknown global tool')) return []
+  return [...message.matchAll(/"([^"]+)"/g)].map(match => match[1] as string)
+}
+
+/**
+ * Start one member, dropping any filter name the host reports as unknown and
+ * retrying.
+ *
+ * Resolving the filter against the registry view ({@link memberToolFilter})
+ * only covers hosts that expose one. A rejected filter still leaves the member
+ * without a session for the lifetime of the team, so the start must survive the
+ * cases that resolution cannot see — no registry view, a name that is known but
+ * not restrictable, a composition that mounted differently than expected. The
+ * host names the offenders in its rejection, so they are removed and the start
+ * retried; the retry only runs while the deny list strictly shrinks, and any
+ * failure that is not an unknown-name report propagates untouched.
+ * @param start - performs one start attempt for the given `toolFilter`.
+ * @param filter - the filter to attempt first.
+ * @returns the started member.
+ */
+export async function startMemberWithLenientFilter<T>(
+  start: (filter: { deny: string[] }) => Promise<T>,
+  filter: { deny: string[] },
+): Promise<T> {
+  let deny = [...filter.deny]
+  for (;;) {
+    try {
+      return await start({ deny })
+    } catch (error: unknown) {
+      const unknown = unknownToolNames(error)
+      const remaining = deny.filter(name => !unknown.includes(name))
+      if (unknown.length === 0 || remaining.length === deny.length) throw error
+      deny = remaining
+    }
+  }
+}

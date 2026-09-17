@@ -40,7 +40,7 @@ export function apply(ctx) {
             'ENTRY_NO_ACTIVATION: Do not use AgentTeams; answer directly.',
             'ENTRY_NO_ACTIVATION: Translate this quote: "use AgentTeams to research this".',
         ]) await send(ordinary.agent, text);
-        assert.equal((await teamNames(ordinary.agent)).length, 13);
+        assert.equal((await teamNames(ordinary.agent)).length, 14);
         assert.equal(existsSync(join(ordinary.cwd, '.agent-teams/runtime-lab/team.json')), false);
         const cases = [
             ['natural', 'Use AgentTeams to plan this task.', false],
@@ -65,15 +65,15 @@ export function apply(ctx) {
             assert.equal(staged.members.length, 1);
             assert.ok(staged.members.every(m => !m.id));
             const requests = trace().filter(x => x.event === 'request' && !x.purpose && x.sessionId === agent.id).slice(label === 'natural' ? 30 : 0);
-            assert.equal(requests[0].toolNames.filter(n => n.startsWith('agent_teams_')).length, 13);
+            assert.equal(requests[0].toolNames.filter(n => n.startsWith('agent_teams_')).length, 14);
             const assembly = await ctx.systemPrompt.assemble({ agent, scope: agent });
             assert.match(assembly.sections.find(s => s.name === 'agent-teams:usage')?.text ?? '', /Tasks carry attempt_id/);
             assert.doesNotMatch(requests[1].lastToolText, /"instructions":/);
             assert.equal(requests[1].called[0], 'agent_teams_create');
             assert.ok(requests.every(request => !request.toolNames.includes('agent_teams_open')));
-            assert.equal(requests[1].toolNames.filter(n => n.startsWith('agent_teams_')).length, 13);
+            assert.equal(requests[1].toolNames.filter(n => n.startsWith('agent_teams_')).length, 14);
             if (input.startsWith('/')) assert.match(requests[0].userText, /Inspect existing team state with agent_teams_status/);
-            assert.equal((await teamNames(ordinary.agent)).length, 13);
+            assert.equal((await teamNames(ordinary.agent)).length, 14);
             await measure(agent, label.startsWith('profile') ? 'captain-profile' : 'captain');
             await send(agent, 'REOPEN_ENTRY: inspect the existing AgentTeams plan.');
             assert.equal(readFileSync(statePath, 'utf8'), before);
@@ -97,7 +97,14 @@ export function apply(ctx) {
             appendFileSync(process.env.LAB_TRACE, JSON.stringify({ event: 'stable-prefix-passed', label, requests: budgets.length, precedingOrdinaryTurns: label === 'natural' ? 30 : 0, systemSha256: budgets[0].systemSha256, toolsSha256: budgets[0].toolsSha256 }) + '\n');
             appendFileSync(process.env.LAB_TRACE, JSON.stringify({ event: 'entry-case-passed', label, captain: agent.id, member: completed.members[0].id }) + '\n');
         }
-        for (const agent of ctx.agents.list()) { await agent.whenIdle(); if (ctx.sessions.get(agent.id) === agent.session) await ctx.sessions.flush(agent.session); }
+        for (const agent of ctx.agents.list()) {
+            await agent.whenIdle();
+            // Best effort: a handle may close while this loop awaits an earlier
+            // agent. Closing persists, so a closed handle needs no flush — and
+            // the host rejects flushing one.
+            try { if (ctx.sessions.get(agent.id) === agent.session) await ctx.sessions.flush(agent.session); }
+            catch (error) { if (String(error?.name) !== 'SessionHandleClosedError') throw error; }
+        }
         process.stdout.write('PROGRESSIVE_ENTRY_OK\n');
         ctx.get('appExit')(0);
     })().catch(error => { process.stderr.write(String(error.stack ?? error) + '\n'); ctx.get('appExit')(1); });

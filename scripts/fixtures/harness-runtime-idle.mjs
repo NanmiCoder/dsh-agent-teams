@@ -30,7 +30,11 @@ export function apply(ctx) {
             throw Error('Captain did not wake after yielding; no further driver followup was sent');
         for (const agent of ctx.agents.list()) {
             await agent.whenIdle();
-            if (ctx.sessions.get(agent.id) === agent.session) await ctx.sessions.flush(agent.session);
+            // Best effort: a handle may close while this loop awaits an earlier
+            // agent. Closing persists, so a closed handle needs no flush — and
+            // the host rejects flushing one.
+            try { if (ctx.sessions.get(agent.id) === agent.session) await ctx.sessions.flush(agent.session); }
+            catch (error) { if (String(error?.name) !== 'SessionHandleClosedError') throw error; }
         }
         process.stdout.write('CAPTAIN_IDLE_WAKEUP_OK\n');
         ctx.get('appExit')(0);

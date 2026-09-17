@@ -1,6 +1,6 @@
 # AgentTeams 固定协议与业务工具
 
-AgentTeams 保留原有 13 个业务工具，删除 `agent_teams_open`。精简的核心规则从首次请求起固定在 system 中，创建、批准、继续、暂停或归档团队都不切换这段提示词和工具定义。无需加载工具，也没有额外的激活调用。
+AgentTeams 保留原有 14 个业务工具，删除 `agent_teams_open`。精简的核心规则从首次请求起固定在 system 中，创建、批准、继续、暂停或归档团队都不切换这段提示词和工具定义。无需加载工具，也没有额外的激活调用。
 
 这项修改针对两个问题：
 
@@ -9,7 +9,7 @@ AgentTeams 保留原有 13 个业务工具，删除 `agent_teams_open`。精简�
 
 | 会话身份 | 固定团队工具 | 固定 system 内容 |
 |---|---|---|
-| 普通会话、队长、冷恢复的队长 | 原有 13 个业务工具 | 触发边界、审批、协作、attempt、质量门禁、暂停/恢复、收尾规则及已配置模板目录 |
+| 普通会话、队长、冷恢复的队长 | 原有 14 个业务工具 | 触发边界、审批、协作、attempt、质量门禁、暂停/恢复、收尾规则及已配置模板目录 |
 | 成员 | claim、update、send_message、status | 成员规则和原有 persona |
 
 普通编程/研究工具照常保留。成员身份来自持久化成员 ID、退休成员索引或插件正在执行的可信成员创建登记，不凭可自由填写的 label 判断。工具限制同时适用于原生 schema 和 PTC SDK，不能解除用户或 preset 的限制。
@@ -32,11 +32,11 @@ Web 的 Approve & Run 提交批准并启动调度后，通过 `captain.steer` �
 
 ## 验证标准与证据
 
-`pnpm verify:capabilities` 使用真实 scoped registry、prompt assembly 和 WorkerThreadCodeRuntime，覆盖固定规则、13 工具直接业务调用、重复创建保留原团队、用户 restriction、取消/失败、可信成员身份、暂停、冷恢复、HMR、PTC/both SDK 和实际结果裁剪。
+`pnpm verify:capabilities` 使用真实 scoped registry、prompt assembly 和 WorkerThreadCodeRuntime，覆盖固定规则、14 工具直接业务调用、重复创建保留原团队、用户 restriction、取消/失败、可信成员身份、暂停、冷恢复、HMR、PTC/both SDK 和实际结果裁剪。
 
 `scripts/harness-runtime-verify.mjs` 将打包产物安装到隔离 profile，通过发布版 CLI 和真实 Loader 启动。只有外部 LLM 是确定性 fixture；工具、会话、持久化、调度和成员创建均走生产实现。
 
-- `progressive-entry` 保留历史场景名，覆盖中文/英文自然语言、原始 slash、宿主 command registry、profile alias、`--profile` 六条路径。模型请求只包含 13 个团队工具，直接创建 staged 计划。测试继续已有计划、显式批准、成员执行和回报、归档、普通续聊和归档后状态检查。自然语言路径先进行 30 轮普通对话，再逐次检查 system/tools 哈希不变。
+- `progressive-entry` 保留历史场景名，覆盖中文/英文自然语言、原始 slash、宿主 command registry、profile alias、`--profile` 六条路径。模型请求只包含 14 个团队工具，直接创建 staged 计划。测试继续已有计划、显式批准、成员执行和回报、归档、普通续聊和归档后状态检查。自然语言路径先进行 30 轮普通对话，再逐次检查 system/tools 哈希不变。
 - `protocol-compatibility` 用 13 工具白名单直接使用模板、恢复同一会话，并调用宿主 `compactNow` 后修改原计划。另一条路径用真实代码运行时丢弃 status 返回、实际裁剪和压缩，再修改并归档同一团队。逐次检查核心规则和前缀。
 - `web-approval` 通过真实 HTTP 路由和宿主鉴权批准，检查批准通知、队长结束等待轮次、成员报告再次唤醒，以及重复/失败批准不产生成功通知。
 - 保留 lifecycle、fallback、failure、captain-idle-wakeup 和两组冷恢复场景。

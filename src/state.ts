@@ -751,6 +751,7 @@ function isTeamMember(value: unknown): value is TeamMember {
     && isOptionalString(value['reasoningEffort'])
     && isOptionalString(value['activeProvider'])
     && isOptionalString(value['activeModel'])
+    && isOptionalString(value['spawnError'])
     && (value['executionPrompt'] === undefined || typeof value['executionPrompt'] === 'string')
     && (value['fallback'] === undefined || (isRecord(value['fallback']) && typeof value['fallback']['provider'] === 'string' && typeof value['fallback']['model'] === 'string'))
     && (value['fallbackActive'] === undefined || typeof value['fallbackActive'] === 'boolean')

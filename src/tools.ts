@@ -437,6 +437,22 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
 
   async function dispatchMember(captain: Agent, teamId: string, memberName: string, text: string, signal: AbortSignal, mode: 'queue' | 'steer', attemptId?: string): Promise<boolean> {
     const root = stateRootOf(workspaceOf(captain), config)
+    // Record why a member never started. The scheduler treats a failed dispatch as
+    // "not now" and retries, so without this the captain only ever sees an
+    // unexplained `unspawned` member and no diagnostic reaches any surface.
+    const recordSpawnError = async (reason: string): Promise<void> => {
+      try {
+        await withTeamLock(teamLockKey(root, teamId), async () => {
+          const fresh = await requireFreshCaptainTeam(root, teamId, captain.id)
+          const failed = fresh.members.find(item => item.name === memberName && item.status !== 'removed')
+          if (failed === undefined || failed.id !== '') return
+          failed.spawnError = reason
+          await writeTeam(root, fresh)
+        })
+      } catch (error: unknown) {
+        ctx.logger.warn(`agent-teams: could not record the member start failure for ${memberName}: ${String(error)}`)
+      }
+    }
     let orphan: TeamMember | undefined
     /**
      * Reject one dispatch, naming the guard that refused it.
@@ -477,6 +493,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         await spawnMember(ctx, memberRuntime(config), memberSelections, selection, captain, team, member, config.stateDir, signal, text)
         orphan = { ...member }
         clearDispatchFailure(team)
+        delete member.spawnError
         await writeTeam(root, team)
         orphan = undefined
         return true
@@ -486,10 +503,17 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         await recordRetiredMemberIds(root, [orphan.id])
         await stopTeamMemberActivations(ctx, captain, [orphan])
       }
+      // The stack carries the failing frame; the message alone rarely does.
+      let reason = String(error)
+      if (error instanceof Error && typeof error.stack === 'string' && error.stack !== '') reason = error.stack
       ctx.logger.warn(`agent-teams: member dispatch failed for ${memberName}: ${String(error)}`)
       // A throw here is the failure mode that used to be invisible: a rejected
       // spawn (an unknown deny name, a missing provider, a route that will not
-      // resolve) reached the captain as "nothing happened". Record it.
+      // resolve) reached the captain as "nothing happened". Record it on both
+      // surfaces, which answer different questions: the member carries the stack
+      // (the failing frame is what names the cause), the team carries the
+      // rejection itself so it renders above the roster.
+      await recordSpawnError(reason)
       await recordRejectedDispatch(root, teamId, memberName, String(error))
       return false
     }
@@ -2038,6 +2062,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
           reasoning_effort: member.reasoningEffort ?? '',
           status: member.status,
           activity: member.id !== '' ? (activity.get(member.id) ?? 'unknown') : 'unspawned',
+          ...member.spawnError === undefined ? {} : { spawn_error: member.spawnError },
         }))
       const tasks = team.tasks.map((task) => ({
         id: task.id,
@@ -2488,6 +2513,7 @@ function renderStatus(value: JsonValue): string {
       reasoning_effort: string
       status: string
       activity: string
+      spawn_error?: string
     }[]
     tasks: { id: string; subject: string; status: string; assignee: string; dependencies: string[]; attempt: number; attempt_id: string; reassigning: boolean; seed_id?: string; output?: string; kind?: string; round?: number; verdict?: string; findings_open?: number }[]
     captain_inbox: { from: string; content: string }[]
@@ -2527,7 +2553,8 @@ function renderStatus(value: JsonValue): string {
     ...team.members.map((member) => {
       const route = member.provider && member.model ? ` · ${member.provider}/${member.model}` : ''
       const effort = member.reasoning_effort ? ` · reasoning ${member.reasoning_effort}` : ''
-      return `  - ${member.name} [${member.role}] ${member.status}/${member.activity}${route}${effort}`
+      const failure = member.spawn_error === undefined ? '' : `\n      start failed: ${member.spawn_error.slice(0, 400)}`
+      return `  - ${member.name} [${member.role}] ${member.status}/${member.activity}${route}${effort}${failure}`
     }),
     `Tasks (${team.tasks.length}):`,
     ...team.tasks.map((task) => {

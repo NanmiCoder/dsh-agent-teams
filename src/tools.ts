@@ -32,8 +32,10 @@ import {
   findTeamByCaptain,
   findTeamByParticipant,
   cancelUnfinishedTask,
+  clearDispatchFailure,
   invalidateTaskAttempt,
   readUnreadMailbox,
+  recordDispatchFailure,
   recordRetiredMemberIds,
   releaseMailboxDelivery,
   readTeam,
@@ -452,19 +454,45 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
       }
     }
     let orphan: TeamMember | undefined
+    /**
+     * Reject one dispatch, naming the guard that refused it.
+     *
+     * The reason has to outlive the turn in durable state. On a web/desktop
+     * host this plugin's logger output is visible nowhere — no terminal, and
+     * nothing in the service journal — so a `logger.warn` on its own reproduces
+     * exactly the silent failure this exists to end. The log line stays for
+     * whoever is watching a terminal.
+     */
+    const reject = async (team: TeamState | undefined, reason: string): Promise<boolean> => {
+      ctx.logger.warn(`agent-teams: dispatch rejected for ${memberName} (team ${teamId}): ${reason}`)
+      if (team !== undefined) {
+        recordDispatchFailure(team, memberName, reason)
+        await writeTeam(root, team)
+      }
+      return false
+    }
     try {
       return await withTeamLock(teamLockKey(root, teamId), async () => {
         const team = await readTeam(root, teamId)
-        if (team?.captainSessionId !== captain.id || team.halted === true || team.phase === 'staged') return false
+        if (team === undefined) return false
+        if (team.captainSessionId !== captain.id) return reject(team, `team is owned by captain session ${team.captainSessionId}, not ${captain.id}`)
+        if (team.halted === true) return reject(team, 'team is halted; resume it before dispatching')
+        if (team.phase === 'staged') return reject(team, 'team is staged; approve the plan before dispatching')
         const member = team.members.find(item => item.name === memberName && item.status !== 'removed')
-        if (member === undefined || member.stopping === true || team.tasks.some(task => task.reassigning === true && task.assignee === memberName)) return false
-        if (attemptId !== undefined && !team.tasks.some(task => task.attemptId === attemptId && task.assignee === memberName && (task.status === 'claimed' || task.status === 'in_progress'))) return false
+        if (member === undefined) return reject(team, `member "${memberName}" is not on the roster`)
+        if (member.stopping === true) return reject(team, `member "${memberName}" is still stopping`)
+        const quiescing = team.tasks.find(task => task.reassigning === true && task.assignee === memberName)
+        if (quiescing !== undefined) return reject(team, `task ${quiescing.id} is still quiescing a handoff for "${memberName}"`)
+        if (attemptId !== undefined && !team.tasks.some(task => task.attemptId === attemptId && task.assignee === memberName && (task.status === 'claimed' || task.status === 'in_progress'))) {
+          return reject(team, `attempt ${attemptId} is no longer the live capability for "${memberName}"`)
+        }
         if (member.id !== '') return deliverToMember(ctx, captain, member.id, text, signal, mode)
         const selection = await resolveMemberLlmSelection(ctx, captain, {
           provider: member.provider, model: member.model, reasoningEffort: member.reasoningEffort, fallback: member.fallback,
         }, signal)
         await spawnMember(ctx, memberRuntime(config), memberSelections, selection, captain, team, member, config.stateDir, signal, text)
         orphan = { ...member }
+        clearDispatchFailure(team)
         delete member.spawnError
         await writeTeam(root, team)
         orphan = undefined
@@ -479,8 +507,35 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
       let reason = String(error)
       if (error instanceof Error && typeof error.stack === 'string' && error.stack !== '') reason = error.stack
       ctx.logger.warn(`agent-teams: member dispatch failed for ${memberName}: ${String(error)}`)
+      // A throw here is the failure mode that used to be invisible: a rejected
+      // spawn (an unknown deny name, a missing provider, a route that will not
+      // resolve) reached the captain as "nothing happened". Record it on both
+      // surfaces, which answer different questions: the member carries the stack
+      // (the failing frame is what names the cause), the team carries the
+      // rejection itself so it renders above the roster.
       await recordSpawnError(reason)
+      await recordRejectedDispatch(root, teamId, memberName, String(error))
       return false
+    }
+  }
+
+  /**
+   * Record a dispatch rejection that surfaced as a thrown error.
+   *
+   * The throw happens inside `withTeamLock`, but this handler runs after that
+   * lock has been released, so the write takes the lock again. Bookkeeping must
+   * never mask the original failure, hence the swallowed secondary error.
+   */
+  const recordRejectedDispatch = async (root: string, teamId: string, memberName: string, reason: string): Promise<void> => {
+    try {
+      await withTeamLock(teamLockKey(root, teamId), async () => {
+        const team = await readTeam(root, teamId)
+        if (team === undefined) return
+        recordDispatchFailure(team, memberName, reason)
+        await writeTeam(root, team)
+      })
+    } catch (error: unknown) {
+      ctx.logger.warn(`agent-teams: could not record the dispatch rejection for ${memberName}: ${String(error)}`)
     }
   }
 
@@ -2079,6 +2134,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         deliverable: loop.deliverable,
         coverage,
         delivery,
+        ...team.lastDispatchError === undefined ? {} : { last_dispatch_error: { ...team.lastDispatchError } },
         ...team.profile === undefined ? {} : {
           profile: {
             name: team.profile.name,
@@ -2472,6 +2528,7 @@ function renderStatus(value: JsonValue): string {
     deliverable?: boolean
     coverage?: { goal_item: string; status: string; task_ids: string[] }[]
     delivery?: { ok: boolean; blockers: string[] }
+    last_dispatch_error?: { at: number; member: string; reason: string }
   }
   const flags = [
     team.halted ? 'halted' : undefined,
@@ -2486,6 +2543,12 @@ function renderStatus(value: JsonValue): string {
     ...team.profile === undefined ? [] : [`Profile: ${team.profile.name}${team.profile.task_planning ? ` [${team.profile.task_planning}]` : ''}${team.profile.protocol ? ` — ${team.profile.protocol}` : ''}`],
     ...team.loop_summary ? [`Loop: ${team.loop_state ?? ''} — ${team.loop_summary}`.replace(/^Loop:  — /u, 'Loop: ')] : [],
     `Viewing as: ${team.viewer}`,
+    // Above the roster on purpose: a rejected dispatch is exactly why members
+    // can sit at `unspawned` while their tasks stay `pending`, and the captain
+    // should not have to infer it from a climbing attempt counter.
+    ...team.last_dispatch_error === undefined ? [] : [
+      `Last dispatch rejection: ${team.last_dispatch_error.member} — ${team.last_dispatch_error.reason}`,
+    ],
     `Members (${team.members.length}):`,
     ...team.members.map((member) => {
       const route = member.provider && member.model ? ` · ${member.provider}/${member.model}` : ''

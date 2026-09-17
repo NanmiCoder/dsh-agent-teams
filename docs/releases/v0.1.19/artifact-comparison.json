@@ -1,0 +1,9 @@
+{
+  "runtimeIdentical": true,
+  "runtimeFiles": 79,
+  "changedFiles": [
+    "package/release-notes/v0.1.19.md"
+  ],
+  "testedArtifactSha256": "cbf3b687573379694cbe3656515bc8df13a74136dc8bdcbda0c12dd6c85a7f31",
+  "releaseArtifactSha256": "a7ffe37241f67b32be57779fbee0506b163a68907327f9d088c5a3f10742320c"
+}

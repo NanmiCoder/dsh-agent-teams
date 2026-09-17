@@ -1163,6 +1163,73 @@ console.log('quality-gates TDD — tool-level closed loop')
   }
 }
 
+console.log('quality-gates TDD — H. generated repair scope (#173)')
+
+{
+  const source = {
+    ...task({
+      id: 't1',
+      status: 'completed',
+      assignee: 'implementer',
+      ...implContract(),
+    }),
+    inScope: ['deploy/compose/postfix/master.cf.inc', 'internal/pkg/releasedeliver/deliver.go'],
+    // A directory pattern that covers the first inScope entry above. The
+    // validator consults outOfScope before inScope, so inheriting this verbatim
+    // makes the repair's own inScope impossible to register.
+    outOfScope: ['deploy/compose/postfix/', 'go.mod'],
+  }
+  const review = task({
+    id: 't2',
+    assignee: 'reviewer',
+    status: 'failed',
+    verdict: 'needs_revision',
+    round: 1,
+    reviewedTaskId: 't1',
+    reviewedAttempt: 1,
+    findings: [
+      {
+        id: 'C-001',
+        severity: 'medium',
+        file: 'deploy/compose/postfix/master.cf.inc',
+        problem: 'the reinjection mount key is missing',
+        requiredFix: 'add no_address_mappings',
+      },
+      {
+        id: 'C-002',
+        severity: 'low',
+        file: 'deploy/compose/postfix/master.cf.inc',
+        problem: 'second finding on the same file',
+        requiredFix: 'and land it once',
+      },
+    ],
+    ...reviewContract(),
+  })
+  const planned = api.planQualityFollowUp?.(team({ tasks: [source, review], taskSeq: 2 }), review)
+  const repair = (planned?.created ?? planned?.tasks ?? []).find((item) => item.kind === 'repair')
+
+  check(
+    'tdd.scope.generated-repair-inScope-has-no-duplicates',
+    Array.isArray(repair?.inScope)
+      && repair.inScope.filter((path) => path === 'deploy/compose/postfix/master.cf.inc').length === 1,
+    JSON.stringify(repair?.inScope),
+  )
+  check(
+    'tdd.scope.generated-repair-drops-outOfScope-covering-its-inScope',
+    Array.isArray(repair?.outOfScope)
+      && !repair.outOfScope.includes('deploy/compose/postfix/')
+      && repair.outOfScope.includes('go.mod'),
+    JSON.stringify(repair?.outOfScope),
+  )
+  check(
+    'tdd.scope.every-generated-repair-inScope-path-is-registrable',
+    (repair?.inScope ?? []).length > 0
+      && (repair?.inScope ?? []).every(
+        (path) => api.classifyChangedPath?.(path, repair.inScope, repair.outOfScope ?? []) === 'in_scope',
+      ),
+  )
+}
+
 if (failures > 0) {
   console.error(`quality-gates TDD failed: ${failures} check(s)`)
   process.exitCode = 1

@@ -1,0 +1,21 @@
+{
+  "passed": false,
+  "requests": 50,
+  "elapsedMs": 95810,
+  "checks": {
+    "realMember": true,
+    "membersCannotAmend": true,
+    "automaticRepair": true,
+    "scopeIncludesTarget": true,
+    "noInheritedExclusion": true,
+    "repairCompleted": true,
+    "reviewCompleted": true
+  },
+  "external": {
+    "passed": false,
+    "seedUnchanged": true
+  },
+  "artifactSha256": "cbf3b687573379694cbe3656515bc8df13a74136dc8bdcbda0c12dd6c85a7f31",
+  "modelErrors": [],
+  "classification": "ambiguous test wording: exactly 2 words was interpreted as hello world; runtime repair and re-review checks passed"
+}

@@ -1,0 +1,30 @@
+{
+  "passed": true,
+  "pluginVersion": "0.1.19",
+  "artifactSha256": "a7ffe37241f67b32be57779fbee0506b163a68907327f9d088c5a3f10742320c",
+  "provider": "deepseek-official",
+  "model": "deepseek-flash",
+  "requests": 15,
+  "elapsedMs": 39999,
+  "checks": {
+    "realMember": true,
+    "membersCannotAmend": true,
+    "memberStarted": true,
+    "taskCompleted": true
+  },
+  "external": {
+    "passed": true,
+    "seedUnchanged": true
+  },
+  "metrics": {
+    "requests": 15,
+    "memberRequests": 7
+  },
+  "modelErrors": [],
+  "exit": {
+    "code": 0,
+    "signal": null,
+    "timedOut": false
+  },
+  "hostVersion": "0.1.2-rc.1"
+}

@@ -1,0 +1,228 @@
+{
+  "passed": true,
+  "pluginVersion": "0.1.19",
+  "artifactSha256": "cbf3b687573379694cbe3656515bc8df13a74136dc8bdcbda0c12dd6c85a7f31",
+  "provider": "deepseek-official",
+  "model": "deepseek-flash",
+  "reasoningEffort": "max",
+  "requests": 14,
+  "elapsedMs": 33495,
+  "checks": {
+    "realMember": true,
+    "membersCannotAmend": true,
+    "memberStarted": true,
+    "taskCompleted": true
+  },
+  "external": {
+    "passed": true,
+    "seedUnchanged": true
+  },
+  "metrics": {
+    "requests": 14,
+    "memberRequests": 8
+  },
+  "actualUsage": [
+    {
+      "inputTokens": 1764,
+      "outputTokens": 1450,
+      "totalTokens": 14606,
+      "cacheReadTokens": 11392,
+      "reasoningTokens": 1315
+    },
+    {
+      "inputTokens": 193,
+      "outputTokens": 956,
+      "totalTokens": 15741,
+      "cacheReadTokens": 14592,
+      "reasoningTokens": 526
+    },
+    {
+      "inputTokens": 10535,
+      "outputTokens": 53,
+      "totalTokens": 10588,
+      "cacheReadTokens": 0,
+      "reasoningTokens": 8
+    },
+    {
+      "inputTokens": 720,
+      "outputTokens": 156,
+      "totalTokens": 15980,
+      "cacheReadTokens": 15104,
+      "reasoningTokens": 131
+    },
+    {
+      "inputTokens": 387,
+      "outputTokens": 218,
+      "totalTokens": 11101,
+      "cacheReadTokens": 10496,
+      "reasoningTokens": 90
+    },
+    {
+      "inputTokens": 261,
+      "outputTokens": 197,
+      "totalTokens": 11338,
+      "cacheReadTokens": 10880,
+      "reasoningTokens": 65
+    },
+    {
+      "inputTokens": 300,
+      "outputTokens": 413,
+      "totalTokens": 16585,
+      "cacheReadTokens": 15872,
+      "reasoningTokens": 178
+    },
+    {
+      "inputTokens": 301,
+      "outputTokens": 374,
+      "totalTokens": 11939,
+      "cacheReadTokens": 11264,
+      "reasoningTokens": 117
+    },
+    {
+      "inputTokens": 328,
+      "outputTokens": 238,
+      "totalTokens": 12470,
+      "cacheReadTokens": 11904,
+      "reasoningTokens": 129
+    },
+    {
+      "inputTokens": 303,
+      "outputTokens": 1285,
+      "totalTokens": 14004,
+      "cacheReadTokens": 12416,
+      "reasoningTokens": 178
+    },
+    {
+      "inputTokens": 370,
+      "outputTokens": 295,
+      "totalTokens": 14617,
+      "cacheReadTokens": 13952,
+      "reasoningTokens": 0
+    },
+    {
+      "inputTokens": 198,
+      "outputTokens": 323,
+      "totalTokens": 14985,
+      "cacheReadTokens": 14464,
+      "reasoningTokens": 0
+    },
+    {
+      "inputTokens": 320,
+      "outputTokens": 257,
+      "totalTokens": 17089,
+      "cacheReadTokens": 16512,
+      "reasoningTokens": 105
+    },
+    {
+      "inputTokens": 670,
+      "outputTokens": 598,
+      "totalTokens": 18292,
+      "cacheReadTokens": 17024,
+      "reasoningTokens": 78
+    }
+  ],
+  "modelErrors": [],
+  "exit": {
+    "code": 0,
+    "signal": null,
+    "timedOut": false
+  },
+  "team": {
+    "captainId": "session-81fbb45f-d1c3-4e00-83ac-b7ecdba11b14",
+    "teamId": "final-validation",
+    "tasks": [
+      {
+        "id": "t1",
+        "profileSeedId": "copy-input-to-output",
+        "subject": "复制 input.txt 到 output.txt 并验证字节相同",
+        "description": "项目目录（绝对路径，所有操作仅限此目录）：/tmp/agentteams-final-validation/disabled/run/candidate/workspace\n\n步骤：\n1. cd 到上面这个项目目录。\n2. 读取 input.txt 的全部字节内容，并原样写入同目录下的 output.txt（不得添加、删除、换行转换或修改任何字节；不要使用会做编码/换行转换的方式）。\n3. 实际验证字节相同：运行 cmp input.txt output.txt（必须无差异、退出码 0），并运行 sha256sum input.txt output.txt 或 wc -c 对比字节数。\n4. 不要读取或写入该目录以外的任何文件，不要改动 input.txt。\n5. 完成后用中文报告：创建的文件绝对路径、cmp 结果与退出码、sha256sum/字节数对比结果。\n\n交付物：/tmp/agentteams-final-validation/disabled/run/candidate/workspace/output.txt",
+        "status": "completed",
+        "assignee": "worker",
+        "dependencies": [],
+        "attempt": 1,
+        "createdAt": 1789611361763,
+        "updatedAt": 1789611374136,
+        "attemptId": "851dd06b-e856-4229-91e9-0ae92d92ecab",
+        "reassigning": false,
+        "output": "已完成 input.txt → output.txt 的字节级复制与验证。\n\n创建文件绝对路径：/tmp/agentteams-final-validation/disabled/run/candidate/workspace/output.txt（15 字节，权限 -rw-r--r--）\n\n验证结果（均在项目目录内执行，未触碰目录外文件，input.txt 未被修改，mtime 仍为 10:15）：\n- cmp input.txt output.txt → 无任何差异输出，退出码 0\n- cmp -l input.txt output.txt → 无差异行，退出码 0（逐字节确认）\n- sha256sum：input.txt 与 output.txt 均为 b6b0cf8af81b233935d7d4fb5b4c697cd2dacc53cf26de7cd996f5e7c2c41d3d（完全一致）\n- md5：两者均为 3ada58af068bef9c2bf203a3e2dda6db\n- wc -c：input.txt = 15，output.txt = 15（字节数相同）\n- xxd 对比：两者均为 5245 414c 5f4d 454d 4245 525f 4f4b 0a（\"REAL_MEMBER_OK\\n\"），无换行/编码转换\n\n结论：字节完全一致，任务成功。",
+        "changedPaths": [
+          "output.txt"
+        ],
+        "acceptanceResults": [
+          {
+            "criterion": "在项目目录内创建 output.txt，内容为 input.txt 的逐字节副本（无任何修改/换行转换）",
+            "status": "passed",
+            "evidence": "cp input.txt output.txt 退出码 0；xxd 显示两者均为 5245 414c 5f4d 454d 4245 525f 4f4b 0a（REAL_MEMBER_OK\\n），15 字节"
+          },
+          {
+            "criterion": "cmp input.txt output.txt 无差异且退出码 0",
+            "status": "passed",
+            "evidence": "cmp 无输出、退出码 0；cmp -l 无差异行、退出码 0"
+          },
+          {
+            "criterion": "sha256sum 或 wc -c 字节数对比一致",
+            "status": "passed",
+            "evidence": "sha256sum 两者均 b6b0cf8af81b233935d7d4fb5b4c697cd2dacc53cf26de7cd996f5e7c2c41d3d；wc -c 两者均 15"
+          },
+          {
+            "criterion": "不读写项目目录以外文件，且不修改 input.txt",
+            "status": "passed",
+            "evidence": "仅执行 ls/cp/cmp/sha256sum/wc/md5/xxd 于 /tmp/agentteams-final-validation/disabled/run/candidate/workspace；input.txt 大小 15、hash 与操作前一致、mtime 未变（Sep 17 10:15）"
+          }
+        ],
+        "commandsRun": [
+          {
+            "command": "cd /tmp/agentteams-final-validation/disabled/run/candidate/workspace && cp -- input.txt output.txt",
+            "status": "passed",
+            "exitCode": 0,
+            "evidence": "cp exit=0，生成 output.txt（15 字节）"
+          },
+          {
+            "command": "cmp input.txt output.txt",
+            "status": "passed",
+            "exitCode": 0,
+            "evidence": "无差异输出，退出码 0"
+          },
+          {
+            "command": "cmp -l input.txt output.txt",
+            "status": "passed",
+            "exitCode": 0,
+            "evidence": "无差异行，退出码 0（逐字节比较无不同）"
+          },
+          {
+            "command": "sha256sum input.txt output.txt",
+            "status": "passed",
+            "exitCode": 0,
+            "evidence": "两行哈希均为 b6b0cf8af81b233935d7d4fb5b4c697cd2dacc53cf26de7cd996f5e7c2c41d3d"
+          },
+          {
+            "command": "wc -c input.txt output.txt",
+            "status": "passed",
+            "exitCode": 0,
+            "evidence": "15 input.txt；15 output.txt"
+          },
+          {
+            "command": "md5 input.txt output.txt",
+            "status": "passed",
+            "exitCode": 0,
+            "evidence": "两者均 3ada58af068bef9c2bf203a3e2dda6db"
+          }
+        ]
+      }
+    ],
+    "members": [
+      {
+        "id": "25e01a3e-2390-414a-86df-4850d010379f",
+        "name": "worker",
+        "role": "file-copy worker：在指定项目目录内执行文件复制并做字节级验证",
+        "provider": "deepseek-official",
+        "model": "deepseek-flash",
+        "reasoningEffort": "max",
+        "joinedAt": 1789611361763,
+        "status": "idle"
+      }
+    ]
+  },
+  "hostVersion": "0.1.5-rc.1",
+  "traceEvents": 105
+}

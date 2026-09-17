@@ -574,30 +574,24 @@ const REPAIR_SCOPE_LINE_SUFFIX = /:\d+$/
  * accepted: inScope is an audit upper bound, and the requiredFix text still
  * tells the implementer what to touch.
  *
- * A candidate that the source task's inherited `outOfScope` already covers is
- * skipped instead: `classifyChangedPath` consults `outOfScope` before
- * `inScope`, so declaring it would add an entry the member can never register
- * — widening the scope must not manufacture that contradiction. Resolving the
- * inherited patterns themselves stays with the generator-level conflict fix;
- * this filter is a no-op once that lands.
+ * Keep all derived paths until the generator resolves inherited exclusions;
+ * filtering first would silently discard a required fix target.
  */
 export function repairScopeFromFindings(
   findings: readonly ReviewFinding[],
   fallback: string[] | undefined,
-  inheritedOutOfScope: readonly string[] = [],
 ): string[] | undefined {
   const derived: string[] = []
   const push = (raw: string): void => {
     const normalized = normalizeWorkspacePath(raw.replace(REPAIR_SCOPE_LINE_SUFFIX, ''))
     if (normalized === undefined || derived.includes(normalized)) return
-    if (inheritedOutOfScope.some((pattern) => pathMatchesScope(normalized, pattern))) return
     derived.push(normalized)
   }
   for (const finding of findings) {
     if (nonemptyString(finding.file)) push(finding.file)
     for (const match of finding.requiredFix.matchAll(REPAIR_SCOPE_PATH_PATTERN)) push(match[0])
   }
-  return derived.length > 0 ? derived : fallback
+  return derived.length > 0 ? derived : fallback === undefined ? undefined : [...new Set(fallback)]
 }
 
 /** Captain-only amendment payload: replacement values for contract fields. */
@@ -747,6 +741,16 @@ function hasOpenFollowUp(team: TeamState, sourceTaskId: string, findingIds: read
   ))
 }
 
+/** Drop previous-round exclusions that intersect this generated repair's scope. */
+function withoutScopeConflicts(
+  outOfScope: readonly string[] | undefined,
+  inScope: readonly string[] | undefined,
+): string[] | undefined {
+  if (outOfScope === undefined) return undefined
+  const conflicting = new Set(inScopeOverlap(outOfScope, inScope ?? []))
+  return outOfScope.filter((pattern) => !conflicting.has(pattern))
+}
+
 export function planQualityFollowUp(team: TeamState, closed: TeamTask): PlanQualityFollowUpResult {
   const empty = { created: [] as PlannedFollowUpTask[], tasks: [] as PlannedFollowUpTask[] }
   const kind = taskKindOf(closed)
@@ -785,6 +789,7 @@ export function planQualityFollowUp(team: TeamState, closed: TeamTask): PlanQual
   // inScope is derived from the findings below: the observed file plus any
   // workspace-relative paths referenced by the requiredFix instructions.
 
+  const repairScope = repairScopeFromFindings(findings, source?.inScope)
   const implementer = schedulableAssignee(source?.assignee, team)
   const repair: PlannedFollowUpTask = {
     id: `repair-round-${nextRound}`,
@@ -794,8 +799,8 @@ export function planQualityFollowUp(team: TeamState, closed: TeamTask): PlanQual
     dependencies: [sourceId],
     round: nextRound,
     objective: source?.objective ?? closed.objective ?? `Fix findings from ${sourceId}`,
-    inScope: repairScopeFromFindings(findings, source?.inScope, source?.outOfScope),
-    outOfScope: source?.outOfScope,
+    inScope: repairScope,
+    outOfScope: withoutScopeConflicts(source?.outOfScope, repairScope),
     verify: source?.verify,
     acceptance: findings.map((finding) => finding.requiredFix),
     sourceTaskId: sourceId,

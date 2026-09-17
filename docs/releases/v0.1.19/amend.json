@@ -1,0 +1,252 @@
+{
+  "passed": true,
+  "pluginVersion": "0.1.19",
+  "artifactSha256": "cbf3b687573379694cbe3656515bc8df13a74136dc8bdcbda0c12dd6c85a7f31",
+  "provider": "deepseek-official",
+  "model": "deepseek-flash",
+  "reasoningEffort": "max",
+  "requests": 20,
+  "elapsedMs": 50574,
+  "checks": {
+    "realMember": true,
+    "membersCannotAmend": true,
+    "sameTaskCompleted": true,
+    "revisionPersisted": true,
+    "amendCalled": true
+  },
+  "external": {
+    "passed": true,
+    "seedUnchanged": true
+  },
+  "metrics": {
+    "requests": 20,
+    "memberRequests": 10
+  },
+  "actualUsage": [
+    {
+      "inputTokens": 1938,
+      "outputTokens": 1277,
+      "totalTokens": 15247,
+      "cacheReadTokens": 12032,
+      "reasoningTokens": 1132
+    },
+    {
+      "inputTokens": 276,
+      "outputTokens": 140,
+      "totalTokens": 15648,
+      "cacheReadTokens": 15232,
+      "reasoningTokens": 20
+    },
+    {
+      "inputTokens": 196,
+      "outputTokens": 556,
+      "totalTokens": 16368,
+      "cacheReadTokens": 15616,
+      "reasoningTokens": 246
+    },
+    {
+      "inputTokens": 171,
+      "outputTokens": 1482,
+      "totalTokens": 17909,
+      "cacheReadTokens": 16256,
+      "reasoningTokens": 874
+    },
+    {
+      "inputTokens": 11191,
+      "outputTokens": 86,
+      "totalTokens": 11277,
+      "cacheReadTokens": 0,
+      "reasoningTokens": 41
+    },
+    {
+      "inputTokens": 198,
+      "outputTokens": 256,
+      "totalTokens": 18246,
+      "cacheReadTokens": 17792,
+      "reasoningTokens": 136
+    },
+    {
+      "inputTokens": 151,
+      "outputTokens": 256,
+      "totalTokens": 18583,
+      "cacheReadTokens": 18176,
+      "reasoningTokens": 203
+    },
+    {
+      "inputTokens": 271,
+      "outputTokens": 607,
+      "totalTokens": 12142,
+      "cacheReadTokens": 11264,
+      "reasoningTokens": 494
+    },
+    {
+      "inputTokens": 434,
+      "outputTokens": 494,
+      "totalTokens": 12960,
+      "cacheReadTokens": 12032,
+      "reasoningTokens": 292
+    },
+    {
+      "inputTokens": 327,
+      "outputTokens": 813,
+      "totalTokens": 19700,
+      "cacheReadTokens": 18560,
+      "reasoningTokens": 435
+    },
+    {
+      "inputTokens": 515,
+      "outputTokens": 220,
+      "totalTokens": 13663,
+      "cacheReadTokens": 12928,
+      "reasoningTokens": 28
+    },
+    {
+      "inputTokens": 161,
+      "outputTokens": 461,
+      "totalTokens": 20206,
+      "cacheReadTokens": 19584,
+      "reasoningTokens": 67
+    },
+    {
+      "inputTokens": 2078,
+      "outputTokens": 579,
+      "totalTokens": 16225,
+      "cacheReadTokens": 13568,
+      "reasoningTokens": 457
+    },
+    {
+      "inputTokens": 149,
+      "outputTokens": 125,
+      "totalTokens": 16402,
+      "cacheReadTokens": 16128,
+      "reasoningTokens": 16
+    },
+    {
+      "inputTokens": 164,
+      "outputTokens": 350,
+      "totalTokens": 16770,
+      "cacheReadTokens": 16256,
+      "reasoningTokens": 176
+    },
+    {
+      "inputTokens": 168,
+      "outputTokens": 466,
+      "totalTokens": 17402,
+      "cacheReadTokens": 16768,
+      "reasoningTokens": 61
+    },
+    {
+      "inputTokens": 213,
+      "outputTokens": 268,
+      "totalTokens": 17761,
+      "cacheReadTokens": 17280,
+      "reasoningTokens": 0
+    },
+    {
+      "inputTokens": 139,
+      "outputTokens": 349,
+      "totalTokens": 18152,
+      "cacheReadTokens": 17664,
+      "reasoningTokens": 0
+    },
+    {
+      "inputTokens": 331,
+      "outputTokens": 557,
+      "totalTokens": 20984,
+      "cacheReadTokens": 20096,
+      "reasoningTokens": 329
+    },
+    {
+      "inputTokens": 1003,
+      "outputTokens": 1849,
+      "totalTokens": 23716,
+      "cacheReadTokens": 20864,
+      "reasoningTokens": 1152
+    }
+  ],
+  "modelErrors": [],
+  "exit": {
+    "code": 0,
+    "signal": null,
+    "timedOut": false
+  },
+  "team": {
+    "captainId": "session-21493f94-5248-4757-a8ad-6bd41d9175ef",
+    "teamId": "amend-contract-validation",
+    "tasks": [
+      {
+        "id": "t1",
+        "subject": "[AMEND] Write src/result.txt with AMEND_OK",
+        "description": "Project root (the ONLY directory you may read or write): /tmp/agentteams-final-validation/amend/run/candidate/workspace\n\nDeliverable: create the file src/result.txt under the project root whose trimmed content is exactly AMEND_OK (a single trailing newline is fine), then really run the verify command from the project root so that node check-result.mjs exits 0. Do not modify check-result.mjs, docs/note.txt, or anything under .agent-teams/. Re-read the task contract before working: the captain may have amended it (the inScope for this task was deliberately wrong on creation). Report real changedPaths and real command output as evidence.",
+        "status": "completed",
+        "dependencies": [],
+        "attempt": 1,
+        "createdAt": 1789611366746,
+        "updatedAt": 1789611384412,
+        "kind": "implementation",
+        "objective": "Write src/result.txt with AMEND_OK",
+        "inScope": [
+          "src/result.txt"
+        ],
+        "acceptance": [
+          "src/result.txt contains AMEND_OK"
+        ],
+        "verify": [
+          "node check-result.mjs"
+        ],
+        "assignee": "worker",
+        "attemptId": "ce1fcd7e-8698-4335-b160-c709a3bad153",
+        "reassigning": false,
+        "revisions": [
+          {
+            "at": 1789611368515,
+            "by": "captain",
+            "reason": "Objective targets src/result.txt but original scope only allows docs",
+            "fields": [
+              "inScope"
+            ],
+            "previous": {
+              "inScope": [
+                "docs/"
+              ]
+            }
+          }
+        ],
+        "output": "Amended contract honored: inScope revision 1 = [\"src/result.txt\"]. Created src/result.txt containing AMEND_OK; `node check-result.mjs` from the project root exited 0 (no output). check-result.mjs and docs/note.txt left untouched; no writes under docs/ or .agent-teams/.",
+        "changedPaths": [
+          "src/result.txt"
+        ],
+        "acceptanceResults": [
+          {
+            "criterion": "src/result.txt contains AMEND_OK",
+            "status": "passed",
+            "evidence": "Created /tmp/agentteams-final-validation/amend/run/candidate/workspace/src/result.txt with content \"AMEND_OK\\n\" (9 bytes); reading it back shows line 1 = AMEND_OK, and check-result.mjs's assert.equal(readFileSync('src/result.txt','utf8').trim(),'AMEND_OK') passes."
+          }
+        ],
+        "commandsRun": [
+          {
+            "command": "node check-result.mjs",
+            "status": "passed",
+            "exitCode": 0,
+            "evidence": "Ran from project root /tmp/agentteams-final-validation/amend/run/candidate/workspace; command produced no output and exited 0 (captured EXIT_CODE=0)."
+          }
+        ]
+      }
+    ],
+    "members": [
+      {
+        "id": "57e5808b-46b9-4032-ab3d-fd95887f55e1",
+        "name": "worker",
+        "role": "worker",
+        "provider": "deepseek-official",
+        "model": "deepseek-flash",
+        "reasoningEffort": "max",
+        "executionPrompt": "Project root (the ONLY directory you may read or write): /tmp/agentteams-final-validation/amend/run/candidate/workspace\n\nHard scope rules:\n- Use absolute paths under that project root, or cd into it first. Never touch any other directory, and never read or modify .agent-teams/ state or plugin configuration.\n- Run every command with the project root as the working directory (the verify script resolves paths relative to cwd).\n\nWhen you receive the [AMEND] implementation task: first re-read its CURRENT contract (objective/inScope/acceptance/verify) via your task claim, because the captain amends deliberately wrong contracts before you start. Then do exactly the work the amended contract describes, really execute the verify commands, and finish the original task with changedPaths plus one acceptanceResults entry per acceptance criterion and one commandsRun entry per verify command, quoting the real observed output.",
+        "joinedAt": 1789611366736,
+        "status": "idle"
+      }
+    ]
+  },
+  "hostVersion": "0.1.5-rc.1",
+  "traceEvents": 163
+}

@@ -1,0 +1,225 @@
+{
+  "passed": true,
+  "pluginVersion": "0.1.19",
+  "artifactSha256": "cbf3b687573379694cbe3656515bc8df13a74136dc8bdcbda0c12dd6c85a7f31",
+  "provider": "deepseek-official",
+  "model": "deepseek-flash",
+  "reasoningEffort": "max",
+  "requests": 15,
+  "elapsedMs": 48546,
+  "checks": {
+    "realMember": true,
+    "membersCannotAmend": true,
+    "memberStarted": true,
+    "taskCompleted": true
+  },
+  "external": {
+    "passed": true,
+    "seedUnchanged": true
+  },
+  "metrics": {
+    "requests": 15,
+    "memberRequests": 9
+  },
+  "actualUsage": [
+    {
+      "inputTokens": 1730,
+      "outputTokens": 1164,
+      "totalTokens": 15054,
+      "cacheReadTokens": 12160,
+      "reasoningTokens": 1072
+    },
+    {
+      "inputTokens": 210,
+      "outputTokens": 2284,
+      "totalTokens": 17470,
+      "cacheReadTokens": 14976,
+      "reasoningTokens": 1577
+    },
+    {
+      "inputTokens": 11356,
+      "outputTokens": 124,
+      "totalTokens": 11480,
+      "cacheReadTokens": 0,
+      "reasoningTokens": 0
+    },
+    {
+      "inputTokens": 772,
+      "outputTokens": 426,
+      "totalTokens": 12590,
+      "cacheReadTokens": 11392,
+      "reasoningTokens": 276
+    },
+    {
+      "inputTokens": 156,
+      "outputTokens": 672,
+      "totalTokens": 18236,
+      "cacheReadTokens": 17408,
+      "reasoningTokens": 297
+    },
+    {
+      "inputTokens": 258,
+      "outputTokens": 581,
+      "totalTokens": 13255,
+      "cacheReadTokens": 12416,
+      "reasoningTokens": 72
+    },
+    {
+      "inputTokens": 617,
+      "outputTokens": 468,
+      "totalTokens": 14269,
+      "cacheReadTokens": 13184,
+      "reasoningTokens": 378
+    },
+    {
+      "inputTokens": 251,
+      "outputTokens": 904,
+      "totalTokens": 15235,
+      "cacheReadTokens": 14080,
+      "reasoningTokens": 0
+    },
+    {
+      "inputTokens": 186,
+      "outputTokens": 263,
+      "totalTokens": 15553,
+      "cacheReadTokens": 15104,
+      "reasoningTokens": 33
+    },
+    {
+      "inputTokens": 339,
+      "outputTokens": 1241,
+      "totalTokens": 17068,
+      "cacheReadTokens": 15488,
+      "reasoningTokens": 108
+    },
+    {
+      "inputTokens": 286,
+      "outputTokens": 386,
+      "totalTokens": 17696,
+      "cacheReadTokens": 17024,
+      "reasoningTokens": 0
+    },
+    {
+      "inputTokens": 202,
+      "outputTokens": 321,
+      "totalTokens": 18059,
+      "cacheReadTokens": 17536,
+      "reasoningTokens": 0
+    },
+    {
+      "inputTokens": 399,
+      "outputTokens": 656,
+      "totalTokens": 19231,
+      "cacheReadTokens": 18176,
+      "reasoningTokens": 543
+    },
+    {
+      "inputTokens": 475,
+      "outputTokens": 302,
+      "totalTokens": 19977,
+      "cacheReadTokens": 19200,
+      "reasoningTokens": 241
+    },
+    {
+      "inputTokens": 1047,
+      "outputTokens": 632,
+      "totalTokens": 21647,
+      "cacheReadTokens": 19968,
+      "reasoningTokens": 111
+    }
+  ],
+  "modelErrors": [],
+  "exit": {
+    "code": 0,
+    "signal": null,
+    "timedOut": false
+  },
+  "team": {
+    "captainId": "session-0b16b752-d207-4d01-99a7-1a86d86bac0e",
+    "teamId": "agentteams-final-validation",
+    "tasks": [
+      {
+        "id": "t1",
+        "profileSeedId": "copy-input-verbatim",
+        "subject": "Copy input.txt to output.txt byte-for-byte and verify identity",
+        "description": "Project directory (this is the ONLY directory you may operate in; use full absolute paths):\n/tmp/agentteams-final-validation/renamed/run/candidate/workspace\n\nGoal:\n1) Read /tmp/agentteams-final-validation/renamed/run/candidate/workspace/input.txt\n2) Write its content EXACTLY as-is (byte-for-byte, no newline changes, no encoding changes, no trimming) to /tmp/agentteams-final-validation/renamed/run/candidate/workspace/output.txt\n3) Actually verify byte identity on disk, e.g.:\n   cmp /tmp/agentteams-final-validation/renamed/run/candidate/workspace/input.txt /tmp/agentteams-final-validation/renamed/run/candidate/workspace/output.txt\n   shasum -a 256 /tmp/agentteams-final-validation/renamed/run/candidate/workspace/input.txt /tmp/agentteams-final-validation/renamed/run/candidate/workspace/output.txt\n   wc -c on both files\n   Record the real exit codes and hash values.\n4) Write a JSON report to /tmp/agentteams-final-validation/renamed/run/candidate/workspace/reports/worker-report.json containing: task id, status, the file paths as PROJECT-RELATIVE paths (input.txt, output.txt, reports/worker-report.json - NOT absolute paths), byte sizes, sha256 hashes of both files, the exact commands run and their exit codes, and a boolean byteIdentical.\n5) Claim the task, then complete it with an output summary that includes the observed byte sizes, the sha256 hashes, and the byteIdentical result.\n\nStrict constraints:\n- Do NOT read, write, or list anything outside /tmp/agentteams-final-validation/renamed/run/candidate/workspace.\n- Do NOT read any plugin configuration or AgentTeams state files; do not touch .agent-teams.\n- In all report content, path fields must stay project-relative.\n- If verification fails for any reason, report the failure honestly with real command output instead of claiming success.",
+        "status": "completed",
+        "assignee": "worker",
+        "dependencies": [],
+        "attempt": 1,
+        "createdAt": 1789611366170,
+        "updatedAt": 1789611384537,
+        "attemptId": "f7ab7368-1e39-49f7-b768-6a840ce5f4ca",
+        "reassigning": false,
+        "output": "t1 complete: input.txt copied byte-for-byte to output.txt and verified on disk. Bytes: input.txt=15, output.txt=15 (equal). sha256 both = b6b0cf8af81b233935d7d4fb5b4c697cd2dacc53cf26de7cd996f5e7c2c41d3d (identical). byteIdentical=true. Evidence (all exit 0): cp -- input.txt output.txt (0); cmp input.txt output.txt (0, no output); shasum -a 256 (0, matching hashes); wc -c (0, 15/15); od hex-dump diff (0, identical). Report written to project-relative reports/worker-report.json (valid JSON, status=completed, byteIdentical=true, all path fields project-relative). Content preserved exactly as \"REAL_MEMBER_OK\\n\" with trailing 0x0A intact. Re-verified after report write: cmp exit 0, hashes still match.",
+        "changedPaths": [
+          "output.txt",
+          "reports/worker-report.json"
+        ],
+        "acceptanceResults": [
+          {
+            "criterion": "input.txt copied to output.txt exactly as-is (byte-for-byte, no newline/encoding changes)",
+            "status": "passed",
+            "evidence": "cp -- input.txt output.txt exit 0; output.txt is 15 bytes on disk matching input.txt size; trailing 0x0A preserved (content REAL_MEMBER_OK\\n)"
+          },
+          {
+            "criterion": "Byte identity actually verified on disk with real exit codes",
+            "status": "passed",
+            "evidence": "cmp input.txt output.txt exit 0 (no output); shasum -a 256 exit 0 with both hashes b6b0cf8af81b233935d7d4fb5b4c697cd2dacc53cf26de7cd996f5e7c2c41d3d; wc -c exit 0 reporting 15 and 15; od -An -tx1 diff exit 0"
+          },
+          {
+            "criterion": "JSON report at reports/worker-report.json with task id, status, project-relative paths, sizes, sha256 hashes, commands+exit codes, boolean byteIdentical",
+            "status": "passed",
+            "evidence": "reports/worker-report.json written (2196 bytes); parsed successfully with python3 json.load (exit 0); contains taskId=t1, status=completed, path fields input.txt/output.txt/reports/worker-report.json (relative), bytes 15/15, both sha256 values, 5 commands with exit codes, byteIdentical=true"
+          }
+        ],
+        "commandsRun": [
+          {
+            "command": "cp -- /tmp/agentteams-final-validation/renamed/run/candidate/workspace/input.txt /tmp/agentteams-final-validation/renamed/run/candidate/workspace/output.txt",
+            "status": "passed",
+            "exitCode": 0,
+            "evidence": "copy succeeded; output.txt created with same 15-byte size"
+          },
+          {
+            "command": "cmp /tmp/agentteams-final-validation/renamed/run/candidate/workspace/input.txt /tmp/agentteams-final-validation/renamed/run/candidate/workspace/output.txt",
+            "status": "passed",
+            "exitCode": 0,
+            "evidence": "no output from cmp => files byte identical; re-run after report write also exit 0"
+          },
+          {
+            "command": "shasum -a 256 /tmp/agentteams-final-validation/renamed/run/candidate/workspace/input.txt /tmp/agentteams-final-validation/renamed/run/candidate/workspace/output.txt",
+            "status": "passed",
+            "exitCode": 0,
+            "evidence": "both files: b6b0cf8af81b233935d7d4fb5b4c697cd2dacc53cf26de7cd996f5e7c2c41d3d"
+          },
+          {
+            "command": "wc -c /tmp/agentteams-final-validation/renamed/run/candidate/workspace/input.txt /tmp/agentteams-final-validation/renamed/run/candidate/workspace/output.txt",
+            "status": "passed",
+            "exitCode": 0,
+            "evidence": "15 input.txt; 15 output.txt; 30 total"
+          },
+          {
+            "command": "python3 -c \"import json; json.load(open('reports/worker-report.json'))\"",
+            "status": "passed",
+            "exitCode": 0,
+            "evidence": "JSON parsed, byteIdentical=True, status=completed"
+          }
+        ]
+      }
+    ],
+    "members": [
+      {
+        "id": "72d7dd4c-610c-4357-9047-10f9eba23706",
+        "name": "worker",
+        "role": "worker",
+        "provider": "deepseek-official",
+        "model": "deepseek-flash",
+        "reasoningEffort": "max",
+        "joinedAt": 1789611366170,
+        "status": "idle"
+      }
+    ]
+  },
+  "hostVersion": "0.1.5-rc.1",
+  "traceEvents": 117
+}

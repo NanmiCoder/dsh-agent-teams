@@ -8,17 +8,15 @@
  * named a path the scope forbade — no honest completion existed and the
  * repair dead-locked (worker blocked, downstream review permanently pending).
  *
- * Second incident (issue #173): the repair inherits the source task's
- * `outOfScope` verbatim, and `classifyChangedPath` lets `outOfScope` win
- * (`tdd.scope.out-of-scope-wins`). A derived candidate covered by an inherited
- * directory pattern is therefore unregistrable, so the derivation skips it
- * instead of widening the scope with an entry the gate always rejects.
+ * Issue #173: derive every required path before dropping inherited exclusions
+ * that conflict with the generated repair scope. Handwritten contracts still
+ * enforce outOfScope first.
  *
  * Run: node --test scripts/quality-gates-repair-scope.test.mjs
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { pathMatchesScope, planQualityFollowUp, repairScopeFromFindings } from '../lib/quality-gates.js'
+import { classifyChangedPath, evaluateQualityCompletion, planQualityFollowUp, repairScopeFromFindings } from '../lib/quality-gates.js'
 
 function finding(extra = {}) {
   return { id: 'F1', severity: 'medium', problem: 'problem', requiredFix: 'fix it', ...extra }
@@ -104,43 +102,42 @@ test('end-to-end: generated repair round is satisfiable for the incident shape',
   )
 })
 
-test('a candidate covered by the inherited outOfScope is not declared', () => {
-  const scope = repairScopeFromFindings(
-    [finding({
-      file: 'data/sample.txt',
-      requiredFix: 'edit deploy/compose/postfix/master.cf.inc and README.md',
-    })],
-    undefined,
-    ['deploy/compose/postfix/'],
-  )
-  assert.ok(
-    !scope.includes('deploy/compose/postfix/master.cf.inc'),
-    `covered path must be skipped, got ${JSON.stringify(scope)}`,
-  )
-  assert.ok(scope.includes('README.md'))
-  assert.ok(scope.includes('data/sample.txt'))
-})
-
-test('fallback survives when the inherited outOfScope covers every candidate', () => {
-  const scope = repairScopeFromFindings(
-    [finding({ file: 'deploy/only.txt', requiredFix: 'fix deploy/only.txt' })],
-    ['src/'],
-    ['deploy/'],
-  )
-  assert.deepEqual(scope, ['src/'])
-})
-
-test('end-to-end: generated repair declares no path its inherited outOfScope forbids', () => {
-  const closed = failedReview({
-    findings: [finding({
-      file: 'deploy/compose/postfix/master.cf.inc',
-      requiredFix: 'edit deploy/compose/postfix/master.cf.inc and docs/guide.md',
-    })],
+for (const [label, source, findings, expectedScope, expectedExclusions] of [
+  ['real F_DOC incident',
+    { inScope: ['data/sample.txt'], outOfScope: ['README.md', 'check-data.mjs', 'reports/'] },
+    [finding({ file: 'data/sample.txt', requiredFix: 'Edit README.md to contain exactly 2 words. Keep data/sample.txt unchanged.' })],
+    ['data/sample.txt', 'README.md'], ['check-data.mjs', 'reports/']],
+  ['directory exclusion covers observed and required paths',
+    { inScope: ['src/'], outOfScope: ['deploy/', 'go.mod'] },
+    [finding({ file: 'deploy/old.txt', requiredFix: 'edit deploy/new.txt and deploy/old.txt' }), finding({ file: 'deploy/old.txt' })],
+    ['deploy/old.txt', 'deploy/new.txt'], ['go.mod']],
+  ['fallback scope has duplicates and overlapping exclusions',
+    { inScope: ['src/', 'src/'], outOfScope: ['src/private.ts', 'docs/'] },
+    [finding()], ['src/'], ['docs/']],
+]) {
+  test(`generated repair is completable: ${label}`, () => {
+    const state = teamWithSource(source)
+    const original = structuredClone(state)
+    const closed = failedReview({ findings })
+    const result = planQualityFollowUp(state, closed)
+    const repair = result.created.find((item) => item.kind === 'repair')
+    assert.deepEqual(repair.inScope, expectedScope)
+    assert.deepEqual(repair.outOfScope, expectedExclusions)
+    assert.deepEqual(state, original, 'source contract must remain untouched')
+    assert.deepEqual(repair.acceptance, findings.map((item) => item.requiredFix))
+    for (const path of expectedScope) {
+      const concretePath = path.endsWith('/') ? `${path}fixed.ts` : path
+      assert.equal(classifyChangedPath(concretePath, repair.inScope, repair.outOfScope), 'in_scope')
+      const completion = evaluateQualityCompletion({ ...repair, status: 'in_progress' }, {
+        status: 'completed', changedPaths: [concretePath],
+        acceptanceResults: repair.acceptance.map((criterion) => ({ criterion, status: 'passed' })),
+        commandsRun: [{ command: 'pnpm test', status: 'passed', exitCode: 0 }],
+      })
+      assert.equal(completion.ok, true, completion.error)
+    }
+    assert.equal(result.created.find((item) => item.kind === 'review').reviewedTaskId, repair.id)
+    for (const path of expectedExclusions) {
+      assert.equal(classifyChangedPath(path, repair.inScope, repair.outOfScope), 'out_of_scope')
+    }
   })
-  const result = planQualityFollowUp(teamWithSource({ outOfScope: ['deploy/compose/postfix/'] }), closed)
-  const repair = result.created.find((item) => item.kind === 'repair')
-  assert.ok(repair, 'repair round must be generated')
-  assert.ok(repair.inScope.includes('docs/guide.md'), `docs/guide.md missing from ${JSON.stringify(repair.inScope)}`)
-  const forbidden = repair.inScope.filter((entry) => pathMatchesScope(entry, 'deploy/compose/postfix/'))
-  assert.deepEqual(forbidden, [], 'no declared path may be covered by the inherited outOfScope')
-})
+}

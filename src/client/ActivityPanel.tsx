@@ -18,6 +18,7 @@
  */
 
 import {
+import { sanitizeField } from '../sanitize.js'
   useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore,
   type CSSProperties, type PointerEvent as ReactPointerEvent,
 } from 'react'
@@ -166,7 +167,7 @@ function taskTitle(task: ActivityTask, model: string): string {
     task.verdict,
     model === '' ? undefined : model,
   ].filter((item): item is string => item !== undefined)
-  return extras.length === 0 ? `${task.id} · ${task.subject}` : `${task.id} · ${task.subject} · ${extras.join(' · ')}`
+  return extras.length === 0 ? `${task.id} · ${sanitizeField(task.subject, 'subject')}` : `${task.id} · ${sanitizeField(task.subject, 'subject')} · ${extras.join(' · ')}`
 }
 
 /** Badge/bar coloring key: visual state, widened for terminal statuses. */
@@ -440,7 +441,7 @@ function DependencyMap({ tasks, members, t, discarded = false }: {
           <section className={css.taskDetail} data-task-detail={detailTask.id}>
             <span className={css.taskDetailHead}>
               <span className={css.taskDetailId}>{detailTask.id}</span>
-              <span className={css.taskDetailSubject} title={detailTask.subject}>{detailTask.subject.replace(/^开发\s*/u, '')}</span>
+              <span className={css.taskDetailSubject} title={sanitizeField(detailTask.subject, 'subject')}>{detailTask.subject.replace(/^开发\s*/u, '')}</span>
               <span className={css.taskDetailBadge} data-state={discarded ? 'cancelled' : taskTone(detailTask.state, detailTask.status)}>
                 {discarded ? t('task.status.notRun') : taskStatusLabel(detailTask.status, t)}
               </span>
@@ -532,7 +533,7 @@ function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscarded, on
     <>
       <section className={css.team} data-team-id={team.teamId}>
         <header className={css.teamHead}>
-          <span className={css.teamName} title={team.name}>{team.name}</span>
+          <span className={css.teamName} title={sanitizeField(team.name, 'name')}>{sanitizeField(team.name, 'name')}</span>
           {historic && <span className={css.historicPill}>{t(discarded ? 'team.discarded' : 'team.ended')}</span>}
           {stopped && <span className={css.historicPill}>{t('team.stopped')}</span>}
           <span className={css.teamStats}>
@@ -638,8 +639,8 @@ function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscarded, on
                   </span>
                   <span className={css.memberInfo}>
                     <span className={css.memberLine}>
-                      <span className={css.memberName}>{member.name}</span>
-                      {member.role !== '' && <span className={css.memberRole}>{member.role}</span>}
+                      <span className={css.memberName}>{sanitizeField(member.name, 'name')}</span>
+                      {member.role !== '' && <span className={css.memberRole}>{sanitizeField(member.role, 'role')}</span>}
                       {/* Inline member model badge: compact visible label, full route in
                           title/aria-label (accessible tooltip) and the data-member-model
                           DOM probe; noninteractive span, no tab stop. */}

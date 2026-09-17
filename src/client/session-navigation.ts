@@ -1,6 +1,7 @@
 /** Version-tolerant navigation into durable AgentTeams member transcripts. */
 
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import { sanitizeField } from '../sanitize.js'
 import type { SubagentAddress } from '@deepseek-ai/dsh-subagent/client'
 
 /** Narrow sessions-service face used by the activity panel and team card. */

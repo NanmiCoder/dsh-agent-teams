@@ -7,6 +7,7 @@
  */
 
 import { useCallback, useEffect, useId, useState, useSyncExternalStore, type FormEvent } from 'react'
+import { sanitizeField } from '../sanitize.js'
 import type { ModelDirectory } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import { Menu, type MenuEntry } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ActivityMember, ActivityTask, ActivityTeam } from './activity-monitor.ts'
@@ -377,8 +378,8 @@ function StagedMemberEditor({ team, member, modelDirectory, onPendingChange, t }
   const dirty = signature !== savedSignature
 
   useEffect(() => {
-    onPendingChange(`member:${member.name}`, dirty || busy)
-    return () => { onPendingChange(`member:${member.name}`, false) }
+    onPendingChange(`member:${sanitizeField(member.name, 'name')}`, dirty || busy)
+    return () => { onPendingChange(`member:${sanitizeField(member.name, 'name')}`, false) }
   }, [busy, dirty, member.name, onPendingChange])
 
   useEffect(() => {
@@ -431,7 +432,7 @@ function StagedMemberEditor({ team, member, modelDirectory, onPendingChange, t }
 
   const route = `${provider}/${model}`.replace(/^\//u, '')
   return (
-    <article className={css.planCard} data-plan-member={member.name} data-open={open}>
+    <article className={css.planCard} data-plan-member={sanitizeField(member.name, 'name')} data-open={open}>
       <button
         type="button"
         className={css.planCardHeader}
@@ -440,7 +441,7 @@ function StagedMemberEditor({ team, member, modelDirectory, onPendingChange, t }
         onClick={() => { setOpen((current) => !current) }}
       >
         <span className={css.planCardIdentity}>
-          <strong>{member.name}</strong>
+          <strong>{sanitizeField(member.name, 'name')}</strong>
           <span>{role || t('plan.member.roleFallback')}</span>
         </span>
         <span className={css.planCardMeta} title={route}>{route}</span>
@@ -580,7 +581,7 @@ function StagedTaskEditor({ team, task, onPendingChange, t }: {
               <label>{t('plan.task.assignee')}
                 <select name="assignee" value={assignee} onChange={(event) => { setAssignee(event.currentTarget.value); markEdited() }}>
                   <option value="">{t('plan.task.unassigned')}</option>
-                  {team.members.map((member) => <option key={member.name} value={member.name}>{member.name}</option>)}
+                  {team.members.map((member) => <option key={sanitizeField(member.name, 'name')} value={sanitizeField(member.name, 'name')}>{sanitizeField(member.name, 'name')}</option>)}
                 </select>
               </label>
               <label>
@@ -748,7 +749,7 @@ export function StagingPlanEditor({ team, modelDirectory, onContinuePlanning, on
               ? <p className={css.planEmpty}>{t('plan.members.empty')}</p>
               : team.members.map((member) => (
                 <StagedMemberEditor
-                  key={member.name}
+                  key={sanitizeField(member.name, 'name')}
                   team={team}
                   member={member}
                   modelDirectory={modelDirectory}

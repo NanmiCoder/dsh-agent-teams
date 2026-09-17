@@ -11,6 +11,7 @@
  */
 
 import { useEffect, useMemo, useSyncExternalStore } from 'react'
+import { sanitizeField } from '../sanitize.js'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import {
@@ -97,14 +98,14 @@ export function AgentTeamsCard({ node, openMember, sessionId, t }: AgentTeamsCar
               onClick={() => {
                 if (member.id !== '') openMember(owner as SessionId, member.id as SessionId)
               }}
-              title={member.role === '' ? member.name : `${member.name} · ${member.role}`}
+              title={member.role === '' ? member.name : `${sanitizeField(member.name, 'name')} · ${sanitizeField(member.role, 'role')}`}
             >
               {memberArtUrl(member.name, member.role) !== null ? (
                 <img className={css.memberArt} src={memberArtUrl(member.name, member.role) ?? ''} alt="" aria-hidden />
               ) : (
                 <span className={css.memberInitial}>{member.name.trim().slice(0, 1).toUpperCase() || '?'}</span>
               )}
-              <span className={css.memberName}>{member.name}</span>
+              <span className={css.memberName}>{sanitizeField(member.name, 'name')}</span>
             </button>
           ))}
         </div>

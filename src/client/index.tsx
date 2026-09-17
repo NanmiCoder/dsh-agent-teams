@@ -1,6 +1,7 @@
 /** Browser plugin for the AgentTeams activity floater and conversation card. */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
+import { sanitizeField } from '../sanitize.js'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'

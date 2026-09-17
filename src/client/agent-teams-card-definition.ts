@@ -12,6 +12,7 @@
  */
 
 import type {
+import { sanitizeField } from '../sanitize.js'
   ConversationNodeContext,
   ConversationNodeDefinition,
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -56,7 +57,7 @@ export function parseAgentTeamsCreateArgs(value: string): { teamId: string; name
     if (typeof parsed !== 'object' || parsed === null || !('name' in parsed) || typeof parsed.name !== 'string') {
       return undefined
     }
-    const name = parsed.name.trim()
+    const name = sanitizeField(parsed.name, 'name')
     if (name === '') return undefined
     const cleaned = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
     return { teamId: cleaned === '' ? 'team' : cleaned, name }

@@ -10,6 +10,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
+import { sanitizeField } from './sanitize.js'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { SessionId } from '@deepseek-ai/dsh-session'
@@ -757,7 +758,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
       const captain = requireCaptain(exec)
       const workspace = workspaceOf(captain)
       const stateRoot = stateRootOf(workspace, config)
-      const teamName = args.name.trim()
+      const teamName = sanitizeField(args.name, 'name')
       if (teamName === '') throw new Error('team name must not be empty')
       const teamId = sanitizeKey(teamName)
       const staged = args.approval === 'required'
@@ -786,7 +787,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
             const state: TeamState = {
               name: teamName,
               id: teamId,
-              description: args.description,
+              description: sanitizeField(args.description, 'description'),
               captainSessionId: captain.id,
               createdAt: Date.now(),
               members: [],
@@ -808,7 +809,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
             teamId,
             profileName: profileName ?? 'inline-plan',
             inlinePlan: args.plan,
-            description: args.description,
+            description: sanitizeField(args.description, 'description'),
             staged,
           })
         })
@@ -1077,14 +1078,14 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
       const team = await requireCaptainTeam(workspace, config, captain)
       const created = await withTeamLock(teamLockKey(stateRoot, team.id), async () => {
         const fresh = await requireFreshCaptainTeam(stateRoot, team.id, captain.id)
-        const memberName = args.name.trim()
+        const memberName = sanitizeField(args.name, 'name')
         if (memberName === '') throw new Error('member name must not be empty')
         const memberKey = sanitizeKey(memberName)
         if (memberKey === CAPTAIN_KEY) {
-          throw new Error(`member name "${args.name}" is reserved for the captain`)
+          throw new Error(`member name "${sanitizeField(args.name, 'name')}" is reserved for the captain`)
         }
         if (fresh.members.some((candidate) => sanitizeKey(candidate.name) === memberKey)) {
-          throw new Error(`member name "${args.name}" has already been used in team "${fresh.name}"`)
+          throw new Error(`member name "${sanitizeField(args.name, 'name')}" has already been used in team "${fresh.name}"`)
         }
         if (fresh.members.filter((candidate) => candidate.status !== 'removed').length >= config.maxMembers) {
           throw new Error(`team "${fresh.name}" is at its member cap (${config.maxMembers})`)
@@ -1099,7 +1100,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         const member: TeamMember = {
           id: '',
           name: memberName,
-          role: args.role,
+          role: sanitizeField(args.role, 'role'),
           provider: selection.provider,
           model: selection.model,
           reasoningEffort: selection.reasoningEffort,
@@ -1164,7 +1165,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
       const revoked = await withTeamLock(teamLockKey(stateRoot, team.id), async () => {
         const fresh = await requireFreshCaptainTeam(stateRoot, team.id, captain.id)
         const member = fresh.members.find(item => item.name === args.name)
-        if (member === undefined) throw new Error(`no member \"${args.name}\" in team \"${fresh.name}\"`)
+        if (member === undefined) throw new Error(`no member \"${sanitizeField(args.name, 'name')}\" in team \"${fresh.name}\"`)
         const requeued: string[] = []
         for (const task of fresh.tasks) {
           if (task.assignee !== member.name || task.status === 'completed') continue
@@ -1305,10 +1306,10 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
           : input.acceptance
         const task: TeamTask = {
           id: `t${fresh.taskSeq + 1}`,
-          subject: args.subject,
-          description: args.description,
+          subject: sanitizeField(args.subject, 'subject'),
+          description: sanitizeField(args.description, 'description'),
           status: 'pending',
-          assignee: args.assignee,
+          assignee: sanitizeField(args.assignee, 'assignee'),
           dependencies,
           attempt: 0,
           createdAt: Date.now(),
@@ -1383,7 +1384,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
       const workspace = workspaceOf(captain)
       const stateRoot = stateRootOf(workspace, config)
       const team = await requireCaptainTeam(workspace, config, captain)
-      const target = args.assignee.trim()
+      const target = sanitizeField(args.assignee, 'assignee')
       if (target === '') throw new Error('reassignment assignee must not be empty')
 
       const revoked = await withTeamLock(teamLockKey(stateRoot, team.id), async () => {

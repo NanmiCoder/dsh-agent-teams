@@ -531,6 +531,17 @@ export function evaluateQualityCompletion(
       }
       for (const path of changed) {
         const classification = classifyChangedPath(path, task.inScope ?? [], task.outOfScope ?? [])
+        // outOfScope deliberately wins over inScope, so a path present in both
+        // is rejected as out_of_scope. Say so: the bare verdict sends the member
+        // hunting for a scope violation that is really a contradictory contract.
+        if (classification === 'out_of_scope'
+          && (task.inScope ?? []).some((pattern) => pathMatchesScope(path, pattern))) {
+          return {
+            ok: false,
+            error: `${kind} cannot complete: ${path} is listed in inScope but also matches outOfScope`
+              + ' — the two lists contradict each other; narrow one of them before resubmitting',
+          }
+        }
         if (classification !== 'in_scope') {
           return { ok: false, error: `${kind} cannot complete: ${path} is ${classification}` }
         }

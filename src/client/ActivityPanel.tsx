@@ -39,6 +39,7 @@ import {
   COMPACT_DAG_NODE_WIDTH,
   dependencyFocusTaskId,
   memberRouteLabel,
+  orderDelegationMembers,
   relatedTaskIds,
   taskModelLabel,
   teamIsActive,
@@ -481,7 +482,7 @@ function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscarded, on
   readonly t: AgentTeamsTranslate
   readonly historic?: boolean
 }) {
-  const [membersOpen, setMembersOpen] = useState(true)
+  const [membersOpen, setMembersOpen] = useState(false)
   const [stopOpen, setStopOpen] = useState(false)
   const [stopping, setStopping] = useState(false)
   const [stopError, setStopError] = useState('')
@@ -605,17 +606,33 @@ function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscarded, on
 
         <ProgressOverview team={team} t={t} discarded={discarded} />
 
-        <button type="button" className={css.membersToggle} onClick={() => { setMembersOpen((current) => !current) }} aria-expanded={membersOpen} data-members-toggle>
-          <span><Chevron open={membersOpen} />{t('members.toggle', { count: team.members.length })}</span>
-          <span>{t(membersOpen ? 'members.collapse' : 'members.expand')}</span>
-        </button>
+        {(() => {
+          const orderedMembers = orderDelegationMembers(team.members, team.tasks)
+          const runningMembers = orderedMembers.filter((member) => (
+            member.activity === 'working' || member.status === 'working'
+            || team.tasks.some((task) => task.assignee === member.name
+              && (task.status === 'pending' || task.status === 'claimed' || task.status === 'in_progress'))
+          ))
+          const visibleMembers = membersOpen ? orderedMembers : runningMembers
+          const hiddenFinishedCount = orderedMembers.length - visibleMembers.length
+          const expandLabel = membersOpen
+            ? t('members.collapse')
+            : hiddenFinishedCount > 0
+              ? t('members.expandFinished', { count: hiddenFinishedCount })
+              : t('members.expand')
+          return (
+            <>
+              <button type="button" className={css.membersToggle} onClick={() => { setMembersOpen((current) => !current) }} aria-expanded={membersOpen} data-members-toggle>
+                <span><Chevron open={membersOpen} />{t('members.toggle', { count: team.members.length })}</span>
+                <span>{expandLabel}</span>
+              </button>
 
-        {membersOpen && <div className={css.delegationTree}>
-          {team.members.length === 0 && <span className={css.emptyHint}>{t('members.empty')}</span>}
-          {team.members.map((member) => {
-            const owned = team.tasks.filter((task) => task.assignee === member.name)
-            const memberModel = memberRouteLabel(member)
-            return (
+              {(membersOpen || visibleMembers.length > 0) && <div className={css.delegationTree}>
+                {team.members.length === 0 && <span className={css.emptyHint}>{t('members.empty')}</span>}
+                {visibleMembers.map((member) => {
+                  const owned = team.tasks.filter((task) => task.assignee === member.name)
+                  const memberModel = memberRouteLabel(member)
+                  return (
               <div key={member.id || member.name} className={css.memberBlock} data-activity={member.activity}>
                 <span className={css.memberBranch} aria-hidden><span /></span>
                 <button
@@ -699,10 +716,13 @@ function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscarded, on
                         })}
                   </span>
                 </div>
-              </div>
-            )
-          })}
-        </div>}
+                  </div>
+                )
+              })}
+                </div>}
+            </>
+          )
+        })()}
       </section>
 
       <DependencyMap tasks={team.tasks} members={team.members} t={t} discarded={discarded} />

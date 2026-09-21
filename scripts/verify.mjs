@@ -39,7 +39,9 @@ import {
   COMPACT_DAG_NODE_HEIGHT,
   COMPACT_DAG_NODE_WIDTH,
   dependencyFocusTaskId,
+  memberFinishedAt,
   memberRouteLabel,
+  orderDelegationMembers,
   relatedTaskIds,
   taskModelLabel,
   taskStages,
@@ -442,7 +444,7 @@ check(
 // noninteractive span keeps the full route in title, aria-label, and the
 // data-member-model DOM probe. The badge must sit inside memberLine after the
 // role and before the member state; the old standalone third-line row is gone.
-const memberMapStart = activityPanelSource.indexOf('team.members.map((member) => {')
+const memberMapStart = activityPanelSource.indexOf('visibleMembers.map((member) => {')
 const memberBadgeSection = activityPanelSource.slice(
   memberMapStart,
   activityPanelSource.indexOf('css.assignmentLine', memberMapStart),
@@ -464,6 +466,14 @@ check(
   !activityPanelSource.includes("t('member.model'")
     && !localesSource.includes("'member.model'"),
   'the previous standalone model row and its orphaned locale key must not remain',
+)
+check(
+  'delegation list collapses finished members and sorts them by finish time (issue #192)',
+  activityPanelSource.includes('orderDelegationMembers(team.members, team.tasks)')
+    && activityPanelSource.includes("useState(false)")
+    && activityPanelSource.includes("'members.expandFinished'")
+    && localesSource.includes("'members.expandFinished'"),
+  'collapsed list must show running members only; expanding shows finished members newest-first',
 )
 const memberModelCssStart = activityPanelCss.indexOf('.memberModel {')
 const memberModelCssBlock = activityPanelCss.slice(
@@ -846,6 +856,30 @@ check('settled failed/completed team is not waiting to be scheduled', teamIsActi
   ],
 }) === false)
 check('progress summary prefers running task titles', teamProgressSummary(liveTeam, '、').detail === 'Clarify requirements')
+check('delegation list keeps running members first in snapshot order', orderDelegationMembers([
+  { name: 'finished-b', activity: 'idle' },
+  { name: 'running-a', activity: 'working' },
+  { name: 'finished-a', activity: 'idle' },
+], [
+  { assignee: 'finished-a', status: 'completed', updatedAt: 20 },
+  { assignee: 'finished-b', status: 'completed', updatedAt: 10 },
+  { assignee: 'running-a', status: 'in_progress', updatedAt: 5 },
+]).map((member) => member.name).join(',') === 'running-a,finished-a,finished-b')
+check('delegation list sorts finished members by finish time, newest first', orderDelegationMembers([
+  { name: 'old', activity: 'idle' },
+  { name: 'new', activity: 'idle' },
+  { name: 'unstamped', activity: 'idle' },
+], [
+  { assignee: 'old', status: 'failed', updatedAt: 3 },
+  { assignee: 'new', status: 'cancelled', updatedAt: 9 },
+]).map((member) => member.name).join(',') === 'new,old,unstamped')
+check('member finish time ignores open tasks and missing stamps', memberFinishedAt('solo', [
+  { assignee: 'solo', status: 'in_progress', updatedAt: 99 },
+  { assignee: 'solo', status: 'completed' },
+]) === undefined && memberFinishedAt('solo', [
+  { assignee: 'solo', status: 'completed', updatedAt: 7 },
+  { assignee: 'other', status: 'completed', updatedAt: 50 },
+]) === 7)
 check('a real dependency keeps the layered DAG layout', !usesParallelTaskGrid([
   { id: 't1', dependencies: [], depth: 0 },
   { id: 't2', dependencies: ['t1'], depth: 1 },

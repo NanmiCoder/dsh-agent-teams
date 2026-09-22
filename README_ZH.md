@@ -125,6 +125,7 @@ npm 默认标签 `latest` 现指向 `0.1.20`，因此新 profile 使用 `dsh plu
     memberModel: deepseek-v4
     memberMaxDepth: 0
     maxMembers: 8
+    maxConcurrentWorkers: 0       # 单团队同时派工的成员并发上限（0 = 不限）
 ```
 
 `memberMaxDepth` 默认 `0`，团队成员不能再创建子代理；显式设为 `1` 可允许一层后代，运行时和代码工具调用同样受限。默认成员统一通过团队消息汇报，避免再走宿主消息重复通知队长。无任务成员不调用模型；任务分配开启独立轮次，纠正消息进入最近的模型步骤。消息投递与读取分别记录；移除和归档必须等成员分支及待处理输入清理完成后才报告成功。

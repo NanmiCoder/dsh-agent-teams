@@ -138,6 +138,7 @@ Defaults work without extra setup. A trusted profile can override member behavio
     memberModel: deepseek-v4
     memberMaxDepth: 0
     maxMembers: 8
+    maxConcurrentWorkers: 0       # per-team cap of concurrently dispatched member workers (0 = unlimited)
 ```
 
 `memberMaxDepth` defaults to `0`: team members cannot create nested subagents. Set `1` to explicitly permit one descendant level; the limit also covers runtime/code-tool calls. Default members report through team messages only, avoiding duplicate native parent reports. Idle roster members make no model requests. Task assignments start distinct turns; coordination joins the nearest model step. Acceptance and consumption are tracked separately. Removal/archive drains the selected branch and its pending input before reporting success.

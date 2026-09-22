@@ -486,7 +486,23 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         if (attemptId !== undefined && !team.tasks.some(task => task.attemptId === attemptId && task.assignee === memberName && (task.status === 'claimed' || task.status === 'in_progress'))) {
           return reject(team, `attempt ${attemptId} is no longer the live capability for "${memberName}"`)
         }
-        if (member.id !== '') return deliverToMember(ctx, captain, member.id, text, signal, mode)
+        if (member.id !== '') {
+          // A delivery the host rejects is the same silence the guards above
+          // close: `deliverToMember` swallows its own failure, so without a
+          // record here the captain sees an idle member next to a task the
+          // scheduler just rolled back to `pending` — the exact symptom this
+          // exists to end, reached through the delivery branch instead.
+          const delivered = await deliverToMember(ctx, captain, member.id, text, signal, mode)
+          if (!delivered) return reject(team, `the prompt delivery to "${memberName}" was rejected`)
+          // A delivered prompt is a successful dispatch, so the record clears
+          // here too; otherwise a stale rejection outlives its condition and
+          // keeps rendering on a team that is dispatching fine.
+          if (team.lastDispatchError !== undefined) {
+            clearDispatchFailure(team)
+            await writeTeam(root, team)
+          }
+          return true
+        }
         const selection = await resolveMemberLlmSelection(ctx, captain, {
           provider: member.provider, model: member.model, reasoningEffort: member.reasoningEffort, fallback: member.fallback,
         }, signal)

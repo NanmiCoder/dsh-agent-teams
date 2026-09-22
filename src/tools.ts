@@ -91,6 +91,8 @@ export interface ToolsConfig {
   memberMaxDepth?: number
   /** Team size cap (members). */
   maxMembers: number
+  /** Per-team cap of concurrently dispatched member workers (`0` = unlimited). */
+  maxConcurrentWorkers?: number
   /** Named team profiles from the active DSH profile. */
   profiles: Record<string, import('./profiles.ts').TeamProfileConfig>
 }
@@ -428,7 +430,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
   installRetiredMemberGuard(ctx, config.stateDir)
   installMemberDelegationGuard(ctx, config.stateDir, config.memberMaxDepth ?? 0)
   installMailboxAdmission(ctx, config.stateDir)
-  const scheduler = installTeamScheduler(ctx, { stateDir: config.stateDir, executionPrompt: config.executionPrompt, dispatch: dispatchMember })
+  const scheduler = installTeamScheduler(ctx, { stateDir: config.stateDir, executionPrompt: config.executionPrompt, maxConcurrentWorkers: config.maxConcurrentWorkers, dispatch: dispatchMember })
   const memberSelections = installMemberSelectionRuntime(ctx, config.stateDir, (workspace, teamId, memberName) => (
     scheduler.kickMember(workspace, teamId, memberName)
   ))

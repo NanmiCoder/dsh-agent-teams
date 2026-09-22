@@ -1433,9 +1433,9 @@ try {
   emitTurnError(flake, { code: 'STREAM_CLOSED', message: 'SSE stream ended without [DONE]' })
   // Degraded non-atomic overwrites can hand a reader torn JSON; retry the
   // durable reads instead of letting environmental I/O noise fail the checks.
-  const readTeamStable = async (teamId) => {
+  const readTeamStable = async (teamId, root = stateRoot) => {
     for (let attempt = 0; ; attempt += 1) {
-      try { return await readTeam(stateRoot, teamId) } catch (error) { if (attempt >= 5) throw error }
+      try { return await readTeam(root, teamId) } catch (error) { if (attempt >= 5) throw error }
     }
   }
   const readMailboxStable = async (teamId, agentKey) => {
@@ -1504,6 +1504,146 @@ try {
   check('failed member drain never reports a successful archive', archiveRejected && await readTeam(stateRoot, 'batch-plan') !== undefined && await readArchivedTeam(stateRoot, 'batch-plan') === undefined)
   await call('agent_teams_delete', {})
   check('archive retries drain previously removed roster rows', await readTeam(stateRoot, 'batch-plan') === undefined && !liveAgents.has(batchWorker.id))
+  // ── member concurrency budget (issue #97) ────────────────────────────
+  // A second plugin registration with maxConcurrentWorkers=2 reuses the same
+  // fake harness but keeps its own state root, so the budget applies only to
+  // this team. Each open (claimed/in_progress) task held by a member occupies
+  // one license; captain takeovers do not count, and cold recovery of an
+  // unobserved durable attempt must never be blocked by a saturated budget.
+  const capDefinitions = new Map()
+  const capCtx = {
+    ...ctx,
+    tools: { register(definition) { capDefinitions.set(definition.name, definition) } },
+  }
+  registerAgentTeamsTools(capCtx, {
+    stateDir: '.agent-teams-capped',
+    memberProvider: 'spawn',
+    memberMaxDepth: 1,
+    maxMembers: 8,
+    maxConcurrentWorkers: 2,
+    profiles: {},
+  })
+  const capCall = (name, args, subject = captain) => {
+    const definition = capDefinitions.get(name)
+    if (!definition) throw new Error(`missing tool ${name}`)
+    return definition.execute(args, execFor(subject))
+  }
+  const cappedRoot = join(workspace, '.agent-teams-capped')
+  const cappedState = () => readTeamStable('capped-concurrency', cappedRoot)
+  const cappedTask = async id => (await cappedState())?.tasks.find(candidate => candidate.id === id)
+  const cappedOpen = async () => (await cappedState())?.tasks
+    .filter(candidate => candidate.status === 'claimed' || candidate.status === 'in_progress')
+    .length ?? 0
+  const capSettle = async (label, predicate) => {
+    for (let waited = 0; waited < 4000; waited += 20) {
+      if (await predicate()) return
+      await new Promise(resolve => setTimeout(resolve, 20))
+    }
+    check(label, false, 'timed out waiting for the expected team state')
+  }
+
+  // Idle workers one at a time: only the first two take the two licenses.
+  // A dispatch under 0.1.18 spawns the member with the prompt attached, so
+  // count spawns rather than post-spawn deliveries. The graph kick on each
+  // create_task already dispatches idle workers, so baseline before the team.
+  const spawnsBeforeCapWave = children.length
+  await capCall('agent_teams_create', { name: 'Capped Concurrency', description: 'worker budget' })
+  for (let index = 1; index <= 7; index += 1) {
+    await capCall('agent_teams_add_member', { name: `worker-${index}`, role: 'builder' })
+  }
+  const capTaskIds = []
+  for (let index = 1; index <= 7; index += 1) {
+    capTaskIds.push((await capCall('agent_teams_create_task', { subject: `capped unit ${index}` })).task_id)
+  }
+  // Since 0.1.18 add_member only writes the roster row and the first dispatch
+  // spawns the continuable child. Resolve workers through the durable roster
+  // (not a captured live-agent list) and wait for the spawn a dispatch causes.
+  const capWorkerId = async name => (await cappedState())?.members.find(candidate => candidate.name === name)?.id ?? ''
+  const capLiveWorker = async name => {
+    for (let waited = 0; waited < 4000; waited += 20) {
+      const id = await capWorkerId(name)
+      const agent = id === '' ? undefined : liveAgents.get(id)
+      if (agent !== undefined) return agent
+      await new Promise(resolve => setTimeout(resolve, 20))
+    }
+    return undefined
+  }
+
+  // Idle workers one at a time: only the first two take the two licenses.
+  // A dispatch under 0.1.18 spawns the member with the prompt attached, so
+  // count spawns rather than post-spawn deliveries.
+  await capCall('agent_teams_status', {})
+  await capSettle('first idle worker is dispatched under the cap',
+    async () => (await cappedTask(capTaskIds[0]))?.status === 'claimed')
+  await capSettle('second idle worker fills the concurrency budget',
+    async () => (await cappedTask(capTaskIds[1]))?.status === 'claimed')
+  const firstWorker = await capLiveWorker('worker-1')
+  const secondWorker = await capLiveWorker('worker-2')
+  check('both license holders spawned, the rest never did', firstWorker !== undefined && secondWorker !== undefined
+    && /^worker-[3-7]$/.test('') === false && (await cappedState()).members
+      .filter(member => /^worker-[3-7]$/.test(member.name))
+      .every(member => member.id === ''))
+  await new Promise(resolve => setTimeout(resolve, 60))
+  check('cap keeps the remaining five ready tasks pending and members idle (#97)',
+    await cappedOpen() === 2
+      && (await cappedState()).tasks.filter(candidate => candidate.status === 'pending').length === 5
+      && children.length === spawnsBeforeCapWave + 2
+      && (await cappedState()).members
+        .filter(member => /^worker-[3-7]$/.test(member.name))
+        .every(member => member.status === 'idle'))
+
+  // Completing one task frees its license at the graph-kick boundary; exactly
+  // one queued task may then be dispatched.
+  const firstClaim = await capCall('agent_teams_claim_task', { task_id: capTaskIds[0] }, firstWorker)
+  await capCall('agent_teams_update_task', {
+    task_id: capTaskIds[0], status: 'in_progress', attempt_id: firstClaim.attempt_id,
+  }, firstWorker)
+  await capCall('agent_teams_update_task', {
+    task_id: capTaskIds[0], status: 'completed', output: 'unit 1 done', attempt_id: firstClaim.attempt_id,
+  }, firstWorker)
+  await capSettle('completion frees exactly one license for the next queued task',
+    async () => (await cappedTask(capTaskIds[2]))?.status === 'claimed')
+  publishStatus(firstWorker, 'idle')
+  await new Promise(resolve => setTimeout(resolve, 60))
+  check('saturated budget blocks the freed member from extra queued work (#97)',
+    await cappedOpen() === 2
+      && (await cappedTask(capTaskIds[2]))?.assignee === 'worker-3'
+      && (await cappedTask(capTaskIds[3]))?.status === 'pending'
+      && (await cappedState()).members.find(member => member.name === 'worker-1')?.status === 'idle')
+
+  // A member failure path must release its license instead of wedging the
+  // queue: the failed attempt is terminal and the next queued task dispatches.
+  const secondClaim = await capCall('agent_teams_claim_task', { task_id: capTaskIds[1] }, secondWorker)
+  await capCall('agent_teams_update_task', {
+    task_id: capTaskIds[1], status: 'in_progress', attempt_id: secondClaim.attempt_id,
+  }, secondWorker)
+  await capCall('agent_teams_update_task', {
+    task_id: capTaskIds[1], status: 'failed', output: 'blocked on missing input', attempt_id: secondClaim.attempt_id,
+  }, secondWorker)
+  await capSettle('failed attempt releases its license to the queue',
+    async () => (await cappedTask(capTaskIds[3]))?.status === 'claimed')
+  publishStatus(secondWorker, 'idle')
+  await new Promise(resolve => setTimeout(resolve, 60))
+  check('failure keeps one failed task and exactly two fresh open tasks (#97)',
+    (await cappedTask(capTaskIds[1]))?.status === 'failed'
+      && await cappedOpen() === 2
+      && (await cappedState()).tasks.filter(candidate => candidate.status === 'pending').length === 3
+      && (await cappedState()).members.find(member => member.name === 'worker-2')?.status === 'idle')
+
+  // Cold recovery of an unobserved durable attempt bypasses the budget: with
+  // both licenses still held and the owner's handle disposed, the exact next
+  // kick must still rotate that one attempt instead of wedging behind #97.
+  const thirdBefore = await cappedTask(capTaskIds[2])
+  liveAgents.delete(await capWorkerId('worker-3'))
+  await capCall('agent_teams_status', {})
+  await new Promise(resolve => setTimeout(resolve, 60))
+  const thirdAfter = await cappedTask(capTaskIds[2])
+  check('recovery dispatch is never blocked by a saturated budget (#86/#97)',
+    thirdAfter?.status === 'claimed'
+      && thirdAfter?.attempt === (thirdBefore?.attempt ?? 0) + 1
+      && thirdAfter?.attemptId !== thirdBefore?.attemptId
+      && await cappedOpen() === 2)
+  await capCall('agent_teams_delete', {})
 } finally {
   await rm(workspace, { recursive: true, force: true })
 }

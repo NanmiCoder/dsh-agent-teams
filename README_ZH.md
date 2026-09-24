@@ -30,7 +30,7 @@
 
 ## 版本更新
 
-[v0.1.20](./release-notes/v0.1.20.md) 仅把本文档中的版本引用同步到 npm `latest`，不含任何代码或行为变更，打包产物与 [v0.1.19](./release-notes/v0.1.19.md) 完全一致；该版本带来上一份文档版本以来的实质变更：宿主禁用或改名委派工具时成员仍能正常启动；自动修复范围改为从 `requiredFix` 推导；新增队长专用的 `agent_teams_amend_task`。推荐 DeepSeek Harness `0.1.5-rc.1`，保留三个旧宿主目标。
+[v0.1.21](./release-notes/v0.1.21.md) 把 AgentTeams 迁移到 **DeepSeek Harness `0.1.7-rc.1`**（新的推荐宿主），并移除旧宿主目标：浏览器侧无法同时跨越两代宿主（`agent/session-start` 合并为 serial 的 `agent/created`；`plugin` 消息来源类型被删除；图标名在外部化解析的包中改名；会话导航迁移到 `uiWorkspace`）。同时按 `dsh-agent-teams-doctor` 报出的重复解析身份对齐了 Cordis 与 schemastery 基线。[v0.1.20](./release-notes/v0.1.20.md) 仍是 `0.1.5-rc.1` 及更早宿主的最后一个版本。
 
 ## 为什么需要 AgentTeams？
 
@@ -48,19 +48,17 @@
 
 ## 安装与版本选择
 
-**推荐组合：DeepSeek Harness `0.1.5-rc.1` + AgentTeams `0.1.20`。Harness 仍为预发布版本。**
+**推荐组合：DeepSeek Harness `0.1.7-rc.1` + AgentTeams `0.1.21`。Harness 仍为预发布版本。**
 
 | 使用场景 | DeepSeek Harness | AgentTeams 插件 |
 | --- | --- | --- |
-| **推荐安装** | **`0.1.5-rc.1`** | **`0.1.20`** |
-| 保留旧 RC | `0.1.2-rc.1` | `0.1.20` |
-| 开发者测试 Alpha | `0.1.2-alpha.5` | `0.1.20` |
-| 保留旧 Alpha | `0.1.2-alpha.2` | `0.1.20` |
+| **推荐安装** | **`0.1.7-rc.1`** | **`0.1.21`** |
+| 保留旧 RC | `0.1.5-rc.1` | [0.1.20](./release-notes/v0.1.20.md) |
 
 ### 1. 安装 DeepSeek Harness
 
 ```sh
-npm install --global @deepseek-ai/dsh@0.1.5-rc.1
+npm install --global @deepseek-ai/dsh@0.1.7-rc.1
 dsh --version
 ```
 
@@ -71,12 +69,12 @@ dsh --version
 安装到 `web` profile；使用其他 profile 时替换名称：
 
 ```sh
-dsh plugin --profile web add --save-exact @nanmicoder/dsh-agent-teams@0.1.20
+dsh plugin --profile web add --save-exact @nanmicoder/dsh-agent-teams@0.1.21
 ```
 
 **安装后，停止并重新启动该 profile 的 Harness 进程，再刷新浏览器。**
 
-npm 默认标签 `latest` 现指向 `0.1.20`，因此新 profile 使用 `dsh plugin --profile web add @nanmicoder/dsh-agent-teams` 即可安装本版；需要锁定版本时使用上面的精确版本命令。推荐宿主为 Harness `0.1.5-rc.1`，安装插件不会自动升级宿主。源码安装见[维护指南](./docs/maintenance-workflow.md)，验证范围见[本版验收记录](./docs/releases/v0.1.19/README.md)。
+npm 默认标签 `latest` 现指向 `0.1.21`，因此新 profile 使用 `dsh plugin --profile web add @nanmicoder/dsh-agent-teams` 即可安装本版；需要锁定版本时使用上面的精确版本命令。推荐宿主为 Harness `0.1.7-rc.1`，安装插件不会自动升级宿主。源码安装见[维护指南](./docs/maintenance-workflow.md)，验证范围见[本版验收记录](./docs/releases/v0.1.19/README.md)。
 
 > Desktop 用户需核对应用内置的 Harness 核心；全局 CLI 升级不会升级桌面内核。旧 `0.1.0-*` / `0.1.1-*` 或其他未列出的宿主，请先保留已工作的组合，参考[旧版本与诊断指引](./docs/maintenance-workflow.md)。
 

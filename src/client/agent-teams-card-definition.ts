@@ -90,8 +90,10 @@ export const agentTeamsCardDefinition: ConversationNodeDefinition<AgentTeamsNode
   },
   update: (context, match) => {
     if (match.event.type !== 'tool/result') return context.state
+    // 0.1.7 removed the `tool-result` content block; the tool outcome is now
+    // the ToolResultMessage's own `isError` plus the event's optional `error`.
     const failed = match.event.data.error !== undefined
-      || match.event.data.message.content.some((block) => block.type === 'tool-result' && block.isError === true)
+      || match.event.data.message.isError === true
     if (failed) return context.state
     return { ...context.state, accepted: true }
   },

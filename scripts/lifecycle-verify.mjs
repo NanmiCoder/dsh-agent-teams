@@ -208,7 +208,7 @@ const ctx = {
       child.ctx = childContext(child)
       if (deliveryHarness) delete child.ctx.agent
       if (modernHarness) {
-        for (const listener of listeners.get('agent/session-start') ?? []) listener({ agent: child, source: 'startup' })
+        for (const listener of listeners.get('agent/created') ?? []) listener({ agent: child, source: 'startup' })
       } else {
         for (const setup of continuableSetups) setup(child.ctx)
       }
@@ -412,7 +412,7 @@ check('bare gesture yields an empty goal', invokedAgentTeamsGoal([userMessage(' 
 check('mid-sentence mention stays ordinary prose',
   invokedAgentTeamsGoal([userMessage('how do I use /agent-teams here?')]) === undefined)
 check('non-user sources cannot forge the gesture',
-  invokedAgentTeamsGoal([{ ...userMessage('/agent-teams x'), source: { kind: 'plugin', plugin: 'fake' } }]) === undefined)
+  invokedAgentTeamsGoal([{ ...userMessage('/agent-teams x'), source: { kind: 'not-a-user-gesture' } }]) === undefined)
 check('latest user gesture wins in a batch',
   invokedAgentTeamsGoal([userMessage('/agent-teams first'), userMessage('/agent-teams second')]) === 'second')
 const profileOnly = command.handler({
@@ -1139,7 +1139,7 @@ try {
   const deliveriesBeforeRemovedFollowup = deliveries.length
   try {
     await directPrompt(captain, alpha.id, [{ type: 'text', text: 'must not resume' }], {
-      source: { kind: 'plugin', plugin: 'verification' }, signal: new AbortController().signal,
+      source: { kind: 'verification' }, signal: new AbortController().signal,
     })
   } catch (error) {
     removedFollowupRejected = error?.code === 'NOT_RESUMABLE'
@@ -1344,7 +1344,7 @@ try {
   const deliveriesBeforeColdFollowup = deliveries.length
   try {
     await directPrompt(captain, gamma.id, [{ type: 'text', text: 'must stay retired' }], {
-      source: { kind: 'plugin', plugin: 'verification' }, signal: new AbortController().signal,
+      source: { kind: 'verification' }, signal: new AbortController().signal,
     })
   } catch (error) {
     coldFollowupRejected = error?.code === 'NOT_RESUMABLE'
@@ -1357,7 +1357,7 @@ try {
   const foreignFollowup = await directPrompt(captain, 'foreign-session', [
     { type: 'text', text: 'unrelated work still routes' },
   ], {
-    source: { kind: 'plugin', plugin: 'verification' }, signal: new AbortController().signal,
+    source: { kind: 'verification' }, signal: new AbortController().signal,
   })
   check('team shutdown leaves unrelated continuable followup untouched',
     typeof foreignFollowup === 'string'

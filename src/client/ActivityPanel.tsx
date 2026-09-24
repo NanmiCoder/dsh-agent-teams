@@ -22,14 +22,17 @@ import {
   type CSSProperties, type PointerEvent as ReactPointerEvent,
 } from 'react'
 import {
-  IconBranchOutline16, IconChevronDownOutline14, IconPanelLeftOutline16,
-  IconStopFill16, IconWarningOutline16, Modal,
+  IconBranchOutlineMedium, IconChevronDownOutlineMedium, IconPanelLeftOutlineMedium,
+  IconStopFillMedium, IconWarningOutlineMedium, Modal,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ModelDirectory, ModelDirectoryResolver } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
 import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
+// Declaration merge only: adds the `mainView` retain-source label that marks
+// the Session the frame is currently showing.
+import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import {
   activityPanelExpandedForSession,
   activityPanelShouldAutoExpand,
@@ -379,7 +382,7 @@ function DependencyMap({ tasks, members, t, discarded = false }: {
     <section className={css.dependencySection} aria-label={t('dependency.aria')} data-dependency-map>
       <header className={css.sectionHead}>
         <button type="button" className={css.sectionToggleTitle} onClick={() => { setOpen((current) => !current) }} aria-expanded={open}>
-          <Chevron open={open} /><IconBranchOutline16 /> {t(parallel ? 'dependency.parallel' : 'dependency.title')}
+          <Chevron open={open} /><IconBranchOutlineMedium /> {t(parallel ? 'dependency.parallel' : 'dependency.title')}
         </button>
         <span className={css.sectionHint}>{pinnedTaskId === null
           ? t(parallel ? 'dependency.hint.parallel' : 'dependency.hint.chain')
@@ -548,7 +551,7 @@ function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscarded, on
               title={t('team.stop')}
               onClick={() => { setStopError(''); setStopOpen(true) }}
             >
-              <IconStopFill16 />
+              <IconStopFillMedium />
             </button>
           )}
         </header>
@@ -717,13 +720,13 @@ function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscarded, on
           <span className={css.stopModalActions}>
             <button type="button" disabled={stopping} onClick={() => { setStopOpen(false) }}>{t('team.stopCancel')}</button>
             <button type="button" data-danger disabled={stopping} onClick={() => { void stopTeam() }}>
-              <IconStopFill16 />
+              <IconStopFillMedium />
               {stopping ? t('team.stopping') : t('team.stopConfirm')}
             </button>
           </span>
         )}
       >
-        {stopError !== '' && <p className={css.stopModalError} role="alert"><IconWarningOutline16 />{stopError}</p>}
+        {stopError !== '' && <p className={css.stopModalError} role="alert"><IconWarningOutlineMedium />{stopError}</p>}
       </Modal>
     </>
   )
@@ -752,6 +755,15 @@ function historicCardTeam(data: AgentTeamsCardData, owner: string): ActivityTeam
     messageCount: 0,
     captainInbox: [],
   }
+}
+
+/**
+ * The Session the frame currently shows: the single Session retained under the
+ * `mainView` source. Harness 0.1.7 removed `SessionListState.current`, and this
+ * retention count is the replacement the shipped client plugins use.
+ */
+export function currentSessionIdOf(state: SessionListState): SessionId | undefined {
+  return Object.values(state.byId).find((session) => (session.retainedBy.mainView ?? 0) > 0)?.id
 }
 
 /** The top-right activity floater. Teams follow the current session: live
@@ -786,10 +798,13 @@ export function ActivityPanel({ sessionsList, modelDirectories, openMember, t, c
   const gestureRef = useRef<PanelGesture | null>(null)
   const frameRef = useRef<number | null>(null)
   const pendingLayoutRef = useRef<PanelLayout | null>(null)
-  const current = useSyncExternalStore(
-    sessionsList.subscribe,
-    sessionsList.getSnapshot,
-  ).current
+  // 0.1.7 removed `SessionListState.current`. The frame keeps exactly one
+  // Session retained under the `mainView` source, which is the current one.
+  const selectCurrentSession = useCallback(
+    (): SessionId | undefined => currentSessionIdOf(sessionsList.getSnapshot()),
+    [sessionsList],
+  )
+  const current = useSyncExternalStore(sessionsList.subscribe, selectCurrentSession)
   const autoOpenTrackerRef = useRef<{
     sessionId: SessionId | undefined
     restoreComplete: boolean
@@ -1211,7 +1226,7 @@ export function ActivityPanel({ sessionsList, modelDirectories, openMember, t, c
                   aria-label={t(geometry.mode === 'docked' ? 'activity.float' : 'activity.dockRight')}
                   title={t(geometry.mode === 'docked' ? 'activity.float' : 'activity.dockRight')}
                 >
-                  <IconPanelLeftOutline16 />
+                  <IconPanelLeftOutlineMedium />
                 </button>
               )}
               <button
@@ -1225,7 +1240,7 @@ export function ActivityPanel({ sessionsList, modelDirectories, openMember, t, c
                 aria-label={t('activity.collapse')}
                 title={t('activity.collapse')}
               >
-                <IconChevronDownOutline14 />
+                <IconChevronDownOutlineMedium />
               </button>
             </span>
           </header>

@@ -13,14 +13,32 @@ test('stable latest requires the recommended host and bounded compatibility', ()
   assert.deepEqual(releaseMetadata(fixture('0.1.16', 'latest')), {
     value: '0.1.16', dist_tag: 'latest', prerelease: false,
   })
-  const alphaOnly = fixture('0.1.16', 'latest')
-  for (const name of Object.keys(alphaOnly.devDependencies)) {
-    if (name === '@deepseek-ai/dsh' || name.startsWith('@deepseek-ai/dsh-')) alphaOnly.devDependencies[name] = '0.1.2-alpha.2'
+  // A development baseline outside the supported matrix is refused outright.
+  const unsupported = fixture('0.1.16', 'latest')
+  for (const name of Object.keys(unsupported.devDependencies)) {
+    if (name === '@deepseek-ai/dsh' || name.startsWith('@deepseek-ai/dsh-')) unsupported.devDependencies[name] = '0.1.2-alpha.2'
   }
-  for (const name of Object.keys(alphaOnly.pnpm.overrides)) {
-    if (name === '@deepseek-ai/dsh' || name.startsWith('@deepseek-ai/dsh-')) alphaOnly.pnpm.overrides[name] = '0.1.2-alpha.2'
+  for (const name of Object.keys(unsupported.pnpm.overrides)) {
+    if (name === '@deepseek-ai/dsh' || name.startsWith('@deepseek-ai/dsh-')) unsupported.pnpm.overrides[name] = '0.1.2-alpha.2'
   }
-  assert.throws(() => releaseMetadata(alphaOnly), /recommended host/)
+  assert.throws(() => releaseMetadata(unsupported), /supported target/)
+  // A supported-but-legacy baseline still cannot ship as `latest`. The shipping
+  // policy supports one host, so the branch is exercised through a widened
+  // matrix rather than a fiction the checked-in policy could not express.
+  const legacy = '0.1.7-alpha.1'
+  const widened = { ...policy, supportedHosts: [...policy.supportedHosts, { version: legacy, track: 'legacy' }] }
+  const legacyPinned = fixture('0.1.16', 'latest')
+  for (const table of [legacyPinned.devDependencies, legacyPinned.pnpm.overrides]) {
+    for (const name of Object.keys(table)) {
+      if (name === '@deepseek-ai/dsh' || name.startsWith('@deepseek-ai/dsh-')) table[name] = legacy
+    }
+  }
+  for (const name of Object.keys(legacyPinned.peerDependencies)) {
+    if (name === '@deepseek-ai/dsh' || name.startsWith('@deepseek-ai/dsh-')) {
+      legacyPinned.peerDependencies[name] = `${policy.recommendedHost} || ${legacy}`
+    }
+  }
+  assert.throws(() => releaseMetadata(legacyPinned, widened), /recommended host/)
   assert.throws(() => releaseMetadata(fixture('0.1.16', 'latest'), {
     ...policy, recommendedHost: '0.1.2-alpha.2',
     supportedHosts: [{ version: '0.1.2-alpha.2', track: 'recommended' }],

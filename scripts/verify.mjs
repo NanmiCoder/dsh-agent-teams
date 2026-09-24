@@ -212,7 +212,11 @@ check(
 check(
   'client uses the uiConversation event registry and registers the official locale namespace',
   AGENT_TEAMS_LOCALE_NAMESPACE === 'agentTeams'
-    && clientIndexSource.includes("'uiConversation', 'slots', 'sessions', 'locale', 'modelDirectories'")
+    // The client requires the conversation registry, slots, the session list,
+    // Workspace navigation (0.1.7 moved Session opening to uiWorkspace), the
+    // official locale service, and the model catalog.
+    && ['uiConversation', 'slots', 'sessions', 'uiWorkspace', 'locale', 'modelDirectories', 'layout']
+      .every(service => clientIndexSource.includes(`'${service}'`))
     && clientIndexSource.includes('ctx.uiConversation.events.register(agentTeamsCardDefinition)')
     && clientIndexSource.includes('ctx.locale.register(AGENT_TEAMS_LOCALE_NAMESPACE, { zh, en })')
     && clientIndexSource.match(/locale:\s*AGENT_TEAMS_LOCALE_NAMESPACE/gu)?.length === 2,
@@ -1195,50 +1199,35 @@ check(
     && settledFallbackKeys[0] === pollTarget.key,
 )
 const navigationCalls = []
-const addressedNavigation = await openAgentTeamMember({
-  open: (id) => { navigationCalls.push(['open', id]) },
-  refreshSubagents: async (id) => { navigationCalls.push(['refresh', id]) },
-  subagentAddress: () => undefined,
-  openSubagent: (address) => { navigationCalls.push(['openSubagent', address]) },
+const addressedNavigation = openAgentTeamMember({
+  openSession: (target) => { navigationCalls.push(target) },
 }, 'captain-session', 'member-session')
 check(
-  'rc.8 member navigation refreshes the parent catalog and opens an addressed continuable child',
+  'member navigation opens the exact parent/child continuable address',
   addressedNavigation === 'subagent'
-    && navigationCalls[0]?.[0] === 'refresh'
-    && navigationCalls[1]?.[0] === 'openSubagent'
-    && navigationCalls[1]?.[1]?.parentSessionId === 'captain-session'
-    && navigationCalls[1]?.[1]?.childSessionId === 'member-session'
-    && navigationCalls[1]?.[1]?.mode === 'continuable',
-)
-const legacyNavigationCalls = []
-const legacyNavigation = await openAgentTeamMember({
-  open: (id) => { legacyNavigationCalls.push(id) },
-}, 'captain-session', 'member-session')
-check(
-  'pre-rc.8 member navigation keeps the ordinary session fallback',
-  legacyNavigation === 'session' && legacyNavigationCalls[0] === 'member-session',
+    && navigationCalls.length === 1
+    && navigationCalls[0]?.parentSessionId === 'captain-session'
+    && navigationCalls[0]?.childSessionId === 'member-session'
+    && navigationCalls[0]?.mode === 'continuable',
 )
 const panelNavigationCalls = []
-await openAgentTeamMember({
-  open() { throw new Error('expected addressed navigation') },
-  refreshSubagents: async () => {},
-  openSubagent: () => panelNavigationCalls.push('member'),
+openAgentTeamMember({
+  openSession: () => panelNavigationCalls.push('member'),
 }, 'captain-session', 'member-session', {
   beginNavigation: () => new AbortController().signal,
   selectPanel: id => panelNavigationCalls.push(id),
 })
-check('0.1.5 member navigation selects the Conversation after opening its transcript',
+check('member navigation selects the Conversation after opening its transcript',
   JSON.stringify(panelNavigationCalls) === JSON.stringify(['member', null]))
 const supersededNavigation = new AbortController()
-const cancelledNavigation = await openAgentTeamMember({
-  open() { throw new Error('cancelled navigation must not open a Session') },
-  refreshSubagents: async () => { supersededNavigation.abort() },
-  openSubagent() { throw new Error('cancelled refresh must not steal the current Session') },
+supersededNavigation.abort()
+const cancelledNavigation = openAgentTeamMember({
+  openSession() { throw new Error('cancelled navigation must not open a Session') },
 }, 'captain-session', 'member-session', {
   beginNavigation: () => supersededNavigation.signal,
   selectPanel() { throw new Error('cancelled navigation must not change main panel') },
 })
-check('0.1.5 superseded catalog refresh cannot steal navigation', cancelledNavigation === 'cancelled')
+check('a superseded layout token cannot steal navigation', cancelledNavigation === 'cancelled')
 check(
   'agent team cards derive a stable id from the standard create tool call',
   JSON.stringify(parseAgentTeamsCreateArgs('{"name":" Repo Review 2W! "}'))

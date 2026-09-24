@@ -101,7 +101,12 @@ export function installTeamCapabilities(ctx: Context, config: CapabilityConfig):
       return agent !== undefined && states.get(agent)?.member ? TEAM_MEMBER_PROMPT : captainPrompt
     },
   })
-  ctx.on('agent/session-start', ({ agent }) => { attach(agent) })
+  // 0.1.7 declares `agent/created` as a serial lifecycle listener whose
+  // completion gates agent creation, so it must return undefined explicitly.
+  ctx.on('agent/created', ({ agent }) => {
+    attach(agent)
+    return undefined
+  })
   ctx.effect(() => () => {
     mounted = false
     for (const state of [...active]) state.dispose()

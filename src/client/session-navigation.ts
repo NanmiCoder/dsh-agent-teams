@@ -1,54 +1,46 @@
-/** Version-tolerant navigation into durable AgentTeams member transcripts. */
+/**
+ * Navigation into durable AgentTeams member transcripts.
+ *
+ * Harness 0.1.7 owns Session navigation in the Workspace UI domain:
+ * `ISessions` lost `open`/`openSubagent`/`subagentAddress` ("navigation belongs
+ * to view owners") and `UiWorkspace.openSession(target)` accepts the
+ * `SessionId | SubagentAddress` union directly. That removes the runtime
+ * feature-detection this module used to carry: the address is always the
+ * durable direct-parent address, so a member transcript is always reachable.
+ * @module dsh-agent-teams/client/session-navigation
+ */
 
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { SubagentAddress } from '@deepseek-ai/dsh-subagent/client'
+import type { UiWorkspace } from '@deepseek-ai/dsh-client-ui-workspace/client'
 
-/** Narrow sessions-service face used by the activity panel and team card. */
-export interface AgentTeamsSessionNavigator {
-  /** Legacy/ordinary session navigation. */
-  open(id: SessionId): void
-  /** rc.8 addressed subagent navigation. */
-  openSubagent?(address: SubagentAddress): void
-  /** Refresh the exact parent's durable direct-child catalog. */
-  refreshSubagents?(parentSessionId: SessionId): Promise<void>
-  /** Reuse an address already retained by the client runtime when available. */
-  subagentAddress?(id: SessionId): SubagentAddress | undefined
-}
-
-/** Main-panel navigation added in Harness 0.1.5; older layouts omit these actions. */
+/** Layout owner actions used to reveal the Conversation panel for the target. */
 export interface AgentTeamsLayoutNavigator {
   selectPanel?(panelId: null): void
   beginNavigation?(): AbortSignal
 }
 
+/** Narrow Workspace face used by the activity panel and team card. */
+export type AgentTeamsSessionNavigator = Pick<UiWorkspace, 'openSession'>
+
 /**
  * Open one member's persisted transcript.
  *
- * Harness rc.8 intentionally removed cold subagents from the ordinary session
- * list. They must first be rediscovered in their parent's catalog, then opened
- * with the exact parent/child/mode address. Older runtimes have only `open()`;
- * the fallback preserves ordinary-session navigation. New layouts also select
- * the Conversation panel and cancel catalog refreshes superseded by navigation.
+ * The member is a continuable direct child of the captain, so the exact
+ * parent/child address is always known and never needs discovery through a
+ * catalog. Navigation supersedes any earlier request, so a stale layout token
+ * cancels the selection instead of yanking the UI to an abandoned target.
  */
-export async function openAgentTeamMember(
+export function openAgentTeamMember(
   sessions: AgentTeamsSessionNavigator,
   parentSessionId: SessionId,
   childSessionId: SessionId,
   layout?: AgentTeamsLayoutNavigator,
-): Promise<'subagent' | 'session' | 'cancelled'> {
+): 'subagent' | 'cancelled' {
   const navigation = layout?.beginNavigation?.()
-  if (sessions.openSubagent === undefined || sessions.refreshSubagents === undefined) {
-    sessions.open(childSessionId)
-    layout?.selectPanel?.(null)
-    return 'session'
-  }
-
-  await sessions.refreshSubagents(parentSessionId)
-  if (navigation?.aborted) return 'cancelled'
-  const retained = sessions.subagentAddress?.(childSessionId)
-  sessions.openSubagent(retained?.parentSessionId === parentSessionId
-    ? retained
-    : { parentSessionId, childSessionId, mode: 'continuable' })
+  if (navigation?.aborted === true) return 'cancelled'
+  const address: SubagentAddress = { parentSessionId, childSessionId, mode: 'continuable' }
+  sessions.openSession(address)
   layout?.selectPanel?.(null)
   return 'subagent'
 }

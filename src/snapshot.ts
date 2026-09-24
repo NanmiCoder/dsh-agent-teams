@@ -53,6 +53,8 @@ export interface TeamActivityTask {
   readonly kind?: string
   readonly round?: number
   readonly verdict?: string
+  /** Durable last-write stamp; drives the finished-member ordering (issue #192). */
+  readonly updatedAt: number
 }
 
 /** One captain-inbox preview row. */
@@ -188,6 +190,7 @@ export async function assembleTeamSnapshot(
       ...task.kind === undefined ? {} : { kind: task.kind },
       ...task.round === undefined ? {} : { round: task.round },
       ...task.verdict === undefined ? {} : { verdict: task.verdict },
+      updatedAt: task.updatedAt,
     })),
     messageCount: captainInbox.length
       + members.reduce((count, member) => count + member.unread, 0),

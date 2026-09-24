@@ -32,6 +32,8 @@ export interface ActivityTask {
   readonly kind?: string
   readonly round?: number
   readonly verdict?: string
+  /** Durable last-write stamp; drives the finished-member ordering (issue #192). */
+  readonly updatedAt?: number
 }
 
 /** One captain-inbox preview row. */

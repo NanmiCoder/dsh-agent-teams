@@ -81,6 +81,86 @@ export function liveCaptainTeam<T extends { readonly captainSessionId: string; r
   return teams.find((team) => team.captainSessionId === owner && team.halted !== true)
 }
 
+/** Minimal member shape needed to order the delegation list (issue #192). */
+export interface MemberListEntry {
+  readonly name: string
+  readonly activity?: string
+  readonly status?: string
+}
+
+/** Minimal task shape needed to derive a member's finish time (issue #192). */
+export interface MemberFinishTask {
+  readonly assignee: string
+  readonly status: string
+  readonly updatedAt?: number
+}
+
+/**
+ * Latest terminal-task `updatedAt` owned by one member.
+ * @param memberName - member whose owned tasks are scanned.
+ * @param tasks - team tasks carrying durable `updatedAt` stamps.
+ * @returns the newest terminal stamp, or undefined when the member owns none.
+ */
+export function memberFinishedAt(
+  memberName: string,
+  tasks: readonly MemberFinishTask[],
+): number | undefined {
+  let latest: number | undefined
+  for (const task of tasks) {
+    if (task.assignee !== memberName) continue
+    if (task.status !== 'completed' && task.status !== 'failed' && task.status !== 'cancelled') continue
+    const stamp = task.updatedAt
+    if (typeof stamp !== 'number' || !Number.isFinite(stamp)) continue
+    if (latest === undefined || stamp > latest) latest = stamp
+  }
+  return latest
+}
+
+/** Whether a member still has live work (running activity or an open task). */
+function memberIsRunning(
+  member: MemberListEntry,
+  tasks: readonly MemberFinishTask[],
+): boolean {
+  if (member.activity === 'working' || member.status === 'working') return true
+  return tasks.some((task) => task.assignee === member.name
+    && (task.status === 'pending' || task.status === 'claimed' || task.status === 'in_progress'))
+}
+
+/**
+ * Order the delegation member list for issue #192.
+ *
+ * Running members keep their incoming relative order and come first; finished
+ * members follow sorted by finish time, newest first. Members without a
+ * derivable finish time keep their incoming relative order after the stamped
+ * ones, so an older host that omits stamps never reorders them randomly.
+ * @param members - delegation roster in snapshot order.
+ * @param tasks - team tasks carrying durable `updatedAt` stamps.
+ * @returns the members in display order.
+ */
+export function orderDelegationMembers<TMember extends MemberListEntry>(
+  members: readonly TMember[],
+  tasks: readonly MemberFinishTask[],
+): readonly TMember[] {
+  const running: { member: TMember; index: number }[] = []
+  const finishedStamped: { member: TMember; index: number; finishedAt: number }[] = []
+  const finishedUnstamped: { member: TMember; index: number }[] = []
+  members.forEach((member, index) => {
+    if (memberIsRunning(member, tasks)) {
+      running.push({ member, index })
+      return
+    }
+    const finishedAt = memberFinishedAt(member.name, tasks)
+    if (finishedAt === undefined) finishedUnstamped.push({ member, index })
+    else finishedStamped.push({ member, index, finishedAt })
+  })
+  finishedStamped.sort((left, right) => right.finishedAt - left.finishedAt || left.index - right.index)
+  return [
+    ...running,
+    ...finishedStamped,
+    ...finishedUnstamped,
+  ].map((entry) => entry.member)
+}
+
 /** Whether the captain chat should keep showing the in-progress banner. */
 export function teamIsActive(team: {
   readonly phase?: string

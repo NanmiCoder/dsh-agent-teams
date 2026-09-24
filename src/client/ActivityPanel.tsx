@@ -19,12 +19,10 @@
 
 import {
   useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore,
-  type CSSProperties, type PointerEvent as ReactPointerEvent,
+  type ComponentType, type CSSProperties, type PointerEvent as ReactPointerEvent,
 } from 'react'
-import {
-  IconBranchOutline16, IconChevronDownOutline14, IconPanelLeftOutline16,
-  IconStopFill16, IconWarningOutline16, Modal,
-} from '@deepseek-ai/dsh-client-ui-primitives'
+import { Modal } from '@deepseek-ai/dsh-client-ui-primitives'
+import * as uiPrimitives from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ModelDirectory, ModelDirectoryResolver } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -380,7 +378,7 @@ function DependencyMap({ tasks, members, t, discarded = false }: {
     <section className={css.dependencySection} aria-label={t('dependency.aria')} data-dependency-map>
       <header className={css.sectionHead}>
         <button type="button" className={css.sectionToggleTitle} onClick={() => { setOpen((current) => !current) }} aria-expanded={open}>
-          <Chevron open={open} /><IconBranchOutline16 /> {t(parallel ? 'dependency.parallel' : 'dependency.title')}
+          <Chevron open={open} /><IconBranchOutline /> {t(parallel ? 'dependency.parallel' : 'dependency.title')}
         </button>
         <span className={css.sectionHint}>{pinnedTaskId === null
           ? t(parallel ? 'dependency.hint.parallel' : 'dependency.hint.chain')
@@ -549,7 +547,7 @@ function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscarded, on
               title={t('team.stop')}
               onClick={() => { setStopError(''); setStopOpen(true) }}
             >
-              <IconStopFill16 />
+              <IconStopFill />
             </button>
           )}
         </header>
@@ -737,13 +735,13 @@ function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscarded, on
           <span className={css.stopModalActions}>
             <button type="button" disabled={stopping} onClick={() => { setStopOpen(false) }}>{t('team.stopCancel')}</button>
             <button type="button" data-danger disabled={stopping} onClick={() => { void stopTeam() }}>
-              <IconStopFill16 />
+              <IconStopFill />
               {stopping ? t('team.stopping') : t('team.stopConfirm')}
             </button>
           </span>
         )}
       >
-        {stopError !== '' && <p className={css.stopModalError} role="alert"><IconWarningOutline16 />{stopError}</p>}
+        {stopError !== '' && <p className={css.stopModalError} role="alert"><IconWarningOutline />{stopError}</p>}
       </Modal>
     </>
   )
@@ -784,6 +782,34 @@ export type ActivityPanelProps = {
   readonly openMember: (parentId: SessionId, childId: SessionId) => void
 } & PropsLocale<'agentTeams'>
 
+/** Harness 0.1.7 renamed the icon exports from size suffixes (`*16`/`*14`) to weight suffixes
+ * (`Regular`/`Medium`). Resolve whichever name the host provides so the panel keeps working on
+ * both 0.1.5.x and 0.1.7.x instead of rendering `undefined` (React #130). */
+function resolveIcon(weighted: string, sized: string): ComponentType {
+  const bag = uiPrimitives as unknown as Record<string, ComponentType | undefined>
+  const found = bag[weighted] ?? bag[sized]
+  if (found === undefined) {
+    console.warn(`[agent-teams] ui-primitives exposes neither ${weighted} nor ${sized}`)
+    return () => null
+  }
+  return found
+}
+
+const IconBranchOutline = resolveIcon('IconBranchOutlineRegular', 'IconBranchOutline16')
+const IconChevronDownOutline = resolveIcon('IconChevronDownOutlineRegular', 'IconChevronDownOutline14')
+const IconPanelLeftOutline = resolveIcon('IconPanelLeftOutlineRegular', 'IconPanelLeftOutline16')
+const IconStopFill = resolveIcon('IconStopFillRegular', 'IconStopFill16')
+const IconWarningOutline = resolveIcon('IconWarningOutlineRegular', 'IconWarningOutline16')
+
+/** `SessionListState.current` was dropped in Harness 0.1.7. Recover the main session exactly the
+ * way the host does in ui-session's `publishMain()`: the entry retained by the main view. */
+function currentSessionFromListState(state: SessionListState): SessionId | undefined {
+  const byId = (state as { byId?: Record<string, { id?: SessionId; retainedBy?: { mainView?: number } }> }).byId
+  if (byId === undefined) return undefined
+  const hit = Object.values(byId).find((row) => ((row?.retainedBy?.mainView) ?? 0) > 0)
+  return hit?.id ?? (Object.keys(byId).length === 1 ? (Object.keys(byId)[0] as SessionId) : undefined)
+}
+
 export function ActivityPanel({ sessionsList, modelDirectories, openMember, t, conversationVisible = true }: ActivityPanelProps) {
   // Navigating to a member's subagent transcript is an explicit departure:
   // hide the floater immediately instead of waiting out the autocollapse
@@ -806,10 +832,12 @@ export function ActivityPanel({ sessionsList, modelDirectories, openMember, t, c
   const gestureRef = useRef<PanelGesture | null>(null)
   const frameRef = useRef<number | null>(null)
   const pendingLayoutRef = useRef<PanelLayout | null>(null)
-  const current = useSyncExternalStore(
+  const sessionListState = useSyncExternalStore(
     sessionsList.subscribe,
     sessionsList.getSnapshot,
-  ).current
+  )
+  const current = (sessionListState as { current?: SessionId }).current
+    ?? currentSessionFromListState(sessionListState)
   const autoOpenTrackerRef = useRef<{
     sessionId: SessionId | undefined
     restoreComplete: boolean
@@ -1231,7 +1259,7 @@ export function ActivityPanel({ sessionsList, modelDirectories, openMember, t, c
                   aria-label={t(geometry.mode === 'docked' ? 'activity.float' : 'activity.dockRight')}
                   title={t(geometry.mode === 'docked' ? 'activity.float' : 'activity.dockRight')}
                 >
-                  <IconPanelLeftOutline16 />
+                  <IconPanelLeftOutline />
                 </button>
               )}
               <button
@@ -1245,7 +1273,7 @@ export function ActivityPanel({ sessionsList, modelDirectories, openMember, t, c
                 aria-label={t('activity.collapse')}
                 title={t('activity.collapse')}
               >
-                <IconChevronDownOutline14 />
+                <IconChevronDownOutline />
               </button>
             </span>
           </header>

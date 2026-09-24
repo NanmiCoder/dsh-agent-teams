@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { currentSessionId, openAgentTeamMember } from '../lib/client/session-navigation.js'
-import { toolResultFailed } from '../lib/client/agent-teams-card-definition.js'
+import { toolResultFailed, teamCardsForTurn } from '../lib/client/agent-teams-card-definition.js'
 
 test('panel follows mainView ownership including retained subagents outside the list ids', () => {
   assert.equal(currentSessionId({ current: 'old', byId: {} }), 'old')
@@ -30,4 +30,17 @@ test('legacy sessions keep their old address navigation even when uiWorkspace ex
     openSession: () => { throw new Error('old uiWorkspace does not accept a subagent address') },
   })
   assert.deepEqual(calls, ['child'])
+})
+
+
+test('turn tail keeps each team summary on its create turn and supports multiple teams', () => {
+  const first = { key: 'a', kind: 'agent-teams', location: { kind: 'step', turn: { turn: 1 } } }
+  const second = { key: 'b', kind: 'agent-teams', location: { kind: 'turn', turn: { turn: 1 } } }
+  const later = { key: 'c', kind: 'agent-teams', location: { kind: 'step', turn: { turn: 2 } } }
+  const prose = { key: 'd', kind: 'assistant-step', location: first.location }
+  const unbound = { key: 'e', kind: 'agent-teams', location: { kind: 'session' } }
+  const nodes = new Map([first, second, later, prose, unbound].map(node => [node.key, node]))
+  assert.deepEqual(teamCardsForTurn(nodes.values(), 1), [first, second])
+  assert.deepEqual(teamCardsForTurn(nodes.values(), 2), [later])
+  assert.deepEqual(teamCardsForTurn(nodes.values(), 3), [])
 })

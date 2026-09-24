@@ -123,3 +123,9 @@ export function toolResultFailed(message: { readonly content: readonly unknown[]
     typeof block === 'object' && block !== null && 'type' in block && block.type === 'tool-result'
     && 'isError' in block && block.isError === true)
 }
+
+/** Keep summaries tied to the create turn, including multiple teams in one turn. */
+export function teamCardsForTurn(nodes: Iterable<ChatConversationViewNode>, turn: number): ChatConversationViewNode[] {
+  return [...nodes].filter(node => node.kind === 'agent-teams'
+    && (node.location.kind === 'turn' || node.location.kind === 'step') && node.location.turn.turn === turn)
+}

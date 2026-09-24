@@ -20,6 +20,7 @@ import type { UsePanelInfo } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import { ActivitySurface, WorkspaceActivity, createWorkspaceBridge, TEAM_TAB_ID, TEAM_TAB_KIND } from './WorkspaceActivity.tsx'
+import { TeamChatEntry, TeamTurnCard } from './TeamChatEntry.tsx'
 import { createWorkspaceState } from './workspace-state.ts'
 import { AgentTeamsCard, type AgentTeamsCardInjected } from './AgentTeamsCard.tsx'
 import { agentTeamsCardDefinition } from './agent-teams-card-definition.ts'
@@ -89,8 +90,16 @@ export function apply(ctx: ClientContext): void {
     native.effect(() => native.sidebarRightTabs.register({
       id: TEAM_TAB_ID, kind: TEAM_TAB_KIND,
       title: () => t('workspace.title'),
-      guide: [{ id: 'teams', order: 40, title: () => t('workspace.title'), description: () => t('workspace.guide') }],
     }))
+    native.slots.inject('conversation.session.header.actions', () => native.slots.register({
+      name: 'conversation.session.header.actions', id: 'agent-teams-entry', order: 50,
+      locale: AGENT_TEAMS_LOCALE_NAMESPACE,
+    }, TeamChatEntry))
+    native.slots.inject('conversation.chat.turnTail', () => native.slots.register({
+      name: 'conversation.chat.turnTail', id: 'agent-teams-summary', order: 50,
+      locale: AGENT_TEAMS_LOCALE_NAMESPACE,
+      inject: () => ({ openMember }),
+    }, TeamTurnCard))
     native.slots.inject('sidebar.right.pane.tab', () => {
       const dispose = native.slots.register({
         name: 'sidebar.right.pane.tab', key: TEAM_TAB_ID,
@@ -124,7 +133,7 @@ export function apply(ctx: ClientContext): void {
     key: 'agent-teams',
     locale: AGENT_TEAMS_LOCALE_NAMESPACE,
     inject: (): AgentTeamsCardInjected => ({
-      openMember,
+      openMember, workspaceBridge: bridge,
     }),
   }, AgentTeamsCard))
 }

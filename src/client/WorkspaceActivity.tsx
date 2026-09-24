@@ -111,11 +111,6 @@ export function WorkspaceActivity({ sessionId, useTabInfo, t, state, modelDirect
   return (
     <div className={css.root} data-agent-teams-workspace data-session-id={sessionId}>
       <div className={css.content}>
-        <header className={css.header}>
-          <span className={css.eyebrow}>{t('workspace.eyebrow')}</span>
-          <h2>{t('workspace.title')}</h2>
-          <p>{t('workspace.description')}</p>
-        </header>
         {status === 'error' && <div className={css.error} role="alert"><span>{t('workspace.error')}</span><button onClick={() => setRetry(value => value + 1)}>{t('workspace.retry')}</button></div>}
         {records.length > 1 && <nav className={css.selector} aria-label={t('workspace.title')}>
           {records.map(team => <button key={team.teamId} aria-pressed={selected?.teamId === team.teamId} onClick={() => state.select(sessionId, team.teamId)}>{team.name}<span>{t(live.includes(team) ? 'workspace.current' : 'workspace.history')}</span></button>)}
@@ -125,11 +120,6 @@ export function WorkspaceActivity({ sessionId, useTabInfo, t, state, modelDirect
           <h3>{t('workspace.emptyTitle')}</h3><p>{t('workspace.emptyBody')}</p>
           <button onClick={backToChat}>{t('workspace.back')}</button>
         </section> : <>
-          <div className={css.summary}>
-            <span><strong>{selected.tasks.filter(task => task.status === 'completed').length}<small> / {selected.tasks.length}</small></strong>{t('workspace.completed')}</span>
-            <span><strong>{selected.members.length}</strong>{t('workspace.members')}</span>
-            <p>{t('workspace.relationships')}</p>
-          </div>
           <TeamSection key={`${sessionId}:${selected.teamId}`} team={selected} workspace historic={history}
             modelDirectory={selected.phase === 'staged' ? modelDirectories.directoryFor(sessionId) : undefined}
             onContinuePlanning={backToChat} onDiscarded={backToChat} onNavigate={openMember} t={t} />

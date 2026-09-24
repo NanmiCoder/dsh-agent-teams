@@ -139,3 +139,10 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.chatEntry { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 7px; color: var(--dsw-alias-label-secondary); background: transparent; font: inherit; font-size: 12px; white-space: nowrap; cursor: pointer; }
+.chatEntry img { width: 22px; height: 22px; object-fit: contain; }
+.chatEntry:hover { background: var(--dsw-alias-bg-module-platform); }
+.chatEntry:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 2px; }
+.turnCards { display: grid; gap: 8px; margin-block: 10px; }
+@media (max-width: 600px) { .head { flex-wrap: wrap; } }

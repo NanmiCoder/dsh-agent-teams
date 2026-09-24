@@ -2185,7 +2185,10 @@
 
 /* Native workspace shares the team's content, never the legacy overlay geometry. */
 .dagOwner { margin-left: auto; max-width: 64px; overflow: hidden; text-overflow: ellipsis; font-size: 9px; font-weight: 400; }
-.team[data-workspace-team] { padding: 16px 0 0; border: 0; background: transparent; }
+/* Native grid and its children must query the same workspace container.
+ * The legacy team's nested container made the grid switch before its children
+ * at widths where the workspace padding straddled a breakpoint. */
+.team[data-workspace-team] { container-type: normal; container-name: none; padding: 0; border: 0; background: transparent; }
 .team[data-workspace-team] .teamHead { flex-wrap: wrap; gap: 8px; padding-bottom: 18px; }
 .team[data-workspace-team] .teamName { font-size: 15px; }
 .team[data-workspace-team] .teamStats { flex-wrap: wrap; }
@@ -2198,7 +2201,7 @@
 .team[data-workspace-team] .memberStatusLine { white-space: normal; }
 .team[data-workspace-team] .taskDetailSubject { white-space: normal; }
 .team[data-workspace-team] .dagViewport { padding-bottom: 12px; }
-@container (min-width: 720px) {
+@container (min-width: 1000px) {
   .team[data-workspace-team] { display: grid; grid-template-columns: minmax(260px, .85fr) minmax(0, 1.35fr); column-gap: 32px; align-items: start; }
   .team[data-workspace-team] > .teamHead { grid-column: 1 / -1; }
   .team[data-workspace-team] > :not(.teamHead):not(.delegationSection):not(.dependencySection) { grid-column: 1 / -1; }

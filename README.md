@@ -25,12 +25,12 @@
 Ask in natural language. The plugin provides the team protocol, 14 coordination tools, persistent state, an automatic shared-task scheduler, and a live Web UI—without requiring a separate workflow engine.
 
 <p align="center">
-  <img src="./assets/ui.png" width="100%" alt="DeepSeek Harness conversation with the AgentTeams live activity panel, members, tasks, dependencies, and reports">
+  <img src="./assets/readme/workspace.png" width="100%" alt="AgentTeams native workspace with members, task dependencies, and progress">
 </p>
 
 ## Releases
 
-[v0.1.21-rc.1](./release-notes/v0.1.21-rc.1.md) is a local, unpublished compatibility candidate. It adapts startup events, session navigation and tool results for Harness `0.1.7-rc.2`, and adds `0.1.5-rc.2/rc.3` support. See the exact [support matrix](./compatibility.json) and [compatibility audit](./docs/harness-0.1.7-rc.2-audit-2026-09-25/README.md).
+[v0.1.21](./release-notes/v0.1.21.md) brings teams into the native Harness workspace, restores **View team** in chat, and fixes narrow layouts. This is the npm `latest` release; the recommended host is Harness `0.1.7-rc.2` (its `next` channel). See the exact [support matrix](./compatibility.json).
 
 ## Why AgentTeams?
 
@@ -49,15 +49,15 @@ The conversation card and activity panel use Harness's official locale service. 
 
 ## Install and choose versions
 
-**Candidate pair (not yet published): DeepSeek Harness `0.1.7-rc.2` + AgentTeams `0.1.21-rc.1`. Harness remains a prerelease.**
+**Recommended pair: DeepSeek Harness `0.1.7-rc.2` + AgentTeams `0.1.21`. Harness remains a prerelease.**
 
 | Use case | DeepSeek Harness | AgentTeams plugin |
 | --- | --- | --- |
-| **Candidate target** | **`0.1.7-rc.2`** | **`0.1.21-rc.1`** |
-| Legacy RC | `0.1.5-rc.1`, `0.1.5-rc.2`, `0.1.5-rc.3` | `0.1.21-rc.1` |
-| Retaining an older RC | `0.1.2-rc.1` | `0.1.21-rc.1` |
-| Developer Alpha testing | `0.1.2-alpha.5` | `0.1.21-rc.1` |
-| Retaining an older Alpha | `0.1.2-alpha.2` | `0.1.21-rc.1` |
+| **Recommended** | **`0.1.7-rc.2`** | **`0.1.21`** |
+| Legacy RC | `0.1.5-rc.1`, `0.1.5-rc.2`, `0.1.5-rc.3` | `0.1.21` |
+| Retaining an older RC | `0.1.2-rc.1` | `0.1.21` |
+| Developer Alpha testing | `0.1.2-alpha.5` | `0.1.21` |
+| Retaining an older Alpha | `0.1.2-alpha.2` | `0.1.21` |
 
 ### 1. Install DeepSeek Harness
 
@@ -70,19 +70,15 @@ Skip this if you already run this version. Alpha is opt-in: select an exact Alph
 
 ### 2. Install the AgentTeams plugin
 
-This candidate is not on npm yet. Build it from this checkout and install the resulting tarball into your chosen test profile:
+Install or upgrade from npm (pinned to this `latest` release):
 
 ```sh
-pnpm install --frozen-lockfile
-pnpm build
-pnpm verify
-pnpm pack --out ./agent-teams-candidate.tgz
-dsh plugin --profile agent-teams-preview add --save-exact "$PWD/agent-teams-candidate.tgz"
+dsh plugin --profile web add --save-exact @nanmicoder/dsh-agent-teams@0.1.21
 ```
 
-**After installation, stop and restart Harness for that profile, then refresh the browser.**
+Replace `web` with your active profile. **Stop and restart that profile's Harness process, then refresh the browser.** Installing the plugin does not upgrade Harness; the host and plugin have independent `latest` channels.
 
-No npm dist-tag has been changed for this candidate. The recommended test host is Harness `0.1.7-rc.2`; installing the plugin does not upgrade the host. See the [source installation guide](./docs/maintenance-workflow.md) and [candidate verification](./docs/harness-0.1.7-rc.2-audit-2026-09-25/README.md).
+For source installations, run `pnpm install --frozen-lockfile` and `pnpm build` after pulling, then restart the corresponding Harness process. Updating Git alone does not update local build output. See the [maintenance guide](./docs/maintenance-workflow.md).
 
 > Desktop users must check the app's embedded Harness core; upgrading the global CLI does not upgrade it. For older `0.1.0-*` / `0.1.1-*` or unlisted hosts, keep a working pair and follow the [older-version and diagnostic guide](./docs/maintenance-workflow.md).
 
@@ -91,6 +87,12 @@ See the full [compatibility matrix](./compatibility.json), [source installation 
 Then ask for a team directly:
 
 > Use AgentTeams to review the commits after v0.5.3 from performance, security, and product perspectives. Return one consolidated report.
+
+## View teams in the workspace
+
+Click **View team** in the current chat header or the team card below a reply to open the native **Team collaboration** tab. The entry belongs to its chat, rather than the general workspace start page.
+
+Team and task content starts immediately: wide panes use columns and narrow panes stack them. Select a task to locate its owner; member icons open their conversations. Closing the tab does not stop the team, and its chat can reopen it. Completed teams retain their archives. Older hosts keep the activity panel.
 
 ## How it works
 

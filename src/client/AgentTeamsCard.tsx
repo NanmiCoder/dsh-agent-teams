@@ -27,6 +27,7 @@ export const OPEN_PANEL_EVENT = 'agent-teams:open-panel'
 
 /** Navigation action injected from the plugin's own SessionsService access. */
 export interface AgentTeamsCardInjected {
+  readonly workspaceBridge?: { getSnapshot: () => unknown; subscribe: (listener: () => void) => () => void }
   readonly openMember: (parentId: SessionId, childId: SessionId) => void
 }
 
@@ -36,10 +37,10 @@ export type AgentTeamsCardProps =
   & PropsLocale<'agentTeams'>
   & AgentTeamsCardInjected
 
-/** Re-activate the top-right activity panel, carrying this team's summary
+/** Open the matching team view, carrying this team's summary
  * so the panel can show it even when the team no longer exists on disk
  * (historical session review). */
-function openActivityPanel(data: AgentTeamsCardData): void {
+export function openActivityPanel(data: AgentTeamsCardData): void {
   window.dispatchEvent(new CustomEvent(OPEN_PANEL_EVENT, {
     detail: {
       teamId: data.teamId,
@@ -51,8 +52,20 @@ function openActivityPanel(data: AgentTeamsCardData): void {
 }
 
 /** Render one durable team as a compact conversation card. */
-export function AgentTeamsCard({ node, openMember, sessionId, t }: AgentTeamsCardProps) {
-  const data = node.data as AgentTeamsCardData
+const noWorkspace = () => undefined
+const noSubscription = () => () => {}
+
+export function AgentTeamsCard({ node, openMember, sessionId, t, workspaceBridge }: AgentTeamsCardProps) {
+  const native = useSyncExternalStore(workspaceBridge?.subscribe ?? noSubscription, workspaceBridge?.getSnapshot ?? noWorkspace)
+  const location = node.location
+  // Closed turns render their card through the official, non-folding turn tail.
+  if (native && (location.kind === 'turn' || location.kind === 'step') && location.turn.status === 'closed') return null
+  return <AgentTeamsSummary data={node.data} openMember={openMember} sessionId={sessionId} t={t} />
+}
+
+export function AgentTeamsSummary({ data, openMember, sessionId, t }: AgentTeamsCardInjected & PropsLocale<'agentTeams'> & {
+  data: AgentTeamsCardData; sessionId: string
+}) {
   // `conversation.chat.node` is session-scoped, so its framework-owned id is
   // a stable owner even while another conversation becomes current.
   const owner = data.captainSessionId || sessionId
@@ -81,10 +94,10 @@ export function AgentTeamsCard({ node, openMember, sessionId, t }: AgentTeamsCar
           type="button"
           className={css.panelButton}
           onClick={() => { openActivityPanel(resolved) }}
-          aria-label={t('action.openActivityPanel')}
-          title={t('action.openActivityPanel')}
+          aria-label={t('workspace.focus')}
+          title={t('workspace.focus')}
         >
-          {t('activity.panelButton')}
+          {t('workspace.focus')}
         </button>
       </header>
       {resolved.members.length > 0 && (

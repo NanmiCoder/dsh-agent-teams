@@ -2182,3 +2182,53 @@
     width: 100%;
   }
 }
+
+/* Native workspace shares the team's content, never the legacy overlay geometry. */
+.dagOwner { margin-left: auto; max-width: 64px; overflow: hidden; text-overflow: ellipsis; font-size: 9px; font-weight: 400; }
+.team[data-workspace-team] { padding: 16px 0 0; border: 0; background: transparent; }
+.team[data-workspace-team] .teamHead { flex-wrap: wrap; gap: 8px; padding-bottom: 18px; }
+.team[data-workspace-team] .teamName { font-size: 15px; }
+.team[data-workspace-team] .teamStats { flex-wrap: wrap; }
+.team[data-workspace-team] .delegationSection { min-width: 0; }
+.team[data-workspace-team] .dependencySection { min-width: 0; }
+.team[data-workspace-team] .dagNodeLabel { white-space: normal; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.4; }
+.team[data-workspace-team] .sectionHead { flex-wrap: wrap; gap: 6px; }
+.team[data-workspace-team] .sectionHint { white-space: normal; }
+.team[data-workspace-team] .memberLine { flex-wrap: wrap; }
+.team[data-workspace-team] .memberStatusLine { white-space: normal; }
+.team[data-workspace-team] .taskDetailSubject { white-space: normal; }
+.team[data-workspace-team] .dagViewport { padding-bottom: 12px; }
+@container (min-width: 720px) {
+  .team[data-workspace-team] { display: grid; grid-template-columns: minmax(260px, .85fr) minmax(0, 1.35fr); column-gap: 32px; align-items: start; }
+  .team[data-workspace-team] > .teamHead { grid-column: 1 / -1; }
+  .team[data-workspace-team] > :not(.teamHead):not(.delegationSection):not(.dependencySection) { grid-column: 1 / -1; }
+  .team[data-workspace-team] .dependencySection { margin: 0; border-top: 0; border-left: 1px solid var(--dsw-alias-border-l2); padding: 0 0 0 28px; }
+  .team[data-workspace-team] .captainNode { padding-top: 0; }
+  .team[data-workspace-team] .dagCanvas[data-layout='parallel'] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.team[data-workspace-team] .dagNode { padding: 10px 11px; border-radius: 9px; }
+.team[data-workspace-team] .dagNodeHead { font-size: 10px; margin-bottom: 7px; }
+.team[data-workspace-team] .dagNodeLabel { font-size: 12px; letter-spacing: 0; }
+.team[data-workspace-team] .dagOwner { font-size: 10px; }
+.team[data-workspace-team] .taskDetail { margin-top: 14px; padding: 14px; }
+.team[data-workspace-team] .captainName { font-size: 14px; }
+.team[data-workspace-team] .captainRole { font-size: 11px; }
+.team[data-workspace-team] .captainSummary { font-size: 12px; line-height: 1.6; }
+.team[data-workspace-team] .captainState { font-size: 11px; }
+.team[data-workspace-team] .memberName { font-size: 13px; }
+.team[data-workspace-team] .memberRole, .team[data-workspace-team] .memberState, .team[data-workspace-team] .memberCount { font-size: 11px; }
+.team[data-workspace-team] .memberStatusLine { font-size: 12px; line-height: 1.6; }
+.team[data-workspace-team] .taskDetailSubject { font-size: 13px; line-height: 1.6; }
+.team[data-workspace-team] .taskDetailLine, .team[data-workspace-team] .taskDetailMeta { font-size: 12px; line-height: 1.6; }
+.team[data-workspace-team] .captainNode { background: var(--dsw-alias-bg-module-platform); border-color: var(--dsw-alias-border-l2); }
+.team[data-workspace-team] .planEditor { background: transparent; border-color: var(--dsw-alias-border-l2); padding: 16px; margin: 0 0 24px; }
+@container (min-width: 1000px) {
+  .team[data-workspace-team]:has(> [data-staging-editor]) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .team[data-workspace-team] > [data-staging-editor] { grid-column: 1 !important; grid-row: 2 / 4; }
+  .team[data-workspace-team]:has(> [data-staging-editor]) > .delegationSection { grid-column: 2; grid-row: 2; }
+  .team[data-workspace-team]:has(> [data-staging-editor]) > .dependencySection { grid-column: 2; grid-row: 3; border-left: 0; padding: 24px 0 0; }
+}
+.team[data-workspace-team] .memberBlock[data-selected-member] .memberRow { outline: 1px solid var(--dsw-alias-state-business-primary); outline-offset: 3px; }
+.team[data-workspace-team] .dagOwner { white-space: nowrap; max-width: 105px; }
+/* The page scrolls as a whole; an overlay approval bar would cover form saves. */
+.team[data-workspace-team] .planApproveRow { position: static; }

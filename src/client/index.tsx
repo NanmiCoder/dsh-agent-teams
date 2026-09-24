@@ -18,7 +18,9 @@ import type { UsePanelInfo } from '@deepseek-ai/dsh-client-ui-layout/client'
 // Official model catalog/directory service. The staged roster reads its
 // provider/model/effort metadata without mutating the captain's own selection.
 import type {} from '@deepseek-ai/dsh-client-ui-model-selection/client'
-import { ActivityPanel } from './ActivityPanel.tsx'
+import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
+import { ActivitySurface, WorkspaceActivity, createWorkspaceBridge, TEAM_TAB_ID, TEAM_TAB_KIND } from './WorkspaceActivity.tsx'
+import { createWorkspaceState } from './workspace-state.ts'
 import { AgentTeamsCard, type AgentTeamsCardInjected } from './AgentTeamsCard.tsx'
 import { agentTeamsCardDefinition } from './agent-teams-card-definition.ts'
 import {
@@ -53,6 +55,8 @@ function HiddenAgentTeamsCommand(): null {
  * monitor via a window event — the recovery path for an old session.
  */
 export function apply(ctx: ClientContext): void {
+  const bridge = createWorkspaceBridge()
+  const state = createWorkspaceState()
   ctx.effect(
     () => ctx.locale.register(AGENT_TEAMS_LOCALE_NAMESPACE, { zh, en }),
     'agent-teams: dictionaries',
@@ -67,7 +71,9 @@ export function apply(ctx: ClientContext): void {
     const usePanel = usePanelInfo ?? useLegacyPanelInfo
     const conversationVisible = usePanel(panel => panel.activePanelId === null)
     return (
-    <ActivityPanel
+    <ActivitySurface
+      bridge={bridge}
+      state={state}
       conversationVisible={conversationVisible}
       sessionsList={ctx.sessions.list}
       modelDirectories={ctx.modelDirectories}
@@ -76,6 +82,26 @@ export function apply(ctx: ClientContext): void {
     />
     )
   }
+  // Optional service scope keeps legacy hosts working and removes every native
+  // contribution when the host provider disappears (including HMR).
+  ctx.inject(['sidebarRight', 'sidebarRightTabs'], (native) => {
+    const t = native.locale.bind(AGENT_TEAMS_LOCALE_NAMESPACE)
+    native.effect(() => native.sidebarRightTabs.register({
+      id: TEAM_TAB_ID, kind: TEAM_TAB_KIND,
+      title: () => t('workspace.title'),
+      guide: [{ id: 'teams', order: 40, title: () => t('workspace.title'), description: () => t('workspace.guide') }],
+    }))
+    native.slots.inject('sidebar.right.pane.tab', () => {
+      const dispose = native.slots.register({
+        name: 'sidebar.right.pane.tab', key: TEAM_TAB_ID,
+        locale: AGENT_TEAMS_LOCALE_NAMESPACE,
+        inject: () => ({ state, modelDirectories: native.modelDirectories, openMember }),
+      }, WorkspaceActivity)
+      bridge.set(native.sidebarRight)
+      return () => { bridge.set(undefined); dispose() }
+    })
+  })
+
   ctx.slots.inject('shell.overlay', () => ctx.slots.register({
     name: 'shell.overlay',
     id: 'agent-teams-activity',

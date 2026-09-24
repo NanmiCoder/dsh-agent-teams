@@ -284,14 +284,20 @@ export function taskStages<T extends RelationshipTask>(tasks: readonly T[]): rea
  * each stage. Edges use cubic curves so fan-in remains readable without
  * turning every task into a large card.
  */
-export function compactDagLayout<T extends RelationshipTask>(tasks: readonly T[]): CompactDagLayout<T> {
+export function compactDagLayout<T extends RelationshipTask>(tasks: readonly T[], dimensions?: {
+  readonly nodeWidth: number; readonly nodeHeight: number; readonly columnGap: number; readonly rowGap: number
+}): CompactDagLayout<T> {
+  const nodeWidth = dimensions?.nodeWidth ?? COMPACT_DAG_NODE_WIDTH
+  const nodeHeight = dimensions?.nodeHeight ?? COMPACT_DAG_NODE_HEIGHT
+  const columnGap = dimensions?.columnGap ?? COMPACT_DAG_COLUMN_GAP
+  const rowGap = dimensions?.rowGap ?? COMPACT_DAG_ROW_GAP
   const stages = taskStages(tasks)
   const positions = new Map<string, { x: number; y: number }>()
   const nodes: CompactDagNode<T>[] = []
   for (const [column, stage] of stages.entries()) {
     for (const [row, task] of stage.tasks.entries()) {
-      const x = column * (COMPACT_DAG_NODE_WIDTH + COMPACT_DAG_COLUMN_GAP)
-      const y = row * (COMPACT_DAG_NODE_HEIGHT + COMPACT_DAG_ROW_GAP)
+      const x = column * (nodeWidth + columnGap)
+      const y = row * (nodeHeight + rowGap)
       positions.set(task.id, { x, y })
       nodes.push({ task, x, y })
     }
@@ -303,10 +309,10 @@ export function compactDagLayout<T extends RelationshipTask>(tasks: readonly T[]
     for (const dependency of task.dependencies) {
       const source = positions.get(dependency)
       if (source === undefined) continue
-      const x1 = source.x + COMPACT_DAG_NODE_WIDTH
-      const y1 = source.y + COMPACT_DAG_NODE_HEIGHT / 2
+      const x1 = source.x + nodeWidth
+      const y1 = source.y + nodeHeight / 2
       const x2 = target.x
-      const y2 = target.y + COMPACT_DAG_NODE_HEIGHT / 2
+      const y2 = target.y + nodeHeight / 2
       edges.push({
         from: dependency,
         to: task.id,
@@ -318,10 +324,10 @@ export function compactDagLayout<T extends RelationshipTask>(tasks: readonly T[]
   return {
     width: stages.length === 0
       ? 0
-      : stages.length * COMPACT_DAG_NODE_WIDTH + (stages.length - 1) * COMPACT_DAG_COLUMN_GAP,
+      : stages.length * nodeWidth + (stages.length - 1) * columnGap,
     height: stages.length === 0
       ? 0
-      : rows * COMPACT_DAG_NODE_HEIGHT + (rows - 1) * COMPACT_DAG_ROW_GAP,
+      : rows * nodeHeight + (rows - 1) * rowGap,
     nodes,
     edges,
   }

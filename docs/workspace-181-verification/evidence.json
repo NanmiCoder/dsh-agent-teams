@@ -1,0 +1,166 @@
+{
+  "date": "2026-09-25",
+  "host": "0.1.7-rc.2",
+  "cohortPackages": 273,
+  "cohortVersions": [
+    "0.1.7-rc.2"
+  ],
+  "model": {
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max"
+  },
+  "tmpRoot": "/tmp/agent-teams-workspace-181",
+  "artifactSha256": "917796b85a65c1b4bf1fc0423696190ab3bf3b5edae24d7efd958bbde2f82a72",
+  "clientSha256": "063609f0dbf170d7aed16988c90838fb3aca434b74949b0782bcd5ddbb52b74d",
+  "normal": {
+    "captain": "session-e5ecaaab-a66d-447a-9604-88b6ed4e7489",
+    "tasks": [
+      {
+        "id": "t1",
+        "status": "completed",
+        "assignee": "inventory",
+        "dependencies": []
+      },
+      {
+        "id": "t2",
+        "status": "completed",
+        "assignee": "receipt",
+        "dependencies": []
+      },
+      {
+        "id": "t3",
+        "status": "completed",
+        "assignee": "verifier",
+        "dependencies": [
+          "t1",
+          "t2"
+        ]
+      },
+      {
+        "id": "t4",
+        "status": "completed",
+        "assignee": "captain",
+        "dependencies": [
+          "t3"
+        ]
+      },
+      {
+        "id": "t5",
+        "status": "completed",
+        "assignee": "receipt",
+        "dependencies": [
+          "t1"
+        ]
+      },
+      {
+        "id": "t6",
+        "status": "completed",
+        "assignee": "inventory",
+        "dependencies": [
+          "t2"
+        ]
+      }
+    ],
+    "members": [
+      {
+        "name": "inventory",
+        "sessionId": "02629b1d-9dca-47e8-8feb-b9ae3db4234d",
+        "model": "deepseek-flash",
+        "toolCalls": 43,
+        "toolNames": [
+          "agent_teams_claim_task",
+          "agent_teams_send_message",
+          "agent_teams_status",
+          "agent_teams_update_task",
+          "bash",
+          "edit",
+          "grep",
+          "read",
+          "send_message",
+          "write"
+        ],
+        "writeOrEditCalls": 2,
+        "logSha256": "bd29c648a8f4391e3a6e7ada01bbc150c9b1e594dfc43b42758732b5f1961e69"
+      },
+      {
+        "name": "receipt",
+        "sessionId": "02c41681-0f2a-475e-8672-d61a6e8b97e3",
+        "model": "deepseek-flash",
+        "toolCalls": 31,
+        "toolNames": [
+          "agent_teams_claim_task",
+          "agent_teams_send_message",
+          "agent_teams_update_task",
+          "bash",
+          "grep",
+          "read",
+          "write"
+        ],
+        "writeOrEditCalls": 1,
+        "logSha256": "9685e34d43bae4266f224a10ebd5bf8591e845ca34815489ed7891ba033a6f60"
+      },
+      {
+        "name": "verifier",
+        "sessionId": "3b5a597e-e8b6-4236-9bda-cb5b34f300b9",
+        "model": "deepseek-flash",
+        "toolCalls": 23,
+        "toolNames": [
+          "agent_teams_claim_task",
+          "agent_teams_send_message",
+          "agent_teams_update_task",
+          "bash",
+          "edit",
+          "read",
+          "send_message",
+          "write"
+        ],
+        "writeOrEditCalls": 4,
+        "logSha256": "a0fa829caed076ba9d956073c0ae314bb4433263695afafafad4a461465eb49a"
+      }
+    ],
+    "externalTests": {
+      "tests": 52,
+      "pass": 52,
+      "fail": 0
+    }
+  },
+  "stopped": {
+    "halted": true,
+    "tasks": [
+      "cancelled",
+      "cancelled"
+    ]
+  },
+  "failed": {
+    "taskStatus": "failed",
+    "commandsRun": [
+      {
+        "command": "node -e 'process.exit(7)'",
+        "status": "failed",
+        "exitCode": 7,
+        "evidence": "raw: exit code 7, stdout: (empty), stderr: (empty) — bash wrapper printed only its own capture line `[exit code: 7]` after the node process exited"
+      }
+    ]
+  },
+  "legacy": {
+    "host": "0.1.2-rc.1",
+    "phase": "staged",
+    "memberIds": [
+      ""
+    ],
+    "archived": true,
+    "attempts": [
+      0
+    ]
+  },
+  "projectFiles": {
+    "README.md": "79e176fddcbc54e9e08b5b4c76504fc8ec46f568a681ec4010748fa98bc12db6",
+    "docs/usage.md": "fece480ec1db97f2baa13506e30aee4c13ddb9b65747c139ed26e86cc544af5c",
+    "package.json": "274147beec8e21ecde35dfe7992921e483a5f613d6c7dac3007ccfdfc5c0a19e",
+    "src/inventory.js": "bdce2d5a563557cf028d1a52dfa247674811b4011e2c64bb7735245c3ae5f535",
+    "src/receipt.js": "119c6a71da69564409a4539ff1d2da4d5b3afd15d3936878f0a7d0de3beb01ce",
+    "test/inventory.test.js": "b4552e964b90b494f21032966dd8f8214521a4741a562d520a8b8caf88fcb07b",
+    "test/receipt.test.js": "cfe00ee6d2babc8b13f13b7f57d6f0addbda514c6f7355a284e8af83c925cd38"
+  }
+}

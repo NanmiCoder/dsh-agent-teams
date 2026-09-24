@@ -50,14 +50,14 @@ test('doctor detects transitive cohort mixing even with an exact CLI version', t
     mkdirSync(directory, { recursive: true })
     writeFileSync(join(directory, 'package.json'), JSON.stringify({ name, version, dependencies }))
   }
-  pkg(root, '@deepseek-ai/dsh', '0.1.2-alpha.2', { '@deepseek-ai/dsh-agent': '^0.1.2-alpha.2' })
+  pkg(root, '@deepseek-ai/dsh', policy.recommendedHost, { '@deepseek-ai/dsh-agent': policy.recommendedHost })
   const dependency = join(root, 'node_modules/@deepseek-ai/dsh-agent')
   pkg(dependency, '@deepseek-ai/dsh-agent', '0.1.2-rc.1')
   const mixed = inspectInstallation(root)
   assert.equal(mixed.ok, false)
   assert.equal(mixed.checkedPackages, 2)
   assert.match(mixed.problems.join(), /differ from host/)
-  pkg(dependency, '@deepseek-ai/dsh-agent', '0.1.2-alpha.2')
+  pkg(dependency, '@deepseek-ai/dsh-agent', policy.recommendedHost)
   assert.equal(inspectInstallation(root).ok, true)
   pkg(root, '@deepseek-ai/dsh', '0.1.0-rc.8')
   assert.match(inspectInstallation(root).problems.join(), /Unsupported host/)
@@ -70,13 +70,13 @@ test('doctor follows profile peers and rejects duplicate runtime identities', t 
     mkdirSync(path, { recursive: true })
     writeFileSync(join(path, 'package.json'), JSON.stringify(data))
   }
-  write(root, { name: '@deepseek-ai/dsh', version: '0.1.2-rc.1', dependencies: { '@deepseek-ai/dsh-agent': '0.1.2-rc.1' } })
-  write(join(root, 'node_modules/@deepseek-ai/dsh-agent'), { name: '@deepseek-ai/dsh-agent', version: '0.1.2-rc.1' })
+  write(root, { name: '@deepseek-ai/dsh', version: policy.recommendedHost, dependencies: { '@deepseek-ai/dsh-agent': policy.recommendedHost } })
+  write(join(root, 'node_modules/@deepseek-ai/dsh-agent'), { name: '@deepseek-ai/dsh-agent', version: policy.recommendedHost })
   const profile = join(root, 'profile')
   write(join(profile, 'node_modules/@nanmicoder/dsh-agent-teams'), {
-    name: '@nanmicoder/dsh-agent-teams', version: '0.1.16-rc.1', peerDependencies: { '@deepseek-ai/dsh-agent': '0.1.2-rc.1' },
+    name: '@nanmicoder/dsh-agent-teams', version: '0.1.16-rc.1', peerDependencies: { '@deepseek-ai/dsh-agent': policy.recommendedHost },
   })
-  write(join(profile, 'node_modules/@deepseek-ai/dsh-agent'), { name: '@deepseek-ai/dsh-agent', version: '0.1.2-rc.1' })
+  write(join(profile, 'node_modules/@deepseek-ai/dsh-agent'), { name: '@deepseek-ai/dsh-agent', version: policy.recommendedHost })
   assert.match(inspectInstallation(root, profile).problems.join(), /Multiple resolved identities/)
 })
 
@@ -129,13 +129,13 @@ test('doctor detects peer-only drift and a mismatched installed plugin', t => {
     mkdirSync(path, { recursive: true })
     writeFileSync(join(path, 'package.json'), JSON.stringify(data))
   }
-  write(root, { name: '@deepseek-ai/dsh', version: '0.1.2-rc.1', dependencies: { '@deepseek-ai/dsh-agent': '0.1.2-rc.1' } })
+  write(root, { name: '@deepseek-ai/dsh', version: policy.recommendedHost, dependencies: { '@deepseek-ai/dsh-agent': policy.recommendedHost } })
   write(join(root, 'node_modules/@deepseek-ai/dsh-agent'), {
-    name: '@deepseek-ai/dsh-agent', version: '0.1.2-rc.1', peerDependencies: { '@deepseek-ai/dsh-session': '*' },
+    name: '@deepseek-ai/dsh-agent', version: policy.recommendedHost, peerDependencies: { '@deepseek-ai/dsh-session': '*' },
   })
   write(join(root, 'node_modules/@deepseek-ai/dsh-session'), { name: '@deepseek-ai/dsh-session', version: '0.1.2-alpha.2' })
   assert.match(inspectInstallation(root).problems.join(), /differ from host/)
-  write(join(root, 'node_modules/@deepseek-ai/dsh-session'), { name: '@deepseek-ai/dsh-session', version: '0.1.2-rc.1' })
+  write(join(root, 'node_modules/@deepseek-ai/dsh-session'), { name: '@deepseek-ai/dsh-session', version: policy.recommendedHost })
   assert.equal(inspectInstallation(root).ok, true)
   const profile = join(root, 'profile')
   write(join(profile, 'node_modules/@nanmicoder/dsh-agent-teams'), { name: '@nanmicoder/dsh-agent-teams', version: '0.1.15' })

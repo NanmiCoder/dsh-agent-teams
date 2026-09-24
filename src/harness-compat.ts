@@ -1,11 +1,17 @@
 /**
- * The audited Harness 0.1.2 / 0.1.5 subagent boundary. Keep version-specific shapes
- * here: API presence alone is not a promise of support for future versions.
+ * The audited Harness 0.1.7-rc.1 subagent boundary. Keep version-specific
+ * shapes here: API presence alone is not a promise of support for future
+ * versions.
  *
- * Alpha.2 owns followup/registerContinuableSetup; Alpha.5 and rc.1 own a
- * host-only FIFO queue; 0.1.5 uses a queue/steer deliverer. Both emit
- * synchronous agent/session-start with the explicit Agent. Their public
- * sendMessage instead steers a running Agent and must never carry team jobs.
+ * The supported host publishes a host-only queue/steer deliverer
+ * (`dsh.subagent.deliverPrompt`) and emits `agent/created` as a serial
+ * lifecycle listener carrying the explicit Agent. Public `sendMessage`
+ * instead steers a running Agent and must never carry team jobs.
+ *
+ * The older fallback branches below (`registerContinuableSetup`, `followup`,
+ * `dsh.subagent.queuePrompt`) are retained defensively: they cost nothing when
+ * absent and keep member startup alive on a host that renamed or disabled a
+ * surface. They are not supported hosts for this release.
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
@@ -14,6 +20,22 @@ import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { Session, SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 import { SubagentError } from '@deepseek-ai/dsh-subagent'
 import { CAPTAIN_TOOL_NAMES } from './tool-names.ts'
+
+/**
+ * AgentTeams' own message source. Harness 0.1.7 removed the catch-all
+ * `plugin` kind from `MessageSourceMap`; each producer now declares its own
+ * kind in its own module. `user`-role messages accept any producer's kind,
+ * which is the only role this plugin authors, so this declaration is the
+ * whole integration surface.
+ */
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    'agent-teams': { readonly kind: 'agent-teams' }
+  }
+}
+
+/** The message source every AgentTeams-authored user message carries. */
+export const AGENT_TEAMS_SOURCE: MessageSource = { kind: 'agent-teams' }
 
 /**
  * Exact protocol exported by dsh-subagent/internal in Alpha.5 and rc.1.
@@ -78,7 +100,7 @@ export function installContinuableMemberSetup(ctx: Context, setup: Setup): void 
   const installed = new WeakSet<Agent>()
   const active = new Set<() => void>()
   ctx.effect(() => {
-    const stop = ctx.on('agent/session-start', ({ agent }) => {
+    const stop = ctx.on('agent/created', ({ agent }): undefined => {
       if (installed.has(agent)) return
       // Deliberately synchronous: awaiting here loses the first-request race.
       let teardown: () => void
@@ -124,7 +146,7 @@ export async function queueMemberPrompt(
   content: ContentBlock[], signal: AbortSignal,
 ): Promise<MessageId> {
   const host = boundary(runtime)
-  const source: MessageSource = { kind: 'plugin', plugin: 'dsh-agent-teams' }
+  const source: MessageSource = AGENT_TEAMS_SOURCE
   if (typeof host.followup === 'function') {
     return host.followup.call(runtime, parent, childId, content, { source, signal })
   }
@@ -141,7 +163,7 @@ export async function steerMemberPrompt(
   content: ContentBlock[], signal: AbortSignal, live?: Agent,
 ): Promise<MessageId> {
   const host = boundary(runtime)
-  const source: MessageSource = { kind: 'plugin', plugin: 'dsh-agent-teams' }
+  const source: MessageSource = AGENT_TEAMS_SOURCE
   const deliver = host[hostPromptDeliver]
   if (typeof deliver === 'function') return deliver.call(runtime, parent, childId, content, source, signal, 'steer')
   if (typeof host.sendMessage === 'function') return host.sendMessage.call(runtime, parent, childId, content, { signal })

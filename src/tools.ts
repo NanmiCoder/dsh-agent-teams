@@ -72,6 +72,7 @@ import { TERMINAL_TASK_STATUSES, type TeamMember, type TeamState, type TeamTask 
 import { collectCompletedDependencyOutputs, formatDependencyOutputs, installTeamScheduler } from './scheduler.ts'
 import { installMailboxAdmission, mailboxPrompt } from './mailbox.ts'
 import { resolveTeamProfile } from './profiles.ts'
+import { AGENT_TEAMS_SOURCE } from './harness-compat.ts'
 
 export { steerCaptainReport } from './members.ts'
 
@@ -643,7 +644,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
     try {
       captain.followup(createUserMessage({
         content: [{ type: 'text', text: stagedPlanFeedbackContext(prepared.teamName) }],
-        source: { kind: 'plugin', plugin: 'dsh-agent-teams' },
+        source: AGENT_TEAMS_SOURCE,
       }))
     } catch (error: unknown) {
       // Do not leave the durable UI in a false waiting state when the live
@@ -681,7 +682,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
     try {
       captain.inject(createUserMessage({
         content: [{ type: 'text', text: stagedPlanDiscardContext(discarded.teamName) }],
-        source: { kind: 'plugin', plugin: 'dsh-agent-teams' },
+        source: AGENT_TEAMS_SOURCE,
       }))
     } catch (error: unknown) {
       // The archive is already authoritative. Cancellation still prevents a

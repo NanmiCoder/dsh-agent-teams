@@ -34,6 +34,7 @@ import {
   type ToolsConfig,
 } from './tools.ts'
 import { installAgentTeamsGestureBoundary, registerAgentTeamsCommand } from './command.ts'
+import { AGENT_TEAMS_SOURCE } from './harness-compat.ts'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -337,7 +338,7 @@ export function apply(ctx: Context, config: Config): void {
             try {
               captain.steer(createUserMessage({
                 content: [{ type: 'text', text: stagedPlanApprovedContext(team.name) }],
-                source: { kind: 'plugin', plugin: 'dsh-agent-teams' },
+                source: AGENT_TEAMS_SOURCE,
               }))
             } catch (error) {
               // Approval is already committed. Do not report a failed approval

@@ -95,7 +95,7 @@ async function fixture(t, { captainStatus = 'idle', fallback, captainOffline = f
     setup = childCtx => {
       child.ctx = childCtx
       if (deliveryHarness) delete childCtx.agent
-      rootListeners.get('agent/session-start')({ agent: child, source: 'startup' })
+      rootListeners.get('agent/created')({ agent: child, source: 'startup' })
       return () => { for (const dispose of disposers) dispose() }
     }
   }

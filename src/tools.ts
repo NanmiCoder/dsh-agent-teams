@@ -34,6 +34,7 @@ import {
   cancelUnfinishedTask,
   invalidateTaskAttempt,
   readUnreadMailbox,
+  readMailbox,
   recordRetiredMemberIds,
   releaseMailboxDelivery,
   readTeam,
@@ -54,6 +55,7 @@ import {
   normalizeBlankOptionalTaskFields,
   taskKindOf,
 } from './state.ts'
+import { appendTaskEvidence } from './quality-gates.ts'
 import type { ContractAmendmentInput } from './state.ts'
 import type { AcceptanceResult, CommandResult, ReviewFinding, ReviewVerdict, TaskKind } from './types.ts'
 import {
@@ -70,7 +72,7 @@ import {
 } from './members.ts'
 import { TERMINAL_TASK_STATUSES, type TeamMember, type TeamState, type TeamTask } from './types.ts'
 import { collectCompletedDependencyOutputs, formatDependencyOutputs, installTeamScheduler } from './scheduler.ts'
-import { installMailboxAdmission, mailboxPrompt } from './mailbox.ts'
+import { installMailboxAdmission, isCurrentMail, mailboxContent, mailboxPrompt, readCurrentMailbox } from './mailbox.ts'
 import { resolveTeamProfile } from './profiles.ts'
 
 export { steerCaptainReport } from './members.ts'
@@ -1586,7 +1588,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
 
   ctx.tools.register(defineTool({
     name: 'agent_teams_update_task',
-    description: 'Update a task status/output. Members must supply the current attempt_id returned by claim_task; stale attempts are rejected after takeover/reassignment. Terminal results are immutable. A captain must use reassign_task(assignee="captain") before updating member-owned work.',
+    description: 'Update a task status/output. Members must supply the current attempt_id returned by claim_task; stale attempts are rejected after takeover/reassignment. Terminal results are immutable, but owners and the captain can append acceptanceResults/commandsRun/evidence_note as attributed supplemental evidence, without reclaiming or changing the verdict. A captain must use reassign_task(assignee="captain") before updating active member-owned work.',
     parameters: {
       task_id: { type: 'string', required: true, description: 'The task id to update.' },
       attempt_id: { type: 'string', description: 'Members must explicitly include the current attempt_id from their assignment/claim in EVERY update, including failed reviews with findings. If omitted, retry with the same current id; omission does not revoke the attempt.' },
@@ -1595,7 +1597,8 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         enum: ['in_progress', 'completed', 'failed', 'cancelled'],
         description: 'New status (in_progress, completed, failed, cancelled).',
       },
-      output: { type: 'string', description: 'Result summary; set when completing or failing.' },
+      output: { type: 'string', description: 'Original result summary; immutable after completion/failure.' },
+      evidence_note: { type: 'string', description: 'Append-only supplementary observation on a terminal task. Does not reopen work or change the original result.' },
       verdict: {
         type: 'string',
         enum: ['pass', 'needs_revision', 'reject'],
@@ -1661,11 +1664,13 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
           output: { type: 'string' },
           attempt: { type: 'number', required: true },
           attempt_id: { type: 'string' },
+          evidence_count: { type: 'number' },
+          follow_up: { type: 'string' },
         },
       },
       render: (args, value) => [{
         type: 'text',
-        text: `Task ${value.task_id} attempt ${value.attempt} → ${value.status}${value.output !== undefined ? `\nOutput: ${value.output}` : ''}`,
+        text: `Task ${value.task_id} attempt ${value.attempt} → ${value.status}${value.output !== undefined ? `\nOutput: ${value.output}` : ''}${value.evidence_count === undefined ? '' : `\nSupplemental evidence records: ${value.evidence_count}. Original result unchanged.`}${value.follow_up ? `\n${value.follow_up}` : ''}`,
       }],
     },
     async execute(args, exec) {
@@ -1673,12 +1678,14 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
       const workspace = workspaceOf(caller)
       const stateRoot = stateRootOf(workspace, config)
       const team = await requireParticipantTeam(workspace, config, caller)
+      let followUpMessage: import('./types.ts').TeamMessage | undefined
       const updated = await withTeamLock(teamLockKey(stateRoot, team.id), async () => {
         const { team: fresh, identity } = await requireFreshParticipant(stateRoot, team.id, caller.id)
         const task = requireTask(fresh, args.task_id)
         if (identity.kind === 'captain'
           && task.assignee !== undefined
           && task.assignee !== CAPTAIN_KEY
+          && !TERMINAL_TASK_STATUSES.includes(task.status)
           && !(args.status === 'cancelled' && task.status === 'pending' && (task.attempt ?? 0) === 0 && task.reassigning !== true)) {
           throw new Error(`task ${task.id} is owned by member "${task.assignee}"; call agent_teams_reassign_task with assignee="captain" before takeover`)
         }
@@ -1694,12 +1701,13 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
           }
         }
         if (TERMINAL_TASK_STATUSES.includes(task.status)) {
-          const sameStatus = args.status === undefined || args.status === task.status
-          const sameOutput = args.output === undefined || args.output === task.output
-          if (!sameStatus || !sameOutput) {
-            throw new Error(`terminal task ${task.id} is immutable; use agent_teams_reassign_task to retry failed/cancelled work`)
-          }
+          const appended = appendTaskEvidence(task, {
+            ...args, findings: parseFindings(args.findings), changedPaths: normalizeBlankOptionalTaskFields(args).changedPaths,
+            acceptanceResults: parseAcceptanceResults(args.acceptanceResults), commandsRun: parseCommandResults(args.commandsRun),
+          }, identity.name)
+          if (appended) await writeTeam(stateRoot, fresh)
           return {
+            evidence_count: task.supplementalEvidence?.length ?? 0,
             task_id: task.id,
             status: task.status,
             attempt: task.attempt ?? 0,
@@ -1707,6 +1715,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
             ...task.output !== undefined ? { output: task.output } : {},
           }
         }
+        if (args.evidence_note?.trim()) throw new Error('evidence_note is for terminal tasks; record active work with output and structured evidence')
         // Blank optional list entries (e.g. changedPaths:[""]) must not be
         // persisted: hasValidQualityTaskFields rejects them on reload and
         // would brick the whole team state (issue #105 class).
@@ -1736,9 +1745,16 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         if (acceptanceResults !== undefined) task.acceptanceResults = acceptanceResults
         if (commandsRun !== undefined) task.commandsRun = commandsRun
         task.updatedAt = Date.now()
+        const priorDependencies = new Map(fresh.tasks.map(item => [item.id, [...item.dependencies]]))
         const followUp = (task.status === 'failed' && (task.verdict === 'needs_revision' || task.verdict === 'reject'))
           ? applyQualityFollowUp(fresh, task)
           : undefined
+        let followUpSummary: string | undefined
+        if ((followUp?.created.length ?? 0) > 0) {
+          const rewired = fresh.tasks.filter(item => priorDependencies.has(item.id) && JSON.stringify(priorDependencies.get(item.id)) !== JSON.stringify(item.dependencies))
+          followUpSummary = `Automatic quality follow-up for ${task.id}: ${followUp!.created.map(item => `${item.id} (${item.kind}, owner=${item.assignee ?? 'unassigned'}, deps=${item.dependencies.join(',') || 'none'})`).join('; ')}.${rewired.length ? ` Updated dependencies: ${rewired.map(item => `${item.id} -> ${item.dependencies.join(',')}`).join('; ')}.` : ''} Use these tasks; do not create duplicate repair/review work.`
+          followUpMessage = createMessage(CAPTAIN_KEY, CAPTAIN_KEY, followUpSummary)
+        }
         if (followUp?.escalated === true) {
           await appendMailbox(stateRoot, fresh.id, CAPTAIN_KEY, createMessage(
             CAPTAIN_KEY,
@@ -1747,6 +1763,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
           ))
         }
         await writeTeam(stateRoot, fresh)
+        if (followUpMessage !== undefined) await appendMailbox(stateRoot, fresh.id, CAPTAIN_KEY, followUpMessage)
         appendTeamEvent(ctx, captainSessionOf(ctx, fresh.captainSessionId, caller.session), 'agent-teams/task-updated', {
           teamId: fresh.id,
           taskId: task.id,
@@ -1768,6 +1785,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
           })
         }
         return {
+          ...followUpSummary === undefined ? {} : { follow_up: followUpSummary },
           task_id: task.id,
           status: task.status,
           attempt: task.attempt ?? 0,
@@ -1775,6 +1793,12 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
           ...task.output !== undefined ? { output: task.output } : {},
         }
       })
+      if (followUpMessage !== undefined) {
+        const captain = ctx.agents.get(team.captainSessionId as SessionId)
+        if (captain !== undefined && steerCaptainReport(captain, CAPTAIN_KEY, followUpMessage.content, mailboxPrompt(team.id, CAPTAIN_KEY, [followUpMessage]))) {
+          await withTeamLock(teamLockKey(stateRoot, team.id), () => markMailboxDelivered(stateRoot, team.id, CAPTAIN_KEY, [followUpMessage!.id]))
+        }
+      }
       await scheduler.kickTeam(workspace, team.id, team.captainSessionId === caller.id ? caller : undefined)
       return updated
     },
@@ -1865,6 +1889,8 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
     name: 'agent_teams_send_message',
     description: 'Send coordination or current-task guidance directly to the captain or a teammate. A running recipient receives it at the next model step; an idle recipient wakes. Messages are durably retained until read. Use task creation/reassignment for a new unit of work, not repeated status nudges.',
     parameters: {
+      source_task_id: { type: 'string', description: 'Sender task, NOT the recipient task. Members include it with source_attempt_id. Captains sending guidance normally omit both source fields.' },
+      source_attempt_id: { type: 'string', description: 'Sender execution capability paired with source_task_id. Stale reports are rejected. Omit for ordinary captain guidance.' },
       to: { type: 'string', required: true, description: 'Recipient: "captain" or a member name.' },
       content: { type: 'string', required: true, description: 'The message text.' },
       from: { type: 'string', description: 'Sender (defaults to the caller: the captain, or the calling member).' },
@@ -1877,7 +1903,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
           message_id: { type: 'string', required: true },
           from: { type: 'string', required: true },
           to: { type: 'string', required: true },
-          delivered: { type: 'string', required: true, description: 'live (accepted by the live captain), wake (member recipient woken), or mailbox (durable inbox only).' },
+          delivered: { type: 'string', required: true, description: 'live (accepted by the live captain), wake (member recipient woken), mailbox (durable inbox only), or duplicate (same message already retained).' },
         },
       },
       render: (args, value) => [{
@@ -1899,8 +1925,24 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         if (args.from !== undefined && args.from !== from) {
           throw new Error(`agent_teams_send_message: "from" must be your own identity ("${from}"), not "${args.from}"`)
         }
+        const sourceTaskId = args.source_task_id?.trim() || undefined
+        const sourceAttemptId = args.source_attempt_id?.trim() || undefined
+        if ((sourceTaskId === undefined) !== (sourceAttemptId === undefined)) throw new Error('send_message requires source_task_id and source_attempt_id together')
+        const source = sourceTaskId === undefined
+          ? identity.kind === 'member' ? memberOpenTask(fresh, identity.name) ?? fresh.tasks.filter(item => item.assignee === identity.name && item.attemptId !== undefined).sort((a, b) => b.updatedAt - a.updatedAt)[0] : undefined
+          : requireTask(fresh, sourceTaskId)
+        if (sourceTaskId !== undefined && (source?.assignee !== identity.name || source.attemptId !== sourceAttemptId)) {
+          throw new Error('stale or foreign source attempt; stop sending results from the revoked task')
+        }
+        const sourceFields = source?.attemptId === undefined ? {} : { sourceTaskId: source.id, sourceAttemptId: source.attemptId, sourceTaskStatus: source.status }
+        const owned = to === CAPTAIN_KEY ? undefined : memberOpenTask(fresh, requireMember(fresh, to).name)
+        const duplicate = (await readMailbox(stateRoot, fresh.id, to)).find(message => message.from === from
+          && message.content === args.content && message.taskId === owned?.id && message.attemptId === owned?.attemptId
+          && message.sourceTaskId === sourceFields.sourceTaskId && message.sourceAttemptId === sourceFields.sourceAttemptId && message.sourceTaskStatus === sourceFields.sourceTaskStatus
+          && isCurrentMail(fresh, message) && (message.attemptId !== undefined || message.sourceAttemptId !== undefined || message.readAt === undefined))
+        if (duplicate !== undefined) return { kind: 'duplicate' as const, message: duplicate, from }
         if (to === CAPTAIN_KEY) {
-          const message = { ...createMessage(from, CAPTAIN_KEY, args.content), deliveryClaimedAt: Date.now() }
+          const message = { ...createMessage(from, CAPTAIN_KEY, args.content), ...sourceFields, deliveryClaimedAt: Date.now() }
           await appendMailbox(stateRoot, fresh.id, CAPTAIN_KEY, message)
           appendTeamEvent(ctx, captainSessionOf(ctx, fresh.captainSessionId, caller.session), 'agent-teams/message-sent', {
             teamId: fresh.id,
@@ -1916,8 +1958,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
           throw new Error(`team "${fresh.name}" is halted; call agent_teams_resume before waking a member`)
         }
         const recipient = requireMember(fresh, to)
-        const owned = memberOpenTask(fresh, recipient.name)
-        const message = { ...createMessage(from, recipient.name, args.content), deliveryClaimedAt: Date.now(),
+        const message = { ...createMessage(from, recipient.name, args.content), ...sourceFields, deliveryClaimedAt: Date.now(),
           ...owned?.attemptId === undefined ? {} : { taskId: owned.id, attemptId: owned.attemptId },
         }
         await appendMailbox(stateRoot, fresh.id, recipient.name, message)
@@ -1932,6 +1973,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         return { kind: 'member' as const, fresh, identity, message, from, recipient }
       })
 
+      if (prepared.kind === 'duplicate') return { message_id: prepared.message.id, from: prepared.from, to: prepared.message.to, delivered: 'duplicate' }
       // Resolve the exact live captain only after releasing the state lock.
       // The plugin mailbox is already durable if live delivery cannot proceed.
       const captain = ctx.agents.get(prepared.fresh.captainSessionId as SessionId)
@@ -2021,6 +2063,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         kind: taskKindOf(task),
         ...task.round === undefined ? {} : { round: task.round },
         ...task.verdict === undefined ? {} : { verdict: task.verdict },
+        ...task.supplementalEvidence === undefined ? {} : { supplemental_evidence: JSON.stringify(task.supplementalEvidence) },
         findings_open: (task.findings ?? []).filter((finding) => finding.resolved !== true).length,
         ...task.profileSeedId === undefined ? {} : { seed_id: task.profileSeedId },
         ...task.output !== undefined ? { output: task.output } : {},
@@ -2034,15 +2077,15 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         }
       }
       const captainInbox = identity.kind === 'captain'
-        ? await readUnreadMailbox(stateRoot, team.id, CAPTAIN_KEY, reportMalformed(CAPTAIN_KEY))
+        ? await readCurrentMailbox(stateRoot, team.id, CAPTAIN_KEY, reportMalformed(CAPTAIN_KEY))
         : []
-      const ownInbox = identity.kind === 'member' ? (await readUnreadMailbox(stateRoot, team.id, identity.name)).slice(0, 10) : []
+      const ownInbox = identity.kind === 'member' ? (await readCurrentMailbox(stateRoot, team.id, identity.name)).slice(0, 10) : []
       const memberInboxes: Record<string, { count: number; latest: string }> = {}
       const visibleMembers = identity.kind === 'captain'
         ? members
         : members.filter((member) => member.name === identity.name)
       for (const member of visibleMembers) {
-        const messages = await readUnreadMailbox(
+        const messages = await readCurrentMailbox(
           stateRoot,
           team.id,
           member.name,
@@ -2093,10 +2136,10 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         tasks,
         captain_inbox: captainInbox.slice(0, 10).map((message) => ({
           from: message.from,
-          content: message.content,
+          content: mailboxContent(message),
           ts: message.ts,
         })),
-        member_inbox: ownInbox.map(message => ({ from: message.from, content: message.content, ts: message.ts })),
+        member_inbox: ownInbox.map(message => ({ from: message.from, content: mailboxContent(message), ts: message.ts })),
         member_inboxes: memberInboxes,
         mailbox_warnings: mailboxWarnings,
         mailbox_warning_count: mailboxWarningCount,
@@ -2459,7 +2502,7 @@ function renderStatus(value: JsonValue): string {
       activity: string
       spawn_error?: string
     }[]
-    tasks: { id: string; subject: string; status: string; assignee: string; dependencies: string[]; attempt: number; attempt_id: string; reassigning: boolean; seed_id?: string; output?: string; kind?: string; round?: number; verdict?: string; findings_open?: number }[]
+    tasks: { id: string; subject: string; status: string; assignee: string; dependencies: string[]; attempt: number; attempt_id: string; reassigning: boolean; seed_id?: string; output?: string; kind?: string; round?: number; verdict?: string; findings_open?: number; supplemental_evidence?: string }[]
     captain_inbox: { from: string; content: string }[]
     member_inbox?: { from: string; content: string }[]
     member_inboxes: Record<string, { count: number; latest: string }>
@@ -2497,12 +2540,13 @@ function renderStatus(value: JsonValue): string {
     ...team.tasks.map((task) => {
       const deps = task.dependencies.length > 0 ? ` (deps: ${task.dependencies.join(',')})` : ''
       const output = task.output !== undefined ? `\n      output: ${task.output.slice(0, 300)}` : ''
+      const evidence = task.supplemental_evidence ? `\n      Supplemental observations (original verdict unchanged): ${task.supplemental_evidence}` : ''
       const handoff = task.reassigning ? ' (reassigning)' : ''
       const seed = task.seed_id === undefined || task.seed_id === '' ? '' : ` seed ${task.seed_id}`
       const kind = task.kind ? ` ${task.kind}` : ''
       const round = task.round === undefined ? '' : ` r${task.round}`
       const verdict = task.verdict === undefined ? '' : ` verdict ${task.verdict}`
-      return `  - ${task.id} [${task.status}]${kind}${round}${verdict} attempt ${task.attempt}${handoff}${seed} ${task.subject} → ${task.assignee || 'unassigned'}${deps}${output}`
+      return `  - ${task.id} [${task.status}]${kind}${round}${verdict} attempt ${task.attempt}${handoff}${seed} ${task.subject} → ${task.assignee || 'unassigned'}${deps}${output}${evidence}`
     }),
     ...team.coverage === undefined || team.coverage.length === 0 ? [] : [
       'Coverage:',

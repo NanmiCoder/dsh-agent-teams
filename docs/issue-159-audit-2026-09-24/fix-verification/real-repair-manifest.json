@@ -1,0 +1,40 @@
+{
+  "caseName": "review",
+  "agentCwd": "/tmp",
+  "hostVersion": "0.1.5-rc.1",
+  "cohortCount": 231,
+  "runtime": "/tmp/issue159-20260924/latest/runtime",
+  "model": {
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max"
+  },
+  "testFiles": {
+    "harness-model-benchmark.mjs": "e1533162afc9383dff336673b8c74f6a674119a877eeb98c74b6352e650243e4",
+    "fixtures/harness-model-case.mjs": "a82be9b5b4be8e018a814d67f0c2392f3e07bec354dd772e5b095355c6699add",
+    "fixtures/harness-model-driver.mjs": "e7824c52bdb4505164d05ed0a26ad272400ae2a77b624cdedcd506079344e8bc",
+    "fixtures/harness-benchmark-scope.mjs": "a93ae5654f97730e25e11be3487921bcb19bd75b55e24f090e93608ed34821cd"
+  },
+  "artifacts": {
+    "baseline": {
+      "path": "/tmp/issue159-fix-20260925/final-artifact/nanmicoder-dsh-agent-teams-0.1.20.tgz",
+      "sha256": "8ad18fd760776072ac5e8ba22baf928a5383ef643237e36f2be39ca754e43d5f"
+    },
+    "candidate": {
+      "path": "/tmp/issue159-fix-20260925/final-artifact/nanmicoder-dsh-agent-teams-0.1.20.tgz",
+      "sha256": "8ad18fd760776072ac5e8ba22baf928a5383ef643237e36f2be39ca754e43d5f"
+    }
+  },
+  "timeoutMs": 360000,
+  "maxRequests": 90,
+  "seedSha256": {
+    "data/sample.txt": "a948904f2f0f479b8f8197694b30184b0d2ed1c1cd2a1ec0fb85d299a192a447",
+    "README.md": "b050796165be4b628c8df3c4d34133560c4a217eaf37b9cce1555eca62281ddd",
+    "check-data.mjs": "8dded4b3c2368dc46f930f0a1047272293d1211002fde0e3ee8964d148c50199"
+  },
+  "inputs": {
+    "fresh": "请用AgentTeams执行真实验证，立即运行无需审批。所有文件操作限制在消息开头指定的项目目录，给成员传递完整目录。队长不代写文件，不绕过契约，不读取项目以外的文件或插件配置。保留团队以便复核。禁止在agent_teams_create中使用plan参数；先仅建空团队再添加成员，必须用agent_teams_create_task并显式传kind创建任务，禁止创建占位work任务。创建review前核实其reviewedTaskId指向kind=implementation的SEED任务，不得指向work任务。仅两个成员worker和reviewer。先创建implementation任务[SEED]分配worker，inScope=[\"data/sample.txt\"]，outOfScope=[\"README.md\"]（只对SEED有效，后续修复应允许README.md），acceptance=[\"data/sample.txt has hello world\"]，verify=[\"node check-data.mjs\"]。要求保留seed内容运行验证后完成，changedFiles可以为空。再创建review任务[REVIEW]分配reviewer，依赖并reviewedTaskId指向[SEED]；objective=Review README accuracy，acceptance=[\"README accurately describes data/sample.txt\"]。reviewer独立读两文件，确认错误后必须提交failed+needs_revision和high finding：id=F_DOC，file=data/sample.txt，problem=README incorrectly describes the sample，requiredFix=Edit README.md so its complete text is the literal string 2 words followed by a newline. Keep data/sample.txt unchanged. 等系统自动生成repair，禁止手工创建repair、调用amend_task或队长改文件。worker执行自动repair，修改README.md为2 words，真实运行验证并使用changedFiles=[\"README.md\"]提交。reviewer完成自动复审，问题解决应pass并标记原finding resolved=true。遇到阻碍如实报告，不绕过契约。",
+    "cold": "请用AgentTeams执行真实验证，立即运行无需审批。所有文件操作限制在消息开头指定的项目目录，给成员传递完整目录。队长不代写文件，不绕过契约，不读取项目以外的文件或插件配置。保留团队以便复核。禁止在agent_teams_create中使用plan参数；先仅建空团队再添加成员，必须用agent_teams_create_task并显式传kind创建任务，禁止创建占位work任务。创建review前核实其reviewedTaskId指向kind=implementation的SEED任务，不得指向work任务。仅两个成员worker和reviewer。先创建implementation任务[SEED]分配worker，inScope=[\"data/sample.txt\"]，outOfScope=[\"README.md\"]（只对SEED有效，后续修复应允许README.md），acceptance=[\"data/sample.txt has hello world\"]，verify=[\"node check-data.mjs\"]。要求保留seed内容运行验证后完成，changedFiles可以为空。再创建review任务[REVIEW]分配reviewer，依赖并reviewedTaskId指向[SEED]；objective=Review README accuracy，acceptance=[\"README accurately describes data/sample.txt\"]。reviewer独立读两文件，确认错误后必须提交failed+needs_revision和high finding：id=F_DOC，file=data/sample.txt，problem=README incorrectly describes the sample，requiredFix=Edit README.md so its complete text is the literal string 2 words followed by a newline. Keep data/sample.txt unchanged. 等系统自动生成repair，禁止手工创建repair、调用amend_task或队长改文件。worker执行自动repair，修改README.md为2 words，真实运行验证并使用changedFiles=[\"README.md\"]提交。reviewer完成自动复审，问题解决应pass并标记原finding resolved=true。遇到阻碍如实报告，不绕过契约。"
+  },
+  "scope": "Real configured DeepSeek adapter; exact published Harness CLI/Loader. External acceptance checks files, task status and member tool provenance. No model call order is preprogrammed."
+}

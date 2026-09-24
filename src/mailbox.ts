@@ -1,7 +1,7 @@
 /** Durable delivery receipts and execution-generation filtering at step admission. */
 import type { Context } from '@deepseek-ai/cordis'
 import { join } from 'node:path'
-import { acknowledgeMailbox, CAPTAIN_KEY, discardMailboxMessages, findTeamByCaptain, readMailbox, readTeam, sanitizeKey, withTeamLock } from './state.ts'
+import { acknowledgeMailbox, CAPTAIN_KEY, discardMailboxMessages, findTeamByCaptain, readMailbox, readUnreadMailbox, readTeam, sanitizeKey, withTeamLock } from './state.ts'
 import type { TeamMessage, TeamState } from './types.ts'
 import { sessionOwnEvents } from './harness-compat.ts'
 
@@ -9,15 +9,35 @@ const PREFIX = 'AgentTeams inbox receipt: '
 
 export function isCurrentMail(team: TeamState, message: TeamMessage): boolean {
   if (message.discardedAt !== undefined) return false
+  if (message.sourceAttemptId !== undefined && !team.tasks.some(task => task.id === message.sourceTaskId
+    && task.attemptId === message.sourceAttemptId && task.assignee === message.from
+    && (message.sourceTaskStatus === undefined || !['completed', 'failed', 'cancelled'].includes(task.status) || message.sourceTaskStatus === task.status))) return false
   if (message.attemptId === undefined) return true
   return team.tasks.some(task => task.id === message.taskId && task.attemptId === message.attemptId
     && task.assignee === message.to && (task.status === 'claimed' || task.status === 'in_progress'))
 }
 
+/** Include structured provenance even in the status-tool fallback presentation. */
+export function mailboxContent(message: TeamMessage): string {
+  return (message.sourceTaskId === undefined ? ''
+    : `[Source task ${message.sourceTaskId}, attempt_id ${message.sourceAttemptId}${message.sourceTaskStatus === undefined ? '' : `, status=${message.sourceTaskStatus}`}]\n`) + message.content
+}
+
 function mailboxBody(recipient: string, messages: readonly TeamMessage[]): string {
   return messages.map(message => recipient === CAPTAIN_KEY
-      ? `AgentTeams message from member ${message.from}:\n\n${message.content}`
-      : `AgentTeams message from ${message.from}${message.attemptId === undefined ? '' : ` for task ${message.taskId}, attempt_id ${message.attemptId}`}:\n\n${message.content}`).join('\n\n')
+      ? `AgentTeams message from member ${message.from}:\n\n${mailboxContent(message)}`
+      : `AgentTeams message from ${message.from}${message.attemptId === undefined ? '' : ` for task ${message.taskId}, attempt_id ${message.attemptId}`}:\n\n${mailboxContent(message)}`).join('\n\n')
+}
+
+/** Fallback reads must enforce the same current-generation rule as live admission. */
+export async function readCurrentMailbox(root: string, teamId: string, recipient: string, onMalformed?: (line: number) => void): Promise<TeamMessage[]> {
+  return withTeamLock(`team:${root}:${teamId}`, async () => {
+    const team = await readTeam(root, teamId)
+    if (team === undefined) return []
+    const messages = await readUnreadMailbox(root, teamId, recipient, onMalformed)
+    await discardMailboxMessages(root, teamId, recipient, messages.filter(message => !isCurrentMail(team, message)).map(message => message.id))
+    return messages.filter(message => isCurrentMail(team, message))
+  })
 }
 
 export function mailboxPrompt(teamId: string, recipient: string, messages: readonly TeamMessage[]): string {

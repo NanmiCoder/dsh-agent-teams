@@ -16,6 +16,7 @@ import {
   type ReviewPolicy,
   type ReviewVerdict,
   type TaskKind,
+  type TaskEvidence,
   type TaskRevision,
   type TaskStatus,
   type TeamState,
@@ -369,6 +370,11 @@ export function validateCreateTask(team: TeamState, input: CreateTaskInput): Val
     if (!team.tasks.some((item) => item.id === input.sourceTaskId)) {
       return { ok: false, error: `source task "${input.sourceTaskId}" does not exist` }
     }
+    const duplicate = team.tasks.find(item => taskKindOf(item) === 'repair'
+      && OPEN_STATUSES.includes(item.status) && item.sourceTaskId === input.sourceTaskId
+      && findingKey(item.sourceFindingIds ?? []) === findingKey(input.sourceFindingIds ?? []))
+    if (duplicate !== undefined) return { ok: false, error: `repair task ${duplicate.id} already covers these findings; use that task instead of creating duplicate work` }
+
   }
 
   const dependencies = input.dependencies ?? []
@@ -1022,6 +1028,7 @@ export function hasValidQualityTaskFields(value: Record<string, unknown>): boole
   if (value['commandsRun'] !== undefined) {
     if (!Array.isArray(value['commandsRun']) || !value['commandsRun'].every(isCommandResult)) return false
   }
+  if (value['supplementalEvidence'] !== undefined && (!Array.isArray(value['supplementalEvidence']) || !value['supplementalEvidence'].every(isTaskEvidence))) return false
   if (value['revisions'] !== undefined) {
     if (!Array.isArray(value['revisions']) || !value['revisions'].every(isTaskRevision)) return false
   }
@@ -1179,3 +1186,48 @@ export function describeQualityLoop(team: TeamState): QualityLoopSnapshot {
 }
 
 export { QUALITY_KINDS, WRITE_KINDS }
+
+/** Persisted evidence must remain loadable after process restart. */
+export function isTaskEvidence(value: unknown): value is TaskEvidence {
+  if (!isRecord(value)) return false
+  return typeof value['at'] === 'number' && Number.isFinite(value['at'])
+    && nonemptyString(value['by']) && Number.isSafeInteger(value['attempt']) && (value['attempt'] as number) >= 0
+    && (value['attemptId'] === undefined || nonemptyString(value['attemptId']))
+    && (value['note'] === undefined || nonemptyString(value['note']))
+    && (value['acceptanceResults'] === undefined || (Array.isArray(value['acceptanceResults']) && value['acceptanceResults'].every(isAcceptanceResult)))
+    && (value['commandsRun'] === undefined || (Array.isArray(value['commandsRun']) && value['commandsRun'].every(isCommandResult)))
+    && (value['note'] !== undefined || (Array.isArray(value['acceptanceResults']) && value['acceptanceResults'].length > 0) || (Array.isArray(value['commandsRun']) && value['commandsRun'].length > 0))
+}
+
+/** Append observations without mutating the original result or its completion time. */
+export function appendTaskEvidence(task: TeamTask, input: QualityCompletionUpdate & { evidence_note?: string }, by: string): boolean {
+  if (!TERMINAL_TASK_STATUSES.includes(task.status)) throw new Error('supplemental evidence requires a terminal task')
+  // Key order must not turn a retried JSON object into a different observation.
+  const stable = (value: unknown): string => JSON.stringify(value, (_key, item) =>
+    typeof item === 'object' && item !== null && !Array.isArray(item)
+      ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b))) : item)
+  for (const key of ['status', 'output', 'verdict', 'findings', 'changedPaths'] as const) {
+    if (input[key] !== undefined && stable(input[key]) !== stable(task[key])) {
+      throw new Error(`terminal task ${task.id} is immutable: cannot change ${key}; append evidence with evidence_note, acceptanceResults or commandsRun instead. Do not reclaim or redo completed work.`)
+    }
+  }
+  const prior = (task.supplementalEvidence ?? []).filter(row => row.by === by && row.attempt === (task.attempt ?? 0) && row.attemptId === task.attemptId)
+  const freshItems = <T>(items: T[] | undefined, existing: T[]): T[] => {
+    const seen = new Set(existing.map(stable))
+    return (items ?? []).filter(item => { const key = stable(item); if (seen.has(key)) return false; seen.add(key); return true })
+  }
+  const acceptanceResults = freshItems(input.acceptanceResults, [...task.acceptanceResults ?? [], ...prior.flatMap(row => row.acceptanceResults ?? [])])
+  const commandsRun = freshItems(input.commandsRun, [...task.commandsRun ?? [], ...prior.flatMap(row => row.commandsRun ?? [])])
+  const trimmed = input.evidence_note?.trim()
+  const note = trimmed && !prior.some(row => row.note === trimmed) ? trimmed : undefined
+  if (!note && acceptanceResults.length === 0 && commandsRun.length === 0) return false
+  const entry: TaskEvidence = { at: Date.now(), by, attempt: task.attempt ?? 0,
+    ...task.attemptId === undefined ? {} : { attemptId: task.attemptId },
+    ...note === undefined ? {} : { note },
+    ...acceptanceResults.length === 0 ? {} : { acceptanceResults },
+    ...commandsRun.length === 0 ? {} : { commandsRun },
+  }
+  if (!isTaskEvidence(entry)) throw new Error('invalid supplemental evidence')
+  task.supplementalEvidence = [...task.supplementalEvidence ?? [], entry]
+  return true
+}

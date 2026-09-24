@@ -20,8 +20,8 @@ for(const flag of ['--runtime-dir','--report-dir','--baseline-artifact']) if(!ar
 const only=args.get('--only'); if(only&&!['baseline','candidate','upgrade','candidate-finish','candidate-cold','candidate-cold-resume','cancellation'].includes(only))throw Error('Invalid --only');
 if(only!=='baseline'&&!args.has('--candidate-artifact'))throw Error('--candidate-artifact required');
 const caseName=args.get('--case')??'review';
-if(!['review','complex'].includes(caseName))throw Error('Unknown benchmark case');
-const caseFile=caseName==='complex'?'fixtures/harness-complex-case.mjs':'fixtures/harness-model-case.mjs';
+if(!['review','complex','issue159'].includes(caseName))throw Error('Unknown benchmark case');
+const caseFile=caseName==='complex'?'fixtures/harness-complex-case.mjs':caseName==='issue159'?'fixtures/harness-issue159-case.mjs':'fixtures/harness-model-case.mjs';
 const caseDefinition=await import('./'+caseFile);
 if(only==='candidate-finish'&&!caseDefinition.finishPrompt)throw Error('Selected case does not support interrupted-work continuation');
 if(only==='candidate-cold-resume'&&!caseDefinition.resumeColdPrompt)throw Error('Selected case does not support interrupted regression continuation');
@@ -110,7 +110,7 @@ async function run(label,phase,artifact,existing) {
     symlinkSync(extracted.packageDir,pluginLink,'dir');
     json(join(profile,'package.json'),{name:'agentteams-real-model-profile',version:'0.0.0',private:true,type:'module',dsh:{profile:{bundles:['@deepseek-ai/dsh-base','@deepseek-ai/dsh-headless','@nanmicoder/dsh-agent-teams'],patchReload:'startup'}}});
     mkdirSync(join(runDir,'executed-fixtures'),{recursive:true});
-    for(const [source,target] of [['fixtures/harness-model-driver.mjs','fixture-model-driver.mjs'],['fixtures/harness-benchmark-scope.mjs','fixture-benchmark-scope.mjs'],[caseFile,'fixture-model-case.mjs'],...caseName==='complex'?[['fixtures/harness-model-case.mjs','harness-model-case.mjs'],['fixtures/harness-complex-oracle.mjs','harness-complex-oracle.mjs']]:[]]) {
+    for(const [source,target] of [['fixtures/harness-model-driver.mjs','fixture-model-driver.mjs'],['fixtures/harness-benchmark-scope.mjs','fixture-benchmark-scope.mjs'],[caseFile,'fixture-model-case.mjs'],...caseName!=='review'?[['fixtures/harness-model-case.mjs','harness-model-case.mjs']]:[],...caseName==='complex'?[['fixtures/harness-complex-oracle.mjs','harness-complex-oracle.mjs']]:[]]) {
         writeFileSync(join(profile,target),testContents[source]);
         writeFileSync(join(runDir,'executed-fixtures',target),testContents[source]);
     }

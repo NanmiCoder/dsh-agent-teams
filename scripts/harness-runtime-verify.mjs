@@ -247,7 +247,7 @@ for (const scenario of (flags.has('--scenario') ? [flags.get('--scenario')] : sc
     const result = await command([process.execPath, join(runtime, 'node_modules/@deepseek-ai/dsh/lib/bin.js'), '--profile', 'headless', 'Run the authorized deterministic AgentTeams fixture immediately.'], workspace, environment({ DSH_HOME: home, DSH_PERMISSION_MODE: 'danger-full-access', DSH_TELEMETRY_DISABLED: '1', LAB_TRACE: tracePath, LAB_TEAMS: '1', LAB_SCENARIO: scenario }), scenario, 90000);
     const trace = existsSync(tracePath) ? readFileSync(tracePath, 'utf8').trim().split('\n').filter(Boolean).map(s => JSON.parse(s)) : [];
     if (scenario === 'stability') {
-        const checks = ['lazy-start', 'running-plan-correction', 'steering', 'read-receipt-continuation', 'reassign', 'archive', 'batch-plan', 'settlement-dedup'];
+        const checks = ['lazy-start', 'running-plan-correction', 'steering', 'read-receipt-continuation', 'reassign', 'archive', 'batch-plan', 'terminal-evidence', 'report-retry', 'settlement-dedup'];
         const assertions = { exit0: result.code === 0 && !result.timedOut, productMarker: result.stdout.includes('STABILITY_OK'), ...Object.fromEntries(checks.map(check => [check, trace.some(x => x.event === `stability-${check}-passed`)])) };
         runs.push({ scenario, passed: Object.values(assertions).every(Boolean), assertions, evidence: trace.filter(x => checks.some(check => x.event === `stability-${check}-passed`)), exit: { code: result.code, signal: result.signal, timedOut: result.timedOut } });
         continue;

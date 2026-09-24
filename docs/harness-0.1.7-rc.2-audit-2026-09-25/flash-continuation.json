@@ -1,0 +1,434 @@
+{
+  "label": "candidate-finish",
+  "passed": true,
+  "provider": "deepseek-official",
+  "model": "deepseek-flash",
+  "phase": "finish",
+  "requests": 167,
+  "elapsedMs": 470474,
+  "checks": {
+    "exactRoster": true,
+    "teamRunning": true,
+    "noUnfinishedTasks": true,
+    "noFailedWork": true,
+    "release": true,
+    "sameTeam": true,
+    "sameMembers": true,
+    "originalTasksRetained": true,
+    "acceptanceRepairs": true,
+    "fullDag": true,
+    "memberWrote:src/pricing.mjs": true,
+    "memberWrote:src/inventory.mjs": true,
+    "memberWrote:src/store.mjs": true,
+    "memberWrote:src/server.mjs": true,
+    "memberWrote:bin/orders.mjs": true,
+    "captainDidNotImplement": true
+  },
+  "external": {
+    "passed": true,
+    "count": 32,
+    "checks": [
+      {
+        "name": "public module exports",
+        "passed": true
+      },
+      {
+        "name": "quote exact cents, sorting and no input mutation",
+        "passed": true
+      },
+      {
+        "name": "quote duplicate normalization and free products",
+        "passed": true
+      },
+      {
+        "name": "quote rejects quantity boundaries",
+        "passed": true
+      },
+      {
+        "name": "quote rejects malformed and merged overflow",
+        "passed": true
+      },
+      {
+        "name": "quote unknown SKU and invalid catalog",
+        "passed": true
+      },
+      {
+        "name": "quote rejects unsafe total arithmetic",
+        "passed": true
+      },
+      {
+        "name": "inventory reserve is atomic across lines",
+        "passed": true
+      },
+      {
+        "name": "inventory idempotency, conflict, release exactly once",
+        "passed": true
+      },
+      {
+        "name": "inventory rejects bad input without mutation, snapshots detached",
+        "passed": true
+      },
+      {
+        "name": "store concurrent transactions retain all writes",
+        "passed": true
+      },
+      {
+        "name": "store failed transaction rolls back and queue recovers",
+        "passed": true
+      },
+      {
+        "name": "store detaches reads and persists across reopen",
+        "passed": true
+      },
+      {
+        "name": "store never silently resets malformed saved JSON",
+        "passed": true
+      },
+      {
+        "name": "HTTP listens on loopback and health matches query",
+        "passed": true
+      },
+      {
+        "name": "HTTP creates exact priced persistent order",
+        "passed": true
+      },
+      {
+        "name": "HTTP duplicate key is idempotent with reordered normalized lines",
+        "passed": true
+      },
+      {
+        "name": "HTTP same key different intent is conflict",
+        "passed": true
+      },
+      {
+        "name": "HTTP order lookup is stable",
+        "passed": true
+      },
+      {
+        "name": "HTTP invalid key/body/unknown product status codes",
+        "passed": true
+      },
+      {
+        "name": "HTTP body limit enforced",
+        "passed": true
+      },
+      {
+        "name": "HTTP missing and path-like IDs are safe JSON errors",
+        "passed": true
+      },
+      {
+        "name": "HTTP cancellation restores inventory exactly once",
+        "passed": true
+      },
+      {
+        "name": "HTTP restart retains orders, idempotency and inventory",
+        "passed": true
+      },
+      {
+        "name": "32 concurrent purchases cannot oversell 20 units",
+        "passed": true
+      },
+      {
+        "name": "16 simultaneous identical keys create one order",
+        "passed": true
+      },
+      {
+        "name": "parallel cancellation and new requests remain consistent",
+        "passed": true
+      },
+      {
+        "name": "failed cancellation persistence cannot release phantom inventory",
+        "passed": true
+      },
+      {
+        "name": "CLI quote exact JSON",
+        "passed": true
+      },
+      {
+        "name": "CLI audit counts confirmed orders only",
+        "passed": true
+      },
+      {
+        "name": "CLI malformed input exits nonzero with structured error",
+        "passed": true
+      },
+      {
+        "name": "member-created tests exist and entire npm test passes",
+        "passed": true
+      }
+    ],
+    "protectedFilesUnchanged": true
+  },
+  "modelErrors": [],
+  "team": {
+    "teamId": "minifulfill",
+    "captainId": "session-cb737111-c2cb-4f8d-bb5e-cb65b6902403",
+    "memberIds": {
+      "pricing": "77789b3e-df34-4d4b-a8d3-2b2e73b0cf99",
+      "inventory": "d067c8a6-f412-45e6-a135-1e32f80256bd",
+      "storage": "1ce66b86-85f5-4e71-9262-749c9d6cb383",
+      "api": "e95c79e8-48a0-4c47-a601-eea93292d747",
+      "verifier": "d1f17895-c61a-4d1e-b629-49c274daccea",
+      "reviewer": "fee951fd-5cb5-4384-8a4c-d76af505521c"
+    },
+    "taskIds": [
+      "t1",
+      "t2",
+      "t3",
+      "t4",
+      "t5",
+      "t6",
+      "t7",
+      "t8",
+      "t9",
+      "t10",
+      "t11",
+      "t12",
+      "t13",
+      "t14",
+      "t15",
+      "t16",
+      "t17",
+      "t18"
+    ],
+    "tasks": [
+      {
+        "id": "t1",
+        "subject": "[SPEC] Derive explicit acceptance criteria from SPEC.md",
+        "kind": "requirements",
+        "assignee": "reviewer",
+        "status": "completed",
+        "dependencies": [],
+        "verdict": "pass"
+      },
+      {
+        "id": "t2",
+        "subject": "[PRICE] Implement quoteOrder in src/pricing.mjs",
+        "kind": "implementation",
+        "assignee": "pricing",
+        "status": "completed",
+        "dependencies": [
+          "t1"
+        ]
+      },
+      {
+        "id": "t3",
+        "subject": "[STOCK] Implement createInventory in src/inventory.mjs",
+        "kind": "implementation",
+        "assignee": "inventory",
+        "status": "completed",
+        "dependencies": [
+          "t1"
+        ]
+      },
+      {
+        "id": "t4",
+        "subject": "[STORE] Implement openStore in src/store.mjs",
+        "kind": "implementation",
+        "assignee": "storage",
+        "status": "completed",
+        "dependencies": [
+          "t1"
+        ]
+      },
+      {
+        "id": "t5",
+        "subject": "[API] Implement startServer in src/server.mjs",
+        "kind": "implementation",
+        "assignee": "api",
+        "status": "completed",
+        "dependencies": [
+          "t1",
+          "t2",
+          "t3",
+          "t4"
+        ]
+      },
+      {
+        "id": "t6",
+        "subject": "[CLI] Implement bin/orders.mjs quote and audit",
+        "kind": "implementation",
+        "assignee": "api",
+        "status": "completed",
+        "dependencies": [
+          "t1",
+          "t2",
+          "t4"
+        ]
+      },
+      {
+        "id": "t7",
+        "subject": "[UNIT] Unit tests for pricing, inventory, store",
+        "kind": "verification",
+        "assignee": "verifier",
+        "status": "completed",
+        "dependencies": [
+          "t2",
+          "t3",
+          "t4"
+        ]
+      },
+      {
+        "id": "t8",
+        "subject": "[E2E] HTTP and CLI integration tests",
+        "kind": "verification",
+        "assignee": "verifier",
+        "status": "completed",
+        "dependencies": [
+          "t5",
+          "t6",
+          "t7"
+        ]
+      },
+      {
+        "id": "t9",
+        "subject": "[REVIEW] Independent full-project review against SPEC.md",
+        "kind": "review",
+        "assignee": "reviewer",
+        "status": "completed",
+        "dependencies": [
+          "t8",
+          "t5"
+        ],
+        "verdict": "pass",
+        "reviewedTaskId": "t5"
+      },
+      {
+        "id": "t10",
+        "subject": "[RELEASE] Full npm test, README.md and reports/release.json",
+        "kind": "integration",
+        "assignee": "storage",
+        "status": "completed",
+        "dependencies": [
+          "t9",
+          "t8"
+        ]
+      },
+      {
+        "id": "t11",
+        "subject": "[INVENTORY-ACCEPTANCE] Verify inventory replay after release is idempotent",
+        "kind": "review",
+        "assignee": "reviewer",
+        "status": "failed",
+        "dependencies": [
+          "t3"
+        ],
+        "verdict": "needs_revision",
+        "reviewedTaskId": "t3"
+      },
+      {
+        "id": "t12",
+        "subject": "[CLI-ACCEPTANCE] Verify CLI quote accepts JSON file paths",
+        "kind": "review",
+        "assignee": "reviewer",
+        "status": "failed",
+        "dependencies": [
+          "t6"
+        ],
+        "verdict": "needs_revision",
+        "reviewedTaskId": "t6"
+      },
+      {
+        "id": "t13",
+        "subject": "repair-round-2",
+        "kind": "repair",
+        "assignee": "inventory",
+        "status": "completed",
+        "dependencies": [
+          "t3"
+        ],
+        "sourceTaskId": "t3"
+      },
+      {
+        "id": "t14",
+        "subject": "review-round-2",
+        "kind": "review",
+        "assignee": "reviewer",
+        "status": "completed",
+        "dependencies": [
+          "t13",
+          "t15"
+        ],
+        "verdict": "pass",
+        "reviewedTaskId": "t13"
+      },
+      {
+        "id": "t15",
+        "subject": "[UNIT-ALIGN] Realign unit test with corrected inventory replay semantics",
+        "kind": "verification",
+        "assignee": "verifier",
+        "status": "completed",
+        "dependencies": [
+          "t13"
+        ]
+      },
+      {
+        "id": "t16",
+        "subject": "repair-round-2",
+        "kind": "repair",
+        "assignee": "api",
+        "status": "completed",
+        "dependencies": [
+          "t6"
+        ],
+        "sourceTaskId": "t6"
+      },
+      {
+        "id": "t17",
+        "subject": "review-round-2",
+        "kind": "review",
+        "assignee": "reviewer",
+        "status": "completed",
+        "dependencies": [
+          "t16",
+          "t18"
+        ],
+        "verdict": "pass",
+        "reviewedTaskId": "t16"
+      },
+      {
+        "id": "t18",
+        "subject": "[CLI-TEST] Cover quote file-path semantics in E2E CLI tests",
+        "kind": "verification",
+        "assignee": "verifier",
+        "status": "completed",
+        "dependencies": [
+          "t16",
+          "t15"
+        ]
+      }
+    ]
+  },
+  "exit": {
+    "code": 0,
+    "signal": null,
+    "timedOut": false
+  },
+  "pluginVersion": "0.1.21-rc.1",
+  "artifactSha256": "abeb89b9ed85ac5e88a1304104d7bbb721d679dab4b2d113400dce6fadaaab2f",
+  "workspace": "/tmp/agent-teams-flash-017rc2/candidate/workspace",
+  "agentCwd": "/tmp/agent-teams-flash-017rc2/candidate/workspace",
+  "fixtureHashes": {
+    "driver": "e7824c52bdb4505164d05ed0a26ad272400ae2a77b624cdedcd506079344e8bc",
+    "case": "27c31d534fc5f7c62a6e5f99df88971367619e775beff6795b2b23f4179783ce"
+  },
+  "priorEvidence": {
+    "path": "/tmp/agent-teams-flash-017rc2/candidate/trace.jsonl",
+    "sha256": "00944f17200f1a1a3909af564f729e1c111f373d1e3ef242156d87e62fbaa3c9",
+    "events": 1735
+  },
+  "postRunProvenance": {
+    "manualRepairCreationCalls": [],
+    "providerRequests": 167,
+    "originalProviderRequests": 220,
+    "totalProviderRequests": 387,
+    "noManualBusinessEditsByHarnessMaintainer": true
+  },
+  "evidence": {
+    "/tmp/agent-teams-flash-017rc2/candidate-finish/run.json": "0c43b42ddba6f53899ea3e25f0da9db72fe821d329aea035dbea3b6ed1d7a820",
+    "/tmp/agent-teams-flash-017rc2/candidate-finish/trace.jsonl": "7aa89cd99fbe36abf78c615bf24f0d326daf084e5a53b1b7c3abf2c2882d0c93"
+  },
+  "changedRunnerInputs": [
+    "fixtures/harness-complex-case.mjs"
+  ]
+}

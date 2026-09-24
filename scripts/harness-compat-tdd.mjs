@@ -16,7 +16,7 @@ import { CAPTAIN_TOOL_NAMES } from '../lib/tool-names.js'
 const queueKey = Symbol.for('dsh.subagent.queuePrompt')
 const deliverKey = Symbol.for('dsh.subagent.deliverPrompt')
 const signal = new AbortController().signal
-const source = { kind: 'plugin', plugin: 'dsh-agent-teams' }
+const source = { kind: 'agent-teams' }
 const content = [{ type: 'text', text: 'next distinct turn' }]
 
 function scope(extra = {}) {
@@ -363,4 +363,28 @@ await test('0.1.5 delivery queues team jobs and guards both host modes across HM
   clean.dispose()
   assert.equal(await queueMemberPrompt(runtime, captain, 'active', content, signal), 'accepted')
   assert.equal(typeof original.value, 'function')
+})
+
+await test('serial agent/created installs before first request, skips old early notification and cleans up', async () => {
+  const ctx = scope({ subagents: modernRuntime() })
+  const agent = child()
+  let installed = 0, disposed = 0
+  installContinuableMemberSetup(ctx, () => { installed++; return () => { disposed++ } })
+  ctx.emit('agent/created', { agent })
+  assert.equal(installed, 0, 'legacy publication must wait for session-start')
+  ctx.emit('agent/created', { agent, source: 'startup' })
+  assert.equal(installed, 1)
+  ctx.emit('agent/created', { agent, source: 'resume' })
+  assert.equal(installed, 1, 'duplicate setup must not leak handlers')
+  ctx.dispose()
+  assert.equal(disposed, 1)
+  agent.ctx.dispose()
+  assert.equal(disposed, 1)
+})
+
+await test('serial initialization failure vetoes creation instead of admitting a default-model request', () => {
+  const ctx = scope({ subagents: modernRuntime() })
+  installContinuableMemberSetup(ctx, () => { throw new Error('damaged durable model route') })
+  assert.throws(() => ctx.emit('agent/created', { agent: child(), source: 'resume' }), /damaged durable model route/)
+  ctx.dispose()
 })

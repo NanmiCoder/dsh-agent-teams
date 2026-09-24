@@ -1,0 +1,58 @@
+[
+  {
+    "host": "0.1.7-rc.2",
+    "passed": true,
+    "scenarios": 10,
+    "plugin": "0.1.21-rc.1",
+    "artifactSha256": "abeb89b9ed85ac5e88a1304104d7bbb721d679dab4b2d113400dce6fadaaab2f",
+    "cohort": 273
+  },
+  {
+    "host": "0.1.5-rc.3",
+    "passed": true,
+    "scenarios": 10,
+    "plugin": "0.1.21-rc.1",
+    "artifactSha256": "abeb89b9ed85ac5e88a1304104d7bbb721d679dab4b2d113400dce6fadaaab2f",
+    "cohort": 231
+  },
+  {
+    "host": "0.1.5-rc.2",
+    "passed": true,
+    "scenarios": 10,
+    "plugin": "0.1.21-rc.1",
+    "artifactSha256": "abeb89b9ed85ac5e88a1304104d7bbb721d679dab4b2d113400dce6fadaaab2f",
+    "cohort": 231
+  },
+  {
+    "host": "0.1.5-rc.1",
+    "passed": true,
+    "scenarios": 10,
+    "plugin": "0.1.21-rc.1",
+    "artifactSha256": "abeb89b9ed85ac5e88a1304104d7bbb721d679dab4b2d113400dce6fadaaab2f",
+    "cohort": 231
+  },
+  {
+    "host": "0.1.2-rc.1",
+    "passed": true,
+    "scenarios": 10,
+    "plugin": "0.1.21-rc.1",
+    "artifactSha256": "abeb89b9ed85ac5e88a1304104d7bbb721d679dab4b2d113400dce6fadaaab2f",
+    "cohort": 214
+  },
+  {
+    "host": "0.1.2-alpha.5",
+    "passed": true,
+    "scenarios": 10,
+    "plugin": "0.1.21-rc.1",
+    "artifactSha256": "abeb89b9ed85ac5e88a1304104d7bbb721d679dab4b2d113400dce6fadaaab2f",
+    "cohort": 214
+  },
+  {
+    "host": "0.1.2-alpha.2",
+    "passed": true,
+    "scenarios": 10,
+    "plugin": "0.1.21-rc.1",
+    "artifactSha256": "abeb89b9ed85ac5e88a1304104d7bbb721d679dab4b2d113400dce6fadaaab2f",
+    "cohort": 215
+  }
+]

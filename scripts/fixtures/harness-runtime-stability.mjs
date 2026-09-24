@@ -30,7 +30,7 @@ class StabilityAdapter extends LlmAdapter {
   async resolveModel(provider, id) { return { ...model, provider, id }; }
   async *stream(options) {
     if (options.purpose) { yield* chunks('Stability lab'); return; }
-    const blocks = options.messages.flatMap(m => m.content ?? []);
+    const blocks = options.messages.flatMap(m => m.role === 'tool' ? [{ type: 'tool-result', content: m.content, isError: m.isError, toolCallId: m.toolCallId }] : m.content ?? []);
     const failed = blocks.find(b => b.type === 'tool-result' && b.isError);
     assert.equal(failed, undefined, `Real tool failed: ${JSON.stringify(failed)}`);
     const userText = options.messages.filter(m => m.role === 'user').flatMap(m => m.content.filter(b => b.type === 'text').map(b => b.text)).join('\n');

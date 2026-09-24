@@ -8,7 +8,8 @@
 
 | 当前候选宿主 | 定位 | 安装与支持边界 |
 | --- | --- | --- |
-| `0.1.5-rc.1` | recommended | 当前普通用户默认组合的验收目标；RC 不是 GA，仍须实际验证 |
+| `0.1.7-rc.2` | recommended | 当前候选的验收目标；位于上游 next 渠道，RC 不是 GA |
+| `0.1.5-rc.3` / `0.1.5-rc.2` / `0.1.5-rc.1` | legacy | 保留旧 RC；每个精确版本独立验证完整依赖闭包 |
 | `0.1.2-rc.1` | legacy | 保留旧 RC；与新版使用隔离的 profile 与会话副本 |
 | `0.1.2-alpha.5` | preview | 主动选择的预览宿主；不能通过插件默认更新要求普通用户切到 Alpha |
 | `0.1.2-alpha.2` | legacy | 兼容保留目标；必须检查完整依赖闭包，单独锁 CLI 仍可能混入 rc.1 分包 |
@@ -87,10 +88,10 @@ node scripts/harness-runtime-verify.mjs \
 | --- | --- | --- |
 | Ubuntu / Windows 静态检查 | Node 24、pnpm 10.33.0、frozen lockfile、typecheck、build、verify | 两个平台各自的任务日志 |
 | Ubuntu 打包 | `pnpm pack --out` 生成真实 tgz，只生成一份候选 | `agent-teams-candidate` artifact 与文件 SHA-256 |
-| 三版本真实宿主 | 从清单生成 matrix，每个精确宿主安装同一 tgz、检查闭包并运行产品入口 | 各宿主 `result.json`、闭包清单、fixture traces 与 stdout/stderr |
+| 清单内全部真实宿主 | 从清单生成 matrix，每个精确宿主安装同一 tgz、检查闭包并运行产品入口 | 各宿主 `result.json`、闭包清单、fixture traces 与 stdout/stderr |
 | 汇总门禁 | 所有任务成功；每份报告的宿主、插件版本、摘要与候选一致 | `Complete compatibility gate` |
 
-runner 为 `scripts/harness-runtime-verify.mjs --host-version <exact> --artifact <tgz> --report-dir <directory>`。模型适配器使用可重复 fixture，宿主 CLI、profile、插件、工具、子代理和会话是真实实现。默认运行六段：正常生命周期、生命周期冷恢复、fallback、fallback 冷恢复、最终失败，以及队长实际结束回合进入 idle 后被成员通知唤醒。测试同时检查队员执行、忙/闲消息、顺序和推理力度；改变这些能力时需增加会准确变红的场景。
+runner 为 `scripts/harness-runtime-verify.mjs --host-version <exact> --artifact <tgz> --report-dir <directory>`。模型适配器使用可重复 fixture，宿主 CLI、profile、插件、工具、子代理和会话是真实实现。当前运行十个场景：正常生命周期及冷恢复、fallback 及冷恢复、最终失败、队长 idle 唤醒、渐进入口、Web 审批、协议兼容和稳定性。测试同时检查队员执行、忙/闲消息、顺序和推理力度；改变这些能力时需增加会准确变红的场景。
 
 CI 仅上传报告、日志和 fixture 状态，不上传 runtime 的 node_modules、缓存、隔离 HOME 或整份 profile 存储。报告保留 14 天；发布维护者应将关键版本、摘要、结果和限制归档到发布记录，不能只留下会过期的临时目录。
 
@@ -101,7 +102,7 @@ CI 仅上传报告、日志和 fixture 状态，不上传 runtime 的 node_modul
 [publish.yml](../.github/workflows/publish.yml) 必须等待整个 `verify` 可复用工作流成功。发布 job 下载该 run 的候选 tgz，重新核验 SHA-256、版本和完整宿主清单，再通过现有 npm OIDC trusted publishing 发布该文件；发布 job 不重新构建，也不以 `pack --dry-run` 作为门禁。
 
 - 新的预发布插件版本（alpha / beta / rc）首次发布进入项目的 `next` 渠道；已验收的 RC 产物可经维护者明确决定，用 `npm dist-tag add` 将同一不可变版本提升为 `latest`，不重新打包。
-- 无后缀插件首次发布及 RC 产物提升到 `latest` 时，开发基线必须是清单中的 recommended 宿主，全部支持目标都要通过。当前 recommended 为 `0.1.5-rc.1`，不得把只在 Alpha 通过的包提升为普通用户默认版本。
+- 无后缀插件首次发布及 RC 产物提升到 `latest` 时，开发基线必须是清单中的 recommended 宿主，全部支持目标都要通过。当前 recommended 为 `0.1.7-rc.2`，不得把只在 Alpha 通过的包提升为普通用户默认版本。
 - 发版 tag 必须等于 `v<package.version>`，GitHub prerelease 标志与插件版本后缀一致；将 RC 提升到 npm `latest` 不会改变其 GitHub 预发布身份。稳定发布前查询 npm 当前 latest，拒绝倒退。
 - 准备 PR、版本或产物不表示已经发布。发布后读取 registry 的版本、integrity 与 dist-tag，并从 registry 再安装精确版本做消费者复验，记录与候选是否一致。
 - 回退分别处理 npm dist-tag、用户 profile/锁文件和数据；保留不可变版本及 Git 历史。不通过删除或重指向 Git tag 来冒充 npm 回滚。

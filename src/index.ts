@@ -337,7 +337,7 @@ export function apply(ctx: Context, config: Config): void {
             try {
               captain.steer(createUserMessage({
                 content: [{ type: 'text', text: stagedPlanApprovedContext(team.name) }],
-                source: { kind: 'plugin', plugin: 'dsh-agent-teams' },
+                source: { kind: 'agent-teams' },
               }))
             } catch (error) {
               // Approval is already committed. Do not report a failed approval

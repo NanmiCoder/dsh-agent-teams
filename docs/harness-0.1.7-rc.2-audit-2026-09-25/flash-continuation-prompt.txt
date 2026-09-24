@@ -1,0 +1,7 @@
+继续当前已有 MiniFulfill 团队，不重建团队或替换成员。Scope remains the original project, protected files and ownership.
+上一轮在220次模型请求预算处停止，原[RELEASE]任务因此failed；这是外部测试预算，不是模型API故障。保留原任务历史。现提供外部验收实测缺陷，请继续真实工作，不要只总结。
+1. 库存：createInventory({A:5,B:1}); reserve("x",[{sku:"A",quantity:2}]); release("x"); reserve("x",[{sku:"A",quantity:2}]); 此时snapshot().A应为5，实际为3。SPEC明确same id + same normalized lines即使release之后也幂等，不能重新扣减。不同lines仍应409。
+2. CLI规格澄清：quote的CATALOG_JSON和LINES_JSON需要支持JSON文件路径，如 node bin/orders.mjs quote fixtures/catalog.json fixtures/lines.json。当前仅JSON.parse参数会报INVALID_JSON。保留现有内联JSON支持也可以。其他错误码、stdout/stderr契约不变。不要修改SPEC、原始fixtures、package.json或public-contract测试；本消息提供路径语义澄清。
+由队长创建两个新的独立review任务（名称[INVENTORY-ACCEPTANCE]与[CLI-ACCEPTANCE]），reviewer负责、reviewedTaskId分别指向原STOCK和CLI任务；报告high阻断findings，failed + needs_revision，要求插件自动生成repair和下一轮review。不要手工创建repair；由原inventory/api成员修各自文件、运行具体回归，再由reviewer复审。保留所有历史任务、原成员id；这一次允许增加这些必要的质量闭环任务，不能重建原10项任务。
+两处修复和复审完成后，重试原failed RELEASE任务，由storage更新README文件路径示例、完整npm test与reports/release.json。队长不代写代码、不代交成员证据、不绕过质量门禁。成员update_task必须带当前attempt_id。不要把预算中断误判为需要废弃整个团队。
+等待成员时结束当前轮，由消息唤醒；不要循环sleep或status。最终所有非review任务完成、两个修复复审通过后保留团队并结束。

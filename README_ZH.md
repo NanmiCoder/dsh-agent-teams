@@ -30,7 +30,7 @@
 
 ## 版本更新
 
-[v0.1.20](./release-notes/v0.1.20.md) 仅把本文档中的版本引用同步到 npm `latest`，不含任何代码或行为变更，打包产物与 [v0.1.19](./release-notes/v0.1.19.md) 完全一致；该版本带来上一份文档版本以来的实质变更：宿主禁用或改名委派工具时成员仍能正常启动；自动修复范围改为从 `requiredFix` 推导；新增队长专用的 `agent_teams_amend_task`。推荐 DeepSeek Harness `0.1.5-rc.1`，保留三个旧宿主目标。
+[v0.1.21-rc.1](./release-notes/v0.1.21-rc.1.md) 是本地兼容候选版本，尚未发布。适配 Harness `0.1.7-rc.2` 的启动事件、会话导航和工具结果格式，并补充 `0.1.5-rc.2/rc.3` 支持。精确支持矩阵见 [compatibility.json](./compatibility.json)，变更原因与验证范围见[兼容审查](./docs/harness-0.1.7-rc.2-audit-2026-09-25/README.md)。
 
 ## 为什么需要 AgentTeams？
 
@@ -48,19 +48,20 @@
 
 ## 安装与版本选择
 
-**推荐组合：DeepSeek Harness `0.1.5-rc.1` + AgentTeams `0.1.20`。Harness 仍为预发布版本。**
+**候选组合（尚未发布）：DeepSeek Harness `0.1.7-rc.2` + AgentTeams `0.1.21-rc.1`。Harness 仍为预发布版本。**
 
 | 使用场景 | DeepSeek Harness | AgentTeams 插件 |
 | --- | --- | --- |
-| **推荐安装** | **`0.1.5-rc.1`** | **`0.1.20`** |
-| 保留旧 RC | `0.1.2-rc.1` | `0.1.20` |
-| 开发者测试 Alpha | `0.1.2-alpha.5` | `0.1.20` |
-| 保留旧 Alpha | `0.1.2-alpha.2` | `0.1.20` |
+| **候选验收目标** | **`0.1.7-rc.2`** | **`0.1.21-rc.1`** |
+| 保留旧 RC | `0.1.5-rc.1`, `0.1.5-rc.2`, `0.1.5-rc.3` | `0.1.21-rc.1` |
+| 保留旧 RC | `0.1.2-rc.1` | `0.1.21-rc.1` |
+| 开发者测试 Alpha | `0.1.2-alpha.5` | `0.1.21-rc.1` |
+| 保留旧 Alpha | `0.1.2-alpha.2` | `0.1.21-rc.1` |
 
 ### 1. 安装 DeepSeek Harness
 
 ```sh
-npm install --global @deepseek-ai/dsh@0.1.5-rc.1
+npm install --global @deepseek-ai/dsh@0.1.7-rc.2
 dsh --version
 ```
 
@@ -68,15 +69,19 @@ dsh --version
 
 ### 2. 安装 AgentTeams 插件
 
-安装到 `web` profile；使用其他 profile 时替换名称：
+本候选尚未发布到 npm。先从当前 checkout 构建，再把产物安装到选定的测试 profile：
 
 ```sh
-dsh plugin --profile web add --save-exact @nanmicoder/dsh-agent-teams@0.1.20
+pnpm install --frozen-lockfile
+pnpm build
+pnpm verify
+pnpm pack --out ./agent-teams-candidate.tgz
+dsh plugin --profile agent-teams-preview add --save-exact "$PWD/agent-teams-candidate.tgz"
 ```
 
 **安装后，停止并重新启动该 profile 的 Harness 进程，再刷新浏览器。**
 
-npm 默认标签 `latest` 现指向 `0.1.20`，因此新 profile 使用 `dsh plugin --profile web add @nanmicoder/dsh-agent-teams` 即可安装本版；需要锁定版本时使用上面的精确版本命令。推荐宿主为 Harness `0.1.5-rc.1`，安装插件不会自动升级宿主。源码安装见[维护指南](./docs/maintenance-workflow.md)，验证范围见[本版验收记录](./docs/releases/v0.1.19/README.md)。
+本次没有修改任何 npm 发布标签。推荐测试宿主为 Harness `0.1.7-rc.2`，安装插件不会自动升级宿主。源码安装见[维护指南](./docs/maintenance-workflow.md)，验证范围见[候选验收记录](./docs/harness-0.1.7-rc.2-audit-2026-09-25/README.md)。
 
 > Desktop 用户需核对应用内置的 Harness 核心；全局 CLI 升级不会升级桌面内核。旧 `0.1.0-*` / `0.1.1-*` 或其他未列出的宿主，请先保留已工作的组合，参考[旧版本与诊断指引](./docs/maintenance-workflow.md)。
 

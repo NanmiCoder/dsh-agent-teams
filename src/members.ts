@@ -142,7 +142,7 @@ export function steerCaptainReport(captain: Pick<Agent, 'steer'>, from: string, 
   try {
     captain.steer(createUserMessage({
       content: [{ type: 'text', text: receipt ?? `AgentTeams message from member ${from}:\n\n${content}` }],
-      source: { kind: 'plugin', plugin: 'dsh-agent-teams' },
+      source: { kind: 'agent-teams' },
     }))
     return true
   } catch {

@@ -643,7 +643,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
     try {
       captain.followup(createUserMessage({
         content: [{ type: 'text', text: stagedPlanFeedbackContext(prepared.teamName) }],
-        source: { kind: 'plugin', plugin: 'dsh-agent-teams' },
+        source: { kind: 'agent-teams' },
       }))
     } catch (error: unknown) {
       // Do not leave the durable UI in a false waiting state when the live
@@ -681,7 +681,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
     try {
       captain.inject(createUserMessage({
         content: [{ type: 'text', text: stagedPlanDiscardContext(discarded.teamName) }],
-        source: { kind: 'plugin', plugin: 'dsh-agent-teams' },
+        source: { kind: 'agent-teams' },
       }))
     } catch (error: unknown) {
       // The archive is already authoritative. Cancellation still prevents a

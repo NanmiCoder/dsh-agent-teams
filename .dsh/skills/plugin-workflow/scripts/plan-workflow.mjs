@@ -33,8 +33,8 @@ const WORKFLOWS = {
     defaults: ['static-tests'],
   },
   'naming-registry': {
-    outcome: 'Validate identifiers and optionally check or register a cloud ID',
-    defaults: ['naming-local'],
+    outcome: 'Validate identifiers and check the reviewed central registry; registration remains optional',
+    defaults: ['naming-local', 'registry-query'],
   },
   'package-release': {
     outcome: 'Prepare and optionally publish a release',
@@ -82,7 +82,12 @@ const CAPABILITIES = {
   'browser-check': { description: 'Browser validation for Web Client surfaces', owner: 'plugin-test', confirmations: ['dependency-runtime'] },
   rollback: { description: 'Rollback rehearsal or recipe', owner: 'plugin-upgrade', confirmations: [] },
   'package-artifact': { description: 'Build and inspect a package artifact', owner: 'plugin-release', confirmations: ['dependency-runtime'], requires: ['static-tests'] },
-  'registry-register': { description: 'Central cloud ID registration', owner: 'plugin-write', confirmations: ['external-publication'], requires: ['registry-query'] },
+  'registry-register': {
+    description: 'Prepare and submit a reviewed central ID registration',
+    owner: 'plugin-write',
+    confirmations: ['repository-writes', 'external-publication'],
+    requires: ['registry-query'],
+  },
   release: {
     description: 'Publish an artifact or release',
     owner: 'plugin-release',

@@ -47,7 +47,7 @@ class ProtocolAdapter extends LlmAdapter {
         assertProtocol(system);
         assert.doesNotMatch(system ?? '', /agent_teams_open/);
         assert.ok(!(options.tools ?? []).some(tool => tool.name === 'agent_teams_open'));
-        const blocks = options.messages.flatMap(message => message.content ?? []);
+        const blocks = options.messages.flatMap(message => message.role === 'tool' ? [{ type: 'tool-result', content: message.content, isError: message.isError, toolCallId: message.toolCallId }] : message.content ?? []);
         const failed = blocks.find(block => block.type === 'tool-result' && block.isError);
         assert.equal(failed, undefined, JSON.stringify(failed));
         const resultText = blocks.filter(block => block.type === 'tool-result').flatMap(block => block.content?.filter(content => content.type === 'text').map(content => content.text) ?? []).join('\n');
@@ -102,7 +102,7 @@ class ProtocolAdapter extends LlmAdapter {
 }
 
 export const name = 'runtime-lab-protocol-compatibility';
-export const inject = ['llm', 'agents', 'sessions', 'systemPrompt', 'compaction', 'toolResultPruner', 'tools', 'codeRuntime'];
+export const inject = ['llm', 'agents', 'sessions', 'systemPrompt', 'compaction', 'toolResultPruner', 'tools'];
 export function apply(ctx) {
     ctx.llm.registerAdapter(['runtime-lab'], new ProtocolAdapter());
     void (async () => {

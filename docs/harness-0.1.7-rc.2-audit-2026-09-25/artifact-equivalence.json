@@ -1,0 +1,12 @@
+{
+  "testedArtifact": "/tmp/agent-teams-candidate-artifact/nanmicoder-dsh-agent-teams-0.1.21-rc.1.tgz",
+  "testedSha256": "abeb89b9ed85ac5e88a1304104d7bbb721d679dab4b2d113400dce6fadaaab2f",
+  "finalArtifact": "/tmp/agent-teams-final-artifact/nanmicoder-dsh-agent-teams-0.1.21-rc.1.tgz",
+  "finalSha256": "1e6c8ecfc3e601109078b63d8b55688be37362e0342e70b528ce41667bd495bb",
+  "changedFiles": [
+    "package/README.md",
+    "package/README_ZH.md"
+  ],
+  "identicalOtherFiles": 99,
+  "note": "Only installation documentation corrected to state the candidate is unpublished; executable code, assets, manifest and compatibility declarations are byte-identical."
+}

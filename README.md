@@ -30,7 +30,7 @@ Ask in natural language. The plugin provides the team protocol, 14 coordination 
 
 ## Releases
 
-[v0.1.20](./release-notes/v0.1.20.md) syncs the version references in this document with the npm `latest` channel. It changes no code and no behavior; the packaged artifact is identical to [v0.1.19](./release-notes/v0.1.19.md), which carries the substantive changes since the last documented release: member startup survives a host that disables or renames its delegation tools, automatic repair scope is derived from `requiredFix`, and captains gain `agent_teams_amend_task`. Recommended host: DeepSeek Harness `0.1.5-rc.1`; the three older supported host targets are retained.
+[v0.1.21-rc.1](./release-notes/v0.1.21-rc.1.md) is a local, unpublished compatibility candidate. It adapts startup events, session navigation and tool results for Harness `0.1.7-rc.2`, and adds `0.1.5-rc.2/rc.3` support. See the exact [support matrix](./compatibility.json) and [compatibility audit](./docs/harness-0.1.7-rc.2-audit-2026-09-25/README.md).
 
 ## Why AgentTeams?
 
@@ -49,19 +49,20 @@ The conversation card and activity panel use Harness's official locale service. 
 
 ## Install and choose versions
 
-**Recommended pair: DeepSeek Harness `0.1.5-rc.1` + AgentTeams `0.1.20`. Harness remains a prerelease.**
+**Candidate pair (not yet published): DeepSeek Harness `0.1.7-rc.2` + AgentTeams `0.1.21-rc.1`. Harness remains a prerelease.**
 
 | Use case | DeepSeek Harness | AgentTeams plugin |
 | --- | --- | --- |
-| **Recommended installation** | **`0.1.5-rc.1`** | **`0.1.20`** |
-| Retaining an older RC | `0.1.2-rc.1` | `0.1.20` |
-| Developer Alpha testing | `0.1.2-alpha.5` | `0.1.20` |
-| Retaining an older Alpha | `0.1.2-alpha.2` | `0.1.20` |
+| **Candidate target** | **`0.1.7-rc.2`** | **`0.1.21-rc.1`** |
+| Legacy RC | `0.1.5-rc.1`, `0.1.5-rc.2`, `0.1.5-rc.3` | `0.1.21-rc.1` |
+| Retaining an older RC | `0.1.2-rc.1` | `0.1.21-rc.1` |
+| Developer Alpha testing | `0.1.2-alpha.5` | `0.1.21-rc.1` |
+| Retaining an older Alpha | `0.1.2-alpha.2` | `0.1.21-rc.1` |
 
 ### 1. Install DeepSeek Harness
 
 ```sh
-npm install --global @deepseek-ai/dsh@0.1.5-rc.1
+npm install --global @deepseek-ai/dsh@0.1.7-rc.2
 dsh --version
 ```
 
@@ -69,15 +70,19 @@ Skip this if you already run this version. Alpha is opt-in: select an exact Alph
 
 ### 2. Install the AgentTeams plugin
 
-Install into the `web` profile. Replace the profile name if needed:
+This candidate is not on npm yet. Build it from this checkout and install the resulting tarball into your chosen test profile:
 
 ```sh
-dsh plugin --profile web add --save-exact @nanmicoder/dsh-agent-teams@0.1.20
+pnpm install --frozen-lockfile
+pnpm build
+pnpm verify
+pnpm pack --out ./agent-teams-candidate.tgz
+dsh plugin --profile agent-teams-preview add --save-exact "$PWD/agent-teams-candidate.tgz"
 ```
 
 **After installation, stop and restart Harness for that profile, then refresh the browser.**
 
-The default npm `latest` tag points to `0.1.20`, so `dsh plugin --profile web add @nanmicoder/dsh-agent-teams` installs this version on a fresh profile. Use the exact-version command above to pin it. The recommended Harness version is `0.1.5-rc.1`; installing the plugin does not upgrade the host. See the [source installation guide](./docs/maintenance-workflow.md) and [release verification](./docs/releases/v0.1.19/README.md).
+No npm dist-tag has been changed for this candidate. The recommended test host is Harness `0.1.7-rc.2`; installing the plugin does not upgrade the host. See the [source installation guide](./docs/maintenance-workflow.md) and [candidate verification](./docs/harness-0.1.7-rc.2-audit-2026-09-25/README.md).
 
 > Desktop users must check the app's embedded Harness core; upgrading the global CLI does not upgrade it. For older `0.1.0-*` / `0.1.1-*` or unlisted hosts, keep a working pair and follow the [older-version and diagnostic guide](./docs/maintenance-workflow.md).
 

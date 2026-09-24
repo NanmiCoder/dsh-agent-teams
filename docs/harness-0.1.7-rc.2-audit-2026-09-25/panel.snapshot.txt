@@ -1,0 +1,209 @@
+[p1 "Runtime lab — DeepSeek Harness" | space "AgentTeams Harness compatibility"(41): 1 managed, 0 untracked — p1* "Runtime lab — DeepSeek Harness"]
+root
+  container
+    container
+      button "新建会话" [ref=22]
+        svg_root
+        svg_root
+      button "收起侧边栏" [ref=23, loc=css:button[aria-label="收起侧边栏"]]
+        svg_root
+    button "新建会话" [ref=24]
+      container
+        svg_root
+        text "新会话"
+      text "⌥"
+      text "⌘"
+      text "N"
+    container "全局面板"
+      button "插件" [ref=25, loc=css:button[aria-label="插件"]]
+        svg_root
+        text "插件"
+    container
+      container
+        text "工作区"
+        button "搜索会话" [ref=26, loc=css:button[aria-label="搜索会话"]]
+          svg_root
+        container
+          button "视图选项" [ref=27, loc=css:button[aria-label="视图选项"]]
+            svg_root
+          button "添加工作区" [ref=28, loc=css:button[aria-label="添加工作区"]]
+            svg_root
+      tree "会话"
+        treeitem
+          svg_root
+          text "默认工作区"
+        treeitem
+          text "Runtime lab"
+          text "刚刚"
+    button "设置" [ref=29, loc=css:button[aria-label="设置"]]
+      svg_root
+      text "设置"
+  container
+    container
+      container
+        container
+          container "会话层级"
+            text "Runtime lab"
+          container
+            button "1 个子智能体" [ref=44, loc=css:button[aria-label="1 个子智能体"]]
+              text "1 个子智能体"
+              svg_root
+            container
+              svg_root
+              text "标准模式"
+        container
+          container
+            button "用 访达 打开" [ref=38, loc=css:button[aria-label="用 访达 打开"]]
+              image
+            button "更多打开方式" [ref=39, loc=css:button[aria-label="更多打开方式"]]
+              svg_root
+          button "更多操作" [ref=40, loc=css:button[aria-label="更多操作"]]
+            svg_root
+        button "打开右侧边栏" [ref=30, loc=css:button[aria-label="打开右侧边栏"]]
+          svg_root
+      tablist
+        tab [ref=41]
+          text "对话"
+        tab [ref=42]
+          text "轨迹"
+    container
+      container
+        container
+          text "Run the authorized deterministic AgentTeams fixture immediately."
+          container
+            text "00:17"
+            button "复制" [ref=45]
+              svg_root
+        button [ref=46]
+          text "用时 21秒"
+          svg_root
+        paragraph
+          text "AGENTTEAMS_PRODUCT_TURN_OK"
+        container
+          button "复制" [ref=56]
+            svg_root
+          button "好的回答" [ref=57, loc=css:button[aria-label="好的回答"]]
+            svg_root
+          button "有问题的回答" [ref=58, loc=css:button[aria-label="有问题的回答"]]
+            svg_root
+          button "在新对话中分支" [ref=59, loc=css:button[aria-label="在新对话中分支"]]
+            svg_root
+          text "00:18"
+      container
+        container
+          container
+            textfield "发消息或创建任务, / 调用指令, @ 文件或对话" [ref=33]
+            text "发消息或创建任务, / 调用指令, @ 文件或对话"
+          container
+            container
+              button "添加文件或调用指令" [ref=34, loc=css:button[aria-label="添加文件或调用指令"]]
+                svg_root
+              button "访问模式，当前：完全权限" [ref=35, loc=css:button[aria-label="访问模式，当前：完全权限"]]
+                svg_root
+                text "完全权限"
+                svg_root
+            container
+              button "选择模型，当前 Deterministic fixture，推理等级 low" [ref=36, loc=css:button[aria-label="选择模型，当前 Deterministic fixture，推理等级 low"]]
+                text "Deterministic fixture"
+                text "low"
+                svg_root
+              button "发送消息" [ref=37, loc=css:button[aria-label="发送消息"]]
+                svg_root
+        container
+          container
+            button "1 轮 6 步 · 18000 tok/s" [ref=48, loc=css:button[aria-label="1 轮 6 步 · 18000 tok/s"]]
+              svg_root
+              container
+                text "1 轮 6 步"
+                text "·"
+                text "18000 tok/s"
+            button "78 tok · 缓存命中 0%" [ref=49, loc=css:button[aria-label="78 tok · 缓存命中 0%"]]
+              svg_root
+              container
+                text "78 tok"
+                text "·"
+                text "缓存命中 0%"
+          button "上下文已用 0%" [ref=50, loc=css:button[aria-label="上下文已用 0%"]]
+            svg_root
+            text "0%"
+  container "AgentTeams 活动面板"
+    container
+      text "AgentTeams 活动"
+      container
+        button "切换为浮动面板" [ref=51, loc=css:button[aria-label="切换为浮动面板"]]
+          svg_root
+        button "收起活动面板" [ref=52, loc=css:button[aria-label="收起活动面板"]]
+          svg_root
+    container
+      container
+        text "runtime-lab"
+        container
+          text "1 名成员"
+          text "1/1 完成"
+          text "0 条消息"
+      container "队长派工关系"
+        container
+          image
+          container
+            container
+              text "队长"
+              text "拆解 · 派发 · 汇总"
+            text "已派发 1 项任务给 1 名成员"
+          container
+            svg_root
+            text "已收齐"
+        container "团队总进度"
+          text "总进度"
+          container
+            text "■ 进行中 0"
+            text "■ 等待依赖 0"
+            text "■ 已交付 1"
+          text "全部 1 项任务已交付"
+        button [ref=53]
+          container
+            svg_root
+            text "1 名成员"
+          text "收起"
+        container
+          button [ref=60]
+            container
+              text "W"
+              image
+            container
+              container
+                text "worker"
+                text "MEMBER_FIXTURE"
+                image "runtime-lab/fixture-model"
+                  text "fixture-model"
+                container
+                  svg_root
+                  text "已交付"
+              text "任务已交付"
+            container
+              text "1"
+              text "/"
+              text "1"
+          container
+            text "队长派发"
+            text "t1"
+      container "任务依赖链"
+        container
+          button [ref=54]
+            svg_root
+            svg_root
+            text "并行任务"
+          text "无前后依赖 · 点击查看详情"
+        button [ref=55]
+          text "t1"
+          text "Runtime fixture t…"
+        container
+          container
+            text "t1"
+            text "Runtime fixture task"
+            text "已完成"
+          container
+            text "worker"
+            text "·"
+            text "已完成并交付"
+          text "runtime-lab/fixture-model"
+          text "无下游任务"

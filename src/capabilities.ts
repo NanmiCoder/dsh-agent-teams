@@ -1,4 +1,5 @@
 /** Stable, agent-scoped presentation. Business authority stays in the tools. */
+import { onAgentReady } from './harness-compat.ts'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { readdirSync } from 'node:fs'
@@ -101,7 +102,7 @@ export function installTeamCapabilities(ctx: Context, config: CapabilityConfig):
       return agent !== undefined && states.get(agent)?.member ? TEAM_MEMBER_PROMPT : captainPrompt
     },
   })
-  ctx.on('agent/session-start', ({ agent }) => { attach(agent) })
+  onAgentReady(ctx, agent => { attach(agent) })
   ctx.effect(() => () => {
     mounted = false
     for (const state of [...active]) state.dispose()

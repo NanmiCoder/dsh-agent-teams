@@ -14,6 +14,7 @@
   "centralRegistry": {
     "repository": "https://github.com/oh-my-dsh/dsh-plugin-registry",
     "contract": "dsh-plugin-registry/v2",
+    "indexSchemaUrl": "https://raw.githubusercontent.com/oh-my-dsh/dsh-plugin-registry/main/registry/schema/plugin-index.schema.json",
     "defaultIndexUrl": "https://raw.githubusercontent.com/oh-my-dsh/dsh-plugin-registry/main/registry/index.json"
   },
   "reservedNamespacePrefixes": [

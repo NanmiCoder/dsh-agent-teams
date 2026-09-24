@@ -23,8 +23,10 @@ import {
 } from 'react'
 import {
   IconBranchOutline16, IconChevronDownOutline14, IconPanelLeftOutline16,
-  IconStopFill16, IconWarningOutline16, Modal,
-} from '@deepseek-ai/dsh-client-ui-primitives'
+  IconStopFill16, IconWarningOutline16,
+} from './icons.tsx'
+import { Modal } from '@deepseek-ai/dsh-client-ui-primitives'
+import { currentSessionId } from './session-navigation.ts'
 import type { ModelDirectory, ModelDirectoryResolver } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -806,10 +808,10 @@ export function ActivityPanel({ sessionsList, modelDirectories, openMember, t, c
   const gestureRef = useRef<PanelGesture | null>(null)
   const frameRef = useRef<number | null>(null)
   const pendingLayoutRef = useRef<PanelLayout | null>(null)
-  const current = useSyncExternalStore(
+  const current = currentSessionId(useSyncExternalStore(
     sessionsList.subscribe,
     sessionsList.getSnapshot,
-  ).current
+  ))
   const autoOpenTrackerRef = useRef<{
     sessionId: SessionId | undefined
     restoreComplete: boolean

@@ -1,0 +1,148 @@
+[p1 "AgentTeams automatic task assignment fro — DeepSeek Harness" | space "AgentTeams Harness compatibility"(41): 1 managed, 0 untracked — p1* "AgentTeams automatic task assignment fro — DeepSeek Harness"]
+root
+  container
+    container
+      button "新建会话" [ref=22]
+        svg_root
+        svg_root
+      button "收起侧边栏" [ref=23, loc=css:button[aria-label="收起侧边栏"]]
+        svg_root
+    button "新建会话" [ref=24]
+      container
+        svg_root
+        text "新会话"
+      text "⌥"
+      text "⌘"
+      text "N"
+    container "全局面板"
+      button "插件" [ref=25, loc=css:button[aria-label="插件"]]
+        svg_root
+        text "插件"
+    container
+      container
+        text "工作区"
+        button "搜索会话" [ref=26, loc=css:button[aria-label="搜索会话"]]
+          svg_root
+        container
+          button "视图选项" [ref=27, loc=css:button[aria-label="视图选项"]]
+            svg_root
+          button "添加工作区" [ref=28, loc=css:button[aria-label="添加工作区"]]
+            svg_root
+      tree "会话"
+        treeitem
+          svg_root
+          text "默认工作区"
+        treeitem
+          text "Runtime lab"
+          text "刚刚"
+    button "设置" [ref=29, loc=css:button[aria-label="设置"]]
+      svg_root
+      text "设置"
+  container
+    container
+      container
+        container
+          container "会话层级"
+            button [ref=61]
+              text "Runtime lab"
+            container
+              text "/"
+              button "切换子智能体：agent-teams:runtime-lab:worker" [ref=62, loc=css:button[aria-label="切换子智能体：agent-teams:runtime-lab:worker"]]
+                text "agent-teams:runtime-lab:worker"
+                svg_root
+          container
+            svg_root
+            text "标准模式"
+        container
+          container
+            button "用 访达 打开" [ref=63, loc=css:button[aria-label="用 访达 打开"]]
+              image
+            button "更多打开方式" [ref=64, loc=css:button[aria-label="更多打开方式"]]
+              svg_root
+          button "更多操作" [ref=65, loc=css:button[aria-label="更多操作"]]
+            svg_root
+        button "打开右侧边栏" [ref=66, loc=css:button[aria-label="打开右侧边栏"]]
+          svg_root
+      tablist
+        tab [ref=67]
+          text "对话"
+        tab [ref=68]
+          text "轨迹"
+    container [ref=69]
+      container
+        container "轮次导航"
+          button "跳转到第 1 轮" [ref=89, loc=css:button[aria-label="跳转到第 1 轮"]]
+          button "跳转到第 2 轮" [ref=90, loc=css:button[aria-label="跳转到第 2 轮"]]
+        container
+          container
+            text "AgentTeams automatic task assignment from the shared task list. You are executing as configured member "worker". Do not start a teammate's assigned task. Team goal: Deterministic real Harness test Pro..."
+            container
+              text "00:17"
+              button "复制" [ref=70]
+                svg_root
+          button [ref=71]
+            text "用时 1秒"
+            svg_root
+          paragraph
+            text "MEMBER_FIRST_TURN_OK"
+          container
+            button "复制" [ref=72]
+              svg_root
+            button "好的回答" [ref=73]
+              svg_root
+            button "有问题的回答" [ref=74]
+              svg_root
+            button "在新对话中分支" [ref=75]
+              svg_root
+            text "00:18"
+          button [ref=76]
+            svg_root
+            text "收到执行请求"
+            text "00:18"
+            svg_root
+          button [ref=77]
+            text "用时 1秒"
+          paragraph
+            text "SECOND_WAKE_OK"
+          container
+            button "复制" [ref=78]
+              svg_root
+            button "好的回答" [ref=79]
+              svg_root
+            button "有问题的回答" [ref=80]
+              svg_root
+            button "在新对话中分支" [ref=81]
+              svg_root
+            text "00:18"
+      container
+        container
+          container
+            textfield "发消息或创建任务, / 调用指令, @ 文件或对话" [ref=82]
+            text "发消息或创建任务, / 调用指令, @ 文件或对话"
+          container
+            container
+              button "添加文件或调用指令" [ref=83, loc=css:button[aria-label="添加文件或调用指令"]]
+                svg_root
+              button "访问模式，当前：完全权限" [ref=84, loc=css:button[aria-label="访问模式，当前：完全权限"]]
+                svg_root
+                text "完全权限"
+                svg_root
+            button "发送消息" [ref=85, loc=css:button[aria-label="发送消息"]]
+              svg_root
+        container
+          container
+            button "2 轮 6 步 · 6000 tok/s" [ref=86, loc=css:button[aria-label="2 轮 6 步 · 6000 tok/s"]]
+              svg_root
+              container
+                text "2 轮 6 步"
+                text "·"
+                text "6000 tok/s"
+            button "78 tok · 缓存命中 0%" [ref=87, loc=css:button[aria-label="78 tok · 缓存命中 0%"]]
+              svg_root
+              container
+                text "78 tok"
+                text "·"
+                text "缓存命中 0%"
+          button "上下文已用 0%" [ref=88, loc=css:button[aria-label="上下文已用 0%"]]
+            svg_root
+            text "0%"

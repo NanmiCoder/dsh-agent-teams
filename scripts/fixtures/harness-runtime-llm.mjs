@@ -10,7 +10,7 @@ const model = { provider: 'runtime-lab', id: 'fixture-model', name: 'Determinist
 function record(data) { appendFileSync(process.env.LAB_TRACE, JSON.stringify({ ...data, time: Date.now() }) + '\n'); }
 function textChunks(text) { return [{ type: 'block-start', index: 0, blockType: 'text' }, { type: 'text-delta', index: 0, text }, { type: 'block-end', index: 0, block: { type: 'text', text } }, { type: 'usage', usage: { inputTokens: 10, outputTokens: 3 } }, { type: 'finish', reason: { kind: 'stop' } }]; }
 function call(name, args) { const id = ToolCallId('lab-' + Date.now().toString(36) + '-' + (++seq)), arguments_ = JSON.stringify(args); return [{ type: 'block-start', index: 0, blockType: 'tool-call' }, { type: 'tool-call-delta', index: 0, id, name, argumentsDelta: arguments_ }, { type: 'block-end', index: 0, block: { type: 'tool-call', id, name, arguments: arguments_ } }, { type: 'usage', usage: { inputTokens: 10, outputTokens: 3 } }, { type: 'finish', reason: { kind: 'tool-calls' } }]; }
-function history(options) { return options.messages.flatMap(m => m.content ?? []); }
+function history(options) { return options.messages.flatMap(m => m.role === 'tool' ? [{ type: 'tool-result', content: m.content, isError: m.isError, toolCallId: m.toolCallId }] : m.content ?? []); }
 class FixtureAdapter extends LlmAdapter {
     async listModels() { return [model, { ...model, id: 'fixture-failing' }, { ...model, id: 'fixture-fallback' }]; }
     async resolveModel(provider, id) { return { ...model, provider, id }; }

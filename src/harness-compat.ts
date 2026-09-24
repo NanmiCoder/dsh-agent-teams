@@ -1,5 +1,5 @@
 /**
- * The audited Harness 0.1.2 / 0.1.5 subagent boundary. Keep version-specific shapes
+ * The audited Harness 0.1.2 / 0.1.5 / 0.1.7 subagent boundary. Keep version-specific shapes
  * here: API presence alone is not a promise of support for future versions.
  *
  * Alpha.2 owns followup/registerContinuableSetup; Alpha.5 and rc.1 own a
@@ -50,6 +50,29 @@ function unsupported(detail: string): never {
   throw new Error(`agent-teams: unsupported Harness subagent contract (${detail}); use an explicitly tested Harness version and a coherent dependency installation`)
 }
 
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    'agent-teams': { readonly kind: 'agent-teams' }
+  }
+}
+
+/**
+ * 0.1.6 moved startup admission to serial agent/created. Older created events
+ * have no source and precede session-start; ignore those until the old hook.
+ * Keep the removed event's type confined to this audited compatibility seam.
+ */
+export function onAgentReady(ctx: Context, listener: (agent: Agent, vetoable: boolean) => void): () => void {
+  const stopCreated = ctx.on('agent/created', payload => {
+    if ('source' in payload) listener(payload.agent, true)
+    return undefined
+  })
+  const legacy = ctx as unknown as {
+    on(name: 'agent/session-start', listener: (payload: { agent: Agent }) => void): () => void
+  }
+  const stopLegacy = legacy.on('agent/session-start', ({ agent }) => listener(agent, false))
+  return () => { stopCreated(); stopLegacy() }
+}
+
 /** Read child-owned history, excluding any descriptor inherited from a parent. */
 export function sessionOwnEvents(session: Session): readonly SessionEvent[] {
   const current = session as unknown as { ownEvents?: () => readonly SessionEvent[] }
@@ -78,13 +101,14 @@ export function installContinuableMemberSetup(ctx: Context, setup: Setup): void 
   const installed = new WeakSet<Agent>()
   const active = new Set<() => void>()
   ctx.effect(() => {
-    const stop = ctx.on('agent/session-start', ({ agent }) => {
+    const stop = onAgentReady(ctx, (agent, vetoable) => {
       if (installed.has(agent)) return
       // Deliberately synchronous: awaiting here loses the first-request race.
       let teardown: () => void
       try {
         teardown = setup(agent.ctx, agent)
       } catch (error: unknown) {
+        if (vetoable) throw error
         // session-start is a notification: Harness logs a thrown listener and
         // still admits the first prompt. Reject request assembly explicitly so
         // a malformed saved route cannot silently execute on a default model.
@@ -124,7 +148,7 @@ export async function queueMemberPrompt(
   content: ContentBlock[], signal: AbortSignal,
 ): Promise<MessageId> {
   const host = boundary(runtime)
-  const source: MessageSource = { kind: 'plugin', plugin: 'dsh-agent-teams' }
+  const source: MessageSource = { kind: 'agent-teams' }
   if (typeof host.followup === 'function') {
     return host.followup.call(runtime, parent, childId, content, { source, signal })
   }
@@ -141,7 +165,7 @@ export async function steerMemberPrompt(
   content: ContentBlock[], signal: AbortSignal, live?: Agent,
 ): Promise<MessageId> {
   const host = boundary(runtime)
-  const source: MessageSource = { kind: 'plugin', plugin: 'dsh-agent-teams' }
+  const source: MessageSource = { kind: 'agent-teams' }
   const deliver = host[hostPromptDeliver]
   if (typeof deliver === 'function') return deliver.call(runtime, parent, childId, content, source, signal, 'steer')
   if (typeof host.sendMessage === 'function') return host.sendMessage.call(runtime, parent, childId, content, { signal })

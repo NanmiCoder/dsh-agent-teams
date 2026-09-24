@@ -19,7 +19,28 @@ const requireTools = createRequire(import.meta.resolve('@deepseek-ai/dsh-tools')
 const requireDsh = createRequire(import.meta.resolve('@deepseek-ai/dsh/package.json'))
 const requireBase = createRequire(requireDsh.resolve('@deepseek-ai/dsh-base/package.json'))
 const { ToolResultPruner } = await import(pathToFileURL(requireBase.resolve('@deepseek-ai/dsh-compaction-tool-result-pruner')).href)
-const { WorkerThreadCodeRuntime } = await import(pathToFileURL(requireBase.resolve('@deepseek-ai/dsh-code-runtime-worker-thread')).href)
+async function mountCodeRuntime(host, workspace) {
+  const fibers = []
+  const load = async (name, config) => {
+    const module = await import(pathToFileURL(requireBase.resolve('@deepseek-ai/dsh-' + name)).href)
+    const fiber = host.plugin(module.default ?? module.NodePtcRuntime, config)
+    fibers.push(fiber)
+    await fiber.await()
+  }
+  try {
+    let modern = false
+    try { requireBase.resolve('@deepseek-ai/dsh-ptc-runtime-node'); modern = true } catch {}
+    if (modern) {
+      await load('session-projection')
+      await load('fs-local')
+      await load('subprocess-local')
+      await load('sandbox-local')
+      await load('sandbox-policy', { mode: 'danger-full-access', workspaceRoot: workspace })
+      await load('ptc-runtime-node', { timeoutMs: 10000, maxOutputBytes: 1048576, maxOldGenerationSizeMb: 128 })
+    } else await load('code-runtime-worker-thread', { computeMs: 3000, maxWallMs: 10000, maxOutputBytes: 1048576, maxOldGenerationSizeMb: 128 })
+    return { dispose: async () => { for (const fiber of fibers.reverse()) await fiber.dispose() } }
+  } catch (error) { for (const fiber of fibers.reverse()) await fiber.dispose(); throw error }
+}
 const { createScope } = await import(pathToFileURL(requireTools.resolve('@deepseek-ai/dsh-scope')).href)
 
 function assertCaptainProtocol(system) {
@@ -34,8 +55,7 @@ test('stable tool presentation uses real scoped registry and prompt assembly', a
   await prompt.await()
   const tools = host.plugin(ToolRuntime, { mode: 'native' })
   await tools.await()
-  const worker = host.plugin(WorkerThreadCodeRuntime, { computeMs: 3000, maxWallMs: 10000, maxOutputBytes: 1048576, maxOldGenerationSizeMb: 128 })
-  await worker.await()
+  const worker = await mountCodeRuntime(host, workspace)
   const agents = []
   const scopes = []
   const noop = () => {}
@@ -54,8 +74,11 @@ test('stable tool presentation uses real scoped registry and prompt assembly', a
   } })
   await business.await()
   const createAgent = (id, parentSession, events = []) => {
+    events = events.map((event, seq) => ({ ...event, seq }))
     const agent = { id, status: 'idle', session: { header: { cwd: workspace, parentSession, seedLength: 0 }, events,
-      append(type, data) { const event = { type, data }; events.push(event); return event },
+      inheritedEventCount: 0, get seq() { return events.length },
+      snapshotEvents: () => events.slice(), eventAt: seq => events[seq],
+      append(type, data) { const event = { seq: events.length, type, data }; events.push(event); return event },
     } }
     const scope = createScope(owned, agent)
     agent.ctx = scope.ctx

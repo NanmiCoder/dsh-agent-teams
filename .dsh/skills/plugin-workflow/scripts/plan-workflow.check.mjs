@@ -90,8 +90,18 @@ export async function runWorkflowPlannerChecks() {
   }))
   const registrationCapabilities = new Map(registration.capabilities.map((entry) => [entry.id, entry]))
   assert.equal(registrationCapabilities.get('registry-register').source, 'user-include')
-  assert.equal(registrationCapabilities.get('registry-query').source, 'required-by:registry-register')
+  assert.equal(registrationCapabilities.get('registry-query').source, 'workflow-default')
+  assert(registration.confirmations.some((entry) => entry.boundary === 'repository-writes'))
   assert(registration.confirmations.some((entry) => entry.boundary === 'external-publication'))
+  const registrationPhase = registration.ledger.find((phase) => phase.capability === 'registry-register')
+  assert.deepEqual(registrationPhase.confirmations, ['repository-writes', 'external-publication'])
+
+  const naming = buildWorkflowPlan(selection({ workflow: 'naming-registry' }))
+  assert.deepEqual(naming.ledger.map((phase) => phase.capability), ['discovery', 'naming-local', 'registry-query'])
+  assert.equal(naming.readOnly, true)
+  assert.equal(naming.confirmations.length, 0)
+  const offlineNaming = buildWorkflowPlan(selection({ workflow: 'naming-registry', exclude: ['registry-query'] }))
+  assert.deepEqual(offlineNaming.ledger.map((phase) => phase.capability), ['discovery', 'naming-local'])
 
   const newPlugin = buildWorkflowPlan(selection({ workflow: 'full-lifecycle', pluginState: 'new' }))
   assert(newPlugin.ledger.some((phase) => phase.capability === 'plugin-implementation' && phase.owner === 'plugin-write'))
@@ -158,5 +168,5 @@ export async function runWorkflowPlannerChecks() {
 const invokedPath = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href : undefined
 if (invokedPath === import.meta.url) {
   await runWorkflowPlannerChecks()
-  console.log('Workflow planner checks OK: pre-run menu, schema sync, explicit selections, dependency gates, confirmations, read-only CLI')
+  console.log('Workflow planner checks OK: pre-run menu, schema sync, naming-registry defaults, explicit selections, dependency gates, confirmations, read-only CLI')
 }

@@ -1,15 +1,24 @@
 #!/usr/bin/env node
 
-import { readFile } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
+import { readFile, stat } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { loadNamingPolicy, validateNamingManifest } from './validate-names.mjs'
 
 export const DEFAULT_REGISTRY_URL = 'https://raw.githubusercontent.com/oh-my-dsh/dsh-plugin-registry/main/registry/index.json'
 export const REGISTRY_CONTRACT = 'dsh-plugin-registry/v2'
+export const REGISTRY_INDEX_SCHEMA_URL = 'https://raw.githubusercontent.com/oh-my-dsh/dsh-plugin-registry/main/registry/schema/plugin-index.schema.json'
 
-const MAX_INDEX_BYTES = 5 * 1024 * 1024
+export const MAX_INDEX_BYTES = 5 * 1024 * 1024
 const semverPattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/
+const coordinatePattern = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*\/[a-z0-9]+(?:-[a-z0-9]+)*$/
+const namePattern = /^[^\s\u0000-\u001f\u007f]{1,192}$/u
+const scopePattern = /^(?:root|agent|unknown|isolated:[a-z0-9]+(?:-[a-z0-9]+)*)$/
+const sourcePathPattern = /^(?!\/)(?!.*(?:^|\/)\.{1,2}(?:\/|$))(?!.*\/\/)[^\u0000-\u001f\u007f\\?#]+\.json$/u
+const packagePattern = /^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/
+const pluginStatuses = new Set(['active', 'deprecated', 'archived'])
+const routeKinds = new Set(['exact', 'prefix', 'upgrade'])
 const scopedKinds = ['services', 'tools', 'commands', 'skillProviders', 'settingsNamespaces']
 const requiredClaimKinds = [
   'pluginNames',
@@ -19,6 +28,7 @@ const requiredClaimKinds = [
   'events',
   'routes',
 ]
+const indexDigests = new WeakMap()
 
 export class RegistryQueryInputError extends Error {
   constructor(message, options) {
@@ -31,15 +41,82 @@ function isObject(value) {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+function invalid(path, message) {
+  throw new RegistryQueryInputError(`${path} ${message}`)
+}
+
+function checkObject(value, path, { allowed, required = allowed } = {}) {
+  if (!isObject(value)) invalid(path, 'must be an object')
+  for (const key of required) {
+    if (!Object.hasOwn(value, key)) invalid(`${path}.${key}`, 'is required')
+  }
+  for (const key of Object.keys(value)) {
+    if (!allowed.includes(key)) invalid(`${path}.${key}`, 'is not supported by the v2 contract')
+  }
+}
+
+function checkString(value, path, { pattern, maxLength = 512 } = {}) {
+  if (typeof value !== 'string' || value.length === 0 || value.length > maxLength) {
+    invalid(path, `must be a non-empty string up to ${maxLength} characters`)
+  }
+  if (pattern && !pattern.test(value)) invalid(path, 'has an invalid format')
+}
+
+function checkOptionalString(value, path, options) {
+  if (value !== undefined) checkString(value, path, options)
+}
+
+function duplicateKey(seen, key, path, description) {
+  if (seen.has(key)) invalid(path, `duplicates ${description}`)
+  seen.add(key)
+}
+
+function compareText(left, right) {
+  const leftPoints = Array.from(left, (character) => character.codePointAt(0))
+  const rightPoints = Array.from(right, (character) => character.codePointAt(0))
+  const length = Math.min(leftPoints.length, rightPoints.length)
+  for (let offset = 0; offset < length; offset += 1) {
+    if (leftPoints[offset] !== rightPoints[offset]) return leftPoints[offset] < rightPoints[offset] ? -1 : 1
+  }
+  return leftPoints.length === rightPoints.length ? 0 : leftPoints.length < rightPoints.length ? -1 : 1
+}
+
+function repositoryParts(repository) {
+  try {
+    const url = new URL(repository)
+    if (url.protocol !== 'https:' || url.hostname.toLowerCase() !== 'github.com' || url.username || url.password
+      || url.port || url.search || url.hash) return undefined
+    const segments = url.pathname.replace(/^\/|\/$/g, '').split('/')
+    if (
+      segments.length !== 2
+      || !/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/.test(segments[0])
+      || !/^[A-Za-z0-9._-]{1,100}$/.test(segments[1])
+      || segments[1] === '.'
+      || segments[1] === '..'
+    ) return undefined
+    return { owner: segments[0].toLowerCase() }
+  } catch {
+    return undefined
+  }
+}
+
 function parseSemver(value) {
+  if (typeof value !== 'string' || value.length > 128) return undefined
   const match = semverPattern.exec(value)
   if (!match) return undefined
+  const prerelease = match[4] ? match[4].split('.') : []
+  if (prerelease.some((part) => /^\d+$/.test(part) && part.length > 1 && part.startsWith('0'))) return undefined
   return {
-    major: Number(match[1]),
-    minor: Number(match[2]),
-    patch: Number(match[3]),
-    prerelease: match[4] ? match[4].split('.') : [],
+    major: match[1],
+    minor: match[2],
+    patch: match[3],
+    prerelease,
   }
+}
+
+function compareNumericIdentifiers(left, right) {
+  if (left.length !== right.length) return left.length < right.length ? -1 : 1
+  return left === right ? 0 : left < right ? -1 : 1
 }
 
 function comparePrerelease(left, right) {
@@ -50,13 +127,14 @@ function comparePrerelease(left, right) {
   for (let index = 0; index < length; index += 1) {
     if (left[index] === undefined) return -1
     if (right[index] === undefined) return 1
-    const leftNumber = /^\d+$/.test(left[index]) ? Number(left[index]) : undefined
-    const rightNumber = /^\d+$/.test(right[index]) ? Number(right[index]) : undefined
-    if (leftNumber !== undefined && rightNumber !== undefined && leftNumber !== rightNumber) {
-      return leftNumber < rightNumber ? -1 : 1
+    const leftNumeric = /^\d+$/.test(left[index])
+    const rightNumeric = /^\d+$/.test(right[index])
+    if (leftNumeric && rightNumeric) {
+      const comparison = compareNumericIdentifiers(left[index], right[index])
+      if (comparison) return comparison
     }
-    if (leftNumber !== undefined && rightNumber === undefined) return -1
-    if (leftNumber === undefined && rightNumber !== undefined) return 1
+    if (leftNumeric && !rightNumeric) return -1
+    if (!leftNumeric && rightNumeric) return 1
     if (left[index] !== right[index]) return left[index] < right[index] ? -1 : 1
   }
   return 0
@@ -67,7 +145,8 @@ function compareSemver(leftValue, rightValue) {
   const right = parseSemver(rightValue)
   if (!left || !right) throw new RegistryQueryInputError('registry contains an invalid Harness semantic version')
   for (const field of ['major', 'minor', 'patch']) {
-    if (left[field] !== right[field]) return left[field] < right[field] ? -1 : 1
+    const comparison = compareNumericIdentifiers(left[field], right[field])
+    if (comparison) return comparison
   }
   return comparePrerelease(left.prerelease, right.prerelease)
 }
@@ -78,58 +157,251 @@ function supportsHarnessVersion(plugin, version) {
   return compareSemver(range.min, version) <= 0 && (!range.maxExclusive || compareSemver(version, range.maxExclusive) < 0)
 }
 
+function validateNamedClaims(value, path) {
+  if (!Array.isArray(value)) invalid(path, 'must be an array')
+  const seen = new Set()
+  for (let offset = 0; offset < value.length; offset += 1) {
+    checkString(value[offset], `${path}[${offset}]`, { pattern: namePattern, maxLength: 192 })
+    duplicateKey(seen, value[offset], `${path}[${offset}]`, `name ${JSON.stringify(value[offset])}`)
+  }
+}
+
+function validateScopedClaims(value, path) {
+  if (!Array.isArray(value)) invalid(path, 'must be an array')
+  const seen = new Set()
+  for (let offset = 0; offset < value.length; offset += 1) {
+    const claimPath = `${path}[${offset}]`
+    const claim = value[offset]
+    checkObject(claim, claimPath, { allowed: ['name', 'scope'] })
+    checkString(claim.name, `${claimPath}.name`, { pattern: namePattern, maxLength: 192 })
+    checkString(claim.scope, `${claimPath}.scope`, { pattern: scopePattern, maxLength: 128 })
+    duplicateKey(seen, `${claim.name}\u0000${claim.scope}`, claimPath, 'the same name and scope')
+  }
+}
+
+function validateClaims(claims, path) {
+  checkObject(claims, path, { allowed: requiredClaimKinds })
+  validateNamedClaims(claims.pluginNames, `${path}.pluginNames`)
+  if (claims.pluginNames.length === 0) invalid(`${path}.pluginNames`, 'must contain at least one item')
+  for (const kind of scopedKinds) validateScopedClaims(claims[kind], `${path}.${kind}`)
+
+  if (!Array.isArray(claims.loaderIds)) invalid(`${path}.loaderIds`, 'must be an array')
+  if (claims.loaderIds.length === 0) invalid(`${path}.loaderIds`, 'must contain at least one item')
+  const loaders = new Set()
+  for (let offset = 0; offset < claims.loaderIds.length; offset += 1) {
+    const claimPath = `${path}.loaderIds[${offset}]`
+    const claim = claims.loaderIds[offset]
+    checkObject(claim, claimPath, { allowed: ['name', 'composition', 'layer', 'overrideIntent'] })
+    checkString(claim.name, `${claimPath}.name`, { pattern: namePattern, maxLength: 192 })
+    checkString(claim.composition, `${claimPath}.composition`, { pattern: scopePattern, maxLength: 128 })
+    if (!Number.isInteger(claim.layer) || claim.layer < 0 || claim.layer > 1024) invalid(`${claimPath}.layer`, 'must be an integer from 0 to 1024')
+    if (!['none', 'replace'].includes(claim.overrideIntent)) invalid(`${claimPath}.overrideIntent`, 'must be none or replace')
+    duplicateKey(loaders, `${claim.name}\u0000${claim.composition}\u0000${claim.layer}`, claimPath,
+      'the same Loader name, composition, and layer')
+  }
+
+  if (!Array.isArray(claims.skills)) invalid(`${path}.skills`, 'must be an array')
+  const skills = new Set()
+  for (let offset = 0; offset < claims.skills.length; offset += 1) {
+    const claimPath = `${path}.skills[${offset}]`
+    const claim = claims.skills[offset]
+    checkObject(claim, claimPath, { allowed: ['name', 'scope', 'provider', 'rank'] })
+    checkString(claim.name, `${claimPath}.name`, { pattern: namePattern, maxLength: 192 })
+    checkString(claim.scope, `${claimPath}.scope`, { pattern: scopePattern, maxLength: 128 })
+    checkString(claim.provider, `${claimPath}.provider`, { pattern: namePattern, maxLength: 192 })
+    if (!Number.isInteger(claim.rank) || claim.rank < -1_000_000 || claim.rank > 1_000_000) {
+      invalid(`${claimPath}.rank`, 'must be an integer from -1000000 to 1000000')
+    }
+    duplicateKey(skills, `${claim.name}\u0000${claim.scope}\u0000${claim.provider}\u0000${claim.rank}`, claimPath,
+      'the same Skill selection claim')
+  }
+
+  if (!Array.isArray(claims.events)) invalid(`${path}.events`, 'must be an array')
+  const events = new Set()
+  for (let offset = 0; offset < claims.events.length; offset += 1) {
+    const claimPath = `${path}.events[${offset}]`
+    const claim = claims.events[offset]
+    checkObject(claim, claimPath, { allowed: ['name', 'scope', 'role', 'schema'] })
+    checkString(claim.name, `${claimPath}.name`, { pattern: namePattern, maxLength: 192 })
+    checkString(claim.scope, `${claimPath}.scope`, { pattern: scopePattern, maxLength: 128 })
+    if (!['publisher', 'consumer', 'both'].includes(claim.role)) invalid(`${claimPath}.role`, 'must be publisher, consumer, or both')
+    if (claim.schema !== null) checkString(claim.schema, `${claimPath}.schema`, { maxLength: 512 })
+    duplicateKey(events, `${claim.name}\u0000${claim.scope}\u0000${claim.role}`, claimPath,
+      'the same event name, scope, and role')
+  }
+
+  if (!Array.isArray(claims.routes)) invalid(`${path}.routes`, 'must be an array')
+  const routes = new Set()
+  for (let offset = 0; offset < claims.routes.length; offset += 1) {
+    const claimPath = `${path}.routes[${offset}]`
+    const claim = claims.routes[offset]
+    checkObject(claim, claimPath, { allowed: ['kind', 'path', 'scope'] })
+    if (!routeKinds.has(claim.kind)) invalid(`${claimPath}.kind`, 'must be exact, prefix, or upgrade')
+    checkString(claim.path, `${claimPath}.path`, { pattern: /^\/[^?#\s]*[^/?#\s]$/, maxLength: 256 })
+    checkString(claim.scope, `${claimPath}.scope`, { pattern: scopePattern, maxLength: 128 })
+    duplicateKey(routes, `${claim.kind}\u0000${claim.path}\u0000${claim.scope}`, claimPath,
+      'the same route kind, path, and scope')
+  }
+}
+
+function validateRegistration(registration, path) {
+  checkObject(registration, path, {
+    allowed: ['$schema', 'schemaVersion', 'plugin', 'source', 'compatibility', 'claims', 'manifestPath'],
+    required: ['schemaVersion', 'plugin', 'source', 'compatibility', 'claims', 'manifestPath'],
+  })
+  checkOptionalString(registration.$schema, `${path}.$schema`)
+  if (registration.schemaVersion !== 2) invalid(`${path}.schemaVersion`, 'must be 2')
+
+  checkObject(registration.plugin, `${path}.plugin`, {
+    allowed: ['id', 'displayName', 'repository', 'package', 'release', 'status'],
+    required: ['id', 'repository', 'package', 'status'],
+  })
+  const plugin = registration.plugin
+  checkString(plugin.id, `${path}.plugin.id`, { pattern: coordinatePattern, maxLength: 127 })
+  checkOptionalString(plugin.displayName, `${path}.plugin.displayName`, { maxLength: 128 })
+  checkString(plugin.repository, `${path}.plugin.repository`)
+  const repository = repositoryParts(plugin.repository)
+  if (!repository) invalid(`${path}.plugin.repository`, 'must be a canonical https://github.com/<owner>/<repo> URL')
+  const namespace = plugin.id.split('/')[0]
+  if (repository.owner !== namespace) invalid(`${path}.plugin.repository`, `GitHub owner must match plugin namespace ${JSON.stringify(namespace)}`)
+  checkString(plugin.package, `${path}.plugin.package`, { pattern: packagePattern, maxLength: 214 })
+  checkOptionalString(plugin.release, `${path}.plugin.release`, { maxLength: 128 })
+  if (plugin.release !== undefined && !parseSemver(plugin.release)) {
+    invalid(`${path}.plugin.release`, 'must be a valid semantic version')
+  }
+  if (!pluginStatuses.has(plugin.status)) invalid(`${path}.plugin.status`, 'must be active, deprecated, or archived')
+
+  checkObject(registration.source, `${path}.source`, { allowed: ['commit', 'namingManifest'] })
+  checkString(registration.source.commit, `${path}.source.commit`, { pattern: /^[0-9a-f]{40}$/, maxLength: 40 })
+  checkString(registration.source.namingManifest, `${path}.source.namingManifest`, { pattern: sourcePathPattern, maxLength: 512 })
+
+  checkObject(registration.compatibility, `${path}.compatibility`, { allowed: ['harness'] })
+  checkObject(registration.compatibility.harness, `${path}.compatibility.harness`, {
+    allowed: ['min', 'maxExclusive'],
+    required: ['min'],
+  })
+  const harness = registration.compatibility.harness
+  if (!parseSemver(harness.min)) invalid(`${path}.compatibility.harness.min`, 'must be a valid semantic version')
+  if (harness.maxExclusive !== undefined && !parseSemver(harness.maxExclusive)) {
+    invalid(`${path}.compatibility.harness.maxExclusive`, 'must be a valid semantic version')
+  }
+  if (harness.maxExclusive && compareSemver(harness.min, harness.maxExclusive) >= 0) {
+    invalid(`${path}.compatibility.harness.maxExclusive`, 'must be greater than min')
+  }
+
+  validateClaims(registration.claims, `${path}.claims`)
+  checkString(registration.manifestPath, `${path}.manifestPath`, { pattern: sourcePathPattern, maxLength: 512 })
+}
+
 function validateIndex(index) {
   if (!isObject(index) || index.schemaVersion !== 2 || index.contract !== REGISTRY_CONTRACT || !Array.isArray(index.plugins)) {
     throw new RegistryQueryInputError(`registry index must use ${REGISTRY_CONTRACT}`)
   }
+  checkObject(index, 'index', {
+    allowed: ['$schema', 'schemaVersion', 'contract', 'source', 'plugins'],
+    required: ['schemaVersion', 'contract', 'source', 'plugins'],
+  })
+  if (index.$schema !== undefined && index.$schema !== REGISTRY_INDEX_SCHEMA_URL) {
+    invalid('index.$schema', `must be ${REGISTRY_INDEX_SCHEMA_URL}`)
+  }
+  if (index.source !== 'registry/entries') invalid('index.source', 'must be registry/entries')
+  if (!Array.isArray(index.plugins)) invalid('index.plugins', 'must be an array')
+  const coordinates = new Set()
+  const manifestPaths = new Set()
+  const duplicateCoordinates = new Set()
+  const duplicateManifestPaths = new Set()
+  let previousCoordinate
   for (let offset = 0; offset < index.plugins.length; offset += 1) {
     const plugin = index.plugins[offset]
     const path = `index.plugins[${offset}]`
-    if (!isObject(plugin?.plugin) || typeof plugin.plugin.id !== 'string' || typeof plugin.plugin.repository !== 'string'
-      || typeof plugin.plugin.package !== 'string' || typeof plugin.plugin.status !== 'string') {
-      throw new RegistryQueryInputError(`${path}.plugin is invalid`)
+    validateRegistration(plugin, path)
+    if (coordinates.has(plugin.plugin.id)) duplicateCoordinates.add(plugin.plugin.id)
+    if (manifestPaths.has(plugin.manifestPath)) duplicateManifestPaths.add(plugin.manifestPath)
+    if (previousCoordinate !== undefined && compareText(plugin.plugin.id, previousCoordinate) < 0) {
+      invalid(`${path}.plugin.id`, 'plugins must be sorted by plugin.id')
     }
-    if (!isObject(plugin.compatibility?.harness) || !parseSemver(plugin.compatibility.harness.min)
-      || (plugin.compatibility.harness.maxExclusive !== undefined && !parseSemver(plugin.compatibility.harness.maxExclusive))) {
-      throw new RegistryQueryInputError(`${path}.compatibility.harness is invalid`)
-    }
-    if (plugin.compatibility.harness.maxExclusive
-      && compareSemver(plugin.compatibility.harness.min, plugin.compatibility.harness.maxExclusive) >= 0) {
-      throw new RegistryQueryInputError(`${path}.compatibility.harness is empty`)
-    }
-    if (!isObject(plugin.claims)) throw new RegistryQueryInputError(`${path}.claims is invalid`)
-    for (const kind of requiredClaimKinds) {
-      if (!Array.isArray(plugin.claims[kind])) throw new RegistryQueryInputError(`${path}.claims.${kind} must be an array`)
-    }
-    if (!plugin.claims.loaderIds.every((claim) => isObject(claim) && typeof claim.name === 'string')) {
-      throw new RegistryQueryInputError(`${path}.claims.loaderIds is invalid`)
-    }
-    for (const kind of [...scopedKinds, 'skills', 'events']) {
-      if (!plugin.claims[kind].every((claim) => isObject(claim) && typeof claim.name === 'string')) {
-        throw new RegistryQueryInputError(`${path}.claims.${kind} is invalid`)
-      }
-    }
-    if (!plugin.claims.routes.every((claim) => isObject(claim) && typeof claim.kind === 'string' && typeof claim.path === 'string')) {
-      throw new RegistryQueryInputError(`${path}.claims.routes is invalid`)
-    }
+    coordinates.add(plugin.plugin.id)
+    manifestPaths.add(plugin.manifestPath)
+    previousCoordinate = plugin.plugin.id
+  }
+  if (duplicateCoordinates.size || duplicateManifestPaths.size) {
+    const details = [
+      ...[...duplicateCoordinates].sort(compareText).map((value) => `coordinate ${JSON.stringify(value)}`),
+      ...[...duplicateManifestPaths].sort(compareText).map((value) => `manifestPath ${JSON.stringify(value)}`),
+    ]
+    invalid('index.plugins', `duplicates ${details.join(' and ')}`)
   }
   return index
 }
 
+function contentLength(response) {
+  const raw = response.headers?.get?.('content-length')
+  if (raw === null || raw === undefined) return undefined
+  if (!/^\d+$/.test(raw)) throw new RegistryQueryInputError('registry index has an invalid Content-Length header')
+  const value = Number(raw)
+  if (!Number.isSafeInteger(value)) throw new RegistryQueryInputError('registry index has an invalid Content-Length header')
+  return value
+}
+
+async function readBoundedChunks(iterable) {
+  const chunks = []
+  let length = 0
+  for await (const value of iterable) {
+    if (!(value instanceof Uint8Array)) throw new RegistryQueryInputError('registry response body yielded a non-byte chunk')
+    length += value.byteLength
+    if (length > MAX_INDEX_BYTES) throw new RegistryQueryInputError('registry index is too large')
+    chunks.push(Buffer.from(value.buffer, value.byteOffset, value.byteLength))
+  }
+  return Buffer.concat(chunks, length)
+}
+
 async function readBoundedResponse(response) {
-  const length = Number(response.headers.get('content-length'))
-  if (Number.isFinite(length) && length > MAX_INDEX_BYTES) throw new RegistryQueryInputError('registry index is too large')
-  const text = await response.text()
-  if (Buffer.byteLength(text, 'utf8') > MAX_INDEX_BYTES) throw new RegistryQueryInputError('registry index is too large')
-  return text
+  const declaredLength = contentLength(response)
+  if (declaredLength !== undefined && declaredLength > MAX_INDEX_BYTES) throw new RegistryQueryInputError('registry index is too large')
+  const body = response.body
+  if (body && typeof body.getReader === 'function') {
+    const reader = body.getReader()
+    try {
+      return await readBoundedChunks({
+        async *[Symbol.asyncIterator]() {
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) return
+            yield value
+          }
+        },
+      })
+    } catch (error) {
+      await reader.cancel(error).catch(() => {})
+      throw error
+    }
+  }
+  if (body && typeof body[Symbol.asyncIterator] === 'function') return readBoundedChunks(body)
+  throw new RegistryQueryInputError('registry response body is not stream-readable; bounded fallback refused')
+}
+
+function proxyDiagnostic() {
+  const proxyVariables = ['HTTPS_PROXY', 'https_proxy', 'HTTP_PROXY', 'http_proxy', 'ALL_PROXY', 'all_proxy']
+    .filter((name) => process.env[name])
+  const proxyEnabled = process.execArgv.includes('--use-env-proxy') || process.env.NODE_USE_ENV_PROXY === '1'
+  if (!proxyVariables.length || proxyEnabled) return ''
+  const major = Number(process.versions.node.split('.')[0])
+  return major >= 24
+    ? `; proxy environment detected (${proxyVariables.join(', ')}). Retry Node 24+ with --use-env-proxy before this script`
+    : `; proxy environment detected (${proxyVariables.join(', ')}), but Node ${major} fetch does not automatically use it. Use Node 24+ with --use-env-proxy, an approved --registry-url mirror, or --index`
 }
 
 export async function readRegistryIndex({ indexPath, registryUrl = DEFAULT_REGISTRY_URL, fetchImpl = fetch } = {}) {
-  let text
+  let bytes
   if (indexPath) {
     try {
-      text = await readFile(resolve(indexPath), 'utf8')
+      const absolute = resolve(indexPath)
+      const metadata = await stat(absolute)
+      if (metadata.size > MAX_INDEX_BYTES) throw new RegistryQueryInputError('registry index is too large')
+      bytes = await readFile(absolute)
+      if (bytes.byteLength > MAX_INDEX_BYTES) throw new RegistryQueryInputError('registry index is too large')
     } catch (error) {
+      if (error instanceof RegistryQueryInputError) throw error
       throw new RegistryQueryInputError(`cannot read registry index ${resolve(indexPath)}: ${error.message}`, { cause: error })
     }
   } else {
@@ -137,16 +409,25 @@ export async function readRegistryIndex({ indexPath, registryUrl = DEFAULT_REGIS
     try {
       response = await fetchImpl(registryUrl, {
         headers: { accept: 'application/json', 'user-agent': 'dsh-plugin-write-registry-query' },
+        redirect: 'error',
         signal: AbortSignal.timeout(10_000),
       })
     } catch (error) {
-      throw new RegistryQueryInputError(`registry query unavailable: ${error.message}`, { cause: error })
+      throw new RegistryQueryInputError(`registry query unavailable: ${error.message}${proxyDiagnostic()}`, { cause: error })
     }
     if (!response.ok) throw new RegistryQueryInputError(`registry query unavailable: HTTP ${response.status} ${response.statusText}`)
-    text = await readBoundedResponse(response)
+    try {
+      bytes = await readBoundedResponse(response)
+    } catch (error) {
+      if (error instanceof RegistryQueryInputError) throw error
+      throw new RegistryQueryInputError(`registry query unavailable while reading the response: ${error.message}${proxyDiagnostic()}`, { cause: error })
+    }
   }
   try {
-    return validateIndex(JSON.parse(text))
+    const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
+    const index = validateIndex(JSON.parse(text))
+    indexDigests.set(index, createHash('sha256').update(bytes).digest('hex'))
+    return index
   } catch (error) {
     if (error instanceof RegistryQueryInputError) throw error
     throw new RegistryQueryInputError(`cannot parse registry index: ${error.message}`, { cause: error })
@@ -155,23 +436,23 @@ export async function readRegistryIndex({ indexPath, registryUrl = DEFAULT_REGIS
 
 function centralNames(plugin) {
   return {
-    pluginNames: [...plugin.claims.pluginNames].sort(),
-    loaderIds: plugin.claims.loaderIds.map((claim) => claim.name).sort(),
-    services: plugin.claims.services.map((claim) => claim.name).sort(),
-    tools: plugin.claims.tools.map((claim) => claim.name).sort(),
-    commands: plugin.claims.commands.map((claim) => claim.name).sort(),
-    skills: plugin.claims.skills.map((claim) => claim.name).sort(),
-    skillProviders: plugin.claims.skillProviders.map((claim) => claim.name).sort(),
-    events: plugin.claims.events.map((claim) => claim.name).sort(),
-    settingsNamespaces: plugin.claims.settingsNamespaces.map((claim) => claim.name).sort(),
-    routes: plugin.claims.routes.map((claim) => `${claim.kind}\u0000${claim.path}`).sort(),
+    pluginNames: [...plugin.claims.pluginNames].sort(compareText),
+    loaderIds: plugin.claims.loaderIds.map((claim) => claim.name).sort(compareText),
+    services: plugin.claims.services.map((claim) => claim.name).sort(compareText),
+    tools: plugin.claims.tools.map((claim) => claim.name).sort(compareText),
+    commands: plugin.claims.commands.map((claim) => claim.name).sort(compareText),
+    skills: plugin.claims.skills.map((claim) => claim.name).sort(compareText),
+    skillProviders: plugin.claims.skillProviders.map((claim) => claim.name).sort(compareText),
+    events: plugin.claims.events.map((claim) => claim.name).sort(compareText),
+    settingsNamespaces: plugin.claims.settingsNamespaces.map((claim) => claim.name).sort(compareText),
+    routes: plugin.claims.routes.map((claim) => `${claim.kind}\u0000${claim.path}`).sort(compareText),
   }
 }
 
 function localNames(manifest) {
   return {
-    ...Object.fromEntries(requiredClaimKinds.filter((kind) => kind !== 'routes').map((kind) => [kind, [...manifest.names[kind]].sort()])),
-    routes: manifest.names.routes.map((claim) => `${claim.kind}\u0000${claim.path}`).sort(),
+    ...Object.fromEntries(requiredClaimKinds.filter((kind) => kind !== 'routes').map((kind) => [kind, [...manifest.names[kind]].sort(compareText)])),
+    routes: manifest.names.routes.map((claim) => `${claim.kind}\u0000${claim.path}`).sort(compareText),
   }
 }
 
@@ -199,8 +480,8 @@ export function checkNamingAgainstIndex(manifest, index, { harnessVersion } = {}
   validateIndex(index)
   const coordinate = manifest.plugin.coordinate
   const eligible = index.plugins.filter((plugin) => supportsHarnessVersion(plugin, harnessVersion))
-  const registered = eligible.find((plugin) => plugin.plugin.id === coordinate)
-    ?? index.plugins.find((plugin) => plugin.plugin.id === coordinate)
+  const registeredInRange = eligible.find((plugin) => plugin.plugin.id === coordinate)
+  const registered = registeredInRange ?? index.plugins.find((plugin) => plugin.plugin.id === coordinate)
   const matches = []
   if (registered) {
     if (registered.plugin.package !== manifest.plugin.packageName) {
@@ -265,15 +546,24 @@ export function checkNamingAgainstIndex(manifest, index, { harnessVersion } = {}
       }
     }
   }
+  for (const match of matches) {
+    match.registrations.sort((left, right) => compareText(left.id, right.id) || compareText(left.manifestPath, right.manifestPath))
+  }
   matches.sort((left, right) =>
-    left.severity.localeCompare(right.severity) || left.kind.localeCompare(right.kind) || left.claim.localeCompare(right.claim),
+    compareText(left.severity, right.severity) || compareText(left.kind, right.kind) || compareText(left.claim, right.claim),
   )
   return {
     status: 'checked',
     contract: REGISTRY_CONTRACT,
+    indexSha256: indexDigests.get(index) ?? null,
     coordinate,
     harnessVersion: harnessVersion ?? null,
-    registration: registered ? pluginSummary(registered) : null,
+    registration: registered
+      ? {
+          ...pluginSummary(registered),
+          appliesToHarnessVersion: harnessVersion ? registeredInRange !== undefined : null,
+        }
+      : null,
     matches,
     summary: {
       errors: matches.filter((match) => match.severity === 'error').length,
@@ -301,11 +591,19 @@ export async function queryManifestFile({ manifestPath, indexPath, registryUrl, 
 }
 
 export function renderRegistryQuery(result, source) {
+  const registration = result.registration
+    ? `${result.registration.status} at ${result.registration.repository}${
+        result.registration.appliesToHarnessVersion === false
+          ? '; requested Harness version is outside the registered range'
+          : ''
+      }`
+    : 'not present in the reviewed registry'
   const lines = [
     `Registry checked: ${result.coordinate} (${result.contract})`,
     `- Source: ${source}`,
+    `- Index SHA-256: ${result.indexSha256 ?? 'unavailable for an in-memory index'}`,
     `- Harness version: ${result.harnessVersion ?? 'not supplied; all registered ranges were considered'}`,
-    `- Registration: ${result.registration ? `${result.registration.status} at ${result.registration.repository}` : 'not present in the reviewed registry'}`,
+    `- Registration: ${registration}`,
   ]
   if (!result.matches.length) lines.push('- No reviewed cross-plugin matches found. This is not a global uniqueness proof.')
   for (const match of result.matches) {

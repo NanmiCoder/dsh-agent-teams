@@ -1,0 +1,33 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import { currentSessionId, openAgentTeamMember } from '../lib/client/session-navigation.js'
+import { toolResultFailed } from '../lib/client/agent-teams-card-definition.js'
+
+test('panel follows mainView ownership including retained subagents outside the list ids', () => {
+  assert.equal(currentSessionId({ current: 'old', byId: {} }), 'old')
+  assert.equal(currentSessionId({ current: undefined, byId: {} }), undefined)
+  const byId = { root: { id: 'root', retainedBy: { background: 1 } }, child: { id: 'child', retainedBy: { mainView: 1 } } }
+  assert.equal(currentSessionId({ byId, ids: ['root'] }), 'child')
+  assert.equal(currentSessionId({ byId: { root: byId.root } }), undefined)
+})
+
+test('new workspace navigation opens an exact durable member address without removed session methods', async () => {
+  const targets = []
+  assert.equal(await openAgentTeamMember({}, 'captain', 'child', undefined, { openSession: target => targets.push(target) }), 'subagent')
+  assert.deepEqual(targets, [{ parentSessionId: 'captain', childSessionId: 'child', mode: 'continuable' }])
+  await assert.rejects(openAgentTeamMember({}, 'captain', 'child'), /does not expose session navigation/)
+})
+
+test('failed create results never become successful team cards across both message formats', () => {
+  assert.equal(toolResultFailed({ content: [{ type: 'text', text: 'rejected' }], isError: true }), true)
+  assert.equal(toolResultFailed({ content: [{ type: 'tool-result', isError: true, content: [] }] }), true)
+  assert.equal(toolResultFailed({ content: [{ type: 'text', text: 'created' }] }), false)
+})
+
+test('legacy sessions keep their old address navigation even when uiWorkspace exists', async () => {
+  const calls = []
+  await openAgentTeamMember({ open: id => calls.push(id) }, 'parent', 'child', undefined, {
+    openSession: () => { throw new Error('old uiWorkspace does not accept a subagent address') },
+  })
+  assert.deepEqual(calls, ['child'])
+})

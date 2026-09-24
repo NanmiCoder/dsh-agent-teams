@@ -4,22 +4,22 @@
 
 ## 来源与更新
 
-9 个上游 skill 来自 [oh-my-dsh/dsh-plugin-upgrade-skill](https://github.com/oh-my-dsh/dsh-plugin-upgrade-skill/tree/ecab245c6c1831c51b0240aca13573b94a6e525e)，固定 commit `ecab245c6c1831c51b0240aca13573b94a6e525e`，更新日期 2026-09-10。120 个上游文件保持原样。来源清单及每个文件的 SHA-256 见 [upstream-lock.json](upstream-lock.json)，MIT 许可见 [LICENSE.dsh-plugin-upgrade-skill](LICENSE.dsh-plugin-upgrade-skill)。首次导入基线为 `cd4d497588cdd4f16300622779b62a78fe803169`（2026-09-06，115 文件）。
+10 个上游 skill 来自 [oh-my-dsh/dsh-plugin-upgrade-skill](https://github.com/oh-my-dsh/dsh-plugin-upgrade-skill/tree/eeff1cdcffe4013e094d94c8d9b8651a65fbc79a)，固定 commit `eeff1cdcffe4013e094d94c8d9b8651a65fbc79a`，更新日期 2026-09-25。127 个上游文件保持原样。来源清单及每个文件的 SHA-256 见 [upstream-lock.json](upstream-lock.json)，MIT 许可见 [LICENSE.dsh-plugin-upgrade-skill](LICENSE.dsh-plugin-upgrade-skill)。首次导入基线为 `cd4d497588cdd4f16300622779b62a78fe803169`（2026-09-06，115 文件）。
 
 项目原有 `dsh-plugin-development` 单独维护；其历史 API 示例已加适用范围说明，不包含在上游 hash 清单中。
 
 更新时先审阅明确 commit 的差异，再更新 skill 目录、来源清单和镜像，并保留清单中 4 个上游脚本的执行权限。不要自动追随上游 `main`。同步器会报告额外镜像文件和已从 canonical 删除的旧 skill 目录，不会自动删除；须审阅来源后单独处理。新增或删除 skill 时也要同步 `.agents/skills/` 的发现链接。
 
-这批资料是开发维护工具，不是运行时依赖；当前 npm `files` 清单不包含这些目录。上游完整 benchmark 保留在独立 clone，不复制进应用。本次 clone 位于 `/tmp/dsh-plugin-upgrade-skill-20260910`；临时目录丢失后，可按固定 SHA 重新克隆。
+这批资料是开发维护工具，不是运行时依赖；当前 npm `files` 清单不包含这些目录。上游完整 benchmark 保留在独立 clone，不复制进应用。本次 clone 位于 `/tmp/dsh-plugin-upgrade-skill-20260924`；临时目录丢失后，可按固定 SHA 重新克隆。
 
 ### 重复升级命令
 
-已有 clone 时先 `git -C /tmp/dsh-plugin-upgrade-skill-20260910 fetch origin main`，读取 `origin/main` 的完整 SHA，并审阅它相对 `upstream-lock.json` 中 commit 的差异。首次下载可运行 `git clone https://github.com/oh-my-dsh/dsh-plugin-upgrade-skill.git /tmp/dsh-plugin-upgrade-skill-20260910`。
+已有 clone 时先 `git -C /tmp/dsh-plugin-upgrade-skill-20260924 fetch origin main`，读取 `origin/main` 的完整 SHA，并审阅它相对 `upstream-lock.json` 中 commit 的差异。首次下载可运行 `git clone https://github.com/oh-my-dsh/dsh-plugin-upgrade-skill.git /tmp/dsh-plugin-upgrade-skill-20260924`。
 
 ```sh
 # 默认只预览；将 SHA 换为本次已经审阅的完整 commit。
-pnpm update:skills /tmp/dsh-plugin-upgrade-skill-20260910 ecab245c6c1831c51b0240aca13573b94a6e525e
-pnpm update:skills /tmp/dsh-plugin-upgrade-skill-20260910 ecab245c6c1831c51b0240aca13573b94a6e525e --apply
+pnpm update:skills /tmp/dsh-plugin-upgrade-skill-20260924 eeff1cdcffe4013e094d94c8d9b8651a65fbc79a
+pnpm update:skills /tmp/dsh-plugin-upgrade-skill-20260924 eeff1cdcffe4013e094d94c8d9b8651a65fbc79a --apply
 pnpm verify:skill
 pnpm test:skills-updater
 ```
@@ -28,7 +28,7 @@ pnpm test:skills-updater
 
 上游推荐的通用安装方式是 `npx skills add oh-my-dsh/dsh-plugin-upgrade-skill`，Skills CLI 也提供 `npx skills update [skills]`。本项目采用自有 `skills/upstream-lock.json` 与 `skills/ → .agents/skills/ + .dsh/skills/` 布局，通用 CLI 不负责维护这些清单；本仓库使用上述项目命令，避免混合两套管理方式。
 
-本次更新新增 `0.1.3-alpha.1` / `0.1.3-alpha.2` 迁移卡、precision checklist 和 `inject-lint`；**仍未覆盖 `0.1.3-alpha.2 → 0.1.5-rc.1`**。AgentTeams 的缺口审查单独记录在 [0.1.5 适配报告](../docs/harness-0.1.5-rc.1-audit-2026-09-10/README.md)，不改写上游文件，也不将资料更新视为运行时适配完成。
+本次同步新增通用 `generic-migration` skill，以及 `0.1.5-alpha.1` 至 `0.1.6-alpha.1` 的迁移卡和运行时验证记录；**仍未覆盖 `0.1.6-alpha.1 → 0.1.7-rc.2`**。新增 skill 已单独审阅并补全发现链接，其余文件通过项目更新器核验后导入。上游资料中的 dist-tag 快照是历史值，不能作为当前版本结论。资料同步不代表运行时适配完成。
 
 ## 使用入口
 

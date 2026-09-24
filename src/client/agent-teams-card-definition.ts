@@ -91,7 +91,7 @@ export const agentTeamsCardDefinition: ConversationNodeDefinition<AgentTeamsNode
   update: (context, match) => {
     if (match.event.type !== 'tool/result') return context.state
     const failed = match.event.data.error !== undefined
-      || match.event.data.message.content.some((block) => block.type === 'tool-result' && block.isError === true)
+      || toolResultFailed(match.event.data.message)
     if (failed) return context.state
     return { ...context.state, accepted: true }
   },
@@ -115,4 +115,11 @@ export const agentTeamsCardDefinition: ConversationNodeDefinition<AgentTeamsNode
       },
     }
   },
+}
+
+/** V4 tool-role results carry isError directly; older logs nest tool-result blocks. */
+export function toolResultFailed(message: { readonly content: readonly unknown[]; readonly isError?: boolean }): boolean {
+  return message.isError === true || message.content.some(block =>
+    typeof block === 'object' && block !== null && 'type' in block && block.type === 'tool-result'
+    && 'isError' in block && block.isError === true)
 }

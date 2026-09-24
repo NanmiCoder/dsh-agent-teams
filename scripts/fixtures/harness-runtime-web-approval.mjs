@@ -43,7 +43,7 @@ class WebApprovalAdapter extends LlmAdapter {
     async *stream(options) {
         const system = options.system ?? options.messages.filter(message => message.role === 'system').flatMap(message => message.content.filter(block => block.type === 'text').map(block => block.text)).join('\n');
         if (options.purpose) { yield* textChunks('Web approval lab'); return; }
-        const blocks = options.messages.flatMap(message => message.content ?? []);
+        const blocks = options.messages.flatMap(message => message.role === 'tool' ? [{ type: 'tool-result', content: message.content, isError: message.isError, toolCallId: message.toolCallId }] : message.content ?? []);
         const calls = blocks.filter(block => block.type === 'tool-call');
         const names = calls.map(block => block.name);
         const userText = options.messages.filter(message => message.role === 'user').flatMap(message => message.content.filter(block => block.type === 'text').map(block => block.text)).join('\n');
@@ -52,7 +52,7 @@ class WebApprovalAdapter extends LlmAdapter {
         assert.equal(failed, undefined, 'Real workflow tool failed: ' + JSON.stringify(failed));
         const isMember = system?.includes('WEB_APPROVAL_MEMBER') === true;
         record({ event: 'web-request', sessionId: options.sessionId, isMember, model: options.model, reasoningEffort: options.reasoningEffort, system: system, tools: options.tools, messages: options.messages });
-        const pluginMessages = options.messages.filter(message => message.role === 'user' && message.source?.kind === 'plugin' && message.source.plugin === 'dsh-agent-teams');
+        const pluginMessages = options.messages.filter(message => message.role === 'user' && message.source?.kind === 'agent-teams');
         const messageText = message => message.content.filter(block => block.type === 'text').map(block => block.text).join('\n');
         const approvals = pluginMessages.filter(message => messageText(message).includes('The user approved the staged AgentTeams plan') && messageText(message).includes('from the pre-run review UI.'));
         const reports = pluginMessages.filter(message => messageText(message).includes('AgentTeams message from member worker:') && messageText(message).includes('WEB_MEMBER_REPORT_OK'));

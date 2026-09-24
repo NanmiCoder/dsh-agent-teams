@@ -47,7 +47,7 @@ Inspect only enough context to make the choices concrete:
 | `upgrade-target` | Upgrade an installed plugin to an explicit version | discovery, upgrade, static checks, rollback record |
 | `compatibility-migration` | Adapt plugin source to an exact DSH target | discovery, DSH audit, seven-touchpoint migration, static and runtime tests |
 | `test-only` | Validate an existing source tree or artifact | discovery, selected test levels, report |
-| `naming-registry` | Validate identifiers and optionally check or register a cloud ID | discovery, offline naming, registry query, optional registration |
+| `naming-registry` | Validate identifiers and check reviewed cloud registrations; optionally register an ID | discovery, offline naming, registry query; optional registration |
 | `package-release` | Prepare and optionally publish a release | discovery, required test gates, pack, consumer smoke, optional publication |
 | `full-lifecycle` | Migrate, validate, name, package, and optionally publish | all applicable stages in dependency order |
 | `runtime-debug` | Diagnose and fix Web Client runtime behavior | runtime diagnosis/fix, static, functional and browser proof, rollback |
@@ -67,9 +67,9 @@ Then let the user include or exclude these capabilities. Recommend the smallest 
 | Exact-version Docker cold start | `docker-smoke` | On for migrations and release candidates when Docker is available |
 | One real functional path | `functional-probe` | On for migrations and releases |
 | Browser validation | `browser-check` | On only for Web Client or UI surfaces |
-| Offline naming declaration validation | `naming-local` | On for new external plugins; otherwise opt-in |
-| Central cloud registry lookup | `registry-query` | Off until selected; read-only |
-| Central cloud ID registration | `registry-register` | Off; requires reviewed external publication |
+| Offline naming declaration validation | `naming-local` | On for `naming-registry` and new external plugins; otherwise opt-in |
+| Central cloud registry lookup | `registry-query` | On for `naming-registry`; otherwise opt-in and read-only |
+| Central cloud ID registration | `registry-register` | Off; local entry preparation writes the registry checkout, and PR submission is external publication |
 | Rollback rehearsal or recipe | `rollback` | Recipe on for every write workflow; rehearsal is opt-in |
 | Build and inspect a package artifact | `package-artifact` | On for package/release and full lifecycle workflows |
 | Publish an artifact or release | `release` | Off unless external release intent is explicit |
@@ -88,7 +88,7 @@ node <plugin-workflow-skill>/scripts/plan-workflow.mjs \
 
 Use `--format json` for automation, or `--selection <selection.json>` for a persisted input that follows the schema. Calling the planner without a selection prints the menu instead of creating a default plan. The planner validates conflicts and required dependencies, emits deterministic phase IDs and confirmation boundaries, and never executes the selected phases. Treat its output as the initial ledger, not as user approval.
 
-Do not treat `registry-query` as a reservation. Do not treat `registry-register` as required for local plugin use. A local plugin and the central registry may share a display name; only concrete identifiers on the same runtime surface can conflict, and the naming owner must report those exact matches.
+The `naming-registry` defaults stop after the read-only `registry-query`; `registry-register` is never implied and retains separate repository-write and external-publication boundaries. A user may explicitly exclude `registry-query` for an offline-only run. Do not treat a query as a reservation or registration as required for local plugin use. A local plugin and the central registry may share a display name; only concrete identifiers on the same runtime surface can conflict, and the naming owner must report those exact matches plus the index SHA-256 when the query completes.
 
 ## Build the phase ledger
 
@@ -115,7 +115,7 @@ Before executing a stage, load and follow its owning Skill. If the owner is unav
 | Stage | Owning Skill | Boundary |
 |---|---|---|
 | Installed update or source compatibility migration | `$plugin-upgrade` | Inspect first; check authorization for config, dependency, or source changes |
-| New plugin code or offline naming declaration | `$plugin-write` | Follow the exact target Harness contract |
+| New plugin code, offline naming, or registry query | `$plugin-write` | Follow the exact target Harness and registry contracts |
 | Static, runtime, Docker, functional, or browser validation | `$plugin-test` | Select the minimum sufficient levels and preserve evidence |
 | Package, release gates, publication, and release rollback | `$plugin-release` | Check the publication destination and authorization |
 | DSH host version-to-version evidence | `$dsh-upgrade-audit` | Keep generated evidence separate from plugin source changes |
@@ -133,7 +133,7 @@ Run stages in dependency order:
 1. discovery and source identity;
 2. DSH audit when selected;
 3. upgrade or implementation changes, then selected runtime repair or dependency integration;
-4. offline naming and optional registry query;
+4. offline naming and the selected registry query (default for `naming-registry`);
 5. static tests;
 6. Docker, functional, and browser proof;
 7. release preparation and artifact inspection;

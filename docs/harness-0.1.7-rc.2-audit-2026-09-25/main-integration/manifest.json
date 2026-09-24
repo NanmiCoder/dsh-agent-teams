@@ -1,0 +1,11 @@
+{
+  "commonBase": "87c95c94d7847e4a242cb589916adc519981175f",
+  "mainReviewed": "9f11fa41b450b5f1bcd12f892e17f7ee70427142",
+  "adaptationCommit": "be0151358f9e0de872389b1693c2dcdcfefba072",
+  "retainedFeature": "1487f33 (#193)",
+  "artifact": "/tmp/agent-teams-main-integration/candidate.tgz",
+  "artifactSha256": "3168b139920494eaeac4213686b4e3efbfd150536385551a43fee9a826285eee",
+  "uiAssetsByteIdenticalToPreviousCandidate": true,
+  "uiFileCount": 18,
+  "workingTreeScope": "Merged on integration branch before fast-forwarding local main; no remote push/publication."
+}

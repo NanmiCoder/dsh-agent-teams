@@ -1,0 +1,13 @@
+Lockfile is up to date, resolution step is skipped
+Already up to date
+
+╭ Warning ─────────────────────────────────────────────────────────────────────╮
+│                                                                              │
+│   Ignored build scripts: @deepseek-ai/dsh-subprocess-local@0.1.7-rc.2,       │
+│   @google/genai@1.52.0, koffi@3.1.6, node-pty@1.2.0-beta.15,                 │
+│   protobufjs@7.6.6.                                                          │
+│   Run "pnpm approve-builds" to pick which dependencies should be allowed     │
+│   to run scripts.                                                            │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+Done in 290ms using pnpm v10.33.0

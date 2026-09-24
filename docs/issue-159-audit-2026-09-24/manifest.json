@@ -1,0 +1,30 @@
+{
+  "sourceCommit": "87c95c94d7847e4a242cb589916adc519981175f",
+  "fixCommit": "68fe529d602b1eea1f1ecaee99857d20a4f94be0",
+  "artifactSha256": {
+    "0.1.17": "ff7a5fc24cda7232538b5646dfd72865f3911de28c1888a44ee1ba376b1b4b1a",
+    "0.1.18": "f6c1950f66744fa5aa27f6f8d9f56df58fe144a16a2e32e765be2b5dc38f57ee",
+    "0.1.20": "a374136e4791a4e34d5d4c45d10cad238efb2e69ebddd687492229ff3d0964a4"
+  },
+  "note": "probe passed means diagnostic sequence completed, not that no bug was observed; probe events deliberately include terminal evidence failure",
+  "rawEvidenceDirectory": "/tmp/issue159-20260924",
+  "files": {
+    "probe-fixture.mjs": "cd2f107cd005197fb2a328cc57c39eb029ea91c075f40ccbcda56ad6ba65ccad",
+    "real-model-manifest.json": "c9b96ddee58aec60052e10e067d3dd56edc22e9e864d4310554c9ecdcc7ea735",
+    "probe-0.1.17.json": "1f15d9dad93d5b7a15ba3f301e04c75084e9318e8cb2fe7880534410725cd101",
+    "lifecycle-unit.log": "1ee719fd28422164a72bdbd5e44aa5369944f08afbcd19f8b758c958c2525dec",
+    "probe-0.1.18-events.jsonl": "3d4fa91616b1fd07e6ffb114b60aa7fe4f1bc19cd4ea5b62369fdfb6451fea55",
+    "probe-0.1.20.json": "0bf8d8f6125d8ca7f6e43d2a511562b7d8e63166d1367163b82f117daa4c3d2a",
+    "host-cohort.json": "fd35802bb2a089fda258c6b6d0ae46deebf21f5681640713a929aefba43b358c",
+    "real-model-trace.jsonl": "43c66e0ae526640f3e9de5f6749ce10db365dc4f0ba56579eb26eb87a6be60e0",
+    "README.md": "94c5aeac6e12b4d3f6e5067c2abf9c7da0c9dba6578dee6d602c03655e99be65",
+    "real-model-result.json": "73339ff21295adcfff8b50fbecfcf473f2da36b71d252992d69f5e2ca6b0b258",
+    "real-model-case.mjs": "ce8d67054ec2e9d9588e5cc2961e986dc8ad8bd3d777e5d19abfbd1b23ca8de6",
+    "probe-0.1.18.json": "b26923ac61d96e8fa34dd43082a3cf4c5205e77639deaecadbd4a5c177775cf3",
+    "stability-unit.log": "efacb1628d338a4ff328e62392aba16e50e287752a0a431d1f7d96d7a15f345f",
+    "runtime-stability.json": "31bc936565830664dfd275a324fda022f0e6d19db2827391fc423d9a6ce0f0b4",
+    "probe-0.1.17-events.jsonl": "46e7f6fdcedf9316b8c3c7a64aa7c3e3770660bfca17f397e6672a7526f5669c",
+    "prepare-runner.mjs": "28a0a1858f0631a1abedeb89ef569a6270689d3cd4efaaf6a24ac68de64927dc",
+    "probe-0.1.20-events.jsonl": "3a98172ac6f4d8063ee29ae3c95e7c09e07502e840ccda0aec45c0cf9b32f012"
+  }
+}

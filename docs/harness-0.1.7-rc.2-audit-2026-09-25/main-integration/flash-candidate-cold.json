@@ -1,0 +1,95 @@
+{
+  "label": "candidate-cold",
+  "passed": true,
+  "provider": "deepseek-official",
+  "model": "deepseek-flash",
+  "phase": "cold",
+  "requests": 18,
+  "elapsedMs": 37439,
+  "checks": {
+    "source:app/orders.mjs": true,
+    "source:app/comments.mjs": true,
+    "source:app/signup.mjs": true,
+    "oneCurrentTeam": true,
+    "exactRoster": true,
+    "running": true,
+    "groundedReport:security": true,
+    "memberWroteReport:security": true,
+    "taskCompleted:security": true,
+    "summary": true,
+    "captainSummarizedAfterCompletion": true,
+    "sameTeam": true,
+    "sameMembers": true,
+    "exactlyOneNewTask": true,
+    "lateEvidence:performance": true,
+    "lateEvidence:security": true,
+    "lateEvidence:interaction": true
+  },
+  "external": {
+    "sourceUnchanged": true,
+    "hashes": {
+      "app/orders.mjs": "437ebb9e258f51ae043c84aed195e5d7ce53a89b56c487a002a018bf97f3a8a6",
+      "app/comments.mjs": "7f5cec1d0b7eec9248c43fbdb8f1151cf6ae52ee37a0e649a39579a289a2c198",
+      "app/signup.mjs": "f28019ae6905f30beae40491a3d73298c853b370aea6740cdbd81679262207b8"
+    },
+    "repeatedProductScans": true,
+    "productIdReads": 20100,
+    "unsafeHtmlEcho": true,
+    "validInputStillDisabled": true
+  },
+  "team": {
+    "teamId": "app-readonly-audit",
+    "captainId": "session-520bb73e-e77a-4b5f-b317-e4af8b6fd21d",
+    "memberIds": {
+      "performance": "de91026b-c3a1-46ba-8628-fe852e67e049",
+      "security": "b09646a7-82e9-4600-8138-01875e4d7532",
+      "interaction": "b822373f-e2c6-4c62-afb9-6b3a832e681d"
+    },
+    "taskIds": [
+      "t1",
+      "t2",
+      "t3",
+      "t4"
+    ],
+    "tasks": [
+      {
+        "id": "t1",
+        "assignee": "performance",
+        "status": "completed"
+      },
+      {
+        "id": "t2",
+        "assignee": "security",
+        "status": "completed"
+      },
+      {
+        "id": "t3",
+        "assignee": "interaction",
+        "status": "completed"
+      },
+      {
+        "id": "t4",
+        "assignee": "security",
+        "status": "completed"
+      }
+    ]
+  },
+  "modelErrors": [],
+  "exit": {
+    "code": 0,
+    "signal": null,
+    "timedOut": false
+  },
+  "pluginVersion": "0.1.21-rc.1",
+  "artifactSha256": "3168b139920494eaeac4213686b4e3efbfd150536385551a43fee9a826285eee",
+  "workspace": "/tmp/agent-teams-main-integration/flash/candidate/workspace",
+  "agentCwd": "/tmp",
+  "fixtureHashes": {
+    "driver": "e7824c52bdb4505164d05ed0a26ad272400ae2a77b624cdedcd506079344e8bc",
+    "case": "44704a556db65812011feadc94da38b37ead5cf622f9c30c45ce7f4b95959f44"
+  },
+  "rawEvidence": {
+    "/tmp/agent-teams-main-integration/flash/candidate-cold/run.json": "7605443e21288914e57b8070546866ff0ae5e258a7e69839c10fd33eb63ba2c7",
+    "/tmp/agent-teams-main-integration/flash/candidate-cold/trace.jsonl": "f3839a6c1c61da8f5a7dac462c423d6e16d9413d637700213b852721a17f4dd3"
+  }
+}

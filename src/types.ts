@@ -100,6 +100,17 @@ export interface TaskRevision {
   previous: Record<string, unknown>
 }
 
+/** Append-only observations; never replace the terminal verdict or unlock a gate. */
+export interface TaskEvidence {
+  at: number
+  by: string
+  attempt: number
+  attemptId?: string
+  note?: string
+  acceptanceResults?: AcceptanceResult[]
+  commandsRun?: CommandResult[]
+}
+
 /** One task of a team's task list. */
 export interface TeamTask {
   /** Stable task id from the profile template; absent for ad-hoc tasks. */
@@ -143,6 +154,8 @@ export interface TeamTask {
   changedPaths?: string[]
   acceptanceResults?: AcceptanceResult[]
   commandsRun?: CommandResult[]
+  /** Supplemental observations, attributed to their original execution generation. */
+  supplementalEvidence?: TaskEvidence[]
   reviewedTaskId?: string
   reviewedAttempt?: number
   /** Repair source: the implementation / previous successful artifact. */
@@ -212,6 +225,10 @@ export interface TeamMessage {
   /** Guidance is scoped to the recipient's execution generation, when present. */
   taskId?: string
   attemptId?: string
+  /** Source execution generation, independent of the recipient guidance generation. */
+  sourceTaskId?: string
+  sourceAttemptId?: string
+  sourceTaskStatus?: TaskStatus
   /** Cancelled delivery is retained for audit but must not wake the recipient. */
   discardedAt?: number
 }

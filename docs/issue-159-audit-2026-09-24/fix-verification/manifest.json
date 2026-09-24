@@ -1,0 +1,25 @@
+{
+  "artifactSha256": "8ad18fd760776072ac5e8ba22baf928a5383ef643237e36f2be39ca754e43d5f",
+  "baseCommit": "87c95c94d7847e4a242cb589916adc519981175f",
+  "published": false,
+  "files": {
+    "build.log": "3f802e36699bd48b99422c763d34c5c3add8b57bd7347da2831cd9e05f809ad2",
+    "host-cohort.json": "f4ec1d420951e70d531b5090be2aa2f7a7ec2d875b122432d0ad122b6cf39a1e",
+    "initial-failed-trial.json": "80db862ce56575bddf2e22cbf7084d87f6f4cdf44f657cf0bdb7fbbb621ccf4a",
+    "real-cold-manifest.json": "c61cd2b0a9c0daa2691a75281f8003b3bd40e00e13f91b63fac94649d3d2f263",
+    "real-cold-result.json": "e6e73b011703043542210169c3bbb9bcb454ccb1073d45c55307de146f52c211",
+    "real-cold-trace.jsonl": "74bb74324bc22a8891408194dff474e9c23ada5dd506cad26c83cf98d457769c",
+    "real-fresh-manifest.json": "c61cd2b0a9c0daa2691a75281f8003b3bd40e00e13f91b63fac94649d3d2f263",
+    "real-fresh-result.json": "0642230ab0c6fa4abb250f3da0884bed8a8b3e305b4dcddc031dfa8dbd397d9b",
+    "real-fresh-trace.jsonl": "24e5858e124242e67753bf6f90ce1b1aad1f1dcf9305332e39a38dd42bd6c416",
+    "real-repair-manifest.json": "c0f0d9283e677f8a1ab57b35fea57dccb1b31648a800ceeb5e948ffaf32e77f8",
+    "real-repair-result.json": "ca8bfb225c86c283b95a23becb7b55408933e951137ca36d3144a334af62cd8f",
+    "real-repair-trace.jsonl": "05123e6a14aea404136031137f954147e9d94e5340eec6c10d3ad05881918b7c",
+    "red-pure.log": "b90aae7b641098dcb593e1be6bcdd511c130f274cf9670255bdfe3b67aba9a66",
+    "red-tools.log": "0bf68c4fe83d0bc87adec102f7cb386f609835bc9654977a7f0e517b6ab64d38",
+    "rollback-red.log": "0c922d46ea392b98e8de5b45cb37df70e84d930409658ac97685409a9aa3d9fa",
+    "runtime-result.json": "e598a892b1398011e85a073a2bfe6dfd31fc505e7bb7922f6dfc83864d3ae2f1",
+    "verify.log": "23034fb88dcb8e059ae39b943cdb5b1376407be3b9cff893727a2eee186d84c5"
+  },
+  "logNormalization": "Trailing whitespace removed; test outcomes and content unchanged."
+}

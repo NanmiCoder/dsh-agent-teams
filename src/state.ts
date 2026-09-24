@@ -164,6 +164,16 @@ export function transitionError(current: TaskStatus, next: TaskStatus): string |
   return undefined
 }
 
+/** Execution results belong to one attempt; a retry must produce its own evidence. */
+function clearAttemptResult(task: TeamTask): void {
+  task.output = undefined
+  task.verdict = undefined
+  task.findings = undefined
+  task.changedPaths = undefined
+  task.acceptanceResults = undefined
+  task.commandsRun = undefined
+}
+
 /** Activate the task's current generation for one owner and return its capability id. */
 export function activateTaskAttempt(task: TeamTask, assignee: string): string {
   const attemptId = randomUUID()
@@ -172,7 +182,7 @@ export function activateTaskAttempt(task: TeamTask, assignee: string): string {
   task.attemptId = attemptId
   task.handoffId = undefined
   task.reassigning = false
-  task.output = undefined
+  clearAttemptResult(task)
   task.updatedAt = Date.now()
   return attemptId
 }
@@ -208,7 +218,7 @@ export function invalidateTaskAttempt(
   task.status = 'pending'
   task.assignee = nextAssignee
   task.reassigning = reassigning
-  task.output = undefined
+  clearAttemptResult(task)
   task.updatedAt = Date.now()
 }
 
@@ -885,6 +895,9 @@ function isTeamMessage(value: unknown): value is TeamMessage {
     && (value['discardedAt'] === undefined || isFiniteNumber(value['discardedAt']))
     && (value['taskId'] === undefined || typeof value['taskId'] === 'string')
     && (value['attemptId'] === undefined || typeof value['attemptId'] === 'string')
+    && (value['sourceTaskId'] === undefined || typeof value['sourceTaskId'] === 'string')
+    && (value['sourceAttemptId'] === undefined || typeof value['sourceAttemptId'] === 'string')
+    && (value['sourceTaskStatus'] === undefined || ['pending', 'claimed', 'in_progress', 'completed', 'failed', 'cancelled'].includes(value['sourceTaskStatus'] as string))
 }
 
 /**

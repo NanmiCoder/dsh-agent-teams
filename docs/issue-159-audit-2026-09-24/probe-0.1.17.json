@@ -1,0 +1,119 @@
+{
+  "passed": true,
+  "version": "0.1.5-rc.1",
+  "artifactSha256": "ff7a5fc24cda7232538b5646dfd72865f3911de28c1888a44ee1ba376b1b4b1a",
+  "pluginVersion": "0.1.17",
+  "testFiles": {
+    "harness-runtime-verify.mjs": "5b1e9f6015415f80ebd7bac04734600e7c05217feab4aead953e7d85c20a0d62",
+    "fixtures/harness-runtime-llm.mjs": "7fe9272c5f63f24dc4ff652817823a03abeeb1741fa9ce3ffff9682e4d4a029b",
+    "fixtures/harness-runtime-resume.mjs": "17f8be68c143a2f49e0c45de90665c4cf24aac2f06d8a415db062e71424b10a7",
+    "fixtures/harness-runtime-idle.mjs": "508f2437610624aaf5196c66c533a0f7b1da021343b1534c1a60818cca54bc72",
+    "fixtures/harness-runtime-entry.mjs": "decd8d29d57abbbc390b9716f8fea4bd9e45c6c5a44d9c3ebe06e2389182c4ef",
+    "fixtures/harness-runtime-web-approval.mjs": "2f28b10b0cea445eeeba21be9488b3d4877ebb83e4593800d691d10416448701",
+    "fixtures/harness-runtime-protocol.mjs": "c3ad840a33006dfdcc091fbf9637ac56dd7bf65f5311839a53a61f7131a531cb",
+    "fixtures/harness-runtime-stability.mjs": "cd2f107cd005197fb2a328cc57c39eb029ea91c075f40ccbcda56ad6ba65ccad"
+  },
+  "node": "v26.7.0",
+  "platform": "darwin",
+  "arch": "arm64",
+  "cohortCount": 231,
+  "runs": [
+    {
+      "scenario": "stability",
+      "passed": true,
+      "assertions": {
+        "exit0": true,
+        "productMarker": true,
+        "probeCompleted": true
+      },
+      "evidence": [
+        {
+          "event": "probe-staged-assignees",
+          "tasks": [
+            {
+              "id": "t1",
+              "assignee": "worker"
+            },
+            {
+              "id": "t2",
+              "assignee": "peer"
+            },
+            {
+              "id": "t3",
+              "assignee": "peer"
+            }
+          ],
+          "time": 1790265475574
+        },
+        {
+          "event": "probe-burst-queued",
+          "nextStep": 0,
+          "nextTurn": 40,
+          "unread": 0,
+          "time": 1790265476579
+        },
+        {
+          "event": "probe-burst-next-step",
+          "captainMessages": 0,
+          "peerMessages": 0,
+          "nextTurn": 40,
+          "time": 1790265476599
+        },
+        {
+          "event": "probe-same-reassign",
+          "beforeAttempt": 1,
+          "afterAttempt": 2,
+          "beforeId": "d264c22e-825b-49b7-b329-0db868c27678",
+          "afterId": "ac625ecb-0baf-436c-850e-420b5a0ec9a4",
+          "status": "claimed",
+          "time": 1790265476690
+        },
+        {
+          "event": "probe-stale-after-reassign",
+          "oldGuidanceInLatest": false,
+          "time": 1790265476690
+        },
+        {
+          "event": "probe-cancel-dependent",
+          "upstream": "cancelled",
+          "dependent": "pending",
+          "time": 1790265476748
+        },
+        {
+          "event": "probe-terminal-evidence",
+          "task": {
+            "id": "t2",
+            "subject": "Parallel peer",
+            "status": "completed",
+            "assignee": "peer",
+            "dependencies": [],
+            "attempt": 1,
+            "createdAt": 1790265475546,
+            "updatedAt": 1790265476784,
+            "kind": "work",
+            "attemptId": "1300a754-995c-4699-b3c4-6d8ae13f84e6",
+            "reassigning": false,
+            "output": "Initial result"
+          },
+          "time": 1790265476843
+        },
+        {
+          "event": "probe-complete",
+          "time": 1790265476843
+        }
+      ],
+      "exit": {
+        "code": 0,
+        "signal": null,
+        "timedOut": false
+      }
+    }
+  ],
+  "unverified": [
+    "real provider APIs and credentials",
+    "browser interaction",
+    "other operating systems",
+    "native terminal execution",
+    "live user-data migration"
+  ]
+}

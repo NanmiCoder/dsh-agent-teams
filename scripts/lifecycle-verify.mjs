@@ -806,6 +806,23 @@ try {
     acceptanceResults: [{ criterion: 'parser accepts empty input', status: 'passed' }],
     commandsRun: [{ command: 'pnpm test', status: 'passed' }],
   }, builder)
+  const finishedBeforeEvidence = (await readTeam(stateRoot, 'quality-loop')).tasks.find(t => t.id === impl.task_id)
+  const supplement = { task_id: impl.task_id, attempt_id: implClaim.attempt_id, status: 'completed', commandsRun: [{ command: 'independent recheck', status: 'passed', exitCode: 0 }] }
+  await call('agent_teams_update_task', supplement, builder)
+  await call('agent_teams_update_task', supplement, builder)
+  const supplemented = (await readTeam(stateRoot, 'quality-loop')).tasks.find(t => t.id === impl.task_id)
+  check('issue159 terminal evidence is durable and duplicate submissions are idempotent', supplemented.supplementalEvidence?.length === 1 && supplemented.supplementalEvidence[0].commandsRun[0].command === 'independent recheck')
+  check('issue159 supplementary evidence preserves the original result and completion timestamp', supplemented.output === finishedBeforeEvidence.output && supplemented.updatedAt === finishedBeforeEvidence.updatedAt && supplemented.commandsRun[0].command === 'pnpm test')
+  const captainSupplement = await call('agent_teams_update_task', { task_id: impl.task_id, evidence_note: 'Captain accepted independent evidence' })
+  check('issue159 captain supplements terminal member work without takeover', captainSupplement.evidence_count === 2)
+  const visibleEvidence = await call('agent_teams_status', {})
+  check('issue159 supplemental evidence is visible in status', visibleEvidence.tasks.find(t => t.id === impl.task_id).supplemental_evidence?.includes('Captain accepted'))
+  let wrongEvidenceAttempt = false
+  try { await call('agent_teams_update_task', { ...supplement, attempt_id: 'revoked' }, builder) } catch { wrongEvidenceAttempt = true }
+  check('issue159 stale capabilities cannot append terminal evidence', wrongEvidenceAttempt)
+  const report1 = await call('agent_teams_send_message', { to: 'captain', content: 'Verified parser completion', source_task_id: impl.task_id, source_attempt_id: implClaim.attempt_id }, builder)
+  const report2 = await call('agent_teams_send_message', { to: 'captain', content: 'Verified parser completion', source_task_id: impl.task_id, source_attempt_id: implClaim.attempt_id }, builder)
+  check('issue159 identical report retries reuse one durable message', report1.message_id === report2.message_id && (await readMailbox(stateRoot, 'quality-loop', 'captain')).filter(m => m.content === 'Verified parser completion').length === 1)
   const review = await call('agent_teams_create_task', {
     subject: 'review parser',
     assignee: 'critic',
@@ -815,6 +832,12 @@ try {
     reviewedTaskId: impl.task_id,
   })
   criticMember = liveAgents.get((await readTeam(stateRoot, 'quality-loop')).members.find(m => m.name === 'critic').id)
+  let foreignEvidence = false
+  try { await call('agent_teams_update_task', supplement, criticMember) } catch { foreignEvidence = true }
+  check('issue159 teammates cannot supplement another owners terminal work', foreignEvidence)
+  let staleReport = false
+  try { await call('agent_teams_send_message', { to:'captain',content:'old report',source_task_id:impl.task_id,source_attempt_id:'revoked' },builder) } catch { staleReport = true }
+  check('issue159 stale explicit reports are rejected before entering the mailbox', staleReport && !(await readMailbox(stateRoot, 'quality-loop', 'captain')).some(m => m.content === 'old report'))
   const reviewClaim = await call('agent_teams_claim_task', { task_id: review.task_id }, criticMember)
   await call('agent_teams_update_task', { task_id: review.task_id, status: 'in_progress', attempt_id: reviewClaim.attempt_id }, criticMember)
   let needsRevisionCompleteRejected = false
@@ -837,6 +860,7 @@ try {
     verdict: 'needs_revision',
     findings: [{ id: 'C-001', severity: 'high', problem: 'null crash', requiredFix: 'guard empty input', file: 'src/parser.ts' }],
   }, criticMember)
+  check('issue159 automatic repair creation notifies the captain', (await readMailbox(stateRoot, 'quality-loop', 'captain')).some(m => m.content.includes('Automatic quality follow-up') && m.content.includes('repair')))
   const afterReview = await readTeam(stateRoot, 'quality-loop')
   const repair = afterReview?.tasks.find(item => item.kind === 'repair')
   const nextReview = afterReview?.tasks.find(item => item.kind === 'review' && item.id !== review.task_id)
@@ -954,6 +978,7 @@ try {
   const recoverFailClaim = await call('agent_teams_claim_task', { task_id: tRecoverFail.task_id }, gamma)
   await call('agent_teams_update_task', {
     task_id: tRecoverFail.task_id, status: 'in_progress', attempt_id: recoverFailClaim.attempt_id,
+    output: 'partial progress', commandsRun: [{ command: 'partial-check', status: 'passed' }],
   }, gamma)
   liveAgents.delete(gamma.id)
   failNextDelivery.add(gamma.id)
@@ -967,6 +992,7 @@ try {
     call('agent_teams_status', {}),
   ])
   await new Promise(resolve => setTimeout(resolve, 20))
+  check('issue159 failed recovery restores partial evidence with the original capability', rolledBackRecovery?.output === 'partial progress' && rolledBackRecovery.commandsRun?.[0]?.command === 'partial-check')
   const throttledFailedRecovery = await task(tRecoverFail.task_id)
   check('failed unobserved recovery restores the original capability and later kicks do not recast it',
     rolledBackRecovery?.status === 'in_progress'

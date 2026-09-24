@@ -1,0 +1,39 @@
+{
+  "caseName": "review",
+  "hostVersion": "0.1.5-rc.1",
+  "cohortCount": 231,
+  "runtime": "/tmp/issue159-20260924/latest/runtime",
+  "model": {
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max"
+  },
+  "testFiles": {
+    "harness-model-benchmark.mjs": "5a6923b352e1db1ce9ec84940d52cfc15cce097b7427e188c85312bcc59d08c7",
+    "fixtures/harness-model-case.mjs": "ce8d67054ec2e9d9588e5cc2961e986dc8ad8bd3d777e5d19abfbd1b23ca8de6",
+    "fixtures/harness-model-driver.mjs": "e7824c52bdb4505164d05ed0a26ad272400ae2a77b624cdedcd506079344e8bc",
+    "fixtures/harness-benchmark-scope.mjs": "a93ae5654f97730e25e11be3487921bcb19bd75b55e24f090e93608ed34821cd"
+  },
+  "artifacts": {
+    "baseline": {
+      "path": "/tmp/issue159-20260924/artifacts/nanmicoder-dsh-agent-teams-0.1.17.tgz",
+      "sha256": "ff7a5fc24cda7232538b5646dfd72865f3911de28c1888a44ee1ba376b1b4b1a"
+    },
+    "candidate": {
+      "path": "/tmp/issue159-20260924/artifacts/nanmicoder-dsh-agent-teams-0.1.20.tgz",
+      "sha256": "a374136e4791a4e34d5d4c45d10cad238efb2e69ebddd687492229ff3d0964a4"
+    }
+  },
+  "timeoutMs": 360000,
+  "maxRequests": 100,
+  "seedSha256": {
+    "app/orders.mjs": "437ebb9e258f51ae043c84aed195e5d7ce53a89b56c487a002a018bf97f3a8a6",
+    "app/comments.mjs": "7f5cec1d0b7eec9248c43fbdb8f1151cf6ae52ee37a0e649a39579a289a2c198",
+    "app/signup.mjs": "f28019ae6905f30beae40491a3d73298c853b370aea6740cdbd81679262207b8"
+  },
+  "inputs": {
+    "fresh": "用 AgentTeams 立即运行真实消息协作回归，已授权不需审批。只创建三个成员 performance/security/interaction，各自独立只读审查 app/，对应性能、安全、交互。每位成员一项独立 work 任务，报告分别 reports/performance.json、security.json、interaction.json，格式为 {\"reviewer\":\"名字\",\"findings\":[{\"path\":\"app/文件名\",\"symbol\":\"函数名\",\"problem\":\"具体问题\",\"evidence\":\"可复现输入操作和错误结果\",\"recommendation\":\"建议\"}]}。至少找出一个可证实问题。不能修改已有 app 文件，禁止访问工作区外、网络、配置和插件源码。\n为压力复现历史消息问题：队长在分配后用 agent_teams_send_message 给 performance 连续发 12 条带序号的审查提醒（AUDIT_CAPTAIN_01 到 AUDIT_CAPTAIN_12）；security 在自己的任务中给 performance 连续发 12 条消息（AUDIT_PEER_01 到 AUDIT_PEER_12）。这些消息都说明只读审查，无需逐条回复、无需重复审查，最后一条说明按当前源码一次性出最终报告。performance 在完成前处理收到的信息并只提交一份最终报告。所有成员完成任务后只汇报一次，不循环轮询、不因提醒新建任务、不重复修复。队长等三份报告完成后写 reports/summary.json，格式 {\"reports\":[\"reports/performance.json\",\"reports/security.json\",\"reports/interaction.json\"],\"summary\":\"汇总结论\"}。保留团队和完成记录。",
+    "cold": ""
+  },
+  "scope": "Real configured DeepSeek adapter; exact published Harness CLI/Loader. External acceptance checks files, task status and member tool provenance. No model call order is preprogrammed."
+}

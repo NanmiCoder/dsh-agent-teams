@@ -160,12 +160,35 @@ export function apply(ctx) {
       memberResponses.set(settledId, update); gates.get(settledId)();
       await until(() => gates.has(settledId), 'next settlement worker step');
     }
+    const originalResult = structuredClone(settledState().tasks[0]);
+    const supplement = { name: 'agent_teams_update_task', args: { task_id: 't1', attempt_id: attempt, status: 'completed', commandsRun: [{command:'late verification',status:'passed',exitCode:0}], evidence_note:'Independent observation after completion' } };
+    for (let i = 0; i < 2; i++) {
+      const count = requests.filter(r => r.sessionId === settledId).length;
+      memberResponses.set(settledId, supplement); gates.get(settledId)();
+      await until(() => gates.has(settledId) && requests.filter(r => r.sessionId === settledId).length > count, 'supplement persisted');
+    }
+    const evidenceTask = settledState().tasks[0];
+    assert.equal(evidenceTask.supplementalEvidence.length,1);
+    assert.equal(evidenceTask.supplementalEvidence[0].by,'worker');
+    assert.equal(evidenceTask.supplementalEvidence[0].attemptId,attempt);
+    assert.equal(evidenceTask.supplementalEvidence[0].commandsRun[0].command,'late verification');
+    assert.equal(evidenceTask.output,originalResult.output);
+    assert.equal(evidenceTask.updatedAt,originalResult.updatedAt);
+    assert.equal(settledState().tasks.length,1);
+    record({event:'stability-terminal-evidence-passed',records:1,duplicateAppend:false,originalResultPreserved:true});
     const parentBeforeReport = requests.filter(r => r.sessionId === captainId).length;
     memberResponses.set(settledId, { name: 'agent_teams_send_message', args: { to: 'captain', content: 'Task t1 completed with verified result.' } });
     gates.get(settledId)();
     await until(() => gates.has(settledId) && requests.filter(r => r.sessionId === captainId).length > parentBeforeReport, 'completion report wakes parent');
     await captain.agent.whenIdle();
     const parentAfterReport = requests.filter(r => r.sessionId === captainId).length;
+    const beforeDuplicate = requests.filter(r => r.sessionId === settledId).length;
+    memberResponses.set(settledId, { name: 'agent_teams_send_message', args: { to: 'captain', source_task_id:'t1',source_attempt_id:attempt,content: 'Task t1 completed with verified result.' } });
+    gates.get(settledId)();
+    await until(() => gates.has(settledId) && requests.filter(r => r.sessionId === settledId).length > beforeDuplicate, 'duplicate report acknowledged');
+    await captain.agent.whenIdle();
+    assert.equal(requests.filter(r=>r.sessionId===captainId).length,parentAfterReport,'identical report must not wake captain twice');
+    record({event:'stability-report-retry-passed',duplicateModelRequests:0});
     const settledAgent = ctx.agents.get(settledId);
     memberResponses.set(settledId, { finish: true }); gates.get(settledId)();
     await settledAgent.whenIdle();

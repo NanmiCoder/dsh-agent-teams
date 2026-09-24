@@ -1,0 +1,44 @@
+[
+  {
+    "version": "0.1.2-alpha.2",
+    "passed": true,
+    "runs": 10,
+    "artifactSha256": "3168b139920494eaeac4213686b4e3efbfd150536385551a43fee9a826285eee"
+  },
+  {
+    "version": "0.1.2-alpha.5",
+    "passed": true,
+    "runs": 10,
+    "artifactSha256": "3168b139920494eaeac4213686b4e3efbfd150536385551a43fee9a826285eee"
+  },
+  {
+    "version": "0.1.2-rc.1",
+    "passed": true,
+    "runs": 10,
+    "artifactSha256": "3168b139920494eaeac4213686b4e3efbfd150536385551a43fee9a826285eee"
+  },
+  {
+    "version": "0.1.5-rc.1",
+    "passed": true,
+    "runs": 10,
+    "artifactSha256": "3168b139920494eaeac4213686b4e3efbfd150536385551a43fee9a826285eee"
+  },
+  {
+    "version": "0.1.5-rc.2",
+    "passed": true,
+    "runs": 10,
+    "artifactSha256": "3168b139920494eaeac4213686b4e3efbfd150536385551a43fee9a826285eee"
+  },
+  {
+    "version": "0.1.5-rc.3",
+    "passed": true,
+    "runs": 10,
+    "artifactSha256": "3168b139920494eaeac4213686b4e3efbfd150536385551a43fee9a826285eee"
+  },
+  {
+    "version": "0.1.7-rc.2",
+    "passed": true,
+    "runs": 10,
+    "artifactSha256": "3168b139920494eaeac4213686b4e3efbfd150536385551a43fee9a826285eee"
+  }
+]

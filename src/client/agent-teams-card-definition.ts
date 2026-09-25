@@ -58,7 +58,15 @@ export function parseAgentTeamsCreateArgs(value: string): { teamId: string; name
     }
     const name = parsed.name.trim()
     if (name === '') return undefined
-    const cleaned = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+    // The card id must match the team id the server derived from the same
+    // name (sanitizeKey, src/state.ts): Unicode letters/digits survive there,
+    // so the old ASCII-only rewrite made every non-ASCII name diverge — a
+    // Chinese name degraded to `team` and the card never matched its live
+    // team. Residual divergence (documented, #203): an all-punctuation name
+    // gets the server's `k-<digest>` vs `team` here, and names beyond
+    // MAX_KEY_LENGTH get a truncated id + digest — neither is reproducible
+    // without the create result carrying the server id.
+    const cleaned = name.normalize('NFC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '')
     return { teamId: cleaned === '' ? 'team' : cleaned, name }
   } catch {
     return undefined

@@ -226,6 +226,32 @@ function rejectCreate(label, current, input, extraOk) {
   })
 }
 
+{
+  const reviewed = task({
+    id: 't1',
+    kind: 'implementation',
+    status: 'completed',
+    assignee: 'implementer',
+    ...implContract(),
+  })
+  rejectCreate('tdd.create.review-cannot-be-assigned-to-implementation-owner', team({ tasks: [reviewed], taskSeq: 1 }), {
+    subject: 'self review',
+    kind: 'review',
+    assignee: 'implementer',
+    objective: 'Review the implementation',
+    acceptance: ['no blocker or high findings'],
+    reviewedTaskId: 't1',
+  }, (result) => /independent|owner|review/i.test(result.error ?? ''))
+  const pooled = api.validateCreateTask?.(team({ tasks: [reviewed], taskSeq: 1 }), {
+    subject: 'pooled review',
+    kind: 'review',
+    objective: 'Review the implementation',
+    acceptance: ['no blocker or high findings'],
+    reviewedTaskId: 't1',
+  })
+  check('tdd.create.unassigned-review-remains-supported', pooled?.ok === true)
+}
+
 rejectCreate('tdd.create.implementation-requires-objective', team(), {
   subject: 'impl',
   kind: 'implementation',

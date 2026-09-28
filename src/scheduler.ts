@@ -29,6 +29,7 @@ import {
   readTeam,
   readPendingMailbox,
   releaseMailboxDelivery,
+  reviewAssigneeError,
   unsatisfiedDependencies,
   withTeamLock,
   writeTeam,
@@ -199,7 +200,8 @@ function ownedOpenTask(tasks: readonly TeamTask[], memberName: string): TeamTask
 function nextReadyTask(tasks: readonly TeamTask[], memberName: string): TeamTask | undefined {
   const ready = tasks.filter(task => task.status === 'pending'
     && task.reassigning !== true
-    && unsatisfiedDependencies([...tasks], task.dependencies).length === 0)
+    && unsatisfiedDependencies([...tasks], task.dependencies).length === 0
+    && (task.kind !== 'review' || reviewAssigneeError(tasks, task.reviewedTaskId, memberName) === undefined))
   return ready.find(task => task.assignee === memberName)
     ?? ready.find(task => task.assignee === undefined)
 }

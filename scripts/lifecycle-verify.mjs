@@ -823,15 +823,67 @@ try {
   const report1 = await call('agent_teams_send_message', { to: 'captain', content: 'Verified parser completion', source_task_id: impl.task_id, source_attempt_id: implClaim.attempt_id }, builder)
   const report2 = await call('agent_teams_send_message', { to: 'captain', content: 'Verified parser completion', source_task_id: impl.task_id, source_attempt_id: implClaim.attempt_id }, builder)
   check('issue159 identical report retries reuse one durable message', report1.message_id === report2.message_id && (await readMailbox(stateRoot, 'quality-loop', 'captain')).filter(m => m.content === 'Verified parser completion').length === 1)
+  let selfReviewCreateRejected = false
+  try {
+    await call('agent_teams_create_task', {
+      subject: 'self review parser',
+      assignee: 'builder',
+      kind: 'review',
+      objective: 'Review the parser',
+      acceptance: ['no blocker or high findings'],
+      reviewedTaskId: impl.task_id,
+    })
+  } catch (error) {
+    selfReviewCreateRejected = /independent|owner/i.test(String(error))
+  }
+  check('implementation owner cannot create a review assigned to itself', selfReviewCreateRejected)
+
+  publishStatus(builder, 'idle')
   const review = await call('agent_teams_create_task', {
     subject: 'review parser',
-    assignee: 'critic',
     kind: 'review',
     objective: 'Review the parser',
     acceptance: ['no blocker or high findings'],
     reviewedTaskId: impl.task_id,
   })
+  let reviewState = (await readTeam(stateRoot, 'quality-loop')).tasks.find(t => t.id === review.task_id)
+  check('unassigned review skips the implementation owner and dispatches an independent reviewer',
+    reviewState?.assignee === 'critic' && reviewState.status === 'claimed')
   criticMember = liveAgents.get((await readTeam(stateRoot, 'quality-loop')).members.find(m => m.name === 'critic').id)
+
+  const pooledReview = await call('agent_teams_create_task', {
+    subject: 'second pooled review',
+    kind: 'review',
+    objective: 'Second independent review',
+    acceptance: ['independent reviewer required'],
+    reviewedTaskId: impl.task_id,
+  })
+  const pooledBeforeClaim = (await readTeam(stateRoot, 'quality-loop')).tasks.find(t => t.id === pooledReview.task_id)
+  check('pooled review stays pending while the only independent reviewer is busy',
+    pooledBeforeClaim?.status === 'pending' && pooledBeforeClaim.assignee === undefined)
+  let selfClaimRejected = false
+  try {
+    await call('agent_teams_claim_task', { task_id: pooledReview.task_id }, builder)
+  } catch (error) {
+    selfClaimRejected = /independent|owner/i.test(String(error))
+  }
+  check('implementation owner cannot manually claim an unassigned review of its own work', selfClaimRejected)
+  await call('agent_teams_update_task', { task_id: pooledReview.task_id, status: 'cancelled' })
+
+  const reviewBeforeReassign = JSON.stringify((await readTeam(stateRoot, 'quality-loop')).tasks.find(t => t.id === review.task_id))
+  let selfReassignRejected = false
+  try {
+    await call('agent_teams_reassign_task', {
+      task_id: review.task_id,
+      assignee: 'builder',
+      reason: 'must remain independently reviewed',
+    })
+  } catch (error) {
+    selfReassignRejected = /independent|owner/i.test(String(error))
+  }
+  reviewState = (await readTeam(stateRoot, 'quality-loop')).tasks.find(t => t.id === review.task_id)
+  check('review cannot be reassigned to the implementation owner',
+    selfReassignRejected && JSON.stringify(reviewState) === reviewBeforeReassign)
   let foreignEvidence = false
   try { await call('agent_teams_update_task', supplement, criticMember) } catch { foreignEvidence = true }
   check('issue159 teammates cannot supplement another owners terminal work', foreignEvidence)
@@ -863,7 +915,8 @@ try {
   check('issue159 automatic repair creation notifies the captain', (await readMailbox(stateRoot, 'quality-loop', 'captain')).some(m => m.content.includes('Automatic quality follow-up') && m.content.includes('repair')))
   const afterReview = await readTeam(stateRoot, 'quality-loop')
   const repair = afterReview?.tasks.find(item => item.kind === 'repair')
-  const nextReview = afterReview?.tasks.find(item => item.kind === 'review' && item.id !== review.task_id)
+  const nextReview = afterReview?.tasks.find(item => item.kind === 'review'
+    && item.id !== review.task_id && item.id !== pooledReview.task_id)
   check('needs_revision opens repair and next review',
     repair !== undefined && nextReview !== undefined
       && repair.dependencies.includes(impl.task_id)

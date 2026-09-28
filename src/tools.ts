@@ -47,6 +47,7 @@ import {
   evaluateQualityCompletion,
   planQualityFollowUp,
   resumeTeamState,
+  reviewAssigneeError,
   buildCoverageMatrix,
   canDeclareDelivery,
   describeQualityLoop,
@@ -1392,6 +1393,10 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         const fresh = await requireFreshCaptainTeam(stateRoot, team.id, captain.id)
         const task = requireTask(fresh, args.task_id)
         if (task.status === 'completed') throw new Error(`completed task ${task.id} is immutable and cannot be reassigned`)
+        if (task.kind === 'review') {
+          const independenceError = reviewAssigneeError(fresh.tasks, task.reviewedTaskId, target)
+          if (independenceError !== undefined) throw new Error(independenceError)
+        }
         if (task.reassigning === true) {
           const previousMember = fresh.members.find(member => member.id === task.handoffFromMemberId && member.stopping === true)
           if (task.assignee !== target || previousMember === undefined) throw new Error(`task ${task.id} is already being reassigned`)
@@ -1537,6 +1542,10 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
             throw new Error(`task ${task.id} is assigned to "${assignee}", not you`)
           }
           assignee = identity.name
+        }
+        if (task.kind === 'review') {
+          const independenceError = reviewAssigneeError(fresh.tasks, task.reviewedTaskId, assignee)
+          if (independenceError !== undefined) throw new Error(independenceError)
         }
         // Authorization must happen before the idempotent return: another
         // member must not receive a false success for somebody else's task.
@@ -1699,6 +1708,10 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
           if (task.attemptId !== undefined && args.attempt_id !== task.attemptId) {
             throw new Error(`stale attempt for task ${task.id}: expected the current attempt_id; stop work and request fresh assignment`)
           }
+        }
+        if (task.kind === 'review' && (args.status === 'completed' || args.verdict === 'pass')) {
+          const independenceError = reviewAssigneeError(fresh.tasks, task.reviewedTaskId, task.assignee)
+          if (independenceError !== undefined) throw new Error(independenceError)
         }
         if (TERMINAL_TASK_STATUSES.includes(task.status)) {
           const appended = appendTaskEvidence(task, {

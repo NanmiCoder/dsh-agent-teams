@@ -331,6 +331,9 @@ export function validateCreateTask(team: TeamState, input: CreateTaskInput): Val
   if (!(TASK_KINDS as readonly string[]).includes(kind)) {
     return { ok: false, error: `unknown task kind "${String(kind)}"` }
   }
+  if (input.round !== undefined && (!Number.isSafeInteger(input.round) || input.round < 1)) {
+    return { ok: false, error: 'task round must be a positive safe integer' }
+  }
 
   if (team.halted === true) {
     const reason = input.resumeReason?.trim() ?? ''

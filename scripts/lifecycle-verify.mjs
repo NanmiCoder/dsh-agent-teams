@@ -14,7 +14,7 @@ import { join } from 'node:path'
 import { LlmError } from '@deepseek-ai/dsh-llm'
 import { haltTeamWork, registerAgentTeamsTools } from '../lib/tools.js'
 import { buildActivationDirective, invokedAgentTeamsGoal, invokedAgentTeamsInvocation, installAgentTeamsGestureBoundary, profileCommandName, registerAgentTeamsCommand } from '../lib/command.js'
-import { readArchivedTeam, readMailbox, readTeam, readUnreadMailbox } from '../lib/state.js'
+import { readArchivedTeam, readMailbox, readTeam, readUnreadMailbox, writeTeam } from '../lib/state.js'
 import { collectArchivedTeamsActivity } from '../lib/snapshot.js'
 
 const deliveryHarness = process.argv.includes('--delivery-harness')
@@ -1153,12 +1153,59 @@ try {
   await call('agent_teams_update_task', { task_id: t5.task_id, status: 'in_progress' })
   await call('agent_teams_update_task', { task_id: t5.task_id, status: 'completed', output: 'closed' })
 
-  await call('agent_teams_remove_member', { name: 'alpha' })
+  const beforeRemoval = await state()
+  const terminalFailed = {
+    id: 'terminal-failed',
+    subject: 'failed history must stay terminal',
+    status: 'failed',
+    assignee: 'alpha',
+    dependencies: [],
+    attempt: 3,
+    attemptId: 'terminal-failed-attempt',
+    output: 'failure evidence',
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    kind: 'work',
+  }
+  const terminalCancelled = {
+    id: 'terminal-cancelled',
+    subject: 'cancelled history must stay terminal',
+    status: 'cancelled',
+    assignee: 'alpha',
+    dependencies: [],
+    attempt: 4,
+    attemptId: 'terminal-cancelled-attempt',
+    output: 'user stopped this task',
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    kind: 'work',
+  }
+  beforeRemoval.tasks.push(terminalFailed, terminalCancelled)
+  await writeTeam(stateRoot, beforeRemoval)
+
+  const removal = await call('agent_teams_remove_member', { name: 'alpha' })
   const afterRemoval = await state()
   const recovered = afterRemoval?.tasks.find(candidate => candidate.id === t4.task_id)
   check('removing a member revokes and redispatches its unfinished task',
     afterRemoval?.members.find(member => member.name === 'alpha')?.status === 'removed'
-      && recovered?.assignee !== 'alpha')
+      && recovered?.assignee !== 'alpha'
+      && removal.requeued_tasks.includes(t4.task_id))
+  const failedHistory = afterRemoval?.tasks.find(candidate => candidate.id === terminalFailed.id)
+  const cancelledHistory = afterRemoval?.tasks.find(candidate => candidate.id === terminalCancelled.id)
+  check('removing a member preserves failed terminal task history',
+    failedHistory?.status === 'failed'
+      && failedHistory.assignee === 'alpha'
+      && failedHistory.attemptId === 'terminal-failed-attempt'
+      && failedHistory.output === 'failure evidence')
+  check('removing a member preserves cancelled terminal task history',
+    cancelledHistory?.status === 'cancelled'
+      && cancelledHistory.assignee === 'alpha'
+      && cancelledHistory.attemptId === 'terminal-cancelled-attempt'
+      && cancelledHistory.output === 'user stopped this task')
+  check('removing a member excludes terminal history from requeued tasks',
+    !removal.requeued_tasks.includes(terminalFailed.id)
+      && !removal.requeued_tasks.includes(terminalCancelled.id))
+
   check('removing a member preserves its catalog entry for transcript history',
     (await ctx.subagents.listChildren(captain.id)).some(child => child.id === alpha.id))
   let removedFollowupRejected = false

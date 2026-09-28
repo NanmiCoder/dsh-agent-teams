@@ -226,6 +226,23 @@ function rejectCreate(label, current, input, extraOk) {
   })
 }
 
+{
+  const ordinary = task({
+    id: 't1',
+    kind: 'work',
+    status: 'completed',
+    assignee: 'implementer',
+  })
+  rejectCreate('tdd.create.review-target-must-be-implementation-or-repair', team({ tasks: [ordinary], taskSeq: 1 }), {
+    subject: 'review ordinary work',
+    kind: 'review',
+    assignee: 'reviewer',
+    objective: 'Review the ordinary task',
+    acceptance: ['review completed'],
+    reviewedTaskId: 't1',
+  }, (result) => /implementation|repair/i.test(result.error ?? ''))
+}
+
 rejectCreate('tdd.create.implementation-requires-objective', team(), {
   subject: 'impl',
   kind: 'implementation',
@@ -1089,6 +1106,14 @@ console.log('quality-gates TDD — tool-level closed loop')
       objective: 'Review it',
       acceptance: ['pass'],
       reviewedTaskId: '',
+    }))
+
+    await throwsAsync('tdd.create.review-work-target-rejected.tool', () => call('agent_teams_create_task', {
+      subject: 'review ordinary work',
+      kind: 'review',
+      objective: 'Review it',
+      acceptance: ['pass'],
+      reviewedTaskId: work.task_id,
     }))
 
     // Regression for #99: a blank optional profile must be treated as omitted,

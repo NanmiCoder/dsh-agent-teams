@@ -1169,7 +1169,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         if (member === undefined) throw new Error(`no member \"${args.name}\" in team \"${fresh.name}\"`)
         const requeued: string[] = []
         for (const task of fresh.tasks) {
-          if (task.assignee !== member.name || task.status === 'completed') continue
+          if (task.assignee !== member.name || TERMINAL_TASK_STATUSES.includes(task.status)) continue
           invalidateTaskAttempt(task)
           task.reassigning = false
           requeued.push(task.id)

@@ -226,6 +226,17 @@ function rejectCreate(label, current, input, extraOk) {
   })
 }
 
+for (const round of [0, 1.5]) {
+  rejectCreate(`tdd.create.invalid-round-${round}-rejected`, team(), {
+    subject: 'review',
+    kind: 'review',
+    round,
+    objective: 'Review the implementation',
+    acceptance: ['no blocker or high findings'],
+    reviewedTaskId: 't1',
+  }, (result) => /positive safe integer/i.test(result.error ?? ''))
+}
+
 rejectCreate('tdd.create.implementation-requires-objective', team(), {
   subject: 'impl',
   kind: 'implementation',
@@ -1158,6 +1169,33 @@ console.log('quality-gates TDD — tool-level closed loop')
         (await readTeam(join(workspace, '.agent-teams'), 'gates'))?.halted !== true,
       )
     }
+
+    const beforeInvalidRound = await readTeam(join(workspace, '.agent-teams'), 'gates')
+    let invalidRoundRejected = false
+    try {
+      await call('agent_teams_create_task', {
+        subject: 'invalid round review',
+        kind: 'review',
+        round: 0,
+        objective: 'Review legacy work',
+        acceptance: ['pass'],
+        reviewedTaskId: work.task_id,
+      })
+    } catch (error) {
+      invalidRoundRejected = /positive safe integer/i.test(String(error))
+    }
+    let afterInvalidRound
+    try {
+      afterInvalidRound = await readTeam(join(workspace, '.agent-teams'), 'gates')
+    } catch {
+      afterInvalidRound = undefined
+    }
+    check(
+      'tdd.create.invalid-round-rejected-before-persistence.tool',
+      invalidRoundRejected
+        && afterInvalidRound?.id === 'gates'
+        && afterInvalidRound.taskSeq === beforeInvalidRound?.taskSeq,
+    )
   } finally {
     await rm(workspace, { recursive: true, force: true })
   }

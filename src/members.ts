@@ -156,7 +156,13 @@ interface FailedMemberAttempt {
   readonly task?: Pick<TeamTask, 'id' | 'attempt' | 'attemptId'>
 }
 
-/** Record a final turn failure, never an intermediate request retry. */
+/**
+ * Record a final turn failure, never an intermediate request retry.
+ *
+ * @returns `true` when an owned attempt was failed and the member release path
+ * should run; `false` when nothing was recorded, or when the failure arrived
+ * after the member's work had already settled (recorded as a note only).
+ */
 export async function failMemberOpenAttempt(
   ctx: Context,
   stateRoot: string,
@@ -171,8 +177,10 @@ export async function failMemberOpenAttempt(
   const prepared = await withTeamLock(lockKey, async () => {
     const team = await readTeam(stateRoot, teamId)
     if (team === undefined || team.halted === true || team.captainSessionId !== observed.captainSessionId) return
+    // A removed member is matched too: its generation is still the one the
+    // error observed, and a settled failure must leave a durable record.
     const member = team.members.find(candidate => candidate.name === memberName
-      && candidate.id === observed.memberId && candidate.status !== 'removed')
+      && candidate.id === observed.memberId)
     if (member === undefined) return
     const task = team.tasks.find(candidate => candidate.assignee === memberName
       && (candidate.status === 'claimed' || candidate.status === 'in_progress'))
@@ -180,20 +188,28 @@ export async function failMemberOpenAttempt(
     // final error is queued. Only the capability observed at that event may fail.
     if (task?.id !== observed.task?.id || task?.attemptId !== observed.task?.attemptId
       || task?.attempt !== observed.task?.attempt) return
-    if (task === undefined && member.status !== 'working') return
-    if (task !== undefined) {
-      task.status = 'failed'
-      task.output = summary
-      task.updatedAt = Date.now()
+    // A settled capability has nothing left to fail: the member finished its
+    // work (or was removed) and the failing turn owned no attempt. Report it
+    // anyway — otherwise a turn that died after delivery is invisible in the
+    // archive, and a run with a dead member turn looks like a clean one.
+    const settled = task === undefined && member.status !== 'working'
+    if (!settled) {
+      if (task !== undefined) {
+        task.status = 'failed'
+        task.output = summary
+        task.updatedAt = Date.now()
+      }
+      if (ctx.agents.get(brandedSessionId(member.id))?.status !== 'running') member.status = 'idle'
+      await writeTeam(stateRoot, team)
     }
-    if (ctx.agents.get(brandedSessionId(member.id))?.status !== 'running') member.status = 'idle'
     const message = {
-      ...createMessage(memberName, CAPTAIN_KEY, task === undefined
-        ? `Member "${memberName}" hit an unrecoverable turn failure: ${summary}. No open attempt was owned.`
-        : `Member "${memberName}" hit an unrecoverable turn failure: ${summary}. Task ${task.id} ("${task.subject}") was marked failed; reassign it or retry when ready.`),
-      deliveryClaimedAt: Date.now(),
+      ...createMessage(memberName, CAPTAIN_KEY, settled
+        ? `Member "${memberName}" hit an unrecoverable turn failure after its work had already settled: ${summary}. No task or attempt was affected; recorded here for visibility.`
+        : task === undefined
+          ? `Member "${memberName}" hit an unrecoverable turn failure: ${summary}. No open attempt was owned.`
+          : `Member "${memberName}" hit an unrecoverable turn failure: ${summary}. Task ${task.id} ("${task.subject}") was marked failed; reassign it or retry when ready.`),
+      ...settled ? {} : { deliveryClaimedAt: Date.now() },
     }
-    await writeTeam(stateRoot, team)
     await appendMailbox(stateRoot, team.id, CAPTAIN_KEY, message)
     if (task !== undefined) {
       appendTeamEvent(ctx, captainSessionOf(ctx, team.captainSessionId, fallbackSession), 'agent-teams/task-updated', {
@@ -208,9 +224,13 @@ export async function failMemberOpenAttempt(
       content: message.content,
       ts: message.ts,
     })
-    return { captainSessionId: team.captainSessionId, message }
+    return { captainSessionId: team.captainSessionId, message, settled }
   })
   if (prepared === undefined) return false
+  // A settled failure has no attempt to release or retry. The durable note
+  // above already reaches the captain through its unread inbox, so waking it
+  // here would spend a turn on nothing.
+  if (prepared.settled) return false
   // Use the same lease/acknowledgment contract as send_message, outside the
   // team lock: steering can synchronously start another agent turn.
   const captain = ctx.agents.get(brandedSessionId(prepared.captainSessionId))
@@ -412,7 +432,10 @@ export function installMemberSelectionRuntime(
         // can let a captain reassign it or replace the member/team generation.
         const snapshot = readTeamSync(stateRoot, teamId)
         if (snapshot?.captainSessionId !== parentSessionId) return
-        const member = snapshot.members.find(item => item.id === child.id && item.name === memberName && item.status !== 'removed')
+        // The member generation is the match, not its current status: a member
+        // removed after delivering still owns the failure of its last turn, and
+        // failMemberOpenAttempt decides whether a task was still in flight.
+        const member = snapshot.members.find(item => item.id === child.id && item.name === memberName)
         if (member === undefined) return
         const task = snapshot.tasks.find(item => item.assignee === memberName
           && (item.status === 'claimed' || item.status === 'in_progress'))

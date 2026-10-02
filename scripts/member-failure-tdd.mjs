@@ -23,7 +23,7 @@ async function eventually(predicate) {
   assert.fail('terminal failure did not settle')
 }
 
-async function fixture(t, { captainStatus = 'idle', fallback, captainOffline = false, rejectDelivery = false } = {}) {
+async function fixture(t, { captainStatus = 'idle', fallback, captainOffline = false, rejectDelivery = false, memberStatus = 'working', taskStatus = 'in_progress' } = {}) {
   const workspace = await mkdtemp(join(tmpdir(), 'dsh-member-failure-'))
   const pendingFailures = []
   let settleOnCleanup = () => {}
@@ -63,8 +63,8 @@ async function fixture(t, { captainStatus = 'idle', fallback, captainOffline = f
   }
   await createTeamDir(stateRoot, {
     id: 'team', name: 'Team', captainSessionId: captain.id, createdAt: 1, taskSeq: 1,
-    members: [{ id: child.id, name: 'worker', status: 'working', joinedAt: 1, provider: 'fake', model: 'primary' }],
-    tasks: [{ id: 't1', subject: 'work', assignee: 'worker', status: 'in_progress', dependencies: [], attempt: 1, attemptId: 'a1', createdAt: 1, updatedAt: 1 }],
+    members: [{ id: child.id, name: 'worker', status: memberStatus, joinedAt: 1, provider: 'fake', model: 'primary' }],
+    tasks: [{ id: 't1', subject: 'work', assignee: 'worker', status: taskStatus, dependencies: [], attempt: 1, attemptId: 'a1', createdAt: 1, updatedAt: 1 }],
   })
   let setup
   const rootListeners = new Map()
@@ -229,6 +229,36 @@ for (const options of [{ captainOffline: true }, { rejectDelivery: true }]) {
     assert.equal(h.steers.length, 0)
   })
 }
+
+// The failure that arrives after the member's own work already settled (task
+// completed, member idle or removed) has no attempt to fail — but it must not
+// vanish: without a record, a run whose member turn died is indistinguishable
+// from a clean one when the operator reads the archive.
+await test('a final failure after the task completed is still recorded, without touching task state', async t => {
+  const h = await fixture(t, { memberStatus: 'idle', taskStatus: 'completed' })
+  h.terminal()
+  await eventually(async () => (await h.mailbox()).length === 1)
+  const team = await h.state()
+  assert.equal(team.tasks[0].status, 'completed')
+  assert.equal(team.tasks[0].attemptId, 'a1')
+  assert.equal(team.members[0].status, 'idle')
+  assert.match((await h.mailbox())[0].content, /STREAM_CLOSED/)
+  assert.match((await h.mailbox())[0].content, /settled/i)
+  // Nothing to release or retry: the note is durable and shows up in the
+  // captain's unread inbox, so it must not spend a captain turn.
+  assert.equal(h.steers.length, 0)
+})
+
+await test('a final failure for an already-removed member is recorded too', async t => {
+  const h = await fixture(t, { memberStatus: 'removed', taskStatus: 'completed' })
+  h.terminal()
+  await eventually(async () => (await h.mailbox()).length === 1)
+  const team = await h.state()
+  assert.equal(team.members[0].status, 'removed')
+  assert.equal(team.tasks[0].status, 'completed')
+  assert.match((await h.mailbox())[0].content, /STREAM_CLOSED/)
+  assert.equal(h.steers.length, 0)
+})
 
 await test('a queued error cannot fail a newer attempt created before it gets the team lock', async t => {
   const h = await fixture(t)

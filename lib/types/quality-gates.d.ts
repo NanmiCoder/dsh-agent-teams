@@ -111,6 +111,7 @@ export declare const DEFAULT_REVIEW_ACCEPTANCE: readonly ["The latest implementa
 export declare const DEFAULT_REVIEW_OBJECTIVE = "Review whether the latest implementation satisfies the user goal";
 export declare function taskKindOf(task: Pick<TeamTask, 'kind'> | undefined): TaskKind;
 export declare function isQualityKind(kind: TaskKind | undefined): boolean;
+export declare function reviewAssigneeError(tasks: readonly TeamTask[], reviewedTaskId: string | undefined, assignee: string | undefined): string | undefined;
 export declare function resolveReviewPolicy(policy: ReviewPolicy | undefined): Required<typeof DEFAULT_REVIEW_POLICY> & ReviewPolicy;
 export declare function isReviewPolicy(value: unknown): value is ReviewPolicy;
 /** Normalize a workspace-relative POSIX path. `undefined` means illegal. */

@@ -13,7 +13,7 @@
  * @module dsh-agent-teams/state
  */
 import { type TaskStatus, type TeamMessage, type TeamState, type TeamTask } from './types.ts';
-export { amendTaskContract, buildCoverageMatrix, canDeclareDelivery, classifyChangedPath, collectChangedPaths, defaultQualityDeliveryGraph, describeQualityLoop, evaluateQualityCompletion, hasValidQualityTaskFields, isQualityKind, isTaskRevision, normalizeBlankOptionalTaskFields, pathMatchesScope, planQualityFollowUp, qualityPlanningPrompt, resumeTeamState, sanitizeReviewAcceptance, sanitizeReviewObjective, taskKindOf, validateCreateTask, } from './quality-gates.ts';
+export { amendTaskContract, buildCoverageMatrix, canDeclareDelivery, classifyChangedPath, collectChangedPaths, defaultQualityDeliveryGraph, describeQualityLoop, evaluateQualityCompletion, hasValidQualityTaskFields, isQualityKind, isTaskRevision, normalizeBlankOptionalTaskFields, pathMatchesScope, planQualityFollowUp, qualityPlanningPrompt, resumeTeamState, reviewAssigneeError, sanitizeReviewAcceptance, sanitizeReviewObjective, taskKindOf, validateCreateTask, } from './quality-gates.ts';
 export type { ContractAmendmentInput } from './quality-gates.ts';
 /** Mailbox key of the captain. */
 export declare const CAPTAIN_KEY = "captain";

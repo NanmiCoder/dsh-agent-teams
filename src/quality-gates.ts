@@ -174,6 +174,17 @@ export function isQualityKind(kind: TaskKind | undefined): boolean {
   return kind !== undefined && kind !== 'work' && (QUALITY_KINDS as readonly string[]).includes(kind)
 }
 
+export function reviewAssigneeError(
+  tasks: readonly TeamTask[],
+  reviewedTaskId: string | undefined,
+  assignee: string | undefined,
+): string | undefined {
+  if (!nonemptyString(reviewedTaskId) || !nonemptyString(assignee)) return undefined
+  const reviewed = tasks.find((item) => item.id === reviewedTaskId)
+  if (reviewed?.assignee !== assignee) return undefined
+  return `review assignee "${assignee}" owns reviewed task "${reviewedTaskId}"; assign an independent reviewer`
+}
+
 export function resolveReviewPolicy(policy: ReviewPolicy | undefined): Required<typeof DEFAULT_REVIEW_POLICY> & ReviewPolicy {
   return {
     ...DEFAULT_REVIEW_POLICY,
@@ -362,6 +373,8 @@ export function validateCreateTask(team: TeamState, input: CreateTaskInput): Val
     if (!team.tasks.some((item) => item.id === input.reviewedTaskId)) {
       return { ok: false, error: `reviewed task "${input.reviewedTaskId}" does not exist` }
     }
+    const independenceError = reviewAssigneeError(team.tasks, input.reviewedTaskId, input.assignee)
+    if (independenceError !== undefined) return { ok: false, error: independenceError }
   }
   if (kind === 'repair') {
     if (!nonemptyString(input.sourceTaskId) || !nonemptyStringList(input.sourceFindingIds)) {

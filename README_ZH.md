@@ -6,6 +6,12 @@
   <img src="./assets/readme/hero.svg" width="100%" alt="dsh-agent-teams 把一个 DeepSeek Harness 会话变成可协作的多智能体团队">
 </p>
 
+<div align="center">
+
+[![AtomGit](https://atomgit.com/NanmiCoder/dsh-agent-teams/star/new_badge.svg)](https://atomgit.com/NanmiCoder/dsh-agent-teams)
+
+</div>
+
 <p align="center">
   <a href="https://dshfind.com/zh/plugins/NanmiCoder/dsh-agent-teams?ref=badge"><img src="https://img.shields.io/badge/%E7%94%B1%20dshfind-%E6%8E%A8%E8%8D%90-FFD700?style=flat-square" alt="由 dshfind 推荐"></a>
   <a href="https://dshfind.com/zh/plugins/NanmiCoder/dsh-agent-teams?ref=badge"><img src="https://dshfind.com/api/badge/NanmiCoder/dsh-agent-teams?lang=zh" alt="dshfind 评分"></a>

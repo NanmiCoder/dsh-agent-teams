@@ -6,6 +6,12 @@
   <img src="./assets/readme/hero.svg" width="100%" alt="dsh-agent-teams turns one DeepSeek Harness session into a coordinated multi-agent team">
 </p>
 
+<div align="center">
+
+[![AtomGit](https://atomgit.com/NanmiCoder/dsh-agent-teams/star/new_badge.svg)](https://atomgit.com/NanmiCoder/dsh-agent-teams)
+
+</div>
+
 <p align="center">
   <a href="https://dshfind.com/en/plugins/NanmiCoder/dsh-agent-teams?ref=badge"><img src="https://img.shields.io/badge/recommended%20by-dshfind-FFD700?style=flat-square" alt="Recommended by dshfind"></a>
   <a href="https://dshfind.com/en/plugins/NanmiCoder/dsh-agent-teams?ref=badge"><img src="https://dshfind.com/api/badge/NanmiCoder/dsh-agent-teams?lang=en" alt="dshfind score"></a>

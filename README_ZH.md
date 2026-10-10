@@ -153,6 +153,7 @@ CLI 管理的安装可将 `web` 换成实际使用的 CLI profile。**安装后�
     memberModel: deepseek-v4
     memberMaxDepth: 0
     maxMembers: 8
+    artworkDir: ~/.dsh-agent-teams/art
 ```
 
 `memberMaxDepth` 默认 `0`，团队成员不能再创建子代理；显式设为 `1` 可允许一层后代，运行时和代码工具调用同样受限。默认成员统一通过团队消息汇报，避免再走宿主消息重复通知队长。无任务成员不调用模型；任务分配开启独立轮次，纠正消息进入最近的模型步骤。消息投递与读取分别记录；移除和归档必须等成员分支及待处理输入清理完成后才报告成功。
@@ -162,6 +163,8 @@ CLI 管理的安装可将 `web` 换成实际使用的 CLI profile。**安装后�
 这里的 `memberProvider` 指子 Agent 的运行后端（`spawn` / `fork`），不是 LLM provider。跨 LLM provider 由 `agent_teams_add_member` 的可选 `provider` + `model` 参数表达；`memberModel` 只是所有成员的模型默认覆盖。成员沿用队长当前 provider/model 时会继承队长的思考强度；provider 或 model 任一改变时会自动使用目标模型的默认档。需要指定特定强度时，可传入可选的 `reasoning_effort` 参数（目标模型支持的档位 id，或 `"default"` 表示强制使用模型自身默认档）。
 
 `slashCommand: false` 可关闭确定性的 `/agent-teams` 激活面（slash 命令与手势边界），仅保留自然语言触发。
+
+`artworkDir` 指向一个自定义美术目录。面板认得的所有 slug —— `team-lead-v2.png`、`member-<role>-v2.png`、`action-<state>-v2.png`，以及厂商命名空间 `member-<vendor>-<role>-v2.png` / `member-<vendor>-v2.png` / `team-lead-<vendor>-v2.png` / `brand-<vendor>.svg` —— 只要该目录里有同名文件就用它，没有就退回随包素材。`-v2` 后缀可省略，接受 `.png`、`.webp`、`.jpg`、`.jpeg`、`.gif`、`.svg`，并按文件自身的扩展名给出媒体类型。相对路径相对宿主进程工作目录解析。成员的模型厂商决定「哪张形象穿这个岗位」，厂商 × 岗位没有对应图时沿候选链逐级兜底，不会出现裂图。这些家族之外的 slug 一律拒绝，因此该目录无法被用来读取目录之外的文件。
 
 ## 使用边界
 

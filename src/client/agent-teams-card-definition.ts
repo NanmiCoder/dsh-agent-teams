@@ -32,6 +32,9 @@ export interface AgentTeamsCardData {
     readonly id: string
     readonly name: string
     readonly role: string
+    /** Model route, so the card can pick the vendor's character art. */
+    readonly provider?: string
+    readonly model?: string
   }[]
 }
 

@@ -497,6 +497,53 @@
   height: 40px;
 }
 
+/* Click-to-enlarge artwork: a 40px roster avatar cannot show the character's
+   role props, so clicking it opens the large art over the panel. */
+.memberAvatar .memberArt[data-art-zoom],
+.captainAvatar .leadAvatar[data-art-zoom] {
+  cursor: zoom-in;
+}
+
+/* Scoped to the panel box, never the viewport: `.panel` is `position: absolute`
+   (the drag layout translates it) and clips to `overflow: hidden`, so an
+   absolutely positioned zoom layer can only cover this panel. A fixed layer
+   would instead escape the shell overlay's stacking context whenever the
+   panel's incidental containing-block properties changed. */
+.artPreview {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgb(8 20 34 / 62%);
+  cursor: zoom-out;
+}
+
+.artPreviewCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 16px 16px 12px;
+  border-radius: 14px;
+  background: var(--dsw-alias-bg-layer-1);
+  box-shadow: 0 12px 40px rgb(8 20 34 / 38%);
+}
+
+.artPreviewImage {
+  width: min(320px, 72vw);
+  height: min(320px, 72vw);
+  object-fit: contain;
+}
+
+.artPreviewCaption {
+  font-size: 12px;
+  opacity: 0.72;
+}
+
 .captainInfo,
 .memberInfo {
   display: flex;
@@ -905,6 +952,15 @@
   filter:
     drop-shadow(0 0 1px var(--dsw-alias-bg-layer-1))
     drop-shadow(0 1px 1px rgb(18 45 72 / 24%));
+}
+
+/* Vendor brand mark in place of the activity art: a white disc keeps thin or
+   monochrome logos legible on top of the avatar. */
+.stateArt[data-brand='true'] {
+  padding: 3px;
+  border-radius: 50%;
+  background: var(--dsw-alias-bg-layer-1);
+  filter: drop-shadow(0 1px 1px rgb(18 45 72 / 24%));
 }
 
 .stateArt[data-activity='working'] {

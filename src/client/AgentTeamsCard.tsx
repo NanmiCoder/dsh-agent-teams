@@ -10,7 +10,7 @@
  * @module dsh-agent-teams/client/card
  */
 
-import { useEffect, useMemo, useSyncExternalStore } from 'react'
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import {
@@ -19,8 +19,23 @@ import {
   subscribeActivitySnapshots,
 } from './activity-monitor.ts'
 import type { AgentTeamsCardData } from './agent-teams-card-definition.ts'
-import { LEAD_ART, memberArtUrl } from './artwork.ts'
+import { LEAD_ART, resolveMemberArtwork, vendorSlug } from './artwork.ts'
 import css from './AgentTeamsCard.module.css'
+
+/** Member avatar with broken-image fallback to the initial-letter badge. */
+function MemberAvatar({
+  name,
+  art,
+}: {
+  readonly name: string
+  readonly art: string
+}) {
+  const [failed, setFailed] = useState(false)
+  if (failed) {
+    return <span className={css.memberInitial}>{name.trim().slice(0, 1).toUpperCase() || '?'}</span>
+  }
+  return <img className={css.memberArt} src={art} alt="" aria-hidden onError={() => { setFailed(true) }} />
+}
 
 /** Window event name the floater listens for to open itself. */
 export const OPEN_PANEL_EVENT = 'agent-teams:open-panel'
@@ -82,7 +97,13 @@ export function AgentTeamsSummary({ data, openMember, sessionId, t }: AgentTeams
     ...data,
     captainSessionId: snapshot?.captainSessionId ?? owner,
     teamName: snapshot?.name ?? data.teamName,
-    members: snapshot?.members.map((member) => ({ id: member.id, name: member.name, role: member.role })) ?? data.members,
+    members: snapshot?.members.map((member) => ({
+      id: member.id,
+      name: member.name,
+      role: member.role,
+      provider: member.provider,
+      model: member.model,
+    })) ?? data.members,
   }), [data, owner, snapshot])
   return (
     <section className={css.root} data-agent-teams-card data-team-id={resolved.teamId}>
@@ -102,24 +123,29 @@ export function AgentTeamsSummary({ data, openMember, sessionId, t }: AgentTeams
       </header>
       {resolved.members.length > 0 && (
         <div className={css.members}>
-          {resolved.members.map((member) => (
-            <button
-              type="button"
-              key={member.id || member.name}
-              className={css.member}
-              onClick={() => {
-                if (member.id !== '') openMember(owner as SessionId, member.id as SessionId)
-              }}
-              title={member.role === '' ? member.name : `${member.name} · ${member.role}`}
-            >
-              {memberArtUrl(member.name, member.role) !== null ? (
-                <img className={css.memberArt} src={memberArtUrl(member.name, member.role) ?? ''} alt="" aria-hidden />
-              ) : (
-                <span className={css.memberInitial}>{member.name.trim().slice(0, 1).toUpperCase() || '?'}</span>
-              )}
-              <span className={css.memberName}>{member.name}</span>
-            </button>
-          ))}
+          {resolved.members.map((member) => {
+            const vendor = vendorSlug(member)
+            const resolved = resolveMemberArtwork({ name: member.name, role: member.role, vendor })
+            const title = resolved.labelKey !== null
+              ? `${member.name} · ${t('member.art.rolePrefix')}${t(resolved.labelKey)}`
+              : resolved.isFallback
+                ? `${member.name} · ${t('member.art.fallbackLabel')}`
+                : member.name
+            return (
+              <button
+                type="button"
+                key={member.id || member.name}
+                className={css.member}
+                onClick={() => {
+                  if (member.id !== '') openMember(owner as SessionId, member.id as SessionId)
+                }}
+                title={title}
+              >
+                {resolved.url !== null && <MemberAvatar name={member.name} art={resolved.url} />}
+                <span className={css.memberName}>{member.name}</span>
+              </button>
+            )
+          })}
         </div>
       )}
     </section>

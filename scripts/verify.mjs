@@ -15,6 +15,7 @@ import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promis
 import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import {
   CAPTAIN_KEY,
   appendMailbox,
@@ -71,7 +72,21 @@ import {
   resizePanelLayout,
   resolvePanelGeometry,
 } from '../lib/client/panel-geometry.js'
-import { memberArtUrl } from '../lib/client/artwork.js'
+import {
+  ART_BASE,
+  LEAD_ART,
+  LEAD_FULL_ART,
+  memberArtUrl,
+  memberRoleSlug,
+  vendorSlug,
+} from '../lib/client/artwork.js'
+import {
+  ARTWORK_ROLES,
+  ARTWORK_VENDORS,
+  PACKAGED_ARTWORK_SLUGS,
+  artworkCandidates,
+  isAllowedArtwork,
+} from '../lib/artwork-source.js'
 import { parseAgentTeamsCreateArgs } from '../lib/client/agent-teams-card-definition.js'
 import {
   AGENT_TEAMS_LOCALE_NAMESPACE,
@@ -197,7 +212,6 @@ const stagingPlanSource = await readFile(new URL('../src/client/StagingPlanEdito
 const clientIndexSource = await readFile(new URL('../src/client/index.tsx', import.meta.url), 'utf8')
 const agentTeamsCardCss = await readFile(new URL('../src/client/AgentTeamsCard.module.css', import.meta.url), 'utf8')
 const agentTeamsCardSource = await readFile(new URL('../src/client/AgentTeamsCard.tsx', import.meta.url), 'utf8')
-const artworkSource = await readFile(new URL('../src/client/artwork.ts', import.meta.url), 'utf8')
 const hostSource = await readFile(new URL('../src/index.ts', import.meta.url), 'utf8')
 const toolsSource = await readFile(new URL('../src/tools.ts', import.meta.url), 'utf8')
 const localesSource = await readFile(new URL('../src/client/locales.ts', import.meta.url), 'utf8')
@@ -297,11 +311,43 @@ const expectedArtwork = [
   'action-sleeping-v2.png', 'action-sending-v2.png',
 ].sort()
 const artworkDir = new URL('../assets/agent-teams/', import.meta.url)
+// The vendor and role enumerations live in exactly one place here, so this gate
+// follows ARTWORK_VENDORS / ARTWORK_ROLES instead of drifting from them.
+const ARTWORK_VENDOR_ALT = 'deepseek|qwen|glm|kimi|claude|gemini|grok|gpt|hunyuan|minimax|meta|mistral|rwkv|seed|ernie'
+const ARTWORK_ROLE_ALT = 'engineer|qa|security|researcher|designer|docs|data|operator|audio|video'
 const packagedArtwork = (await readdir(artworkDir)).sort()
+const packagedArtworkSet = new Set(packagedArtwork)
+// Vendor artwork ships with the bundle, so the directory is no longer required to be
+// *exactly* those fifteen built-in names — that contract would need editing for every
+// new vendor, and the only way to edit it would be to loosen it into "anything goes".
+// Two stricter bounds replace it: the fifteen built-ins must still be present (the
+// baseline cannot be replaced away), and the directory only admits known artwork
+// families (a stray .md, a 1x1 placeholder or a temp file fails right here).
 check(
-  'artwork directory contains exactly the V2 captain, eight members, and six actions',
-  JSON.stringify(packagedArtwork) === JSON.stringify(expectedArtwork),
-  `artwork = ${JSON.stringify(packagedArtwork)}`,
+  'artwork directory still ships the V2 captain, eight members, and six actions',
+  expectedArtwork.every(name => packagedArtworkSet.has(name)),
+  `missing = ${JSON.stringify(expectedArtwork.filter(name => !packagedArtworkSet.has(name)))}`,
+)
+const packagedArtworkName = new RegExp(
+  '^(?:'
+  // The fifteen vendor tokens and ten role tokens are written once each, so no
+  // enumeration can drift away from the others.
+  + `team-lead(?:-(?:${ARTWORK_VENDOR_ALT}))?-v2\\.png`
+  // The click-to-enlarge HD family is WebP: at the same resolution it is roughly a
+  // tenth of the PNG size. Role and captain previews are 1024x1024 squares; a vendor
+  // portrait is tightly cropped to a 2048 long edge and is therefore not square.
+  + `|team-lead(?:-(?:${ARTWORK_VENDOR_ALT}))?-full-v2\\.webp`
+  + `|member-(?:(?:${ARTWORK_VENDOR_ALT})-)?(?:${ARTWORK_ROLE_ALT})-v2\\.png`
+  + `|member-(?:(?:${ARTWORK_VENDOR_ALT})-)?(?:${ARTWORK_ROLE_ALT})-full-v2\\.webp`
+  + `|member-(?:${ARTWORK_VENDOR_ALT})-v2\\.png`
+  + `|member-(?:${ARTWORK_VENDOR_ALT})-full-v2\\.webp`
+  + '|action-(?:working|thinking|reporting|celebrating|sleeping|sending)-v2\\.png'
+  + `|brand-(?:${ARTWORK_VENDOR_ALT})\\.svg`
+  + ')$', 'u')
+check(
+  'packaged artwork admits only the captain, member, action, and brand families',
+  packagedArtwork.every(name => packagedArtworkName.test(name)),
+  `foreign = ${JSON.stringify(packagedArtwork.filter(name => !packagedArtworkName.test(name)))}`,
 )
 const artworkHeaders = await Promise.all(expectedArtwork.map(async (name) => {
   const data = await readFile(new URL(name, artworkDir))
@@ -327,14 +373,13 @@ check(
     || image.bitDepth !== 8
     || image.colorType !== 6))}`,
 )
-check(
-  'client mapping and host allowlist reference every V2 artwork asset',
-  expectedArtwork.every(name => artworkSource.includes(name) || hostSource.includes(name))
-    && artworkSource.includes('member-data-v2.png')
-    && artworkSource.includes('member-operator-v2.png'),
-  'a packaged image is unreachable or one of the eighth-member mappings is missing',
-)
-const eightRoleArtwork = [
+// The fork replaced upstream's fixed role-only slug list with two halves: the
+// host allowlist (`PACKAGED_ARTWORK_SLUGS` plus the vendor namespace) and the
+// client's `vendor+role` template mapping. Both are resolved through the real
+// modules rather than by scanning for literal file names, because the client
+// now builds `member-<vendor>-<role>-v2.png` from a template and never spells
+// an individual packaged slug out.
+const canonicalRoster = [
   ['Researcher', 'Researcher'],
   ['Engineer', 'Backend Engineer'],
   ['QA', 'QA Engineer'],
@@ -343,7 +388,238 @@ const eightRoleArtwork = [
   ['Docs', 'Docs Writer'],
   ['Data', 'Data Analyst'],
   ['Operator', 'Release Operator'],
-].map(([name, role]) => memberArtUrl(name, role))
+]
+// Vendor artwork ships in two tiers: one tier has the full vendor x role set plus the
+// vendor captain image, the other has only the vendor-generic avatar and its 512
+// portrait. The two tiers together must equal ARTWORK_VENDORS exactly — one vendor
+// missing or one extra fails here.
+const ROLE_ART_VENDORS = ['deepseek', 'qwen', 'glm', 'kimi', 'claude', 'gemini', 'grok', 'gpt', 'hunyuan', 'minimax']
+const GENERIC_ONLY_VENDORS = ['meta', 'mistral', 'rwkv', 'seed', 'ernie']
+// The roster table has two halves: the eight canonical roster roles above, and
+// audio / video — not in that roster, but registered in ARTWORK_ROLES and shipping a
+// full vendor set.
+const EXTRA_ROLES = ['audio', 'video']
+const artworkReachesPackage = url => {
+  const slug = typeof url === 'string' && url.startsWith(ART_BASE) ? url.slice(ART_BASE.length) : ''
+  return slug !== '' && artworkCandidates(slug).some(candidate => packagedArtwork.includes(candidate))
+}
+check(
+  'client mapping and host allowlist reference every V2 artwork asset',
+  JSON.stringify([...PACKAGED_ARTWORK_SLUGS].sort()) === JSON.stringify(expectedArtwork)
+    && expectedArtwork.every(name => artworkCandidates(name)[0] === name
+      && artworkReachesPackage(`${ART_BASE}${name}`))
+    && ARTWORK_ROLES.length === canonicalRoster.length + EXTRA_ROLES.length
+    && canonicalRoster.every(([name, memberRole]) => ARTWORK_ROLES.includes(memberRoleSlug(name, memberRole)))
+    && EXTRA_ROLES.every(role => ARTWORK_ROLES.includes(role)
+      // audio / video are not in the eight-member roster but ship a full vendor set:
+      // they must be registered, their request must be an allowed slug, and the
+      // role-art vendor tier must actually carry them.
+      && isAllowedArtwork(memberArtUrl('Engineer', role, 'deepseek').slice(ART_BASE.length))
+      && ROLE_ART_VENDORS.every(vendor => packagedArtworkSet.has(`member-${vendor}-${role}-v2.png`)))
+    && canonicalRoster.every(([name, role]) => memberRoleSlug(name, role) !== null
+      && artworkReachesPackage(memberArtUrl(name, role))
+      && artworkReachesPackage(memberArtUrl(name, role, 'deepseek')))
+    && ARTWORK_VENDORS.length === 15
+    && [...ROLE_ART_VENDORS, ...GENERIC_ONLY_VENDORS].sort().join('|')
+      === [...ARTWORK_VENDORS].sort().join('|')
+    && ARTWORK_VENDORS.every(vendor => vendorSlug({ model: vendor }) === vendor
+      && isAllowedArtwork(`brand-${vendor}.svg`)
+      && canonicalRoster.every(([name, role]) => artworkReachesPackage(memberArtUrl(name, role, vendor))))
+    && artworkReachesPackage(LEAD_ART)
+    && artworkReachesPackage(LEAD_FULL_ART),
+  'a packaged image is unreachable or one of the eighth-member mappings is missing',
+)
+// A missing vendor image is masked by the degradation chain: with only the role-level
+// art packaged, a `vendor+role` request still "succeeds" — the second candidate hits
+// the built-in whale — so the incident is invisible to this gate. This pins down the
+// **first** hop: a role-art vendor must ship all ten roles (avatar PNG + HD WebP) plus
+// its captain (avatar + HD), the generic avatar, its HD portrait and its brand mark;
+// a generic-only vendor must ship at least the generic avatar, its HD portrait and its
+// brand mark. The URL template, the candidate chain and the directory must all point
+// at the same file.
+const packagedVendorArtwork = [
+  ...ROLE_ART_VENDORS.flatMap(vendor => [
+    ...ARTWORK_ROLES.flatMap(role => [`member-${vendor}-${role}-v2.png`, `member-${vendor}-${role}-full-v2.webp`]),
+    `team-lead-${vendor}-v2.png`,
+    `team-lead-${vendor}-full-v2.webp`,
+  ]),
+  ...ARTWORK_VENDORS.flatMap(vendor => [
+    `member-${vendor}-v2.png`,
+    `member-${vendor}-full-v2.webp`,
+    `brand-${vendor}.svg`,
+  ]),
+]
+check(
+  'every vendor ships its own artwork tier inside the bundle',
+  packagedVendorArtwork.every(name => packagedArtworkSet.has(name)),
+  `missing = ${JSON.stringify(packagedVendorArtwork.filter(name => !packagedArtworkSet.has(name)))}`,
+)
+check(
+  'a vendor+role request reaches its own artwork on the first hop',
+  ROLE_ART_VENDORS.every(vendor => canonicalRoster.every(([name, role]) => {
+    const [first] = artworkCandidates(memberArtUrl(name, role, vendor).slice(ART_BASE.length))
+    return first === `member-${vendor}-${memberRoleSlug(name, role)}-v2.png` && packagedArtworkSet.has(first)
+  })),
+  'the vendor namespace degraded to the packaged whale or a role-generic image',
+)
+const artworkHeader = async (name) => {
+  try {
+    const data = await readFile(new URL(name, artworkDir))
+    return {
+      name,
+      png: data.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])),
+      width: data.readUInt32BE(16),
+      height: data.readUInt32BE(20),
+      bitDepth: data[24],
+      colorType: data[25],
+    }
+  }
+  catch {
+    return { name, png: false, width: 0, height: 0, bitDepth: 0, colorType: 0 }
+  }
+}
+/** Read a WebP container header (VP8X carries the alpha flag; fall back to the VP8/VP8L frame header when there is no extended header). */
+const webpHeader = async (name) => {
+  try {
+    const data = await readFile(new URL(name, artworkDir))
+    const riff = data.subarray(0, 4).toString('latin1') === 'RIFF'
+      && data.subarray(8, 12).toString('latin1') === 'WEBP'
+    if (!riff) return { name, webp: false, width: 0, height: 0, alpha: false }
+    let offset = 12
+    while (offset + 8 <= data.length) {
+      const type = data.toString('latin1', offset, offset + 4)
+      const size = data.readUInt32LE(offset + 4)
+      const body = offset + 8
+      if (type === 'VP8X') {
+        return {
+          name,
+          webp: true,
+          width: (data[body + 4] | (data[body + 5] << 8) | (data[body + 6] << 16)) + 1,
+          height: (data[body + 7] | (data[body + 8] << 8) | (data[body + 9] << 16)) + 1,
+          alpha: (data[body] & 0x10) !== 0,
+        }
+      }
+      if (type === 'VP8 ') {
+        return { name, webp: true, width: data.readUInt16LE(body + 6) & 0x3fff, height: data.readUInt16LE(body + 8) & 0x3fff, alpha: false }
+      }
+      if (type === 'VP8L') {
+        const bits = data.readUInt32LE(body + 1)
+        return { name, webp: true, width: (bits & 0x3fff) + 1, height: ((bits >> 14) & 0x3fff) + 1, alpha: ((bits >> 28) & 1) === 1 }
+      }
+      offset = body + size + (size % 2)
+    }
+    return { name, webp: false, width: 0, height: 0, alpha: false }
+  }
+  catch {
+    return { name, webp: false, width: 0, height: 0, alpha: false }
+  }
+}
+// The avatar family is a 256x256 8-bit RGBA PNG rendered at 40-44px; the HD family is
+// WebP — 1024x1024 squares for roles and the captain (1:1 native pixels, centred), while
+// a vendor portrait is tightly cropped to a 2048 long edge and is therefore a portrait,
+// not a square. A wrong size does not break the image, it only stretches one side, so
+// both families are asserted from the packaged bytes.
+const vendorAvatarNames = [
+  ...ROLE_ART_VENDORS.flatMap(vendor => [
+    ...ARTWORK_ROLES.map(role => `member-${vendor}-${role}-v2.png`),
+    `team-lead-${vendor}-v2.png`,
+  ]),
+  ...ARTWORK_VENDORS.map(vendor => `member-${vendor}-v2.png`),
+]
+const offSpecAvatars = (await Promise.all(vendorAvatarNames.map(artworkHeader))).filter(image => !image.png
+  || image.width !== 256
+  || image.height !== 256
+  || image.bitDepth !== 8
+  || image.colorType !== 6)
+check(
+  'vendor avatar artwork is a 256x256 8-bit RGBA PNG',
+  offSpecAvatars.length === 0,
+  `off spec = ${JSON.stringify(offSpecAvatars)}`,
+)
+const vendorHdNames = [
+  ...ROLE_ART_VENDORS.flatMap(vendor => [
+    ...ARTWORK_ROLES.map(role => [`member-${vendor}-${role}-full-v2.webp`, 'square']),
+    [`team-lead-${vendor}-full-v2.webp`, 'square'],
+  ]),
+  ...ARTWORK_VENDORS.map(vendor => [`member-${vendor}-full-v2.webp`, 'portrait']),
+]
+const hdHeaders = await Promise.all(vendorHdNames.map(([name]) => webpHeader(name)))
+const offSpecHd = hdHeaders.filter((image, index) => {
+  const [, shape] = vendorHdNames[index]
+  if (!image.webp || !image.alpha) return true
+  // Roles and the captain are fixed at 1024x1024; a vendor portrait is a portrait whose
+// long edge must not exceed 2048 (and must genuinely reach HD scale).
+  if (shape === 'square') return image.width !== 1024 || image.height !== 1024
+  return image.height <= image.width || image.height > 2048 || image.height < 1024
+})
+check(
+  'vendor HD preview artwork is an alpha WebP at its contracted size',
+  offSpecHd.length === 0,
+  `off spec = ${JSON.stringify(offSpecHd)}`,
+)
+const brandArtwork = await Promise.all(ARTWORK_VENDORS.map(async vendor => {
+  const name = `brand-${vendor}.svg`
+  try {
+    return { name, source: await readFile(new URL(name, artworkDir), 'utf8') }
+  }
+  catch {
+    return { name, source: '' }
+  }
+}))
+const offSpecBrand = brandArtwork.filter(({ source }) => !/^\s*<svg[\s>]/u.test(source)
+  || !source.includes('</svg>')
+  // A brand mark must be self-contained offline: an external reference or a script would
+// make it depend on the network (or become an injection channel).
+  || /<script|href\s*=\s*["']?(?:https?:)?\/\//iu.test(source))
+check(
+  'every vendor brand mark is a self-contained svg',
+  offSpecBrand.length === 0,
+  `invalid = ${JSON.stringify(offSpecBrand.map(({ name }) => name))}`,
+)
+// Regression: the bundle ships both PNG artwork and `brand-<vendor>.svg` marks, so the
+// host half must derive the media type from the **extension**. Serving every packaged
+// asset as `image/png` makes the browser fail to decode an SVG, and the badge then falls
+// back to the activity image on `onError` — which looks exactly like "the SVG was never
+// packaged". This calls the real resolver (the same code the HTTP handler runs) and
+// compares the media type and byte count for every packaged file.
+// The HD family ships as `.webp` while the client always requests the `.png` name, so
+// resolution goes through the **requested** name and is then compared against the file on
+// disk — which also exercises in-bundle probing by extension.
+const { resolveArtwork } = await import('../lib/index.js')
+const packagedArtDir = fileURLToPath(artworkDir)
+const artworkResponses = []
+for (const name of packagedArtwork) {
+  const requested = name.endsWith('.webp') ? name.replace(/\.webp$/u, '.png') : name
+  const resolved = await resolveArtwork(requested, { artDir: packagedArtDir })
+  artworkResponses.push({
+    name,
+    requested,
+    type: resolved?.contentType,
+    bytes: resolved?.data.byteLength ?? 0,
+    disk: (await readFile(new URL(name, artworkDir))).byteLength,
+  })
+}
+const declaredArtworkType = name => name.endsWith('.svg')
+  ? 'image/svg+xml'
+  : name.endsWith('.webp') ? 'image/webp' : 'image/png'
+const wrongArtworkType = artworkResponses.filter(entry => entry.type !== declaredArtworkType(entry.name))
+const mismatchedArtworkBytes = artworkResponses.filter(entry => entry.bytes !== entry.disk)
+check(
+  'packaged artwork is served with the media type its own extension declares',
+  wrongArtworkType.length === 0 && mismatchedArtworkBytes.length === 0,
+  `wrong type = ${JSON.stringify(wrongArtworkType.map(entry => `${entry.name}:${entry.type}`))}`
+    + `; byte mismatch = ${JSON.stringify(mismatchedArtworkBytes.map(entry => entry.name))}`,
+)
+const servedBrands = await Promise.all(ARTWORK_VENDORS.map(
+  vendor => resolveArtwork(`brand-${vendor}.svg`, { artDir: packagedArtDir }),
+))
+check(
+  'every vendor brand mark reaches the browser as an svg document',
+  servedBrands.every(resolved => resolved?.contentType === 'image/svg+xml'
+    && resolved.data.subarray(0, 4).toString('utf8') === '<svg'),
+  `served = ${JSON.stringify(servedBrands.map(resolved => resolved?.contentType ?? 'unresolved'))}`,
+)
+const eightRoleArtwork = canonicalRoster.map(([name, role]) => memberArtUrl(name, role))
 check(
   'canonical eight-member roster resolves to eight distinct role images',
   eightRoleArtwork.every(Boolean) && new Set(eightRoleArtwork).size === 8,
@@ -372,11 +648,20 @@ check(
     && /\.memberState\[data-activity='working'\][^{]*\{[^}]*color:\s*var\(--dsw-alias-state-business-primary\)/su.test(activityPanelCss),
   'the working label and glyph must follow the host business color',
 )
+// The host renders dialogs in its own fixed layer at z-index 1000, so the slot
+// only has to stay below it. Bound every declared z-index rather than one magic
+// number, and reject the actual escalation mechanisms: a body portal
+// (createRoot/createPortal) or a layer that outranks the host's dialog layer.
+const panelZIndexes = [...activityPanelCss.matchAll(/z-index:\s*(\d+)/gu)].map(match => Number(match[1]))
 check(
   'activity panel uses the shell overlay instead of a page-breaking body portal',
   clientIndexSource.includes("ctx.slots.inject('shell.overlay'")
     && !clientIndexSource.includes('createRoot')
+    && !clientIndexSource.includes('createPortal')
+    && !activityPanelSource.includes('createPortal')
     && activityPanelCss.includes('position: absolute')
+    && panelZIndexes.length > 0
+    && panelZIndexes.every(value => value < 1000)
     && !activityPanelCss.includes('2147483000')
     && !activityPanelCss.includes('position: fixed'),
   'a body portal or unbounded z-index can cover host modal controls',

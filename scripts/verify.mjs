@@ -197,7 +197,12 @@ const stagingPlanSource = await readFile(new URL('../src/client/StagingPlanEdito
 const clientIndexSource = await readFile(new URL('../src/client/index.tsx', import.meta.url), 'utf8')
 const agentTeamsCardCss = await readFile(new URL('../src/client/AgentTeamsCard.module.css', import.meta.url), 'utf8')
 const agentTeamsCardSource = await readFile(new URL('../src/client/AgentTeamsCard.tsx', import.meta.url), 'utf8')
-const artworkSource = await readFile(new URL('../src/client/artwork.ts', import.meta.url), 'utf8')
+// The packaged slug list lives in the shared artwork namespace module now, so the
+// reachability check below reads the client mapping and that module together.
+const artworkSource = [
+  await readFile(new URL('../src/client/artwork.ts', import.meta.url), 'utf8'),
+  await readFile(new URL('../src/artwork-source.ts', import.meta.url), 'utf8'),
+].join('\n')
 const hostSource = await readFile(new URL('../src/index.ts', import.meta.url), 'utf8')
 const toolsSource = await readFile(new URL('../src/tools.ts', import.meta.url), 'utf8')
 const localesSource = await readFile(new URL('../src/client/locales.ts', import.meta.url), 'utf8')

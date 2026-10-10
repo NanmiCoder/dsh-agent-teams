@@ -166,6 +166,7 @@ Defaults work without extra setup. A trusted profile can override member behavio
     memberModel: deepseek-v4
     memberMaxDepth: 0
     maxMembers: 8
+    artworkDir: ~/.dsh-agent-teams/art
 ```
 
 `memberMaxDepth` defaults to `0`: team members cannot create nested subagents. Set `1` to explicitly permit one descendant level; the limit also covers runtime/code-tool calls. Default members report through team messages only, avoiding duplicate native parent reports. Idle roster members make no model requests. Task assignments start distinct turns; coordination joins the nearest model step. Acceptance and consumption are tracked separately. Removal/archive drains the selected branch and its pending input before reporting success.
@@ -173,6 +174,8 @@ Defaults work without extra setup. A trusted profile can override member behavio
 `memberProvider` is the sub-agent runtime backend (`spawn` / `fork`), not an LLM provider. Cross-LLM-provider routing uses the optional `provider` + `model` fields of `agent_teams_add_member`; `memberModel` is only a model default for all members. A member on the captain's current provider/model inherits the captain's reasoning effort, while a changed provider or model automatically uses the target model's default. To request a particular effort, pass the optional `reasoning_effort` field — one of the target model's supported effort ids, or `"default"` to force the model's own default.
 
 `slashCommand: false` disables the deterministic `/agent-teams` activation surfaces (slash command and gesture boundary), leaving the natural-language trigger as the only entry point.
+
+`artworkDir` points at a directory of custom character art. Any slug the panel knows — `team-lead-v2.png`, `member-<role>-v2.png`, `action-<state>-v2.png`, and the vendor namespace `member-<vendor>-<role>-v2.png` / `member-<vendor>-v2.png` / `team-lead-<vendor>-v2.png` / `brand-<vendor>.svg` — is served from that directory when a matching file exists, and from the packaged artwork otherwise. The `-v2` suffix is optional, and `.png`, `.webp`, `.jpg`, `.jpeg`, `.gif` and `.svg` are accepted; each file is served with the media type its own extension declares. Relative paths resolve against the host process working directory. A member's model vendor picks which character wears its role, and a vendor or role combination with no artwork degrades to the closest packaged image instead of a broken frame. Slugs outside these families are refused, so the directory cannot be used to read files outside it.
 
 ## Boundaries
 

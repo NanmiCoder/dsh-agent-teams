@@ -74,8 +74,35 @@ export type AgentTeamsSource =
   | { readonly kind: 'agent-teams' }
   | { readonly kind: 'agent-teams-command'; readonly goal?: string; readonly profile?: string }
 
-/** Stored session format generation of the running host; 0 when it exposes none. */
-export function hostSessionFormatVersion(): number {
+/** Anything that exposes the stored format generation on its live session header. */
+export interface SessionFormatBearer {
+  readonly session?: { readonly header?: { readonly version?: unknown } } | undefined
+}
+
+/**
+ * Stored format generation observed on a live session, when the host exposes it.
+ *
+ * The module constant is only a fallback: a plugin can resolve a *nested*
+ * `@deepseek-ai/dsh-session` copy that belongs to a different host generation
+ * than the process loading it (a profile whose lockfile pins the DSH package
+ * line, a Desktop shell with an embedded core, a duplicated store). That copy
+ * then reports the wrong generation — 0 on a v4 host — which selects the
+ * retired `plugin` wrapper and makes every durable AgentTeams message fail the
+ * host's own admission check (#236). The live session header belongs to the
+ * host that persists the message, so it outranks the resolved module.
+ */
+export function observedSessionFormatVersion(subject?: SessionFormatBearer): number | undefined {
+  const version = subject?.session?.header?.version
+  return typeof version === 'number' && Number.isSafeInteger(version) && version >= 0 ? version : undefined
+}
+
+/**
+ * Stored session format generation of the running host; 0 when neither the live
+ * session nor the resolved module exposes one.
+ * @param observed - a live session observation; preferred over the module constant.
+ */
+export function hostSessionFormatVersion(observed?: number): number {
+  if (typeof observed === 'number' && Number.isSafeInteger(observed) && observed >= 0) return observed
   const version = (dshSession as unknown as { SESSION_FORMAT_VERSION?: number }).SESSION_FORMAT_VERSION
   return typeof version === 'number' && Number.isSafeInteger(version) && version >= 0 ? version : 0
 }
@@ -92,10 +119,14 @@ export function hostSessionFormatVersion(): number {
  * the released plugin wrapper is used instead; the goal and profile already
  * travel in the message text.
  * @param modern - the producer-owned source to use where the host admits it.
+ * @param observed - the live session's stored format generation, when callers
+ * have the owning agent at hand. Never trust the resolved module alone: on a
+ * host whose profile pins another DSH line it reports a retired generation and
+ * the v4 writer rejects the wrapper (#236).
  * @returns a source accepted by the running host and by its migration chain.
  */
-export function agentTeamsSource(modern: AgentTeamsSource): MessageSource {
-  if (hostSessionFormatVersion() >= RELEASED_SOURCE_VOCABULARY_VERSION) return modern
+export function agentTeamsSource(modern: AgentTeamsSource, observed?: number): MessageSource {
+  if (hostSessionFormatVersion(observed) >= RELEASED_SOURCE_VOCABULARY_VERSION) return modern
   // Released-format hosts persist plugin-authored messages as this wrapper; the
   // current vocabulary retired it, so the cast stays confined to this branch
   // and `modern` is the only shape a current host ever sees.
@@ -194,7 +225,7 @@ export async function queueMemberPrompt(
   content: ContentBlock[], signal: AbortSignal,
 ): Promise<MessageId> {
   const host = boundary(runtime)
-  const source = agentTeamsSource({ kind: 'agent-teams' })
+  const source = agentTeamsSource({ kind: 'agent-teams' }, observedSessionFormatVersion(parent))
   if (typeof host.followup === 'function') {
     return host.followup.call(runtime, parent, childId, content, { source, signal })
   }
@@ -211,7 +242,7 @@ export async function steerMemberPrompt(
   content: ContentBlock[], signal: AbortSignal, live?: Agent,
 ): Promise<MessageId> {
   const host = boundary(runtime)
-  const source = agentTeamsSource({ kind: 'agent-teams' })
+  const source = agentTeamsSource({ kind: 'agent-teams' }, observedSessionFormatVersion(live ?? parent))
   const deliver = host[hostPromptDeliver]
   if (typeof deliver === 'function') return deliver.call(runtime, parent, childId, content, source, signal, 'steer')
   if (typeof host.sendMessage === 'function') return host.sendMessage.call(runtime, parent, childId, content, { signal })

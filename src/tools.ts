@@ -68,7 +68,7 @@ import {
 import type { DeliveryAudit } from './quality-gates.ts'
 import { auditTeamWorkspace } from './workspace-audit.ts'
 import { readArtifactScope, snapshotWorkspacePaths, workspacePathExists } from './artifacts.ts'
-import { restrictableToolNames } from './harness-compat.ts'
+import { agentTeamsSource, observedSessionFormatVersion, restrictableToolNames } from './harness-compat.ts'
 import { memberSpawnRelaxableDeny, optionalToolPolicy, requireToolPolicy, resolveMemberToolFilter, type MemberToolFilter, type MemberToolPolicy } from './tool-policies.ts'
 import type { ContractAmendmentInput } from './state.ts'
 import type { AcceptanceResult, ArtifactDigest, ArtifactSnapshot, CommandResult, ReviewFinding, ReviewVerdict, TaskKind } from './types.ts'
@@ -861,7 +861,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
     try {
       captain.followup(createUserMessage({
         content: [{ type: 'text', text: stagedPlanFeedbackContext(prepared.teamName) }],
-        source: { kind: 'agent-teams' },
+        source: agentTeamsSource({ kind: 'agent-teams' }, observedSessionFormatVersion(captain)),
       }))
     } catch (error: unknown) {
       // Do not leave the durable UI in a false waiting state when the live
@@ -899,7 +899,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
     try {
       captain.inject(createUserMessage({
         content: [{ type: 'text', text: stagedPlanDiscardContext(discarded.teamName) }],
-        source: { kind: 'agent-teams' },
+        source: agentTeamsSource({ kind: 'agent-teams' }, observedSessionFormatVersion(captain)),
       }))
     } catch (error: unknown) {
       // The archive is already authoritative. Cancellation still prevents a

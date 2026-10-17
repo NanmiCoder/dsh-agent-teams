@@ -1,0 +1,17 @@
+# Normalize text handling so digests and artifacts are reproducible across platforms.
+# Without this, a Windows checkout with core.autocrlf=true rewrites tracked text
+# files to CRLF, and scripts/git-artifacts.mjs — which hashes raw file bytes to
+# prove that committed lib/ matches the build — can never match the LF-only
+# stamp produced by an upstream Linux build.
+* text=auto eol=lf
+
+# Generated and vendored artifacts that must stay byte-exact.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.tgz binary

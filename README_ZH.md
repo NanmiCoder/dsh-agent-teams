@@ -36,7 +36,7 @@
 
 ## 版本更新
 
-[v0.1.24-rc.1](./release-notes/v0.1.24-rc.1.md) 适配 Harness `0.2.1-rc.1` 的成员创建、停止和恢复，并在插件热重载后保留成员角色与自定义工具限制。发布渠道为 npm `next`（预发布）；安装前请在 [npm 版本列表](https://www.npmjs.com/package/@nanmicoder/dsh-agent-teams?activeTab=versions) 确认发布状态。精确范围见 [compatibility.json](./compatibility.json)，验收范围见[迁移记录](./docs/harness-0.2.1-rc.1/README.md)。
+[v0.1.25-rc.1](./release-notes/v0.1.25-rc.1.md) 支持 Harness `0.2.1-rc.2`：该版本面向插件的代码与 `0.2.1-rc.1` 逐字节相同，成员创建、停止和恢复适配，以及插件热重载后保留成员角色与自定义工具限制的行为均保持不变。发布渠道为 npm `next`（预发布）；安装前请在 [npm 版本列表](https://www.npmjs.com/package/@nanmicoder/dsh-agent-teams?activeTab=versions) 确认发布状态。精确范围见 [compatibility.json](./compatibility.json)，验收范围见[迁移记录](./docs/harness-0.2.1-rc.2/README.md)。
 
 ## 为什么需要 AgentTeams？
 
@@ -54,33 +54,33 @@
 
 ## 安装与版本选择
 
-**推荐组合：DeepSeek Harness `0.2.1-rc.1` + AgentTeams `0.1.24-rc.1`。宿主仍为 RC 版本。**
+**推荐组合：DeepSeek Harness `0.2.1-rc.2` + AgentTeams `0.1.25-rc.1`。宿主仍为 RC 版本。**
 
 | 使用场景 | DeepSeek Harness | AgentTeams 插件 |
 | --- | --- | --- |
-| **推荐版本** | **`0.2.1-rc.1`** | **`0.1.24-rc.1`** |
-| 上一推荐 RC | `0.2.0-rc.2`, `0.1.7-rc.2` | `0.1.24-rc.1` |
-| 保留旧 RC | `0.1.5-rc.1`, `0.1.5-rc.2`, `0.1.5-rc.3` | `0.1.24-rc.1` |
-| 保留旧 RC | `0.1.2-rc.1` | `0.1.24-rc.1` |
-| 开发者测试 Alpha | `0.1.2-alpha.5` | `0.1.24-rc.1` |
-| 保留旧 Alpha | `0.1.2-alpha.2` | `0.1.24-rc.1` |
+| **推荐版本** | **`0.2.1-rc.2`** | **`0.1.25-rc.1`** |
+| 上一推荐 RC | `0.2.1-rc.1`, `0.2.0-rc.2`, `0.1.7-rc.2` | `0.1.25-rc.1` |
+| 保留旧 RC | `0.1.5-rc.1`, `0.1.5-rc.2`, `0.1.5-rc.3` | `0.1.25-rc.1` |
+| 保留旧 RC | `0.1.2-rc.1` | `0.1.25-rc.1` |
+| 开发者测试 Alpha | `0.1.2-alpha.5` | `0.1.25-rc.1` |
+| 保留旧 Alpha | `0.1.2-alpha.2` | `0.1.25-rc.1` |
 
 ### 桌面端
 
 在应用侧栏打开「插件 → 添加插件」，输入 npm 包名和版本：
 
 ```text
-@nanmicoder/dsh-agent-teams@0.1.24-rc.1
+@nanmicoder/dsh-agent-teams@0.1.25-rc.1
 ```
 
 安装完成后点击「立即启用」；宿主提示需要重启时，重启桌面应用。发布版请使用上面的包名，npm 或 GitHub 网页链接与 npm 包名不是同一种安装来源。从 Git 安装时，请选用包含下方所述已验证构建产物的提交。
 
-桌面端自带 Harness 内核与包管理器，升级全局 CLI 不会升级桌面端；普通独立 CLI 不能管理桌面 profile，桌面端自带的 CLI carrier 在此版本可以管理。当前精确目标是已发布的 `0.2.1-rc.1`，仍属于 RC；此前源码预测的 `0.2.0` 已退出支持声明。详见[迁移验收记录](./docs/harness-0.2.1-rc.1/README.md)。
+桌面端自带 Harness 内核与包管理器，升级全局 CLI 不会升级桌面端；普通独立 CLI 不能管理桌面 profile，桌面端自带的 CLI carrier 在此版本可以管理。当前精确目标是已发布的 `0.2.1-rc.2`，仍属于 RC；该版本面向插件的代码与 `0.2.1-rc.1` 完全相同。此前源码预测的 `0.2.0` 已退出支持声明。详见[迁移验收记录](./docs/harness-0.2.1-rc.2/README.md)。
 
 ### CLI / Web：1. 安装 DeepSeek Harness
 
 ```sh
-npm install --global @deepseek-ai/dsh@0.2.1-rc.1
+npm install --global @deepseek-ai/dsh@0.2.1-rc.2
 dsh --version
 ```
 
@@ -91,7 +91,7 @@ dsh --version
 此版本发布后，从 npm 安装或升级插件（锁定精确预发布版本）：
 
 ```sh
-dsh plugin --profile web add --save-exact @nanmicoder/dsh-agent-teams@0.1.24-rc.1
+dsh plugin --profile web add --save-exact @nanmicoder/dsh-agent-teams@0.1.25-rc.1
 ```
 
 CLI 管理的安装可将 `web` 换成实际使用的 CLI profile。**安装后，停止并重新启动该 profile 的 Harness 进程，再刷新浏览器。** 安装插件不会自动升级宿主；Harness 的 `latest` 与插件的 `latest` 是两个独立渠道。

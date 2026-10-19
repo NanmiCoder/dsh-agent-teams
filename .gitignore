@@ -13,3 +13,4 @@ node_modules/
 # cordis.patch.yml is maintained locally and intentionally not pushed.
 # Removed from tracking so upstream/fork sync never overwrites the local copy.
 cordis.patch.yml
+cordis.patch.yml.remote-*.bak

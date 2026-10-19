@@ -402,8 +402,8 @@ export function restrictableToolNames(agent: Agent): ReadonlySet<string> | undef
  * This is the legacy filter of a member without a configured tool policy; a
  * selected policy resolves through `resolveMemberToolFilter` instead (#59).
  */
-export function memberToolFilter(maxDepth: number | undefined, knownTools: ReadonlySet<string> | undefined): MemberToolFilter {
-  return resolveMemberToolFilter(undefined, { maxDepth, knownTools })
+export function memberToolFilter(maxDepth: number | undefined, knownTools: ReadonlySet<string> | undefined, memberName?: string): MemberToolFilter {
+  return resolveMemberToolFilter(undefined, { maxDepth, knownTools, memberName })
 }
 
 /**

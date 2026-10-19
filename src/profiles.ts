@@ -20,7 +20,7 @@ export const PROFILE_PROTOCOL_PROMPT_LIMIT = 240
 
 const PROFILE_KEYS = ['description', 'protocol', 'executionPrompt', 'fallback', 'members', 'tasks', 'taskPlanning', 'reviewPolicy'] as const
 const REVIEW_POLICY_KEYS = ['requirementsMinRounds', 'requirementsMaxRounds', 'codeMaxRounds', 'maxRepairAttempts', 'requiredReviewers'] as const
-const MEMBER_KEYS = ['name', 'role', 'provider', 'model', 'reasoning_effort', 'executionPrompt', 'fallback', 'tool_policy'] as const
+const MEMBER_KEYS = ['name', 'role', 'provider', 'model', 'reasoning_effort', 'executionPrompt', 'fallback', 'tool_policy', 'slots'] as const
 const FALLBACK_KEYS = ['provider', 'model'] as const
 const TASK_KEYS = ['id', 'subject', 'description', 'assignee', 'dependencies'] as const
 
@@ -43,6 +43,14 @@ export interface TeamProfileMemberConfig {
    * profile only names a configured policy; it never carries raw tool lists.
    */
   tool_policy?: string
+  /**
+   * Number of parallel instances to expand this member into. `slots: 3` with
+   * `name: backend-dev` produces `backend-dev-1`, `backend-dev-2`,
+   * `backend-dev-3` — each an independent member with the same role/provider/
+   * model/prompt. Default 1 (no expansion). Useful for roles that benefit
+   * from parallelism (multiple backend devs, multiple QA engineers).
+   */
+  slots?: number
 }
 
 /** One seed-task row in a named team-profile template (unresolved). */
@@ -81,6 +89,8 @@ export interface NormalizedProfileMember {
   executionPrompt?: string
   fallback?: TeamModelFallbackConfig
   toolPolicy?: string
+  /** Number of parallel instances (1 = no expansion). */
+  slots: number
 }
 
 /** A profile seed task after assignee canonicalization; `sourceIndex` is the YAML order. */
@@ -320,16 +330,48 @@ function normalizeListedProfile(
   const memberByKey = new Map<string, NormalizedProfileMember>()
   for (let index = 0; index < membersRaw.length; index += 1) {
     const member = normalizeMember(membersRaw[index], `${path}.members[${index}]`, listed.name)
-    const key = sanitizeKey(member.name)
-    const colliding = memberByKey.get(key)
-    if (colliding !== undefined) {
-      throw new Error(
-        `profile members "${colliding.name}" and "${member.name}" collapse to the same name`,
-      )
+    if (member.slots > 1) {
+      // Expand into N independent instances: name-1, name-2, ..., name-N.
+      // Each inherits the same role/provider/model/prompt/policy.
+      for (let slot = 1; slot <= member.slots; slot += 1) {
+        const slotName = `${member.name}-${slot}`
+        if (isCaptainName(slotName)) {
+          throw new Error(`expanded member name "${slotName}" is reserved for the captain`)
+        }
+        const slotKey = sanitizeKey(slotName)
+        const colliding = memberByKey.get(slotKey)
+        if (colliding !== undefined) {
+          throw new Error(
+            `profile members "${colliding.name}" and "${slotName}" collapse to the same name`,
+          )
+        }
+        const slotMember: NormalizedProfileMember = {
+          ...member,
+          name: slotName,
+          slots: 1,
+        }
+        memberByName.set(slotName, slotMember)
+        memberByKey.set(slotKey, slotMember)
+        members.push(slotMember)
+      }
+    } else {
+      const key = sanitizeKey(member.name)
+      const colliding = memberByKey.get(key)
+      if (colliding !== undefined) {
+        throw new Error(
+          `profile members "${colliding.name}" and "${member.name}" collapse to the same name`,
+        )
+      }
+      memberByName.set(member.name, member)
+      memberByKey.set(key, member)
+      members.push(member)
     }
-    memberByName.set(member.name, member)
-    memberByKey.set(key, member)
-    members.push(member)
+  }
+  // Re-check maxMembers after slot expansion.
+  if (members.length > maxMembers) {
+    throw new Error(
+      `profile "${listed.name}" expanded to ${members.length} members (after slots) but maxMembers is ${maxMembers}`,
+    )
   }
 
   const tasksRaw = raw['tasks']
@@ -470,7 +512,16 @@ function normalizeMember(
   if (provider !== undefined && model === undefined) {
     throw new Error(`profile member "${name}" sets provider without model`)
   }
-  return omitUndefined({ name, role, provider, model, reasoningEffort, executionPrompt, fallback, toolPolicy })
+  // slots: optional positive integer >= 1. Default 1 (no expansion).
+  let slots = 1
+  const slotsRaw = raw['slots']
+  if (slotsRaw !== undefined) {
+    if (typeof slotsRaw !== 'number' || !Number.isInteger(slotsRaw) || slotsRaw < 1) {
+      throw new Error(`profile member "${name}" slots must be a positive integer (got ${JSON.stringify(slotsRaw)})`)
+    }
+    slots = slotsRaw
+  }
+  return omitUndefined({ name, role, provider, model, reasoningEffort, executionPrompt, fallback, toolPolicy, slots })
 }
 
 function normalizeFallback(value: unknown, path: string): TeamModelFallbackConfig | undefined {

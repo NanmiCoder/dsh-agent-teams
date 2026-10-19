@@ -28,7 +28,9 @@ export interface TeamActivityMember {
   readonly id: string
   readonly name: string
   readonly role: string
+  /** Effective LLM provider: the active route after a hot-swap, else the original. */
   readonly provider: string
+  /** Effective model: the active route after a hot-swap, else the original. */
   readonly model: string
   readonly reasoningEffort: string
   readonly executionPrompt: string
@@ -39,6 +41,10 @@ export interface TeamActivityMember {
   readonly total: number
   readonly currentTask: string
   readonly unread: number
+  /** Last member-start failure, so the panel can surface a broken member. */
+  readonly spawnError?: string
+  /** Whether the fallback route is currently active (distinct from a manual switch). */
+  readonly fallbackActive?: boolean
 }
 
 /** One task row of the activity snapshot. */
@@ -77,6 +83,8 @@ export interface TeamActivitySnapshot {
   readonly name: string
   readonly description?: string
   readonly captainSessionId: string
+  /** Session ids that adopted this team and gained captain authority. */
+  readonly authorizedLeads?: readonly string[]
   readonly phase: 'staged' | 'running'
   readonly planReviewState?: 'awaiting_review' | 'awaiting_feedback'
   readonly halted?: boolean
@@ -156,12 +164,17 @@ export async function assembleTeamSnapshot(
   const members: TeamActivityMember[] = roster.map((member) => {
     const owned = tasks.filter((task) => task.assignee === member.name)
     const done = owned.filter((task) => task.status === 'completed').length
+    // Effective route: a runtime hot-swap (agent_teams_set_member_model) or a
+    // fallback transition writes activeProvider/activeModel. The panel must
+    // show the route the member actually uses now, not the original descriptor.
+    const effectiveProvider = member.activeProvider ?? member.provider
+    const effectiveModel = member.activeModel ?? member.model
     return {
       id: member.id,
       name: member.name,
       role: member.role ?? '',
-      provider: member.provider?.trim() ?? '',
-      model: member.model?.trim() ?? '',
+      provider: effectiveProvider?.trim() ?? '',
+      model: effectiveModel?.trim() ?? '',
       reasoningEffort: member.reasoningEffort?.trim() ?? '',
       executionPrompt: member.executionPrompt ?? '',
       status: member.status,
@@ -179,6 +192,8 @@ export async function assembleTeamSnapshot(
       total: owned.length,
       currentTask: currentTaskOf(member.name, tasks),
       unread: unreadByMember.get(member.name) ?? 0,
+      ...member.spawnError !== undefined && member.spawnError !== '' ? { spawnError: member.spawnError } : {},
+      ...member.fallbackActive === true ? { fallbackActive: true } : {},
     }
   })
   const captainInbox = await readUnreadMailbox(stateRoot, state.id, CAPTAIN_KEY)
@@ -199,6 +214,9 @@ export async function assembleTeamSnapshot(
     name: state.name,
     ...state.description !== undefined ? { description: state.description } : {},
     captainSessionId: state.captainSessionId,
+    ...state.authorizedLeads !== undefined && state.authorizedLeads.length > 0
+      ? { authorizedLeads: state.authorizedLeads }
+      : {},
     phase: state.phase ?? 'running',
     ...state.phase === 'staged'
       ? { planReviewState: state.planReviewState ?? 'awaiting_review' as const }
@@ -210,14 +228,18 @@ export async function assembleTeamSnapshot(
       delivery: { ok: deliveryCheck.ok, blockers: [...deliveryCheck.blockers], warnings: [...deliveryCheck.warnings] },
     },
     members,
-    tasks: tasks.map((task) => ({
+    tasks: tasks.map((task) => {
+      const assigneeMember = roster.find((member) => member.name === task.assignee)
+      return {
       id: task.id,
       subject: task.subject,
       description: task.description ?? '',
       status: task.status,
       state: taskVisualState(task.status, task.dependencies, tasks),
       assignee: task.assignee ?? '',
-      model: memberModelRoute(roster.find((member) => member.name === task.assignee)),
+      model: memberModelRoute(assigneeMember === undefined
+        ? undefined
+        : { provider: assigneeMember.activeProvider ?? assigneeMember.provider, model: assigneeMember.activeModel ?? assigneeMember.model }),
       dependencies: task.dependencies,
       depth: depths.get(task.id) ?? 0,
       ...task.kind === undefined ? {} : { kind: task.kind },
@@ -225,7 +247,8 @@ export async function assembleTeamSnapshot(
       ...task.verdict === undefined ? {} : { verdict: task.verdict },
       ...staleById.get(task.id) === undefined ? {} : { verdictStale: (staleById.get(task.id) as string[]).join('; ') },
       updatedAt: task.updatedAt,
-    })),
+      }
+    }),
     messageCount: captainInbox.length
       + members.reduce((count, member) => count + member.unread, 0),
     captainInbox: captainInbox.slice(-5).map((message) => ({

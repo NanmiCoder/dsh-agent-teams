@@ -9,7 +9,8 @@ import css from './AgentTeamsCard.module.css'
 
 export function TeamChatEntry({ sessionId, t }: PropsRuntime<'conversation.session.header.actions'> & PropsLocale<'agentTeams'>) {
   const { teams, archivedTeams } = useSyncExternalStore(subscribeActivitySnapshots, getActivitySnapshotsSnapshot)
-  const team = [...teams, ...archivedTeams].find(team => team.captainSessionId === sessionId)
+  const team = [...teams, ...archivedTeams].find(team => team.captainSessionId === sessionId
+    || (team.authorizedLeads !== undefined && team.authorizedLeads.includes(sessionId)))
   if (!team) return null
   return <button className={css.chatEntry} data-team-chat-entry type="button" title={t('workspace.focus')}
     onClick={() => openActivityPanel({ teamId: team.teamId, captainSessionId: sessionId, teamName: team.name, members: team.members })}>

@@ -332,6 +332,12 @@ export interface TeamMessage {
   sourceTaskStatus?: TaskStatus
   /** Cancelled delivery is retained for audit but must not wake the recipient. */
   discardedAt?: number
+  /**
+   * PM observation copy: set when this message is a read-only CC to the PM
+   * of an inter-member conversation. The PM persona uses this flag to
+   * distinguish observations from direct messages and avoid replying.
+   */
+  observation?: boolean
 }
 
 /** Snapshot of the named profile used to seed a team. */
@@ -395,4 +401,12 @@ export interface TeamState {
   reviewPolicy?: ReviewPolicy
   /** Set when an automatic review/repair loop hits its configured ceiling. */
   escalated?: boolean
+  /**
+   * Session ids explicitly authorized to lead this team in addition to the
+   * original `captainSessionId` and its fork descendants. Populated by
+   * `agent_teams_adopt` so a new session can take over an existing team left
+   * behind by a previous captain session that is no longer live. A listed
+   * session still must not be a current member session.
+   */
+  authorizedLeads?: string[]
 }

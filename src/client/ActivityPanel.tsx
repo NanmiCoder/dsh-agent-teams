@@ -963,7 +963,8 @@ export function ActivityPanel({ sessionsList, modelDirectories, openMember, t, c
         const latest = autoOpenTrackerRef.current
         if (!active || latest.sessionId !== current || latest.restoreComplete) return
         latest.liveTeamIds = new Set(getActivitySnapshotsSnapshot().teams
-          .filter((team) => team.captainSessionId === current)
+          .filter((team) => team.captainSessionId === current
+            || (team.authorizedLeads !== undefined && team.authorizedLeads.includes(current)))
           .map((team) => team.teamId))
         latest.restoreComplete = true
       })
@@ -1000,27 +1001,33 @@ export function ActivityPanel({ sessionsList, modelDirectories, openMember, t, c
   }, [])
 
   // Teams follow the current session: live snapshots and historic card
-  // summaries are visible only while their captain session is current.
+  // summaries are visible only while their captain session is current OR
+  // the current session adopted the team (authorizedLeads).
   const visibleTeams = useMemo(
     // No current session (initial load): show nothing until one is picked,
     // so cross-session teams never leak into the floater.
-    () => (current === undefined ? [] : teams.filter((team) => team.captainSessionId === current)),
+    () => (current === undefined ? [] : teams.filter((team) => team.captainSessionId === current
+      || (team.authorizedLeads !== undefined && team.authorizedLeads.includes(current)))),
     [teams, current],
   )
   const visibleHistoric = useMemo(
     () => (current === undefined ? [] : [...historic.values()].filter(({ data, owner }) =>
       owner === current && !teams.some((live) =>
-        live.captainSessionId === current && live.teamId === data.teamId,
+        (live.captainSessionId === current
+          || (live.authorizedLeads !== undefined && live.authorizedLeads.includes(current))) && live.teamId === data.teamId,
       ) && !archivedTeams.some((archived) =>
-        archived.captainSessionId === current && archived.teamId === data.teamId,
+        (archived.captainSessionId === current
+          || (archived.authorizedLeads !== undefined && archived.authorizedLeads.includes(current))) && archived.teamId === data.teamId,
       ),
     )),
     [historic, current, teams, archivedTeams],
   )
   const visibleArchived = useMemo(
     () => (current === undefined ? [] : archivedTeams.filter((team) =>
-      team.captainSessionId === current && !teams.some((live) =>
-        live.captainSessionId === current && live.teamId === team.teamId,
+      (team.captainSessionId === current
+        || (team.authorizedLeads !== undefined && team.authorizedLeads.includes(current))) && !teams.some((live) =>
+        (live.captainSessionId === current
+          || (live.authorizedLeads !== undefined && live.authorizedLeads.includes(current))) && live.teamId === team.teamId,
       ),
     )),
     [archivedTeams, current, teams],

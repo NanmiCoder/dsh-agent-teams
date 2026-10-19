@@ -71,14 +71,18 @@ export function compactModelLabel(route: string): string {
   return slash === -1 ? trimmed : trimmed.slice(slash + 1)
 }
 
-/** A live team the current captain still owns and has not halted. */
-export function liveCaptainTeam<T extends { readonly captainSessionId: string; readonly halted?: boolean }>(
+/** A live team the current captain still owns (or adopted) and has not halted. */
+export function liveCaptainTeam<T extends { readonly captainSessionId: string; readonly authorizedLeads?: readonly string[]; readonly halted?: boolean }>(
   teams: readonly T[],
   sessionId: string | undefined,
 ): T | undefined {
   const owner = sessionId?.trim() ?? ''
   if (owner === '') return undefined
-  return teams.find((team) => team.captainSessionId === owner && team.halted !== true)
+  return teams.find((team) =>
+    team.halted !== true
+    && (team.captainSessionId === owner
+      || (team.authorizedLeads !== undefined && team.authorizedLeads.includes(owner))),
+  )
 }
 
 /** Minimal member shape needed to order the delegation list (issue #192). */

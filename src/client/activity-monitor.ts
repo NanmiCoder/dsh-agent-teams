@@ -16,6 +16,10 @@ export interface ActivityMember {
   readonly total: number
   readonly currentTask: string
   readonly unread: number
+  /** Last member-start failure, so the panel can surface a broken member. */
+  readonly spawnError?: string
+  /** Whether the fallback route is currently active (distinct from a manual switch). */
+  readonly fallbackActive?: boolean
 }
 
 /** One task row of a host snapshot. */
@@ -55,6 +59,8 @@ export interface ActivityTeam {
   readonly name: string
   readonly description?: string
   readonly captainSessionId: string
+  /** Session ids that adopted this team and gained captain authority. */
+  readonly authorizedLeads?: readonly string[]
   readonly phase: 'staged' | 'running'
   readonly planReviewState?: 'awaiting_review' | 'awaiting_feedback'
   readonly halted?: boolean
@@ -289,7 +295,9 @@ export function startActivityPolling(
       discoveredLiveKeys = new Set(discoverySessionId === undefined || discoverySessionId === ''
         ? []
         : liveTeams
-          .filter((team) => team.captainSessionId === discoverySessionId)
+          .filter((team) =>
+            team.captainSessionId === discoverySessionId
+            || (team.authorizedLeads !== undefined && team.authorizedLeads.includes(discoverySessionId)))
           .map((team) => team.teamId))
       // A discovery session found its first team: upgrade from the low-frequency
       // probe to the live cadence for the rest of the controller lifetime.
@@ -300,7 +308,9 @@ export function startActivityPolling(
       const discoveredTeamArchived = [...previousDiscoveredKeys]
         .some((teamId) => !discoveredLiveKeys.has(teamId))
       const missing = monitorTargets.filter((target) => !liveTeams.some((team) =>
-        team.captainSessionId === target.sessionId && team.teamId === target.teamId,
+        (team.captainSessionId === target.sessionId
+          || (team.authorizedLeads !== undefined && team.authorizedLeads.includes(target.sessionId)))
+        && team.teamId === target.teamId,
       ))
       const needsDiscoveryArchive = discoverySessionId !== undefined
         && discoverySessionId !== ''

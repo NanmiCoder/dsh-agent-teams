@@ -25,7 +25,7 @@
  * @module dsh-agent-teams/tool-policies
  */
 
-import { CAPTAIN_TOOL_NAMES, MEMBER_TOOL_NAMES } from './tool-names.ts'
+import { CAPTAIN_TOOL_NAMES, MEMBER_TOOL_NAMES, PM_EXTRA_TOOL_NAMES, isPmMemberName } from './tool-names.ts'
 
 /** Host tools denied when member delegation is switched off (`memberMaxDepth: 0`). */
 const DEPTH_DENY_TOOLS = ['subagent', 'send_message'] as const
@@ -63,6 +63,14 @@ export interface ToolPolicyContext {
   maxDepth?: number
   /** Names the host's `tools.restrict()` would admit, or undefined without a registry view. */
   knownTools?: ReadonlySet<string>
+  /**
+   * Member name this filter is being resolved for. When the name is `pm`
+   * (case-insensitive), the PM scheduling proxy tools (`PM_EXTRA_TOOL_NAMES`)
+   * are removed from the captain-only deny list so the PM can create, reassign,
+   * amend tasks and hot-swap member models. Other members keep the default
+   * captain-only deny list.
+   */
+  memberName?: string
 }
 
 /** Trim, drop blanks, and de-duplicate names, preserving first-seen order. */
@@ -209,7 +217,13 @@ export function resolveMemberToolFilter(policy: MemberToolPolicy | undefined, co
   const depthDeny = context.maxDepth === 0
     ? DEPTH_DENY_TOOLS.filter(name => context.knownTools === undefined || context.knownTools.has(name))
     : []
-  const deny = dedupeToolNames([...(policy?.deny ?? []), ...CAPTAIN_TOOL_NAMES, ...depthDeny])
+  // The PM scheduling proxy keeps the captain-only deny list minus the PM
+  // scheduling tools, so it can create/reassign/amend tasks and hot-swap
+  // member models. Other members keep the full captain-only deny list.
+  const captainDeny = isPmMemberName(context.memberName)
+    ? CAPTAIN_TOOL_NAMES.filter(name => !PM_EXTRA_TOOL_NAMES.includes(name))
+    : CAPTAIN_TOOL_NAMES
+  const deny = dedupeToolNames([...(policy?.deny ?? []), ...captainDeny, ...depthDeny])
   if (policy?.allow === undefined) return { deny }
   // A denied name can never be re-admitted: allow and deny intersect in the
   // host, and the snapshot must say the same thing the host will enforce.

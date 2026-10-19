@@ -5,3 +5,7 @@ node_modules/
 
 # Local immutable candidate used by the Harness compatibility lab.
 /artifacts/harness-0.2.1-rc.1/
+
+# Local build tarballs and runtime locks (not part of source)
+*.tgz
+.dsh-ops-update-*.lock

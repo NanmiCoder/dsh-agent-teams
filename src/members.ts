@@ -25,6 +25,7 @@ import { mailboxPrompt } from './mailbox.ts'
 import { nearestLiveLead } from './lineage.ts'
 import { appendTeamEvent, captainSessionOf } from './events.ts'
 import type { MemberToolFilter } from './tool-policies.ts'
+import { isPmMemberName } from './tool-names.ts'
 import { TERMINAL_TASK_STATUSES, type TeamMember, type TeamState, type TeamTask } from './types.ts'
 
 /** Persona snapshot of a profile protocol; the full text lives on team.json. */
@@ -147,6 +148,13 @@ export interface MemberSelectionRuntime {
     operation: () => Promise<T>,
     setup?: TeamMember['runtimeSetup'],
   ): Promise<T>
+  /**
+   * Look up the live mutable selection ref for one member, so a runtime
+   * hot-swap can mutate `ref.current` and have the next LLM request pick up
+   * the new route. Returns undefined when the member's child context is not
+   * currently resident (cold member, or the member was removed).
+   */
+  getSelectionRef(teamId: string, memberName: string): { current: ModelSelection; assembled?: ModelSelection } | undefined
 }
 
 /**
@@ -625,6 +633,12 @@ export function installMemberSelectionRuntime(
 ): MemberSelectionRuntime {
   const pending = new Map<string, MemberLlmSelection>()
   const pendingSetup = new Map<string, NonNullable<TeamMember['runtimeSetup']>>()
+  // Active selection refs keyed by `${teamId}\u0000${memberName}`. Each entry
+  // is the mutable ref object installed on the member's child context, so a
+  // runtime hot-swap (agent_teams_set_member_model) can mutate
+  // `selectionRef.current` and have the next LLM request pick up the new route
+  // without destroying the member session. Entries are removed on dispose.
+  const activeSelectionRefs = new Map<string, { current: ModelSelection; assembled?: ModelSelection }>()
   installContinuableMemberSetup(ctx, (childCtx, child) => {
     const descriptor = foldSubagentDescriptor(sessionOwnEvents(child.session))
     if (descriptor?.mode !== 'continuable' || !descriptor.label.startsWith(MEMBER_LABEL_PREFIX)) {
@@ -740,6 +754,12 @@ export function installMemberSelectionRuntime(
     // Legacy teams still need failure reporting even without a saved route.
     if (selection === undefined) return () => { disposeFailure(); cleanupAdmission() }
     const selectionRef = { current: modelSelection(selection), assembled: undefined as ModelSelection | undefined }
+    // Register the selection ref so agent_teams_set_member_model can hot-swap
+    // the route at runtime by mutating selectionRef.current. The key combines
+    // team id and member name; the member name is the canonical display name
+    // from the durable team record, not the child session id.
+    const selectionRefKey = `${teamId}\u0000${memberName}`
+    activeSelectionRefs.set(selectionRefKey, selectionRef)
     const disposeSelection = installModelSelection(childCtx, selectionRef)
     const fallback = selection.fallback
     let switched = false
@@ -766,6 +786,7 @@ export function installMemberSelectionRuntime(
     return () => {
       disposeFallback()
       disposeSelection()
+      activeSelectionRefs.delete(selectionRefKey)
       disposeFailure()
       cleanupAdmission()
     }
@@ -777,6 +798,9 @@ export function installMemberSelectionRuntime(
       const descriptor = foldSubagentDescriptor(sessionOwnEvents(agent.session))
       return parent !== undefined && descriptor?.mode === 'continuable'
         && pending.has(pendingSelectionKey(parent, descriptor.label))
+    },
+    getSelectionRef(teamId: string, memberName: string) {
+      return activeSelectionRefs.get(`${teamId}\u0000${memberName}`)
     },
     async withPending<T>(
       parentSessionId: string,
@@ -831,6 +855,29 @@ export function memberPersona(team: TeamState, member: TeamMember, stateDir: str
   const goal = team.description?.trim() || '(not provided)'
   const injectedPrompt = member.executionPrompt?.trim() || executionPrompt?.trim()
   const protocol = truncatedPersonaProtocol(team.profile?.protocol)
+  const isPm = isPmMemberName(member.name)
+  if (isPm) {
+    return `You are ${member.name}, the PM (project manager) of the multi-agent team "${team.name}" running inside DeepSeek Harness AgentTeams. The captain leads the team; you are the captain's scheduling proxy — an independent member that manages task flow on the captain's behalf${member.role ? ` with the role: ${member.role}` : ''}.
+
+Team context:
+- Team id: ${team.id}
+- Your name inside the team (use it as \`from\`/identity): ${member.name}
+- Team goal: ${goal}
+- Profile protocol: ${protocol}
+${injectedPrompt === undefined || injectedPrompt === '' ? '' : `- Execution guidance:
+${injectedPrompt}
+`}- The team state lives under ${stateDir}/${team.id}/ (team.json and inbox/*.jsonl). You may inspect these files read-only for diagnostics, but never edit them directly; use the agent_teams_* tools so JSON escaping and concurrent updates stay safe.
+- The captain and your teammates reach you through messages. Coordination arrives at your nearest model step.
+
+PM scheduling rules:
+1. You may call agent_teams_create_task to create tasks, agent_teams_reassign_task to assign/retry tasks, and agent_teams_amend_task to fix wrong contracts. These are the same tools the captain uses; you act as the captain's delegate for task scheduling.
+2. You may call agent_teams_set_member_model to hot-swap a member's model at runtime without destroying the member's session or losing context.
+3. You receive observation copies of inter-member messages (marked [observation]) so you can track coordination and spot errors. Do not reply to observation copies — they are read-only. Intervene only when you detect a problem (e.g. a member is stuck, a task contract is wrong, a dependency is blocked).
+4. You are still a member: use agent_teams_claim_task / agent_teams_update_task for your own tasks, and agent_teams_send_message to communicate. You may also be assigned tasks yourself.
+5. Do NOT create or delete teams, add/remove members, approve plans, or resume halted teams — those remain captain-only operations.
+6. When you create or reassign a task, the shared scheduler dispatches it automatically. Do not busy-poll; end your turn after scheduling and let members work.
+7. Quality-gate kinds carry a contract (kind, objective, inScope, acceptance, verify). When amending a contract, provide a clear reason; the amendment is recorded in the task's revisions ledger.`
+  }
   return `You are ${member.name}, a member of the multi-agent team "${team.name}" running inside DeepSeek Harness AgentTeams. The captain leads the team; you are a worker member${member.role ? ` with the role: ${member.role}` : ''}.
 
 Team context:
@@ -934,7 +981,9 @@ export async function spawnMember(
   const label = `${MEMBER_LABEL_PREFIX}${team.id}:${member.name}`
   // The legacy filter of a member without a configured tool policy: the
   // captain-only deny list plus the depth entries this host registers.
-  const requestedFilter = resolvedFilter ?? memberToolFilter(config.maxDepth, restrictableToolNames(captain))
+  // PM members keep their scheduling tools (PM_EXTRA_TOOL_NAMES) via the
+  // memberName-aware resolver even without a configured policy.
+  const requestedFilter = resolvedFilter ?? memberToolFilter(config.maxDepth, restrictableToolNames(captain), member.name)
   // The lenient retry may drop names this host reports unknown; keep the exact
   // filter the host accepted for the durable member setup.
   let acceptedFilter = requestedFilter

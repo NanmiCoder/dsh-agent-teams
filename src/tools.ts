@@ -11,13 +11,15 @@ import { drainMemberChildren } from './harness-compat.ts'
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import type { Agent } from '@deepseek-ai/dsh-agent'
-import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import type { Agent, ModelSelection } from '@deepseek-ai/dsh-agent'
+import { createUserMessage, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { ToolRunContext } from '@deepseek-ai/dsh-tools'
 import { join } from 'node:path'
+import { homedir } from 'node:os'
+import { readdir, readFile, writeFile, mkdir } from 'node:fs/promises'
 import { appendTeamEvent, captainSessionOf } from './events.ts'
 import {
   amendTaskContract,
@@ -71,6 +73,7 @@ import { auditTeamWorkspace } from './workspace-audit.ts'
 import { readArtifactScope, snapshotWorkspacePaths, workspacePathExists } from './artifacts.ts'
 import { restrictableToolNames } from './harness-compat.ts'
 import { memberSpawnRelaxableDeny, optionalToolPolicy, requireToolPolicy, resolveMemberToolFilter, type MemberToolFilter, type MemberToolPolicy } from './tool-policies.ts'
+import { isPmMemberName } from './tool-names.ts'
 import type { ContractAmendmentInput } from './state.ts'
 import type { AcceptanceResult, ArtifactDigest, ArtifactSnapshot, CommandResult, ReviewFinding, ReviewVerdict, TaskKind } from './types.ts'
 import {
@@ -97,6 +100,8 @@ export { steerCaptainReport } from './members.ts'
 export interface ToolsConfig {
   /** State directory name under the captain's workspace. */
   stateDir: string
+  /** Global memory directory for cross-workspace member memories. */
+  globalMemoryDir: string
   /** Member subagent provider name. */
   memberProvider: string
   /** Optional member model override. */
@@ -156,6 +161,37 @@ export interface AgentTeamsRuntime {
   approveStagedTeam(captain: Agent, teamId: string, signal?: AbortSignal): Promise<{ teamId: string; members: number; tasks: number }>
   continueStagedPlanning(captain: Agent, teamId: string): Promise<{ teamId: string; alreadyWaiting: boolean }>
   discardStagedTeam(captain: Agent, teamId: string): Promise<{ teamId: string }>
+  /**
+   * Hot-swap one member's LLM route at runtime without destroying the member
+   * session or losing context. Persists activeProvider/activeModel to team.json
+   * and mutates the live selection ref when the member is resident. Shared by
+   * the `agent_teams_set_member_model` tool and the Web member-model route so
+   * the panel can switch a broken or slow model mid-task.
+   * @param captain - the captain (or authorized lead / PM) agent.
+   * @param teamId - the team id.
+   * @param memberName - display name of the member whose model should change.
+   * @param provider - new LLM provider id.
+   * @param model - new model id under the provider.
+   * @param reasoningEffort - optional reasoning effort id; omit for the model default.
+   * @param signal - optional abort signal for catalog resolution.
+   * @returns the previous route, the new route, and whether the live ref was swapped.
+   */
+  setMemberModel(
+    captain: Agent,
+    teamId: string,
+    memberName: string,
+    provider: string,
+    model: string,
+    reasoningEffort?: string,
+    signal?: AbortSignal,
+  ): Promise<{
+    memberName: string
+    previousProvider?: string
+    previousModel?: string
+    newProvider: string
+    newModel: string
+    live: boolean
+  }>
 }
 
 /** The caller agent, or a loud failure for non-agent callers. */
@@ -268,6 +304,46 @@ async function requireFreshCaptainTeam(
   return fresh
 }
 
+/**
+ * The team this captain leads OR the team in which the caller is the PM
+ * scheduling proxy. The PM is a member named `pm` that may create, reassign,
+ * and amend tasks on the captain's behalf without round-tripping through the
+ * captain session. Falls back to {@link requireCaptainTeam} for non-PM callers.
+ */
+async function requireCaptainOrPmTeam(ctx: Context, workspace: string, config: ToolsConfig, caller: Agent): Promise<TeamState> {
+  const captainTeam = await findTeamByCaptain(stateRootOf(workspace, config), caller.id, await leadIdentityOfAsync(ctx, caller.session))
+  if (captainTeam !== undefined) return captainTeam
+  // PM path: find the team the caller participates in, then verify the caller
+  // is the PM member of that team.
+  const participantTeam = await findTeamByParticipant(stateRootOf(workspace, config), caller.id, await leadIdentityOfAsync(ctx, caller.session))
+  if (participantTeam !== undefined) {
+    const pmMember = participantTeam.members.find(member => member.id === caller.id && member.status !== 'removed')
+    if (pmMember !== undefined && isPmMemberName(pmMember.name)) {
+      return participantTeam
+    }
+  }
+  throw new Error(`you are not leading any team and are not the PM of any team — call agent_teams_create first${forkLineageNote(caller.session)}`)
+}
+
+/**
+ * Fresh state with captain OR PM authorization rechecked inside the lock.
+ * The PM must still be an active member named `pm` at the time of the
+ * mutation, so a removed or renamed PM cannot exercise scheduling authority.
+ */
+async function requireFreshCaptainOrPmTeam(
+  ctx: Context,
+  stateRoot: string,
+  teamId: string,
+  callerId: string,
+): Promise<TeamState> {
+  const fresh = await requireFreshTeam(stateRoot, teamId)
+  if (await sessionLeadsTeamAsync(ctx, fresh, callerId)) return fresh
+  // PM path: the caller must be an active member named `pm`.
+  const pmMember = fresh.members.find(member => member.id === callerId && member.status !== 'removed')
+  if (pmMember !== undefined && isPmMemberName(pmMember.name)) return fresh
+  throw new Error(`only the captain of team "${fresh.name}" (session ${fresh.captainSessionId}), a fork descendant, or the PM member may perform this operation`)
+}
+
 /** Fresh state and caller identity rechecked inside the lock. */
 async function requireFreshParticipant(
   ctx: Context,
@@ -328,14 +404,31 @@ function memberToolSelection(
   config: ToolsConfig,
   captain: Agent,
   policyId: string | undefined,
+  memberName?: string,
 ): Pick<TeamMember, 'toolPolicy' | 'toolFilter'> {
-  if (policyId === undefined) return {}
+  // The PM scheduling proxy needs its extra tools even without a configured
+  // policy: resolve a filter that excludes PM_EXTRA_TOOL_NAMES from the
+  // captain-only deny list. Other members without a policy keep `{}` and fall
+  // back to the legacy captain-only filter at spawn time.
+  if (policyId === undefined) {
+    if (isPmMemberName(memberName)) {
+      return {
+        toolFilter: resolveMemberToolFilter(undefined, {
+          maxDepth: config.memberMaxDepth,
+          knownTools: restrictableToolNames(captain),
+          memberName,
+        }),
+      }
+    }
+    return {}
+  }
   const policy = requireToolPolicy(config.toolPolicies, policyId)
   return {
     toolPolicy: policyId,
     toolFilter: resolveMemberToolFilter(policy, {
       maxDepth: config.memberMaxDepth,
       knownTools: restrictableToolNames(captain),
+      memberName,
     }),
   }
 }
@@ -443,6 +536,9 @@ function captainOpenTask(team: TeamState, exceptTaskId?: string): TeamTask | und
  */
 async function memberOperationParent(ctx: Context, team: TeamState, caller: Agent): Promise<Agent> {
   if (caller.id === team.captainSessionId) return caller
+  // An authorized lead (via agent_teams_adopt) has full captain authority and
+  // can command members directly — no need to resume the original captain.
+  if (team.authorizedLeads?.includes(caller.id) === true) return caller
   const resident = ctx.agents.get(team.captainSessionId as SessionId)
   if (resident !== undefined) return resident
   const resumed = await resumeLeadAnchor(ctx, team, caller)
@@ -461,8 +557,10 @@ async function memberOperationParent(ctx: Context, team: TeamState, caller: Agen
  * @param caller - the captain-side session performing the operation.
  * @returns the anchor agent when one is live, else undefined.
  */
-async function liveLeadAnchorAgent(ctx: Context, team: Pick<TeamState, 'captainSessionId' | 'name'>, caller: Agent): Promise<Agent | undefined> {
+async function liveLeadAnchorAgent(ctx: Context, team: Pick<TeamState, 'captainSessionId' | 'name' | 'authorizedLeads'>, caller: Agent): Promise<Agent | undefined> {
   if (caller.id === team.captainSessionId) return caller
+  // An authorized lead (via agent_teams_adopt) is a valid live anchor.
+  if (team.authorizedLeads?.includes(caller.id) === true) return caller
   const resident = ctx.agents.get(team.captainSessionId as SessionId)
   if (resident !== undefined) return resident
   return resumeLeadAnchor(ctx, team as TeamState, caller)
@@ -640,6 +738,12 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
   installMemberDelegationGuard(ctx, config.stateDir, config.memberMaxDepth ?? 0)
   installMailboxAdmission(ctx, config.stateDir)
   const scheduler = installTeamScheduler(ctx, { stateDir: config.stateDir, executionPrompt: config.executionPrompt, dispatch: dispatchMember })
+  // Live-member hydration validates saved filters against registered tools.
+  // Created before tool registration so every tool's execute closure can
+  // access the selection runtime, including the hot-swap tool.
+  const memberSelections = installMemberSelectionRuntime(ctx, config.stateDir, (workspace, teamId, memberName) => (
+    scheduler.kickMember(workspace, teamId, memberName)
+  ))
 
 
   async function dispatchMember(captain: Agent, teamId: string, memberName: string, text: string, signal: AbortSignal, mode: 'queue' | 'steer', attemptId?: string): Promise<boolean> {
@@ -724,7 +828,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
           // only touched when the mutation names one, so a plan revision cannot
           // silently widen a member's tool set.
           if (mutation.toolPolicy !== undefined) {
-            const selected = memberToolSelection(config, captain, trimmedOptional(mutation.toolPolicy))
+            const selected = memberToolSelection(config, captain, trimmedOptional(mutation.toolPolicy), member.name)
             member.toolPolicy = selected.toolPolicy
             member.toolFilter = selected.toolFilter
           }
@@ -910,7 +1014,103 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
     return { teamId: discarded.teamId }
   }
 
+  /**
+   * Hot-swap one member's LLM route at runtime. Shared by the
+   * `agent_teams_set_member_model` tool and the Web member-model route.
+   * Validates the new route, persists activeProvider/activeModel, clears
+   * fallbackActive, and mutates the live selection ref when the member is
+   * resident. Cold members pick up the persisted route on recovery.
+   */
+  const setMemberModel: AgentTeamsRuntime['setMemberModel'] = async (
+    captain,
+    teamId,
+    memberName,
+    provider,
+    model,
+    reasoningEffort,
+    signal,
+  ) => {
+    const workspace = workspaceOf(captain)
+    const stateRoot = stateRootOf(workspace, config)
+    const team = await requireCaptainOrPmTeam(ctx, workspace, config, captain)
+    if (team.id !== teamId) {
+      throw new Error(`team "${teamId}" is not the team you are leading`)
+    }
+    const trimmedName = memberName.trim()
+    if (trimmedName === '') throw new Error('member_name must not be empty')
+    const trimmedProvider = provider.trim()
+    const trimmedModel = model.trim()
+    if (trimmedProvider === '' || trimmedModel === '') throw new Error('provider and model must not be empty')
+    const trimmedEffort = reasoningEffort?.trim() || undefined
 
+    // Validate the new route against the catalog before applying it.
+    const validated = await resolveMemberLlmSelection(ctx, captain, {
+      provider: trimmedProvider,
+      model: trimmedModel,
+      ...trimmedEffort === undefined ? {} : { reasoningEffort: trimmedEffort },
+    }, signal)
+
+    const result = await withTeamLock(teamLockKey(stateRoot, team.id), async () => {
+      const fresh = await requireFreshCaptainOrPmTeam(ctx, stateRoot, team.id, captain.id)
+      const member = requireMember(fresh, trimmedName)
+      const previousProvider = member.activeProvider ?? member.provider
+      const previousModel = member.activeModel ?? member.model
+      // Persist the new route. selectionFromMember reads activeProvider/
+      // activeModel on cold recovery, so this survives a member restart.
+      member.activeProvider = validated.provider
+      member.activeModel = validated.model
+      // Clear fallbackActive: a manual model switch is a deliberate route
+      // change, not a fallback transition. The new model's own fallback
+      // (if configured on the member) remains available.
+      member.fallbackActive = false
+      // Update reasoningEffort only if provided; otherwise clear it so the
+      // new model materializes its own default.
+      if (validated.reasoningEffort !== undefined) {
+        member.reasoningEffort = validated.reasoningEffort
+      } else {
+        member.reasoningEffort = undefined
+      }
+      await writeTeam(stateRoot, fresh)
+      appendTeamEvent(ctx, captainSessionOf(ctx, fresh.captainSessionId, captain.session), 'agent-teams/member-model-changed', {
+        teamId: fresh.id,
+        memberName: member.name,
+        previousProvider,
+        previousModel,
+        newProvider: validated.provider,
+        newModel: validated.model,
+      })
+      return { previousProvider, previousModel, member }
+    })
+
+    // Hot-swap the live selection ref if the member's child context is
+    // currently resident. When the member is cold (not resident), the
+    // persisted activeProvider/activeModel is enough — cold recovery reads
+    // it via selectionFromMember.
+    const liveRef = memberSelections.getSelectionRef(team.id, trimmedName)
+    let live = false
+    if (liveRef !== undefined) {
+      const newSelection: ModelSelection = {
+        provider: validated.provider,
+        model: validated.model,
+        ...validated.reasoningEffort === undefined
+          ? {}
+          : { reasoningEffort: ReasoningEffortId(validated.reasoningEffort) },
+      }
+      liveRef.current = newSelection
+      // Also clear the assembled override so a retry doesn't resurrect the
+      // old route.
+      liveRef.assembled = undefined
+      live = true
+    }
+
+    return {
+      memberName: trimmedName,
+      ...result.previousProvider === undefined ? {} : { previousProvider: result.previousProvider, previousModel: result.previousModel },
+      newProvider: validated.provider,
+      newModel: validated.model,
+      live,
+    }
+  }
 
   ctx.tools.register(defineTool({
     name: 'agent_teams_create',
@@ -1338,7 +1538,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
           reasoningEffort: args.reasoning_effort,
           fallback: config.fallback,
         }, exec.signal)
-        const toolSelection = memberToolSelection(config, captain, trimmedOptional(args.tool_policy))
+        const toolSelection = memberToolSelection(config, captain, trimmedOptional(args.tool_policy), memberName)
         const member: TeamMember = {
           id: '',
           name: memberName,
@@ -1492,14 +1692,14 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
       const captain = requireCaptain(exec)
       const workspace = workspaceOf(captain)
       const stateRoot = stateRootOf(workspace, config)
-      const team = await requireCaptainTeam(ctx, workspace, config, captain)
+      const team = await requireCaptainOrPmTeam(ctx, workspace, config, captain)
       // Some models materialize optional parameters as "" instead of omitting
       // them (issue #105). Normalize blank optional fields to omitted before
       // validation so a blank value can neither be rejected spuriously nor be
       // persisted into team.json, where it would brick the team on reload.
       const input = normalizeBlankOptionalTaskFields(args)
       const created = await withTeamLock(teamLockKey(stateRoot, team.id), async () => {
-        const fresh = await requireFreshCaptainTeam(ctx, stateRoot, team.id, captain.id)
+        const fresh = await requireFreshCaptainOrPmTeam(ctx, stateRoot, team.id, captain.id)
         const gate = validateCreateTask(fresh, {
           subject: input.subject,
           description: input.description,
@@ -1627,12 +1827,12 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
       const captain = requireCaptain(exec)
       const workspace = workspaceOf(captain)
       const stateRoot = stateRootOf(workspace, config)
-      const team = await requireCaptainTeam(ctx, workspace, config, captain)
+      const team = await requireCaptainOrPmTeam(ctx, workspace, config, captain)
       const target = args.assignee.trim()
       if (target === '') throw new Error('reassignment assignee must not be empty')
 
       const revoked = await withTeamLock(teamLockKey(stateRoot, team.id), async () => {
-        const fresh = await requireFreshCaptainTeam(ctx, stateRoot, team.id, captain.id)
+        const fresh = await requireFreshCaptainOrPmTeam(ctx, stateRoot, team.id, captain.id)
         const task = requireTask(fresh, args.task_id)
         if (task.status === 'completed') throw new Error(`completed task ${task.id} is immutable and cannot be reassigned`)
         if (task.reassigning === true) {
@@ -1642,6 +1842,14 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         }
         const targetMember = target === CAPTAIN_KEY ? undefined : requireMember(fresh, target)
         if (target === CAPTAIN_KEY) {
+          // Captain takeover is captain-only: the PM scheduling proxy may
+          // reassign tasks between members but cannot trigger a captain
+          // takeover, which requires the captain to finish the task in its
+          // own turn.
+          const callerMember = fresh.members.find(member => member.id === captain.id && member.status !== 'removed')
+          if (callerMember !== undefined && isPmMemberName(callerMember.name)) {
+            throw new Error('captain takeover is captain-only; the PM may reassign tasks between members but not to the captain')
+          }
           const busy = captainOpenTask(fresh, task.id)
           if (busy !== undefined) {
             throw new Error(`captain is busy with ${busy.id}; complete or reassign it before taking over ${task.id}`)
@@ -1685,7 +1893,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
       }
 
       await withTeamLock(teamLockKey(stateRoot, team.id), async () => {
-        const fresh = await requireFreshCaptainTeam(ctx, stateRoot, team.id, captain.id)
+        const fresh = await requireFreshCaptainOrPmTeam(ctx, stateRoot, team.id, captain.id)
         const task = requireTask(fresh, args.task_id)
         if (task.handoffId !== revoked.handoffId || task.assignee !== target || task.reassigning !== true) {
           throw new Error(`task ${task.id} changed during reassignment; refusing to overwrite the newer state`)
@@ -2088,10 +2296,15 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
       const captain = requireCaptain(exec)
       const workspace = workspaceOf(captain)
       const stateRoot = stateRootOf(workspace, config)
-      const team = await requireCaptainTeam(ctx, workspace, config, captain)
+      const team = await requireCaptainOrPmTeam(ctx, workspace, config, captain)
       const amended = await withTeamLock(teamLockKey(stateRoot, team.id), async () => {
-        const fresh = await requireFreshCaptainTeam(ctx, stateRoot, team.id, captain.id)
+        const fresh = await requireFreshCaptainOrPmTeam(ctx, stateRoot, team.id, captain.id)
         const task = requireTask(fresh, args.task_id)
+        // The amendment author is the captain or the PM member, whichever the
+        // caller is. A PM amendment is recorded under the PM's name so the
+        // revisions ledger shows who changed the contract.
+        const callerMember = fresh.members.find(member => member.id === captain.id && member.status !== 'removed')
+        const amendmentAuthor = callerMember !== undefined && isPmMemberName(callerMember.name) ? callerMember.name : CAPTAIN_KEY
         const input: ContractAmendmentInput = {
           ...args.objective === undefined ? {} : { objective: args.objective },
           ...args.acceptance === undefined ? {} : { acceptance: args.acceptance },
@@ -2099,7 +2312,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
           ...args.inScope === undefined ? {} : { inScope: args.inScope },
           ...args.outOfScope === undefined ? {} : { outOfScope: args.outOfScope },
         }
-        const result = amendTaskContract(fresh, task, normalizeBlankOptionalTaskFields(input), CAPTAIN_KEY, args.reason)
+        const result = amendTaskContract(fresh, task, normalizeBlankOptionalTaskFields(input), amendmentAuthor, args.reason)
         if (!result.ok || result.task === undefined) {
           throw new Error(result.error ?? 'amend_task rejected by quality gates')
         }
@@ -2221,6 +2434,22 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
           content: args.content,
           ts: message.ts,
         })
+        // PM observation copy: when a member sends to another member (not to
+        // the PM itself, not from the PM), the PM receives a read-only
+        // observation copy so it can track inter-member coordination and spot
+        // errors without being in the conversation loop. The copy is marked
+        // with `observation: true` so the PM persona can distinguish it from
+        // direct messages.
+        const pmMember = fresh.members.find(member => isPmMemberName(member.name) && member.status !== 'removed')
+        if (pmMember !== undefined && !isPmMemberName(from) && !isPmMemberName(recipient.name)) {
+          const observationMessage = {
+            ...createMessage(from, pmMember.name, `[observation] ${from} → ${recipient.name}: ${args.content}`),
+            ...sourceFields,
+            deliveryClaimedAt: Date.now(),
+            observation: true,
+          }
+          await appendMailbox(stateRoot, fresh.id, pmMember.name, observationMessage)
+        }
         return { kind: 'member' as const, fresh, identity, message, from, recipient }
       })
 
@@ -2521,10 +2750,382 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
       return { deleted: true, team_name: team.name }
     },
   }))
-  // Live-member hydration validates saved filters against registered tools.
-  const memberSelections = installMemberSelectionRuntime(ctx, config.stateDir, (workspace, teamId, memberName) => (
-    scheduler.kickMember(workspace, teamId, memberName)
-  ))
+
+  ctx.tools.register(defineTool({
+    name: 'agent_teams_adopt',
+    description: 'Adopt an existing team left behind by a previous captain session. A new session (same workspace, different session id) can take over a durable team so its members, tasks, and mailboxes survive across sessions. The caller is added to `authorizedLeads` and gains captain authority. If `team_id` is omitted, adopts the single active team in the workspace; multiple active teams require an explicit id.',
+    parameters: {
+      team_id: { type: 'string', description: 'Optional team id to adopt. Omit when only one active team exists in the workspace.' },
+    },
+    output: {
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          adopted: { type: 'boolean', required: true },
+          team_id: { type: 'string', required: true },
+          team_name: { type: 'string', required: true },
+          description: { type: 'string' },
+          member_count: { type: 'number', required: true },
+          task_count: { type: 'number', required: true },
+          members: { type: 'array', required: true, items: { type: 'object', additionalProperties: true, properties: {
+            name: { type: 'string' },
+            role: { type: 'string' },
+            status: { type: 'string' },
+            currentTask: { type: 'string' },
+          } } },
+          pending_tasks: { type: 'array', required: true, items: { type: 'object', additionalProperties: true, properties: {
+            id: { type: 'string' },
+            subject: { type: 'string' },
+            assignee: { type: 'string' },
+            status: { type: 'string' },
+          } } },
+          recent_messages: { type: 'array', required: true, items: { type: 'object', additionalProperties: true, properties: {
+            from: { type: 'string' },
+            to: { type: 'string' },
+            content: { type: 'string' },
+          } } },
+          guidance: { type: 'string', required: true, description: 'Suggested next steps for the new captain.' },
+        },
+      },
+      render: (args, value) => [{
+        type: 'text',
+        text: `Adopted team "${value.team_name}" (${value.team_id}) with ${value.member_count} members and ${value.task_count} tasks.\n\nMembers:\n${value.members.map((m: { name?: string; role?: string; status?: string; currentTask?: string }) => `  • ${m.name ?? ''} (${m.role ?? ''}) — ${m.status ?? ''}${m.currentTask !== undefined && m.currentTask !== '' ? ` — working on: ${m.currentTask}` : ''}`).join('\n')}\n\nPending tasks:\n${value.pending_tasks.length === 0 ? '  (none)' : value.pending_tasks.map((t: { id?: string; subject?: string; assignee?: string; status?: string }) => `  • [${t.status ?? ''}] ${t.subject ?? ''}${t.assignee !== undefined && t.assignee !== '' ? ` → ${t.assignee}` : ''}`).join('\n')}\n\n${value.guidance}`,
+      }],
+    },
+    async execute(args, exec) {
+      const captain = requireCaptain(exec)
+      const workspace = workspaceOf(captain)
+      const stateRoot = stateRootOf(workspace, config)
+      // The caller must NOT already lead a team in this workspace — adopt is
+      // for taking over an orphaned team, not for adding authority to one you
+      // already own.
+      const existing = await findTeamByCaptain(stateRoot, captain.id, await leadIdentityOfAsync(ctx, captain.session))
+      if (existing !== undefined) {
+        throw new Error(`you already lead team "${existing.name}" (${existing.id}); adopt is for taking over a team you do not currently lead`)
+      }
+      // Find the target team: by explicit id, or the single active team.
+      let target: TeamState | undefined
+      if (args.team_id !== undefined && args.team_id.trim() !== '') {
+        target = await readTeam(stateRoot, args.team_id.trim())
+        if (target === undefined) throw new Error(`no team found with id "${args.team_id}" in this workspace`)
+      } else {
+        // List all active teams and require exactly one.
+        let entries
+        try {
+          entries = await readdir(stateRoot, { withFileTypes: true })
+        } catch (error: unknown) {
+          if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+            throw new Error('no AgentTeams state directory in this workspace; create a team first')
+          }
+          throw error
+        }
+        const teams: TeamState[] = []
+        for (const entry of entries) {
+          if (!entry.isDirectory() || entry.name === 'archive') continue
+          const team = await readTeam(stateRoot, entry.name)
+          if (team !== undefined) teams.push(team)
+        }
+        if (teams.length === 0) throw new Error('no active teams in this workspace to adopt')
+        if (teams.length > 1) throw new Error(`multiple active teams in this workspace (${teams.map(t => t.id).join(', ')}); specify team_id to adopt one`)
+        target = teams[0]
+      }
+      if (target === undefined) throw new Error('no team found to adopt')
+      // The caller must not be a member of the target team — a member adopting
+      // would create a conflicting identity.
+      const callerMember = target.members.find(member => member.id === captain.id && member.status !== 'removed')
+      if (callerMember !== undefined) {
+        throw new Error(`you are already a member ("${callerMember.name}") of team "${target.name}"; a member cannot adopt its own team`)
+      }
+      // Check the caller is not already an authorized lead.
+      if (target.authorizedLeads?.includes(captain.id) === true) {
+        throw new Error(`you are already an authorized lead of team "${target.name}"`)
+      }
+      const adopted = await withTeamLock(teamLockKey(stateRoot, target.id), async () => {
+        const fresh = await readTeam(stateRoot, target!.id)
+        if (fresh === undefined) throw new Error(`team "${target!.name}" was removed during adoption`)
+        // Re-check membership under the lock.
+        const memberNow = fresh.members.find(member => member.id === captain.id && member.status !== 'removed')
+        if (memberNow !== undefined) {
+          throw new Error(`you became a member of team "${fresh.name}" during adoption; aborting`)
+        }
+        // Add the caller to authorizedLeads.
+        const leads = fresh.authorizedLeads ?? []
+        if (!leads.includes(captain.id)) {
+          fresh.authorizedLeads = [...leads, captain.id]
+        }
+        // Transfer captain ownership to the adopting session so member
+        // operations (spawn/deliver/drain) route through THIS session's
+        // subagent registry. Members were spawned under the old captain
+        // session and are not reachable from the new session's ctx.subagents,
+        // so we retire their old child ids and clear member.id — the scheduler
+        // will re-spawn each active member under the new captain on its next
+        // dispatch. Persistent state (mailbox, team_memory, task records) is
+        // on disk and survives the transfer.
+        const previousCaptainId = fresh.captainSessionId
+        fresh.captainSessionId = captain.id
+        const retiredIds: string[] = []
+        for (const member of fresh.members) {
+          if (member.status === 'removed') continue
+          if (member.id !== '') {
+            retiredIds.push(member.id)
+            member.id = ''
+          }
+          // Clear any stale spawn error so the scheduler retries cleanly.
+          if (member.spawnError !== undefined) delete member.spawnError
+          // Reset working members to idle — they will be re-spawned and pick
+          // up their assigned task from the task graph.
+          if (member.status === 'working') member.status = 'idle'
+        }
+        // Persist retired ids so the old captain session (if it ever resumes)
+        // does not try to deliver to these now-orphaned child sessions.
+        if (retiredIds.length > 0) {
+          await recordRetiredMemberIds(stateRoot, retiredIds)
+        }
+        await writeTeam(stateRoot, fresh)
+        appendTeamEvent(ctx, captain.session, 'agent-teams/team-adopted', {
+          teamId: fresh.id,
+          adoptedBy: captain.id,
+          previousCaptainId,
+          retiredMemberIds: retiredIds,
+        })
+        return fresh
+      })
+      // Build a rich status summary so the new captain can immediately see the
+      // team's current state without a separate agent_teams_status call.
+      const activeMembers = adopted.members.filter(m => m.status !== 'removed')
+      const pendingTasks = adopted.tasks.filter(t => t.status === 'pending' || t.status === 'claimed' || t.status === 'in_progress')
+      // Read recent captain inbox messages for context.
+      let recentMessages: { from: string; to: string; content: string }[] = []
+      try {
+        const inbox = await readUnreadMailbox(stateRoot, adopted.id, CAPTAIN_KEY)
+        recentMessages = inbox.slice(-5).map(m => ({ from: m.from, to: CAPTAIN_KEY, content: m.content }))
+      } catch { /* mailbox read is best-effort */ }
+      // Build guidance based on team state.
+      const workingMembers = activeMembers.filter(m => m.status === 'working')
+      const halted = adopted.halted === true
+      const phase = adopted.phase ?? 'running'
+      let guidance = 'You now have captain authority over this team. Member sessions have been re-bound to this session — they will be re-spawned (with their persistent mailbox, team_memory, and task records intact) when you dispatch work. '
+      if (halted) {
+        guidance += 'The team is currently HALTED. Use agent_teams_resume to resume work, or review the task list to decide next steps.'
+      } else if (phase === 'staged') {
+        guidance += 'The team plan is STAGED (awaiting approval). Review the plan and use agent_teams_approve to launch, or agent_teams_edit_plan to adjust.'
+      } else if (pendingTasks.length > 0) {
+        guidance += `${pendingTasks.length} pending task(s) need attention. Use agent_teams_status for a full snapshot, then dispatch or adjust work as needed. Members will wake up on their first dispatched task.`
+      } else if (adopted.tasks.length > 0) {
+        guidance += 'All tasks appear complete. Use agent_teams_status to verify delivery, then agent_teams_delete to archive the team if done.'
+      } else {
+        guidance += 'The team has no tasks yet. Use agent_teams_create_task to assign work to members.'
+      }
+      return {
+        adopted: true,
+        team_id: adopted.id,
+        team_name: adopted.name,
+        ...adopted.description !== undefined ? { description: adopted.description } : {},
+        member_count: activeMembers.length,
+        task_count: adopted.tasks.length,
+        members: activeMembers.map(m => ({
+          name: m.name,
+          role: m.role ?? '',
+          status: m.status,
+          ...m.status === 'working' ? { currentTask: adopted.tasks.find(t => t.status === 'in_progress' && t.assignee === m.name)?.id ?? '' } : {},
+        })),
+        pending_tasks: pendingTasks.map(t => ({
+          id: t.id,
+          subject: t.subject,
+          assignee: t.assignee ?? '',
+          status: t.status,
+        })),
+        recent_messages: recentMessages,
+        guidance,
+      }
+    },
+  }))
+
+  ctx.tools.register(defineTool({
+    name: 'agent_teams_set_member_model',
+    description: 'Hot-swap one member\'s LLM route at runtime without destroying the member session or losing context. The next LLM request the member makes will use the new provider/model. The route is persisted to team.json (activeProvider/activeModel) so cold recovery also uses the new route. Use when a member\'s model is broken, too slow, or you want to switch to a better model mid-task. The captain or PM may call this.',
+    parameters: {
+      member_name: { type: 'string', required: true, description: 'Display name of the member whose model should be changed.' },
+      provider: { type: 'string', required: true, description: 'New LLM provider id.' },
+      model: { type: 'string', required: true, description: 'New model id under the provider.' },
+      reasoning_effort: { type: 'string', description: 'Optional reasoning effort id for the new model. Omit to use the model\'s default.' },
+    },
+    output: {
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          member_name: { type: 'string', required: true },
+          previous_provider: { type: 'string' },
+          previous_model: { type: 'string' },
+          new_provider: { type: 'string', required: true },
+          new_model: { type: 'string', required: true },
+          live: { type: 'boolean', required: true, description: 'Whether the hot-swap was applied to a live member session (true) or only persisted for cold recovery (false).' },
+        },
+      },
+      render: (args, value) => [{
+        type: 'text',
+        text: `Member "${value.member_name}" model changed${value.previous_provider !== undefined ? ` from ${value.previous_provider}/${value.previous_model}` : ''} to ${value.new_provider}/${value.new_model} (${value.live ? 'live hot-swap' : 'persisted for cold recovery'}).`,
+      }],
+    },
+    async execute(args, exec) {
+      const captain = requireCaptain(exec)
+      const team = await requireCaptainOrPmTeam(ctx, workspaceOf(captain), config, captain)
+      const result = await setMemberModel(
+        captain,
+        team.id,
+        args.member_name,
+        args.provider,
+        args.model,
+        args.reasoning_effort,
+        exec.signal,
+      )
+      return {
+        member_name: result.memberName,
+        ...result.previousProvider === undefined ? {} : { previous_provider: result.previousProvider, previous_model: result.previousModel },
+        new_provider: result.newProvider,
+        new_model: result.newModel,
+        live: result.live,
+      }
+    },
+  }))
+
+  ctx.tools.register(defineTool({
+    name: 'agent_teams_team_memory',
+    description: 'Per-role long-term memory that persists across tasks, sessions, AND workspaces. Each role (e.g. "backend-dev", "qa-engineer") has two memory layers: a GLOBAL layer (cross-workspace, at the configured globalMemoryDir, default ~/.agent-teams-memories/<role>.md) and a WORKSPACE layer (project-specific, at <workspace>/.agent-teams/memories/<role>.md). Members MUST recall at the start of a task and append at the end. Actions: "recall" searches past entries by keyword (merges both layers by default); "append" adds a new entry; "list" returns all entries. Use scope="global" (default) for cross-project experience, scope="workspace" for project-specific notes.',
+    parameters: {
+      action: { type: 'string', required: true, description: 'recall = search past entries by keyword; append = add a new entry; list = return all entries.' },
+      role: { type: 'string', required: true, description: 'Your role name (e.g. "backend-dev", "qa-engineer"). Use your own member name, not another member\'s, unless you are the captain reviewing.' },
+      scope: { type: 'string', description: 'Memory layer: "global" (default, cross-workspace) or "workspace" (project-specific). For recall, "global" merges both layers; "workspace" only searches the workspace layer.' },
+      query: { type: 'string', description: 'Search keyword for recall action. Matches against entry content (case-insensitive).' },
+      content: { type: 'string', description: 'Entry text for append action. Be specific and actionable — future you will search by keyword.' },
+    },
+    output: {
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          action: { type: 'string', required: true },
+          role: { type: 'string', required: true },
+          scope: { type: 'string', required: true },
+          entries: { type: 'array', required: true, items: { type: 'object', additionalProperties: true, properties: {
+            ts: { type: 'string' },
+            content: { type: 'string' },
+            scope: { type: 'string', description: 'Which layer this entry came from: "global" or "workspace".' },
+          } } },
+        },
+      },
+      render: (args, value) => [{
+        type: 'text',
+        text: value.entries.length === 0
+          ? `team_memory(${value.action}, "${value.role}", scope=${value.scope}): no entries${args.query !== undefined ? ` matching "${args.query}"` : ''}.`
+          : `team_memory(${value.action}, "${value.role}", scope=${value.scope}): ${value.entries.length} entr${value.entries.length === 1 ? 'y' : 'ies'}\n${value.entries.map((e: { ts?: string; content?: string; scope?: string }) => `[${e.ts ?? ''}|${e.scope ?? ''}] ${e.content ?? ''}`).join('\n')}`,
+      }],
+    },
+    async execute(args, exec) {
+      const caller = requireCaptain(exec)
+      const workspace = workspaceOf(caller)
+      const stateRoot = stateRootOf(workspace, config)
+      const action = args.action?.trim()
+      const role = args.role?.trim()
+      const scope = args.scope?.trim().toLowerCase() ?? 'global'
+      if (action !== 'recall' && action !== 'append' && action !== 'list') {
+        throw new Error(`action must be "recall", "append", or "list" (got "${action}")`)
+      }
+      if (role === '') throw new Error('role must not be empty')
+      if (scope !== 'global' && scope !== 'workspace') {
+        throw new Error(`scope must be "global" or "workspace" (got "${scope}")`)
+      }
+      // Sanitize the role name for the filename to prevent path traversal.
+      const safeRole = sanitizeKey(role)
+      if (safeRole === '') throw new Error(`role "${role}" sanitizes to an empty key`)
+
+      // Resolve the global memory directory: expand leading ~ to the user home.
+      const globalDir = config.globalMemoryDir.startsWith('~/')
+        ? join(homedir(), config.globalMemoryDir.slice(2))
+        : config.globalMemoryDir
+      const workspaceMemoriesDir = join(stateRoot, 'memories')
+      const globalMemoriesDir = join(globalDir)
+
+      type MemoryEntry = { ts: string; content: string; scope: 'global' | 'workspace' }
+
+      // Parse a memory file into entries.
+      const parseMemoryFile = async (file: string, layer: 'global' | 'workspace'): Promise<MemoryEntry[]> => {
+        let raw: string
+        try {
+          raw = await readFile(file, 'utf8')
+        } catch (error: unknown) {
+          if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+            return []
+          }
+          throw error
+        }
+        const entries: MemoryEntry[] = []
+        for (const line of raw.split('\n')) {
+          if (line.trim() === '') continue
+          const match = /^\[([^\]]+)\]\s*(.*)$/.exec(line)
+          if (match !== null) {
+            entries.push({ ts: match[1] ?? '', content: match[2] ?? '', scope: layer })
+          } else if (entries.length > 0) {
+            entries[entries.length - 1]!.content += `\n${line}`
+          } else {
+            entries.push({ ts: '', content: line, scope: layer })
+          }
+        }
+        return entries
+      }
+
+      if (action === 'append') {
+        const content = args.content?.trim()
+        if (content === undefined || content === '') throw new Error('content must not be empty for append action')
+        const ts = new Date().toISOString()
+        const entry = `[${ts}] ${content}\n`
+        const dir = scope === 'workspace' ? workspaceMemoriesDir : globalMemoriesDir
+        const file = join(dir, `${safeRole}.md`)
+        await mkdir(dir, { recursive: true })
+        let existing = ''
+        try {
+          existing = await readFile(file, 'utf8')
+        } catch (error: unknown) {
+          if (!(error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT')) {
+            throw error
+          }
+        }
+        await writeFile(file, existing + entry, 'utf8')
+        return { action, role, scope, entries: [{ ts, content, scope }] }
+      }
+
+      // recall and list: read from the appropriate layer(s).
+      const workspaceFile = join(workspaceMemoriesDir, `${safeRole}.md`)
+      const globalFile = join(globalMemoriesDir, `${safeRole}.md`)
+
+      let entries: MemoryEntry[]
+      if (scope === 'workspace') {
+        entries = await parseMemoryFile(workspaceFile, 'workspace')
+      } else {
+        // global scope: merge both layers. Global entries first (older
+        // cross-project experience), then workspace entries (project-specific).
+        const globalEntries = await parseMemoryFile(globalFile, 'global')
+        const workspaceEntries = await parseMemoryFile(workspaceFile, 'workspace')
+        entries = [...globalEntries, ...workspaceEntries]
+      }
+
+      if (action === 'recall') {
+        const query = args.query?.trim().toLowerCase() ?? ''
+        if (query === '') {
+          // No query: return the most recent 5 entries (newest first).
+          return { action, role, scope, entries: entries.slice(-5).reverse() }
+        }
+        const matched = entries.filter(entry => entry.content.toLowerCase().includes(query))
+        return { action, role, scope, entries: matched.reverse() }
+      }
+
+      // action === 'list'
+      return { action, role, scope, entries: entries.reverse() }
+    },
+  }))
+  // memberSelections was created before tool registration above.
 
   const runtime: AgentTeamsRuntime = {
     isPendingMember: memberSelections.isPendingMember,
@@ -2533,6 +3134,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
     approveStagedTeam,
     continueStagedPlanning,
     discardStagedTeam,
+    setMemberModel,
   }
 
   return runtime
@@ -2588,7 +3190,7 @@ async function initializeProfileTeam(input: {
       const selection = selections[index]!
       // A profile member selects a policy by id; an unknown id fails here,
       // before the team directory and any child session exist (#59).
-      const toolSelection = memberToolSelection(input.config, input.captain, template.toolPolicy)
+      const toolSelection = memberToolSelection(input.config, input.captain, template.toolPolicy, template.name)
       return {
         id: '',
         name: template.name,

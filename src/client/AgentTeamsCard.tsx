@@ -76,8 +76,10 @@ export function AgentTeamsSummary({ data, openMember, sessionId, t }: AgentTeams
   useEffect(() => {
     return monitorAgentTeam(owner, data.teamId)
   }, [data.teamId, owner])
-  const snapshot = teams.find((team) => team.teamId === data.teamId && (owner === '' || team.captainSessionId === owner))
-    ?? archivedTeams.find((team) => team.teamId === data.teamId && (owner === '' || team.captainSessionId === owner))
+  const snapshot = teams.find((team) => team.teamId === data.teamId && (owner === '' || team.captainSessionId === owner
+    || (team.authorizedLeads !== undefined && team.authorizedLeads.includes(owner))))
+    ?? archivedTeams.find((team) => team.teamId === data.teamId && (owner === '' || team.captainSessionId === owner
+      || (team.authorizedLeads !== undefined && team.authorizedLeads.includes(owner))))
   const resolved = useMemo<AgentTeamsCardData>(() => ({
     ...data,
     captainSessionId: snapshot?.captainSessionId ?? owner,

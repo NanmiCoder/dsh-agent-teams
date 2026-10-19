@@ -62,6 +62,11 @@ export interface Config {
    * `<workspace>/<stateDir>/<teamId>/` (default `.agent-teams`).
    */
   stateDir?: string
+  /**
+   * Global memory directory for cross-workspace member memories. Leading `~/`
+   * expands to the user home. Default `~/.agent-teams-memories`.
+   */
+  globalMemoryDir?: string
   /** `ctx.subagents` provider used to spawn members; must support continuable children and personas (default `spawn`). */
   memberProvider?: string
   /**
@@ -130,6 +135,7 @@ const toolPolicyConfig = z.union([
 
 export const Config: z<Config> = z.object({
   stateDir: z.string().default('.agent-teams'),
+  globalMemoryDir: z.string().default('~/.agent-teams-memories'),
   memberProvider: z.string().default('spawn'),
   memberModel: z.string(),
   memberLlmProvider: z.string(),
@@ -150,6 +156,8 @@ export const Config: z<Config> = z.object({
       fallback: fallbackRouteConfig,
       // Owner-declared tool-policy id this profile member selects (#59).
       tool_policy: z.string(),
+      // Number of parallel instances to expand into (name-1, name-2, ...).
+      slots: z.natural().min(1),
     })).min(1).required(),
     taskPlanning: z.union([z.const('captain'), z.const('seed')]),
     reviewPolicy: z.object({
@@ -183,7 +191,7 @@ export function usageSectionText(toolNames: string, profilesText = ''): string {
 4. Respect Web approve/return/discard control messages. On return, ask what to change before editing; after the answer, use one atomic agent_teams_edit_plan batch (edit downstream references before removals), summarize and await review again. Never inspect or edit .agent-teams state files or plugin source code to revise plans. Discard does not authorize a replacement.
 5. The scheduler dispatches ready tasks after approval. Delegate; do not duplicate slow work or send messages merely to start a stage. Handle reports/user work, then yield when waiting is all that remains: reports wake you automatically. Use status after a delivery or user request, never busy-poll or wait for unassigned members.
 6. Tasks carry attempt_id capabilities. Use the current attempt_id; stale means ownership changed. Pause members only on explicit request; later guidance via send_message continues that same attempt. Retry, transfer or take over through reassign_task first; it revokes the old attempt and waits for quiescence. Prefer a member. Captain implementation/review takeover requires a user request. Every takeover is one ready task at a time, finished in this turn; never yield with captain-owned work open.
-7. In a running team, correct never-started pending tasks with edit_plan update_task; preserve dependency and ownership contracts instead of cancelling and recreating the graph. A captain can cancel a never-started pending task directly. Active attempts still require reassign_task. Quality kinds (requirements, implementation, verification, review, repair, integration) require objective + acceptance; implementation/repair also require inScope + verify. Derive paths/commands from the workspace/profile, never assume src/ or pnpm test. Review/requirements complete only with verdict=pass; needs_revision/reject fail with findings. Never approve your own implementation or ask for a deliberate failure. When a quality contract itself is wrong (a verify command that cannot pass, an inScope that forbids the file the objective requires), fix it with agent_teams_amend_task — captain-only, non-terminal tasks only, frozen after a passing review, and every amendment is recorded in the task's revisions ledger — instead of letting the worker dead-lock or game the gate.
+7. In a running team, correct never-started pending tasks with edit_plan update_task; preserve dependency and ownership contracts instead of cancelling and recreating the graph. A captain can cancel a never-started pending task directly. Active attempts still require reassign_task. Quality kinds (requirements, implementation, verification, review, repair, integration) require objective + acceptance; implementation/repair also require inScope + verify. Derive paths/commands from the workspace/profile, never assume src/ or pnpm test. Review/requirements complete only with verdict=pass; needs_revision/reject fail with findings. Never approve your own implementation or ask for a deliberate failure. When a quality contract itself is wrong (a verify command that cannot pass, an inScope that forbids the file the objective requires), fix it with agent_teams_amend_task — captain-only, non-terminal tasks only, frozen after a passing review, and every amendment is recorded in the task's revisions ledger — instead of letting the worker dead-lock or game the gate. When a member's model is broken, too slow, or you want to switch mid-task, use agent_teams_set_member_model to hot-swap its LLM route at runtime without destroying the session; the route persists to team.json (activeProvider/activeModel) for cold recovery, and a live member picks up the new route on its next LLM request. Before calling it, ask the user which provider/model to switch to (and optionally a reasoning effort) — do not pick a replacement model on the user's behalf unless the user already named one. A member in a spawnError/faulted state can also be recovered this way: switch its model, then reassign or resume so the scheduler retries with the new route.
 8. When full quality mode is requested: requirements → implementation → verification → review → integration. Plan the entire DAG while staged, including implementation before requirements finishes and integration depending on review round 1. Failed review automatically adds repair + next review and rewires pending downstream gates. Do not recreate this loop, omit integration or depend on a failed task. Review acceptance judges the latest implementation. Do not put smoke-test scripts into task instructions.
 9. Halted means the user stopped work (including the captain turn). Resume only on a later explicit user request with a reason, via agent_teams_resume or create_task({resume:true,resumeReason}); creating tasks alone never resumes. Escalated means the review loop hit its limit, not a halt. Deployment requires explicit user confirmation.
 10. Wait for all required tasks to be terminal and members idle/ready, present results, then delete/archive unless the user wants to continue. Never discard unfinished work without authorization.
@@ -193,6 +201,7 @@ Tools: ${toolNames}${profilesText === '' ? '' : `\n\n${profilesText}`}`
 export function apply(ctx: Context, config: Config): void {
   const resolved: ToolsConfig = {
     stateDir: config.stateDir ?? '.agent-teams',
+    globalMemoryDir: config.globalMemoryDir ?? '~/.agent-teams-memories',
     memberProvider: config.memberProvider ?? 'spawn',
     memberModel: config.memberModel,
     memberLlmProvider: config.memberLlmProvider,
@@ -473,6 +482,65 @@ export function apply(ctx: Context, config: Config): void {
         }
       },
     }), 'agent-teams: plan route')
+
+    // Member model hot-swap route: the activity panel POSTs here to switch a
+    // member's LLM route at runtime (e.g. a broken or too-slow model) without
+    // destroying the member session. Mirrors the agent_teams_set_member_model
+    // tool via the shared runtime method, so the panel and the model drive the
+    // same persistence + live-ref swap. Works for both running members (live
+    // hot-swap) and cold/failed members (persisted for recovery).
+    ctx.effect(() => webServer.register({
+      kind: 'exact',
+      path: '/plugins/dsh-agent-teams/member-model',
+      handler: async (req, res) => {
+        if (req.method !== 'POST') {
+          res.writeHead(405, { allow: 'POST', 'cache-control': 'no-store' })
+          res.end()
+          return
+        }
+        let payload: Record<string, unknown>
+        try {
+          payload = await readJsonRequest(req)
+        } catch (error: unknown) {
+          res.writeHead(error instanceof RequestBodyError ? error.status : 400, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
+          res.end(JSON.stringify({ error: error instanceof Error ? error.message : 'invalid request body' }))
+          return
+        }
+        const sessionId = typeof payload['sessionId'] === 'string' ? payload['sessionId'].trim() : ''
+        const teamId = typeof payload['teamId'] === 'string' ? payload['teamId'].trim() : ''
+        const memberName = typeof payload['memberName'] === 'string' ? payload['memberName'].trim() : ''
+        const provider = typeof payload['provider'] === 'string' ? payload['provider'].trim() : ''
+        const model = typeof payload['model'] === 'string' ? payload['model'].trim() : ''
+        const reasoningEffort = typeof payload['reasoningEffort'] === 'string' ? payload['reasoningEffort'].trim() : ''
+        if (sessionId === '' || teamId === '' || memberName === '' || provider === '' || model === '') {
+          res.writeHead(400, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
+          res.end(JSON.stringify({ error: 'sessionId, teamId, memberName, provider, and model are required' }))
+          return
+        }
+        const captain = ctx.agents.get(sessionId as import('@deepseek-ai/dsh-session').SessionId)
+        if (captain === undefined) {
+          res.writeHead(409, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
+          res.end(JSON.stringify({ error: 'captain session is not attached' }))
+          return
+        }
+        try {
+          const result = await agentTeamsRuntime.setMemberModel(
+            captain,
+            teamId,
+            memberName,
+            provider,
+            model,
+            reasoningEffort === '' ? undefined : reasoningEffort,
+          )
+          res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
+          res.end(JSON.stringify({ ok: true, ...result }))
+        } catch (error: unknown) {
+          ctx.logger.warn(`agent-teams: member-model swap failed for ${teamId}/${memberName}: ${String(error)}`)
+          res.writeHead(409, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
+          res.end(JSON.stringify({ error: error instanceof Error ? error.message : 'failed to change member model' }))
+        }
+      },
+    }), 'agent-teams: member-model route')
 
   // Whale mascot artwork: serve the packaged V2 role/action images to the
   // activity panel. An explicit allowlist guards the route (no path

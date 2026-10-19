@@ -156,6 +156,11 @@ export interface LeadScopedTeam {
   readonly captainSessionId: string
   /** Present on real team state; omitting it keeps the pure exact-id contract. */
   readonly members?: readonly { readonly id: string; readonly status?: string }[]
+  /**
+   * Session ids explicitly authorized to lead this team (via `agent_teams_adopt`),
+   * in addition to the original captain and its fork descendants.
+   */
+  readonly authorizedLeads?: readonly string[]
 }
 
 /** Whether one identity leads (or inherits the lead of) a team's recorded captain. */
@@ -168,10 +173,16 @@ export function teamLeadMatch(team: LeadScopedTeam, lead: LeadIdentity): boolean
   // team lookups.
   if (members.some(member => member.id === lead.sessionId)) return false
   if (team.captainSessionId === lead.sessionId) return true
+  // An explicitly authorized lead session (via adopt) matches by exact id,
+  // and its fork descendants inherit that authority through the ancestry chain.
+  if (team.authorizedLeads?.includes(lead.sessionId) === true) return true
   if (!lead.inheritsLead) return false
   // Descending from a member (a fork of one) is not lead identity either.
   if (members.some(member => lead.ancestry.includes(member.id))) return false
-  return lead.ancestry.includes(team.captainSessionId)
+  if (lead.ancestry.includes(team.captainSessionId)) return true
+  // A fork descendant of an authorized lead inherits the lead authority.
+  if (team.authorizedLeads !== undefined && lead.ancestry.some(id => team.authorizedLeads!.includes(id))) return true
+  return false
 }
 
 /**
@@ -182,6 +193,7 @@ export function teamLeadMatch(team: LeadScopedTeam, lead: LeadIdentity): boolean
 export function sessionLeadsTeam(ctx: Context, team: LeadScopedTeam, sessionId: string): boolean {
   if (team.members?.some(member => member.id === sessionId) === true) return false
   if (team.captainSessionId === sessionId) return true
+  if (team.authorizedLeads?.includes(sessionId) === true) return true
   const session = liveSession(ctx, sessionId)
   return session !== undefined && teamLeadMatch(team, leadIdentityOf(ctx, session))
 }
@@ -190,6 +202,7 @@ export function sessionLeadsTeam(ctx: Context, team: LeadScopedTeam, sessionId: 
 export async function sessionLeadsTeamAsync(ctx: Context, team: LeadScopedTeam, sessionId: string): Promise<boolean> {
   if (team.members?.some(member => member.id === sessionId) === true) return false
   if (team.captainSessionId === sessionId) return true
+  if (team.authorizedLeads?.includes(sessionId) === true) return true
   const session = liveSession(ctx, sessionId)
   return session !== undefined && teamLeadMatch(team, await leadIdentityOfAsync(ctx, session))
 }

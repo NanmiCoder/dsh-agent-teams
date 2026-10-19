@@ -1,55 +1,22 @@
-# Harness 0.2.1-rc.2 适配
+# Harness 0.2.1-rc.2 compatibility
 
-目标为已发布的 `0.2.1-rc.2`，对照基线为插件上一推荐宿主 `0.2.1-rc.1`。插件起点为
-`6768de25aede12056a497b0a79ebf6cd8bb1e987` / `0.1.24-rc.1`，适配版本为 `0.1.25-rc.1`。
-本次未修改任何参考仓库；差异全部来自 npm 官方 registry 的实际产物。
+The published `0.1.24` and `0.1.24-rc.1` artifacts omit rc.2 in exact peer requirements, so the host rejects installation before activation. `0.1.25` adds rc.2, retains rc.1 and moves the development cohort to rc.2.
 
-## 已核实的变化及处理
+## Source audit
 
-对插件依赖的 25 个 `@deepseek-ai` 包，分别下载 rc.1 与 rc.2 的 tarball 并解包后逐文件比较：
+- rc.1: `1600d8a1e140dcde43a1a0941940a0480712c011`.
+- rc.2: `687f282e8625c6b8d11ff58211a90524be2e4317` (`dsh-v0.2.1-rc.2`).
+- Nine commits including merges. Changes concern release versions, DeepSeek web APIs/settings and a temporary model label. No source changes in agent, session, subagent, tools, system-prompt or plugin-manager contracts used by AgentTeams. The rc.1 activation adapter remains applicable.
+- Official npm rc.2 resolves a complete 295-package DSH cohort. Pin the full closure; a CLI version alone is insufficient.
 
-- 两个 cohort 各 760 个文件，文件集合完全相同，无新增、无删除。
-- 其中 615 个 `.js` / `.d.ts` / `.mjs` / `.cjs` 文件**逐字节相同，差异数为 0**。
-- 仅 21 个 `package.json` 不同，且差异只出现在 `version` 字段与把 `0.2.1-rc.1` 换成
-  `0.2.1-rc.2` 的内部依赖/peer 版本串；`cordis ~4.0.5`、`schemastery ~3.18.5`、`zod 4.4.3`
-  等第三方范围不变。
+## Verification
 
-因此本宿主是 `0.2.1` 维护版本，插件消费的接口面没有任何变化：成员创建
-（`startActivation` 与 continuable 回退）、host FIFO/steer 交付与 `sendMessage`、
-`agent/created` 启动准入与旧 `agent/session-start` 兼容缝、定向子进程回收
-（`drainChildren`）、`tools.view()` 可限制名与队长专用工具拒绝、子会话自有事件读取、
-以及会话存储格式代次，全部保持原样。适配层 `src/harness-compat.ts` **无需修改**。
+The unmodified 0.1.24 official npm tarball was rejected by the rc.2 CLI plugin manager in a fresh isolated profile, reproducing the desktop error with no exemption active. The runtime runner now performs a real CLI plugin-manager add in a separate rc.2 profile, without `allow-version`, in addition to its existing lifecycle, recovery, failure, entry, web approval, protocol and stability scenarios. CI runs the exact supported-host matrix and Ubuntu/Windows checks before npm publication.
 
-本次修改仅限版本元数据与可移植性：
+Real provider credentials, native desktop interaction and migration of existing user data are outside the isolated fixture coverage. Do not equate these checks with a manual desktop acceptance test.
 
-- `compatibility.json`：推荐宿主改为 `0.2.1-rc.2`，`0.2.1-rc.1` 保留为 legacy。
-- `package.json` / `pnpm-workspace.yaml`：peer 范围、devDependencies 与 303 条 pnpm
-  overrides 全部锁定到 `0.2.1-rc.2`。
-- `pnpm-lock.yaml`：重新解析，全仓库 `0.2.1-rc.1` 出现次数为 0，`0.2.1-rc.2` 为 6178 次。
-- 新增 `.gitattributes`：见下节。
+Local macOS validation passed: build, typecheck, full `pnpm verify`, all ten runtime/recovery scenarios and the additional plugin-manager install check. Candidate SHA-256: `492b08fbf6e5cbc2ce8370846118e8cc65a06be95464ebab16bc8629c0b3b990`. The installation gate accepted the exact 0.1.25 package without an exemption. CI/publication results must be checked separately.
 
-## Windows 构建产物可复现性
+## Recovery
 
-`scripts/git-artifacts.mjs` 通过哈希原始文件字节来证明已提交的 `lib/` 与构建结果一致。
-仓库此前没有 `.gitattributes`，Windows 上 `core.autocrlf=true` 会把已跟踪文本文件写成 CRLF，
-而提交进仓库的 stamp 来自上游 Linux 的 LF 文件，导致该检查在任何 Windows clone 上必然失败
-（`Git artifacts are stale or modified`）。新增 `.gitattributes` 将已跟踪文本固定为 `eol=lf`，
-摘要因此与平台无关。这是本机独立复现的问题，不改变产物内容语义。
-
-## 验证与边界
-
-- 改动前基线：`pnpm typecheck` 通过；`pnpm build` 与 `pnpm verify` 因上述 Windows 换行符问题失败，
-  属**基线既有失败**，已按 `.gitattributes` 修复。
-- 候选：`pnpm typecheck`、`pnpm build`、完整 `pnpm verify` 全部通过。
-- 依赖闭包：顶层 27 个 `@deepseek-ai` 包，其中 25 个 `dsh-*` 全部为 `0.2.1-rc.2`，
-  另有 `cordis 4.0.5` 与 `schemastery 3.18.5`；见[依赖闭包](cohort-0.2.1-rc.2.json)。
-
-未验证真实模型服务、交互式浏览器、Electron 桌面安装、其他操作系统和真实用户数据迁移。
-本记录只覆盖 `0.2.1-rc.1 → 0.2.1-rc.2` 这一条边，不代表对宿主全部新功能的全面审计。
-
-重现命令：
-
-```sh
-pnpm install --frozen-lockfile
-pnpm typecheck && pnpm build && pnpm verify
-```
+Existing published artifacts and tags are immutable. Upgrade to 0.1.25 on rc.2; do not bypass host compatibility checks. A rollback to 0.1.24 requires a supported host such as rc.1 and separate care for user data.

@@ -306,7 +306,9 @@
     "@deepseek-ai/dsh-experimental-translator": "0.2.1-rc.2",
     "@deepseek-ai/dsh-experimental-client-ui-cot-translation": "0.2.1-rc.2",
     "@deepseek-ai/dsh-plugin-market-index": "0.2.1-rc.2",
-    "@deepseek-ai/cordis-plugin-group": "1.0.5"
+    "@deepseek-ai/cordis-plugin-group": "1.0.5",
+    "@deepseek-ai/dsh-web-deepseek-api": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-client-ui-deepseek-model-label-1017": "0.2.1-rc.2"
   },
   "autoInstallPeers": true,
   "allowBuilds": {

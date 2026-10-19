@@ -129,6 +129,16 @@ if (flags.has('--prepare-only')) {
 const plugin = JSON.parse(readFileSync(join(runtime, 'node_modules/@nanmicoder/dsh-agent-teams/package.json'), 'utf8'));
 if (plugin.name !== '@nanmicoder/dsh-agent-teams') throw Error('Artifact package identity does not match AgentTeams');
 const runs = await runRuntimeScenarios({ report, runtime, command, environment, selectedScenarios: flags.has('--scenario') ? [flags.get('--scenario')] : scenarios });
+// Exercise the same compatibility gate used by the plugin settings UI. Runtime
+// fixtures alone link the package directly and cannot prove installation works.
+if (version === '0.2.1-rc.2') {
+    const home = join(report, 'plugin-install-home');
+    const install = await command([process.execPath, join(runtime, 'node_modules/@deepseek-ai/dsh/lib/bin.js'), 'plugin', '--profile', 'web', 'add', '--save-exact', resolve(flags.get('--artifact'))], runtime, environment({ DSH_HOME: home, DSH_TELEMETRY_DISABLED: '1' }), 'plugin-manager-install', 120000);
+    const installedPath = join(home, 'profiles/web/node_modules/@nanmicoder/dsh-agent-teams/package.json');
+    const installed = existsSync(installedPath) ? JSON.parse(readFileSync(installedPath, 'utf8')) : undefined;
+    const assertions = { exit0: install.code === 0 && !install.timedOut, exactPluginVersion: installed?.version === plugin.version };
+    runs.push({ scenario: 'plugin-manager-install', passed: Object.values(assertions).every(Boolean), assertions });
+}
 const passed = runs.every(x => x.passed);
 json(join(report, 'result.json'), { passed, version, artifactSha256: artifactSha, pluginVersion: plugin.version, testFiles, node: process.version, platform: process.platform, arch: process.arch, cohortCount: cohort.count, runs, unverified: ['real provider APIs and credentials', 'browser interaction', 'other operating systems', 'native terminal execution', 'live user-data migration'] });
 console.log(JSON.stringify({ passed, version, report, runs }, null, 2));

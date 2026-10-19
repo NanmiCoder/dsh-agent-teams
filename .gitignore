@@ -9,3 +9,7 @@ node_modules/
 # Local build tarballs and runtime locks (not part of source)
 *.tgz
 .dsh-ops-update-*.lock
+
+# cordis.patch.yml is maintained locally and intentionally not pushed.
+# Removed from tracking so upstream/fork sync never overwrites the local copy.
+cordis.patch.yml

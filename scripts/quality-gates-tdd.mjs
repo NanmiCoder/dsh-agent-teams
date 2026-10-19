@@ -1230,6 +1230,33 @@ console.log('quality-gates TDD — H. generated repair scope (#173)')
   )
 }
 
+console.log('quality-gates TDD — I. contradictory contract (#173)')
+
+{
+  // A hand-written contract can contradict itself the same way the generator
+  // used to: `outOfScope` wins over `inScope`, so the path is rejected as
+  // out_of_scope. The rejection must name the two colliding lists instead of
+  // blaming the path, which sends the member hunting for a scope violation that
+  // is really a contract defect.
+  const contradicted = task(implContract({
+    kind: 'repair',
+    status: 'in_progress',
+    inScope: ['deploy/compose/postfix/master.cf.inc'],
+    outOfScope: ['deploy/compose/postfix/'],
+  }))
+  const result = api.evaluateQualityCompletion?.(contradicted, {
+    status: 'completed',
+    changedPaths: ['deploy/compose/postfix/master.cf.inc'],
+    acceptanceResults: [{ criterion: 'parser accepts empty input', status: 'passed' }],
+    commandsRun: [{ command: 'pnpm test', status: 'passed', exitCode: 0 }],
+  })
+  check(
+    'tdd.scope.contradictory-contract-rejection-explains-itself',
+    result?.ok !== true && /inScope[\s\S]*outOfScope/i.test(String(result?.error ?? '')),
+    String(result?.error ?? ''),
+  )
+}
+
 if (failures > 0) {
   console.error(`quality-gates TDD failed: ${failures} check(s)`)
   process.exitCode = 1

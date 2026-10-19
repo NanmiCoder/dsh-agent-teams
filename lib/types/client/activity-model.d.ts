@@ -53,9 +53,10 @@ export declare function taskModelLabel(task: {
 }[]): string;
 /** Short model id for tight DAG/chip surfaces (`openai/gpt-5.6-sol` → `gpt-5.6-sol`). */
 export declare function compactModelLabel(route: string): string;
-/** A live team the current captain still owns and has not halted. */
+/** A live team the current captain still owns (or adopted) and has not halted. */
 export declare function liveCaptainTeam<T extends {
     readonly captainSessionId: string;
+    readonly authorizedLeads?: readonly string[];
     readonly halted?: boolean;
 }>(teams: readonly T[], sessionId: string | undefined): T | undefined;
 /** Minimal member shape needed to order the delegation list (issue #192). */

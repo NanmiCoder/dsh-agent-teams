@@ -51,6 +51,14 @@ export interface ToolPolicyContext {
     maxDepth?: number;
     /** Names the host's `tools.restrict()` would admit, or undefined without a registry view. */
     knownTools?: ReadonlySet<string>;
+    /**
+     * Member name this filter is being resolved for. When the name is `pm`
+     * (case-insensitive), the PM scheduling proxy tools (`PM_EXTRA_TOOL_NAMES`)
+     * are removed from the captain-only deny list so the PM can create, reassign,
+     * amend tasks and hot-swap member models. Other members keep the default
+     * captain-only deny list.
+     */
+    memberName?: string;
 }
 /** Trim, drop blanks, and de-duplicate names, preserving first-seen order. */
 export declare function dedupeToolNames(names: readonly string[]): string[];

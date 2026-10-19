@@ -113,7 +113,7 @@ export declare function restrictableToolNames(agent: Agent): ReadonlySet<string>
  * This is the legacy filter of a member without a configured tool policy; a
  * selected policy resolves through `resolveMemberToolFilter` instead (#59).
  */
-export declare function memberToolFilter(maxDepth: number | undefined, knownTools: ReadonlySet<string> | undefined): MemberToolFilter;
+export declare function memberToolFilter(maxDepth: number | undefined, knownTools: ReadonlySet<string> | undefined, memberName?: string): MemberToolFilter;
 /**
  * Start one member, dropping only the built-in filter names the host reports
  * as unknown and retrying.

@@ -79,6 +79,25 @@ export interface AgentTeamsTeamDeletedData {
 export interface AgentTeamsPlanDiscardedData {
     readonly teamId: string;
 }
+/** Records a new session adopting an existing team as an authorized lead. */
+export interface AgentTeamsTeamAdoptedData {
+    readonly teamId: string;
+    /** The session id that adopted the team. */
+    readonly adoptedBy: string;
+    /** The previous captain session id before the adoption transfer. */
+    readonly previousCaptainId?: string;
+    /** Member child ids retired because they belonged to the old captain session. */
+    readonly retiredMemberIds?: readonly string[];
+}
+/** Records a runtime hot-swap of one member's LLM route. */
+export interface AgentTeamsMemberModelChangedData {
+    readonly teamId: string;
+    readonly memberName: string;
+    readonly previousProvider?: string;
+    readonly previousModel?: string;
+    readonly newProvider: string;
+    readonly newModel: string;
+}
 /** Records one mailbox message sent between team agents. */
 export interface AgentTeamsMessageSentData {
     readonly teamId: string;
@@ -147,7 +166,17 @@ declare module '@deepseek-ai/dsh-session/types' {
          * @param data - stable team identity.
          */
         'agent-teams/plan-discarded': AgentTeamsPlanDiscardedData;
+        /**
+         * Records a new session adopting an existing team.
+         * @param data - team identity and the adopting session id.
+         */
+        'agent-teams/team-adopted': AgentTeamsTeamAdoptedData;
+        /**
+         * Records a runtime hot-swap of one member's LLM route.
+         * @param data - team identity, member name, and the old/new route.
+         */
+        'agent-teams/member-model-changed': AgentTeamsMemberModelChangedData;
     }
 }
 /** The full set of `agent-teams/*` event names. */
-export type AgentTeamsEventType = 'agent-teams/team-created' | 'agent-teams/member-added' | 'agent-teams/member-removed' | 'agent-teams/task-created' | 'agent-teams/task-updated' | 'agent-teams/task-amended' | 'agent-teams/message-sent' | 'agent-teams/team-halted' | 'agent-teams/team-resumed' | 'agent-teams/team-deleted' | 'agent-teams/plan-discarded';
+export type AgentTeamsEventType = 'agent-teams/team-created' | 'agent-teams/member-added' | 'agent-teams/member-removed' | 'agent-teams/task-created' | 'agent-teams/task-updated' | 'agent-teams/task-amended' | 'agent-teams/message-sent' | 'agent-teams/team-halted' | 'agent-teams/team-resumed' | 'agent-teams/team-deleted' | 'agent-teams/plan-discarded' | 'agent-teams/team-adopted' | 'agent-teams/member-model-changed';

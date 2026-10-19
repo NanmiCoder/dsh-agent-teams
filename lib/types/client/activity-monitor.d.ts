@@ -15,6 +15,10 @@ export interface ActivityMember {
     readonly total: number;
     readonly currentTask: string;
     readonly unread: number;
+    /** Last member-start failure, so the panel can surface a broken member. */
+    readonly spawnError?: string;
+    /** Whether the fallback route is currently active (distinct from a manual switch). */
+    readonly fallbackActive?: boolean;
 }
 /** One task row of a host snapshot. */
 export interface ActivityTask {
@@ -51,6 +55,8 @@ export interface ActivityTeam {
     readonly name: string;
     readonly description?: string;
     readonly captainSessionId: string;
+    /** Session ids that adopted this team and gained captain authority. */
+    readonly authorizedLeads?: readonly string[];
     readonly phase: 'staged' | 'running';
     readonly planReviewState?: 'awaiting_review' | 'awaiting_feedback';
     readonly halted?: boolean;

@@ -31,6 +31,11 @@ export interface Config {
      * `<workspace>/<stateDir>/<teamId>/` (default `.agent-teams`).
      */
     stateDir?: string;
+    /**
+     * Global memory directory for cross-workspace member memories. Leading `~/`
+     * expands to the user home. Default `~/.agent-teams-memories`.
+     */
+    globalMemoryDir?: string;
     /** `ctx.subagents` provider used to spawn members; must support continuable children and personas (default `spawn`). */
     memberProvider?: string;
     /**

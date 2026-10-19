@@ -18,6 +18,8 @@ export { steerCaptainReport } from './members.ts';
 export interface ToolsConfig {
     /** State directory name under the captain's workspace. */
     stateDir: string;
+    /** Global memory directory for cross-workspace member memories. */
+    globalMemoryDir: string;
     /** Member subagent provider name. */
     memberProvider: string;
     /** Optional member model override. */
@@ -84,6 +86,29 @@ export interface AgentTeamsRuntime {
     }>;
     discardStagedTeam(captain: Agent, teamId: string): Promise<{
         teamId: string;
+    }>;
+    /**
+     * Hot-swap one member's LLM route at runtime without destroying the member
+     * session or losing context. Persists activeProvider/activeModel to team.json
+     * and mutates the live selection ref when the member is resident. Shared by
+     * the `agent_teams_set_member_model` tool and the Web member-model route so
+     * the panel can switch a broken or slow model mid-task.
+     * @param captain - the captain (or authorized lead / PM) agent.
+     * @param teamId - the team id.
+     * @param memberName - display name of the member whose model should change.
+     * @param provider - new LLM provider id.
+     * @param model - new model id under the provider.
+     * @param reasoningEffort - optional reasoning effort id; omit for the model default.
+     * @param signal - optional abort signal for catalog resolution.
+     * @returns the previous route, the new route, and whether the live ref was swapped.
+     */
+    setMemberModel(captain: Agent, teamId: string, memberName: string, provider: string, model: string, reasoningEffort?: string, signal?: AbortSignal): Promise<{
+        memberName: string;
+        previousProvider?: string;
+        previousModel?: string;
+        newProvider: string;
+        newModel: string;
+        live: boolean;
     }>;
 }
 export declare function haltTeamWork(input: {

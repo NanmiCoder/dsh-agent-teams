@@ -32,6 +32,14 @@ export interface TeamProfileMemberConfig {
      * profile only names a configured policy; it never carries raw tool lists.
      */
     tool_policy?: string;
+    /**
+     * Number of parallel instances to expand this member into. `slots: 3` with
+     * `name: backend-dev` produces `backend-dev-1`, `backend-dev-2`,
+     * `backend-dev-3` — each an independent member with the same role/provider/
+     * model/prompt. Default 1 (no expansion). Useful for roles that benefit
+     * from parallelism (multiple backend devs, multiple QA engineers).
+     */
+    slots?: number;
 }
 /** One seed-task row in a named team-profile template (unresolved). */
 export interface TeamProfileTaskConfig {
@@ -67,6 +75,8 @@ export interface NormalizedProfileMember {
     executionPrompt?: string;
     fallback?: TeamModelFallbackConfig;
     toolPolicy?: string;
+    /** Number of parallel instances (1 = no expansion). */
+    slots: number;
 }
 /** A profile seed task after assignee canonicalization; `sourceIndex` is the YAML order. */
 export interface NormalizedProfileTask {

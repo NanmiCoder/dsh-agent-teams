@@ -12,7 +12,7 @@
  * @module dsh-agent-teams/members
  */
 import type { Context } from '@deepseek-ai/cordis';
-import { type Agent } from '@deepseek-ai/dsh-agent';
+import { type Agent, type ModelSelection } from '@deepseek-ai/dsh-agent';
 import type { Session } from '@deepseek-ai/dsh-session';
 import type { MemberToolFilter } from './tool-policies.ts';
 import { type TeamMember, type TeamState, type TeamTask } from './types.ts';
@@ -109,6 +109,16 @@ export interface MemberSelectionRuntime {
     isPendingMember(agent: Agent): boolean;
     /** Make one selection visible while Harness materializes the fresh child. */
     withPending<T>(parentSessionId: string, label: string, selection: MemberLlmSelection, operation: () => Promise<T>, setup?: TeamMember['runtimeSetup']): Promise<T>;
+    /**
+     * Look up the live mutable selection ref for one member, so a runtime
+     * hot-swap can mutate `ref.current` and have the next LLM request pick up
+     * the new route. Returns undefined when the member's child context is not
+     * currently resident (cold member, or the member was removed).
+     */
+    getSelectionRef(teamId: string, memberName: string): {
+        current: ModelSelection;
+        assembled?: ModelSelection;
+    } | undefined;
 }
 /**
  * Validate a resolved roster against every provider catalog before any child

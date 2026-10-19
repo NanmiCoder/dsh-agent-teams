@@ -63,6 +63,11 @@ export interface LeadScopedTeam {
         readonly id: string;
         readonly status?: string;
     }[];
+    /**
+     * Session ids explicitly authorized to lead this team (via `agent_teams_adopt`),
+     * in addition to the original captain and its fork descendants.
+     */
+    readonly authorizedLeads?: readonly string[];
 }
 /** Whether one identity leads (or inherits the lead of) a team's recorded captain. */
 export declare function teamLeadMatch(team: LeadScopedTeam, lead: LeadIdentity): boolean;

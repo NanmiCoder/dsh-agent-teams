@@ -19,20 +19,3 @@
         stateDir: .agent-teams
         # Provider used to spawn member subagents ('spawn' or 'fork').
         memberProvider: spawn
-        # Default member model route (members without explicit provider/model
-        # inherit this). Override per-member in the profile below.
-        memberModel: GLM-5.2
-        memberLlmProvider: codefree
-        # Plugin-level fallback route: if a member's primary model fails, the
-        # scheduler retries on this route without losing the session context.
-        fallback:
-          provider: codefree
-          model: GLM-5.2
-        # Team size cap — 21 roster members (19 base role entries; frontend-dev
-        # and backend-dev each expand via slots:2 → 19 + 2 = 21 actual members)
-        # + headroom for dynamic additions.
-        maxMembers: 22
-        # Member delegation depth cap (0 = unlimited).
-        memberMaxDepth: 0
-        # Named team profiles. `dev-team` is the standing 19-member roster.
-        profiles:

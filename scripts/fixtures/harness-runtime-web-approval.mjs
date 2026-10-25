@@ -52,7 +52,12 @@ class WebApprovalAdapter extends LlmAdapter {
         assert.equal(failed, undefined, 'Real workflow tool failed: ' + JSON.stringify(failed));
         const isMember = system?.includes('WEB_APPROVAL_MEMBER') === true;
         record({ event: 'web-request', sessionId: options.sessionId, isMember, model: options.model, reasoningEffort: options.reasoningEffort, system: system, tools: options.tools, messages: options.messages });
-        const pluginMessages = options.messages.filter(message => message.role === 'user' && message.source?.kind === 'agent-teams');
+        // Supported pre-v3 hosts use the producer-owned legacy wrapper. Keep
+        // checking the plugin identity so unrelated plugin messages cannot
+        // satisfy the approval/report assertions.
+        const pluginMessages = options.messages.filter(message => message.role === 'user' && (
+            message.source?.kind === 'agent-teams'
+            || (message.source?.kind === 'plugin' && message.source.plugin === '@nanmicoder/dsh-agent-teams')));
         const messageText = message => message.content.filter(block => block.type === 'text').map(block => block.text).join('\n');
         const approvals = pluginMessages.filter(message => messageText(message).includes('The user approved the staged AgentTeams plan') && messageText(message).includes('from the pre-run review UI.'));
         const reports = pluginMessages.filter(message => messageText(message).includes('AgentTeams message from member worker:') && messageText(message).includes('WEB_MEMBER_REPORT_OK'));
@@ -118,6 +123,7 @@ export function apply(ctx) {
     } }));
     void (async () => {
         await ctx.get('loader').await();
+        await ctx.workspaceRegistry.create(process.cwd(), 'Web approval regression');
         const handle = await ctx.agents.create({ sessionId: 'session-' + randomUUID(), meta: { cwd: process.cwd() }, agentOptions: { provider: 'runtime-lab', model: 'fixture-model' } });
         ctx.effect(() => () => handle.dispose());
         const captain = handle.agent;
@@ -173,6 +179,19 @@ export function apply(ctx) {
         assert.equal(events.filter(event => event.event === 'web-request' && !event.isMember).length, beforeRepeatRequests, 'Rejected repeat approval must not wake the captain');
         assert.equal(readTeam().phase, 'running');
         record({ event: 'web-http-repeat-rejected', sessionId: captain.id, status: repeat.status });
+        // #262: the real member is awaiting model output, before in_progress.
+        // The panel route must preserve this claim rather than call it ready/running.
+        await waitFor(() => events.some(event => event.event === 'web-request' && event.isMember), 'Member request starts before checking claimed state');
+        const activityResponse = await fetch(baseUrl + '/plugins/dsh-agent-teams/state', { headers: { cookie }, signal: AbortSignal.timeout(10000) });
+        assert.equal(activityResponse.status, 200);
+        const activityBody = await activityResponse.json();
+        const activityTeam = activityBody.teams.find(team => team.teamId === staged.id);
+        assert.ok(activityTeam, 'Real activity route must discover the staged team after approval');
+        assert.equal(readTeam().tasks[0].status, 'claimed');
+        assert.equal(activityTeam.tasks[0].status, 'claimed');
+        assert.equal(activityTeam.tasks[0].state, 'claimed');
+        assert.equal(activityTeam.members[0].activity, 'working');
+        record({ event: 'web-claimed-projection', taskStatus: activityTeam.tasks[0].status, visualState: activityTeam.tasks[0].state, memberActivity: activityTeam.members[0].activity });
         record({ event: 'web-member-output-released' });
         releaseMember();
         await waitFor(() => events.some(event => event.event === 'web-captain-report-wake'), 'A real member report must wake the idle captain');

@@ -26,7 +26,7 @@ export interface ActivityTask {
     readonly subject: string;
     readonly description?: string;
     readonly status: string;
-    readonly state: 'blocked' | 'open' | 'running' | 'completed' | 'failed' | 'cancelled';
+    readonly state: 'blocked' | 'open' | 'claimed' | 'running' | 'completed' | 'failed' | 'cancelled';
     readonly assignee: string;
     readonly model?: string;
     readonly dependencies: readonly string[];

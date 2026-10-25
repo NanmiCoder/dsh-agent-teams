@@ -142,7 +142,7 @@ function accentOf(id: string): string {
   return ACCENTS[stableHash(id) % ACCENTS.length] ?? ACCENTS[0]
 }
 
-/** Badge text follows the raw task status (finer than the 4 visual states):
+/** Badge text follows the raw task status:
  * claimed/pending/failed/cancelled keep their own labels and colors. */
 const TASK_STATUS_LABEL: Record<string, AgentTeamsLocaleKey> = {
   pending: 'task.status.pending',
@@ -273,6 +273,7 @@ function taskSummary(team: ActivityTeam, t: AgentTeamsTranslate, discarded = fal
   const completed = team.tasks.filter((task) => task.status === 'completed')
   const cancelled = team.tasks.filter((task) => task.status === 'cancelled')
   const running = team.tasks.filter((task) => task.state === 'running')
+  const claimed = team.tasks.filter((task) => task.state === 'claimed')
   const blocked = team.tasks.filter((task) => task.state === 'blocked')
   const ready = team.tasks.filter((task) => task.state === 'open' && task.status !== 'completed' && task.status !== 'failed' && task.status !== 'cancelled')
   const failed = team.tasks.filter((task) => task.status === 'failed')
@@ -287,7 +288,7 @@ function taskSummary(team: ActivityTeam, t: AgentTeamsTranslate, discarded = fal
       failed: failed.length,
     })
   }
-  if (failed.length > 0 && running.length === 0 && ready.length === 0 && blocked.length === 0) {
+  if (failed.length > 0 && running.length === 0 && claimed.length === 0 && ready.length === 0 && blocked.length === 0) {
     return t('task.summary.failedSettled', { count: failed.length })
   }
   if (blocked.length > 0 && running.length > 0) {
@@ -297,6 +298,7 @@ function taskSummary(team: ActivityTeam, t: AgentTeamsTranslate, discarded = fal
     })
   }
   if (running.length > 0) return t('task.summary.running', { tasks: formatTaskIds(running.map((task) => task.id), t) })
+  if (claimed.length > 0) return t('task.summary.claimed', { tasks: formatTaskIds(claimed.map((task) => task.id), t) })
   if (ready.length > 0) return t('task.summary.ready', { tasks: formatTaskIds(ready.map((task) => task.id), t) })
   if (blocked.length > 0) return t('task.summary.blocked', { tasks: formatTaskIds(blocked.map((task) => task.id), t) })
   return t('task.summary.waitingSchedule')
@@ -304,6 +306,7 @@ function taskSummary(team: ActivityTeam, t: AgentTeamsTranslate, discarded = fal
 
 function ProgressOverview({ team, t, discarded = false }: { readonly team: ActivityTeam; readonly t: AgentTeamsTranslate; readonly discarded?: boolean }) {
   const running = discarded ? 0 : team.tasks.filter((task) => task.state === 'running').length
+  const claimed = discarded ? 0 : team.tasks.filter((task) => task.state === 'claimed').length
   const blocked = discarded ? 0 : team.tasks.filter((task) => task.state === 'blocked').length
   const completed = discarded ? 0 : team.tasks.filter((task) => task.status === 'completed').length
   const settled = !discarded && team.tasks.length > 0 && team.tasks.every((task) => (
@@ -320,6 +323,7 @@ function ProgressOverview({ team, t, discarded = false }: { readonly team: Activ
       ) : <span className={css.progressEmpty} />}
       <span className={css.progressLegend}>
         <span data-state="running">{t('progress.running', { count: running })}</span>
+        {claimed > 0 && <span data-state="claimed">{t('progress.claimed', { count: claimed })}</span>}
         <span data-state="blocked">{t('progress.blocked', { count: blocked })}</span>
         <span data-state="completed">{t('progress.delivered', { count: completed })}</span>
       </span>
@@ -328,6 +332,52 @@ function ProgressOverview({ team, t, discarded = false }: { readonly team: Activ
         <span>{taskSummary(team, t, discarded)}</span>
       </span>
     </section>
+  )
+}
+
+/** Workspace-only summary of durable completion and the current unread inbox.
+ * The snapshot is not a chat transcript: it provides at most five unread
+ * captain messages, with no timestamps, so do not imply a complete history.
+ */
+function WorkspaceSummary({ team, t, discarded }: { readonly team: ActivityTeam; readonly t: AgentTeamsTranslate; readonly discarded: boolean }) {
+  const completed = discarded ? 0 : team.tasks.filter(task => task.status === 'completed').length
+  const total = team.tasks.length
+  return (
+    <div className={css.workspaceSummary}>
+      <section className={css.completionCard} aria-label={t('progress.aria')}>
+        <h3>{t('progress.title')}</h3>
+        <div className={css.completionBody}>
+          <div className={css.completionRing} role="img" aria-label={t('team.stats.completed', { completed, total })} data-completed={completed} data-total={total}>
+            <svg viewBox="0 0 120 120" aria-hidden>
+              <circle className={css.ringTrack} cx="60" cy="60" r="51" />
+              <circle className={css.ringValue} cx="60" cy="60" r="51" pathLength="100" strokeDasharray={`${total === 0 ? 0 : completed / total * 100} 100`} />
+            </svg>
+            <span aria-hidden><strong>{completed}<small> / {total}</small></strong><span>{t(discarded ? 'task.status.notRun' : 'workspace.completed')}</span></span>
+          </div>
+          {total === 0 ? <p className={css.summaryEmpty}>{t('workspace.noTasks')}</p> : <ul className={css.completionTasks} tabIndex={0} aria-label={t('workspace.taskSummary')}>
+            {team.tasks.map(task => <li key={task.id} data-state={discarded ? 'cancelled' : taskTone(task.state, task.status)} data-verdict-stale={task.verdictStale === undefined ? undefined : 'true'} title={taskTitle(task, taskModelLabel(task, team.members))}>
+              <span className={css.completionDot} aria-hidden>{task.verdictStale !== undefined ? '!' : !discarded && task.status === 'completed' ? '✓' : '·'}</span>
+              <span className={css.completionTaskId}>{task.id}</span>
+              <span className={css.completionTaskSubject} title={task.subject}>{task.subject}</span>
+              <span className={css.completionTaskStatus}>{discarded ? t('task.status.notRun') : task.verdictStale !== undefined ? t('workspace.verdictStale') : taskStatusLabel(task.status, t)}</span>
+            </li>)}
+          </ul>}
+        </div>
+      </section>
+      <section className={css.inboxCard} aria-label={t('workspace.inbox')}>
+        <header><h3>{t('workspace.inbox')}</h3><span>{t('workspace.inboxHint')}</span></header>
+        {team.captainInbox.length === 0 ? <p className={css.summaryEmpty}>{t('workspace.inboxEmpty')}</p> : <ul className={css.inboxMessages} tabIndex={0} aria-label={t('workspace.inbox')}>
+          {team.captainInbox.map((message, index) => {
+            const member = team.members.find(candidate => candidate.name === message.from)
+            const art = message.from === CAPTAIN_ASSIGNEE ? LEAD_ART : memberArtUrl(message.from, member?.role ?? '')
+            return <li key={`${index}:${message.from}`}>
+              {art === null ? <span className={css.inboxInitial} aria-hidden>{memberInitial(message.from)}</span> : <img src={art} alt="" aria-hidden />}
+              <div><strong>{message.from}</strong><p>{message.content}</p></div>
+            </li>
+          })}
+        </ul>}
+      </section>
+    </div>
   )
 }
 
@@ -381,6 +431,7 @@ function DependencyMap({ tasks, members, t, discarded = false, workspace = false
   if (tasks.length === 0) return null
   const fallbackTask = tasks.find((task) => task.state === 'blocked')
     ?? tasks.find((task) => task.state === 'running')
+    ?? tasks.find((task) => task.state === 'claimed')
     ?? tasks[0]!
   const detailTask = tasks.find((task) => task.id === focusedTaskId) ?? fallbackTask
   const detailModel = taskModelLabel(detailTask, members)
@@ -440,6 +491,7 @@ function DependencyMap({ tasks, members, t, discarded = false, workspace = false
                     <span className={css.dagNodeLabel}>
                       {workspace ? task.subject : compactTaskLabel(task.subject)}
                     </span>
+                    {!discarded && task.state === 'claimed' && <span className={css.dagClaimedState}>{t('task.status.claimed')}</span>}
                     {task.state === 'running' && (
                       <span className={css.dagRunningState} aria-label={t('task.runningAria')}>
                         <WorkGlyph active />
@@ -746,6 +798,7 @@ export function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscar
       </section>
 
       <DependencyMap tasks={team.tasks} members={team.members} t={t} discarded={discarded} workspace={workspace} onSelectTask={setSelectedTaskId} />
+      {workspace && <WorkspaceSummary team={team} t={t} discarded={discarded} />}
       </section>
       <Modal
         open={stopOpen}

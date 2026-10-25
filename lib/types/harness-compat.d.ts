@@ -57,8 +57,33 @@ export type AgentTeamsSource = {
     readonly goal?: string;
     readonly profile?: string;
 };
-/** Stored session format generation of the running host; 0 when it exposes none. */
-export declare function hostSessionFormatVersion(): number;
+/** Anything that exposes the stored format generation on its live session header. */
+export interface SessionFormatBearer {
+    readonly session?: {
+        readonly header?: {
+            readonly version?: unknown;
+        };
+    } | undefined;
+}
+/**
+ * Stored format generation observed on a live session, when the host exposes it.
+ *
+ * The module constant is only a fallback: a plugin can resolve a *nested*
+ * `@deepseek-ai/dsh-session` copy that belongs to a different host generation
+ * than the process loading it (a profile whose lockfile pins the DSH package
+ * line, a Desktop shell with an embedded core, a duplicated store). That copy
+ * then reports the wrong generation — 0 on a v4 host — which selects the
+ * retired `plugin` wrapper and makes every durable AgentTeams message fail the
+ * host's own admission check (#236). The live session header belongs to the
+ * host that persists the message, so it outranks the resolved module.
+ */
+export declare function observedSessionFormatVersion(subject?: SessionFormatBearer): number | undefined;
+/**
+ * Stored session format generation of the running host; 0 when neither the live
+ * session nor the resolved module exposes one.
+ * @param observed - a live session observation; preferred over the module constant.
+ */
+export declare function hostSessionFormatVersion(observed?: number): number;
 /**
  * Source for one AgentTeams-authored message on the running host.
  *
@@ -71,9 +96,13 @@ export declare function hostSessionFormatVersion(): number;
  * the released plugin wrapper is used instead; the goal and profile already
  * travel in the message text.
  * @param modern - the producer-owned source to use where the host admits it.
+ * @param observed - the live session's stored format generation, when callers
+ * have the owning agent at hand. Never trust the resolved module alone: on a
+ * host whose profile pins another DSH line it reports a retired generation and
+ * the v4 writer rejects the wrapper (#236).
  * @returns a source accepted by the running host and by its migration chain.
  */
-export declare function agentTeamsSource(modern: AgentTeamsSource): MessageSource;
+export declare function agentTeamsSource(modern: AgentTeamsSource, observed?: number): MessageSource;
 /**
  * 0.1.6 moved startup admission to serial agent/created. Older created events
  * have no source and precede session-start; ignore those until the old hook.

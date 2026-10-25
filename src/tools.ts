@@ -71,7 +71,7 @@ import {
 import type { DeliveryAudit } from './quality-gates.ts'
 import { auditTeamWorkspace } from './workspace-audit.ts'
 import { readArtifactScope, snapshotWorkspacePaths, workspacePathExists } from './artifacts.ts'
-import { restrictableToolNames } from './harness-compat.ts'
+import { agentTeamsSource, observedSessionFormatVersion, restrictableToolNames } from './harness-compat.ts'
 import { memberSpawnRelaxableDeny, optionalToolPolicy, requireToolPolicy, resolveMemberToolFilter, type MemberToolFilter, type MemberToolPolicy } from './tool-policies.ts'
 import { isPmMemberName } from './tool-names.ts'
 import type { ContractAmendmentInput } from './state.ts'
@@ -385,6 +385,32 @@ function requireStagedTeam(team: TeamState): void {
 function trimmedOptional(value: string | null | undefined): string | undefined {
   const trimmed = value?.trim()
   return trimmed === undefined || trimmed === '' ? undefined : trimmed
+}
+
+/** Whether one materialized plan member carries no roster content at all. */
+function isEmptyPlanMember(member: unknown): boolean {
+  if (member === undefined || member === null) return true
+  if (typeof member !== 'object') return typeof member === 'string' && member.trim() === ''
+  return Object.values(member as Record<string, unknown>).every(value =>
+    value === undefined || value === null || (typeof value === 'string' && value.trim() === ''))
+}
+
+/**
+ * Some model gateways materialize optional object parameters instead of
+ * omitting them: a call that only passed `profile` arrives carrying
+ * `plan: { members: [], tasks: [] }`, or one placeholder member whose every
+ * field is blank (issue #234). Such a plan carries no roster, so it must count
+ * as an omitted plan — the same invariant issue #99 established for a blank
+ * `profile` string (a materialized blank equals "not provided").
+ * @param plan - the materialized inline plan argument.
+ * @returns whether the plan carries no member content and no task at all.
+ */
+function isEmptyInlinePlan(plan: { readonly members?: unknown, readonly tasks?: unknown }): boolean {
+  const members = plan.members
+  const tasks = plan.tasks
+  const emptyMembers = !Array.isArray(members) || members.length === 0 || members.every(member => isEmptyPlanMember(member))
+  const emptyTasks = !Array.isArray(tasks) || tasks.length === 0
+  return emptyMembers && emptyTasks
 }
 
 /**
@@ -964,7 +990,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
     try {
       captain.followup(createUserMessage({
         content: [{ type: 'text', text: stagedPlanFeedbackContext(prepared.teamName) }],
-        source: { kind: 'agent-teams' },
+        source: agentTeamsSource({ kind: 'agent-teams' }, observedSessionFormatVersion(captain)),
       }))
     } catch (error: unknown) {
       // Do not leave the durable UI in a false waiting state when the live
@@ -1002,7 +1028,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
     try {
       captain.inject(createUserMessage({
         content: [{ type: 'text', text: stagedPlanDiscardContext(discarded.teamName) }],
-        source: { kind: 'agent-teams' },
+        source: agentTeamsSource({ kind: 'agent-teams' }, observedSessionFormatVersion(captain)),
       }))
     } catch (error: unknown) {
       // The archive is already authoritative. Cancellation still prevents a
@@ -1196,7 +1222,11 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
       const profileName = args.profile !== undefined && args.profile.trim() !== ''
         ? args.profile.trim()
         : undefined
-      if (profileName !== undefined && args.plan !== undefined) throw new Error('choose either a configured profile or an inline plan')
+      // Gateways materialize the optional `plan` object the same way (issue
+      // #234): an empty shell carries no roster, so it is an omitted plan and
+      // the profile / inline-plan exclusion below stays untouched.
+      const inlinePlan = args.plan !== undefined && !isEmptyInlinePlan(args.plan) ? args.plan : undefined
+      if (profileName !== undefined && inlinePlan !== undefined) throw new Error('choose either a configured profile or an inline plan')
       const created = await withTeamLock(captainLockKey(stateRoot, captain.id), async () => {
         const current = await findTeamByParticipant(stateRoot, captain.id, await leadIdentityOfAsync(ctx, captain.session))
         if (current !== undefined) {
@@ -1212,7 +1242,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
           if (existing !== undefined) {
             throw new Error(`team id "${teamId}" is taken by another captain — pick a different team name`)
           }
-          if (profileName === undefined && args.plan === undefined) {
+          if (profileName === undefined && inlinePlan === undefined) {
             const state: TeamState = {
               name: teamName,
               id: teamId,
@@ -1237,7 +1267,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
             teamName,
             teamId,
             profileName: profileName ?? 'inline-plan',
-            inlinePlan: args.plan,
+            inlinePlan,
             description: args.description,
             staged,
           })
@@ -1280,7 +1310,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
       }
       const persisted = await readTeam(stateRoot, created.state.id).catch(() => undefined)
       const snapshot = persisted ?? created.state
-      if (snapshot.profile === undefined && args.plan === undefined) {
+      if (snapshot.profile === undefined && inlinePlan === undefined) {
         return {
           team_id: snapshot.id,
           team_name: snapshot.name,
@@ -1531,11 +1561,11 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
           throw new Error(`team "${fresh.name}" is at its member cap (${config.maxMembers})`)
         }
         const selection = await resolveMemberLlmSelection(ctx, captain, {
-          provider: args.provider,
-          model: args.model,
+          provider: trimmedOptional(args.provider),
+          model: trimmedOptional(args.model),
           defaultModel: config.memberModel,
           defaultProvider: config.memberLlmProvider,
-          reasoningEffort: args.reasoning_effort,
+          reasoningEffort: trimmedOptional(args.reasoning_effort),
           fallback: config.fallback,
         }, exec.signal)
         const toolSelection = memberToolSelection(config, captain, trimmedOptional(args.tool_policy), memberName)
@@ -1972,16 +2002,22 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         if (task.reassigning === true) {
           throw new Error(`task ${task.id} is being reassigned; wait for the handoff to finish`)
         }
+        // Gateways materialize this deprecated optional argument, and a model may
+        // also restate its own member name. A blank or self-valued assignee is
+        // harmless: it asks for exactly what a claim does anyway.
+        const requestedAssignee = typeof args.assignee === 'string' && args.assignee.trim() !== ''
+          ? args.assignee.trim()
+          : undefined
         let assignee = task.assignee
         if (identity.kind === 'captain') {
           // A captain may read the capability of its already-started takeover,
           // but must never create a member claim without dispatching it (#125).
-          if (args.assignee !== undefined || task.assignee !== CAPTAIN_KEY
+          if (requestedAssignee !== undefined || task.assignee !== CAPTAIN_KEY
               || (task.status !== 'claimed' && task.status !== 'in_progress')) {
             throw new Error('claim_task is for members claiming their own task; captains must use agent_teams_reassign_task to assign and wake a member')
           }
         } else {
-          if (args.assignee !== undefined) {
+          if (requestedAssignee !== undefined && requestedAssignee !== identity.name) {
             throw new Error('members cannot set assignee when claiming a task')
           }
           if (assignee !== undefined && assignee !== identity.name) {
@@ -3154,7 +3190,21 @@ async function initializeProfileTeam(input: {
   description?: string
   staged: boolean
 }): Promise<{ committed: true; state: TeamState }> {
-  const profile = resolveTeamProfile(input.inlinePlan === undefined ? input.config.profiles : { [input.profileName]: input.inlinePlan }, input.profileName, input.config.maxMembers)
+  // Tool gateways can materialize omitted optional strings as blanks (#234).
+  // Normalize only the tool-supplied roster; owner profile validation remains
+  // strict, and required fields, unknown policies and route pairing still fail.
+  const inlinePlan = input.inlinePlan === undefined ? undefined : {
+    ...input.inlinePlan,
+    members: input.inlinePlan.members.map(member => ({
+      ...member,
+      role: trimmedOptional(member.role),
+      provider: trimmedOptional(member.provider),
+      model: trimmedOptional(member.model),
+      reasoning_effort: trimmedOptional(member.reasoning_effort),
+      tool_policy: trimmedOptional(member.tool_policy),
+    })),
+  }
+  const profile = resolveTeamProfile(inlinePlan === undefined ? input.config.profiles : { [input.profileName]: inlinePlan }, input.profileName, input.config.maxMembers)
   const selections: Awaited<ReturnType<typeof resolveMemberLlmSelection>>[] = []
   for (const template of profile.members) {
     selections.push(await resolveMemberLlmSelection(input.ctx, input.captain, {

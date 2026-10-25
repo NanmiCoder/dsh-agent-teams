@@ -22,6 +22,11 @@ export declare const zh: {
     'workspace.completed': string;
     'workspace.focus': string;
     'workspace.noTasks': string;
+    'workspace.inbox': string;
+    'workspace.inboxHint': string;
+    'workspace.inboxEmpty': string;
+    'workspace.taskSummary': string;
+    'workspace.verdictStale': string;
     'card.memberCount': string;
     'action.openActivityPanel': string;
     'activity.panelButton': string;
@@ -83,6 +88,7 @@ export declare const zh: {
     'task.summary.blockedAndRunning': string;
     'task.summary.more': string;
     'task.summary.running': string;
+    'task.summary.claimed': string;
     'task.summary.ready': string;
     'task.summary.blocked': string;
     'task.summary.failedSettled': string;
@@ -90,6 +96,7 @@ export declare const zh: {
     'progress.aria': string;
     'progress.title': string;
     'progress.running': string;
+    'progress.claimed': string;
     'progress.blocked': string;
     'progress.delivered': string;
     'dependency.aria': string;
@@ -237,6 +244,11 @@ export declare const en: {
     'workspace.completed': string;
     'workspace.focus': string;
     'workspace.noTasks': string;
+    'workspace.inbox': string;
+    'workspace.inboxHint': string;
+    'workspace.inboxEmpty': string;
+    'workspace.taskSummary': string;
+    'workspace.verdictStale': string;
     'card.memberCount': string;
     'action.openActivityPanel': string;
     'activity.panelButton': string;
@@ -298,6 +310,7 @@ export declare const en: {
     'task.summary.blockedAndRunning': string;
     'task.summary.more': string;
     'task.summary.running': string;
+    'task.summary.claimed': string;
     'task.summary.ready': string;
     'task.summary.blocked': string;
     'task.summary.failedSettled': string;
@@ -305,6 +318,7 @@ export declare const en: {
     'progress.aria': string;
     'progress.title': string;
     'progress.running': string;
+    'progress.claimed': string;
     'progress.blocked': string;
     'progress.delivered': string;
     'dependency.aria': string;

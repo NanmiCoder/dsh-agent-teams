@@ -665,6 +665,7 @@
 
 .progressLegend {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   color: var(--dsw-alias-label-tertiary);
   font-size: 9.5px;
@@ -2194,55 +2195,140 @@
   }
 }
 
-/* Native workspace shares the team's content, never the legacy overlay geometry. */
+/* The native workspace queries its host pane, not the whole browser width. */
 .dagOwner { margin-left: auto; max-width: 64px; overflow: hidden; text-overflow: ellipsis; font-size: 9px; font-weight: 400; }
-/* Native grid and its children must query the same workspace container.
- * The legacy team's nested container made the grid switch before its children
- * at widths where the workspace padding straddled a breakpoint. */
-.team[data-workspace-team] { container-type: normal; container-name: none; padding: 0; border: 0; background: transparent; }
-.team[data-workspace-team] .teamHead { flex-wrap: wrap; gap: 8px; padding-bottom: 18px; }
-.team[data-workspace-team] .teamName { font-size: 15px; }
-.team[data-workspace-team] .teamStats { flex-wrap: wrap; }
-.team[data-workspace-team] .delegationSection { min-width: 0; }
-.team[data-workspace-team] .dependencySection { min-width: 0; }
-.team[data-workspace-team] .dagNodeLabel { white-space: normal; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.4; }
-.team[data-workspace-team] .sectionHead { flex-wrap: wrap; gap: 6px; }
-.team[data-workspace-team] .sectionHint { white-space: normal; }
-.team[data-workspace-team] .memberLine { flex-wrap: wrap; }
-.team[data-workspace-team] .memberStatusLine { white-space: normal; }
-.team[data-workspace-team] .taskDetailSubject { white-space: normal; }
-.team[data-workspace-team] .dagViewport { padding-bottom: 12px; }
-@container (min-width: 1000px) {
-  .team[data-workspace-team] { display: grid; grid-template-columns: minmax(260px, .85fr) minmax(0, 1.35fr); column-gap: 32px; align-items: start; }
-  .team[data-workspace-team] > .teamHead { grid-column: 1 / -1; }
-  .team[data-workspace-team] > :not(.teamHead):not(.delegationSection):not(.dependencySection) { grid-column: 1 / -1; }
-  .team[data-workspace-team] .dependencySection { margin: 0; border-top: 0; border-left: 1px solid var(--dsw-alias-border-l2); padding: 0 0 0 28px; }
-  .team[data-workspace-team] .captainNode { padding-top: 0; }
-  .team[data-workspace-team] .dagCanvas[data-layout='parallel'] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.team[data-workspace-team] {
+  container-type: normal; container-name: none; padding: 0; border: 0; background: transparent; gap: 14px;
+  --workspace-surface: var(--dsw-alias-bg-layer-1);
+  --workspace-line: color-mix(in srgb, var(--dsw-alias-border-l2) 75%, transparent);
+  --workspace-shadow: 0 3px 14px color-mix(in srgb, var(--dsw-alias-label-primary) 3%, transparent);
 }
-.team[data-workspace-team] .dagNode { padding: 10px 11px; border-radius: 9px; }
-.team[data-workspace-team] .dagNodeHead { font-size: 10px; margin-bottom: 7px; }
-.team[data-workspace-team] .dagNodeLabel { font-size: 12px; letter-spacing: 0; }
-.team[data-workspace-team] .dagOwner { font-size: 10px; }
-.team[data-workspace-team] .taskDetail { margin-top: 14px; padding: 14px; }
+.team[data-workspace-team] .teamHead { flex-wrap: wrap; gap: 8px; padding: 0 2px 2px; }
+.team[data-workspace-team] .teamName { flex-basis: 160px; font-size: 14px; line-height: 1.5; }
+.team[data-workspace-team] .teamStats { flex-wrap: wrap; font-size: 11px; }
+.team[data-workspace-team] .teamStopButton { width: 32px; height: 32px; border-radius: 9px; }
+.team[data-workspace-team] .delegationSection,
+.team[data-workspace-team] .dependencySection,
+.completionCard, .inboxCard {
+  min-width: 0; margin: 0; padding: 18px; border: 1px solid var(--workspace-line); border-radius: 18px;
+  background: var(--workspace-surface); box-shadow: var(--workspace-shadow); box-sizing: border-box;
+}
+.team[data-workspace-team] .captainNode {
+  grid-template-columns: 44px minmax(0, 1fr); gap: 8px; padding: 10px; border-radius: 12px;
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 4%, var(--dsw-alias-bg-module-platform)); border-color: var(--workspace-line);
+}
+.team[data-workspace-team] .captainState { grid-column: 2; justify-self: start; font-size: 11px; }
 .team[data-workspace-team] .captainName { font-size: 14px; }
 .team[data-workspace-team] .captainRole { font-size: 11px; }
-.team[data-workspace-team] .captainSummary { font-size: 12px; line-height: 1.6; }
-.team[data-workspace-team] .captainState { font-size: 11px; }
+.team[data-workspace-team] .captainSummary { font-size: 12px; line-height: 1.6; white-space: normal; }
+.team[data-workspace-team] .progressOverview { margin: 16px 0; gap: 9px; }
+.team[data-workspace-team] .progressSegments { gap: 4px; }
+.team[data-workspace-team] .progressSegments > span { height: 6px; border-radius: 4px; }
+.team[data-workspace-team] .progressLegend { gap: 8px 12px; font-size: 11px; }
+.team[data-workspace-team] .progressSummary { font-size: 11px; line-height: 1.6; }
+.team[data-workspace-team] .progressSummary > span:last-child { white-space: normal; }
+.team[data-workspace-team] .membersToggle { padding: 10px; border-radius: 9px; background: var(--dsw-alias-bg-module-platform); font-size: 11px; }
+.team[data-workspace-team] .memberBlock { padding-top: 14px; padding-bottom: 8px; }
+.team[data-workspace-team] .memberRow { border-radius: 9px; }
+.team[data-workspace-team] .memberLine { flex-wrap: wrap; gap: 4px 6px; }
 .team[data-workspace-team] .memberName { font-size: 13px; }
 .team[data-workspace-team] .memberRole, .team[data-workspace-team] .memberState, .team[data-workspace-team] .memberCount { font-size: 11px; }
-.team[data-workspace-team] .memberStatusLine { font-size: 12px; line-height: 1.6; }
-.team[data-workspace-team] .taskDetailSubject { font-size: 13px; line-height: 1.6; }
+.team[data-workspace-team] .memberRole { padding: 1px 5px; border-radius: 5px; background: var(--dsw-alias-bg-module-platform); }
+.team[data-workspace-team] .memberStatusLine { white-space: normal; font-size: 12px; line-height: 1.6; }
+.team[data-workspace-team] .assignmentLine { flex-wrap: wrap; row-gap: 5px; }
+.team[data-workspace-team] .assignmentLabel { font-size: 10px; }
+.team[data-workspace-team] .assignmentChip { font-size: 10px; line-height: 18px; border-radius: 5px; }
+.team[data-workspace-team] .memberBlock[data-selected-member] .memberRow { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 3px; }
+.team[data-workspace-team] .sectionHead { flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+.team[data-workspace-team] .sectionToggleTitle { font-size: 12px; }
+.team[data-workspace-team] .sectionHint { white-space: normal; font-size: 11px; line-height: 1.6; }
+.team[data-workspace-team] .dagViewport { padding: 4px 2px 14px; }
+.team[data-workspace-team] .dagNode { padding: 10px 11px; border-radius: 11px; background: var(--workspace-surface); }
+.team[data-workspace-team] .dagNodeHead { font-size: 11px; margin-bottom: 6px; }
+.team[data-workspace-team] .dagNodeLabel { white-space: normal; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.4; font-size: 12px; letter-spacing: 0; }
+.team[data-workspace-team] .dagOwner { font-size: 10px; white-space: nowrap; max-width: 105px; }
+.team[data-workspace-team] .taskDetail { margin-top: 14px; padding: 14px; border-radius: 11px; }
+.team[data-workspace-team] .taskDetailSubject { white-space: normal; font-size: 13px; line-height: 1.6; }
 .team[data-workspace-team] .taskDetailLine, .team[data-workspace-team] .taskDetailMeta { font-size: 12px; line-height: 1.6; }
-.team[data-workspace-team] .captainNode { background: var(--dsw-alias-bg-module-platform); border-color: var(--dsw-alias-border-l2); }
-.team[data-workspace-team] .planEditor { background: transparent; border-color: var(--dsw-alias-border-l2); padding: 16px; margin: 0 0 24px; }
-@container (min-width: 1000px) {
-  .team[data-workspace-team]:has(> [data-staging-editor]) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-  .team[data-workspace-team] > [data-staging-editor] { grid-column: 1 !important; grid-row: 2 / 4; }
-  .team[data-workspace-team]:has(> [data-staging-editor]) > .delegationSection { grid-column: 2; grid-row: 2; }
-  .team[data-workspace-team]:has(> [data-staging-editor]) > .dependencySection { grid-column: 2; grid-row: 3; border-left: 0; padding: 24px 0 0; }
-}
-.team[data-workspace-team] .memberBlock[data-selected-member] .memberRow { outline: 1px solid var(--dsw-alias-state-business-primary); outline-offset: 3px; }
-.team[data-workspace-team] .dagOwner { white-space: nowrap; max-width: 105px; }
-/* The page scrolls as a whole; an overlay approval bar would cover form saves. */
+.team[data-workspace-team] .planEditor { background: var(--workspace-surface); border-color: var(--workspace-line); padding: 18px; margin: 0; border-radius: 18px; }
 .team[data-workspace-team] .planApproveRow { position: static; }
+.workspaceSummary { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; min-width: 0; }
+.completionCard h3, .inboxCard h3 { margin: 0; font-size: 12px; line-height: 1.6; font-weight: 600; color: var(--dsw-alias-label-secondary); }
+.completionBody { display: flex; flex-wrap: wrap; align-items: center; gap: 20px; margin-top: 16px; }
+.completionRing { position: relative; width: 132px; height: 132px; flex: none; }
+.completionRing svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.completionRing circle { fill: none; stroke-width: 7; }
+.ringTrack { stroke: var(--dsw-alias-border-l2); }
+.ringValue { stroke: var(--dsw-alias-state-business-primary); }
+.completionRing > span { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 5px; color: var(--dsw-alias-label-secondary); font-size: 11px; }
+.completionRing strong { color: var(--dsw-alias-label-primary); font-size: 26px; line-height: 1.2; font-weight: 600; letter-spacing: -.7px; font-variant-numeric: tabular-nums; }
+.completionRing small { font-size: 18px; font-weight: 450; }
+.completionTasks { flex: 1 1 200px; min-width: 0; max-height: 216px; overflow: auto; list-style: none; margin: 0; padding: 2px; }
+.completionTasks li { display: grid; grid-template-columns: 18px auto minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--workspace-line); font-size: 11px; }
+.completionTasks li:last-child { border: 0; }
+.completionDot { display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: var(--dsw-alias-bg-module-platform); color: var(--dsw-alias-label-secondary); }
+.completionTasks li[data-state='completed'] .completionDot { background: var(--dsw-alias-state-business-primary); color: var(--dsw-alias-label-primary-inverted); }
+.completionTasks li[data-state='failed'] .completionDot { background: var(--dsw-alias-state-error-primary); color: var(--dsw-alias-label-primary-inverted); }
+.completionTaskId { max-width: 6em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dsw-alias-label-secondary); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.completionTaskSubject { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.completionTaskStatus { color: var(--dsw-alias-label-secondary); font-size: 10px; }
+.completionTasks li[data-verdict-stale] .completionDot { background: var(--dsw-alias-state-warn-primary); color: var(--dsw-alias-label-primary); }
+.completionTasks li[data-verdict-stale] .completionTaskStatus { font-weight: 600; }
+.completionTasks:focus-visible, .inboxMessages:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary); outline-offset: 3px; border-radius: 4px; }
+.inboxCard > header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; }
+.inboxCard > header > span { font-size: 10px; color: var(--dsw-alias-label-secondary); }
+.inboxMessages { list-style: none; margin: 14px 0 0; padding: 0; max-height: 260px; overflow: auto; }
+.inboxMessages li { display: flex; align-items: start; gap: 9px; margin: 0 0 12px; }
+.inboxMessages img, .inboxInitial { width: 30px; height: 30px; object-fit: contain; flex: none; }
+.inboxInitial { display: grid; place-items: center; border-radius: 9px; background: var(--dsw-alias-bg-module-platform); font-size: 12px; }
+.inboxMessages li > div { min-width: 0; flex: 1; }
+.inboxMessages strong { font-size: 11px; font-weight: 550; overflow-wrap: anywhere; }
+.inboxMessages p { margin: 5px 0 0; padding: 9px 11px; border-radius: 0 10px 10px; background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 6%, var(--dsw-alias-bg-module-platform)); font-size: 12px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.summaryEmpty { margin: 14px 0 0; color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 1.8; }
+/* Unnamed queries are intentional: CSS Modules scope container names per file,
+ * while the queried container is declared by WorkspaceActivity.module.css. */
+@container (min-width: 800px) {
+  .team[data-workspace-team] { display: grid; grid-template-columns: minmax(280px, .8fr) minmax(0, 1.4fr); gap: 16px; align-items: start; }
+  .team[data-workspace-team] > .teamHead, .team[data-workspace-team] > [data-staging-editor], .workspaceSummary { grid-column: 1 / -1; }
+  .workspaceSummary { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+  .team[data-workspace-team] .dependencySection { align-self: stretch; }
+  .team[data-workspace-team] .dagCanvas[data-layout='parallel'] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container (max-width: 400px) {
+  .team[data-workspace-team] .delegationSection, .team[data-workspace-team] .dependencySection, .completionCard, .inboxCard { padding: 12px; border-radius: 14px; }
+  .team[data-workspace-team] .teamStats { font-size: 10px; gap: 6px; }
+  .completionBody { justify-content: center; }
+}
+
+/* Claimed owns an attempt but has not acknowledged in_progress yet. */
+.progressSegments > span[data-state='claimed'],
+.dagNode[data-state='claimed'] .dagNodeDot {
+  background: var(--dsw-alias-state-warn-primary);
+}
+
+.progressLegend > span[data-state='claimed'] {
+  color: var(--dsw-alias-state-warn-primary);
+}
+
+.dagNode[data-state='claimed'] {
+  border-color: var(--dsw-alias-state-warn-primary);
+}
+
+.dagNode[data-state='claimed'] .dagNodeHead {
+  padding-right: 38px;
+}
+
+.dagClaimedState {
+  position: absolute;
+  top: 4px;
+  right: 5px;
+  color: var(--dsw-alias-state-warn-primary);
+  font-size: 8px;
+  line-height: 10px;
+}
+
+.assignmentChip[data-state='claimed'],
+.taskDetailBadge[data-state='claimed'] {
+  background: var(--dsw-alias-state-warn-primary);
+  color: var(--dsw-alias-label-primary-inverted);
+}

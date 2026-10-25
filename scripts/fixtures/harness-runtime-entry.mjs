@@ -2,12 +2,12 @@
  * Tests transport and business behavior; it does not measure model intent accuracy.
  */
 import assert from 'node:assert/strict';
-import { createUserMessage } from '@deepseek-ai/dsh-llm';
+import { createUserMessage, ToolCallId } from '@deepseek-ai/dsh-llm';
 import { readFileSync, appendFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 export const name = 'runtime-lab-progressive-entry';
-export const inject = ['agents', 'sessions', 'commands', 'systemPrompt'];
+export const inject = ['agents', 'sessions', 'commands', 'systemPrompt', 'tools'];
 export function apply(ctx) {
     void (async () => {
         await ctx.get('loader').await();
@@ -84,6 +84,7 @@ export function apply(ctx) {
             assert.ok(completed.members[0].id);
             const memberRequests = trace().filter(x => x.event === 'request' && !x.purpose && x.sessionId === completed.members[0].id);
             assert.ok(memberRequests.length > 0);
+            assert.ok(trace().some(x => x.event === 'materialized-claim-passed' && x.sessionId === completed.members[0].id));
             for (const request of memberRequests) assert.deepEqual(request.toolNames.filter(n => n.startsWith('agent_teams_')).sort(), ['agent_teams_claim_task', 'agent_teams_send_message', 'agent_teams_status', 'agent_teams_update_task']);
             await send(agent, 'END_ENTRY: End and archive this team.');
             assert.equal(existsSync(statePath), false);
@@ -97,6 +98,64 @@ export function apply(ctx) {
             appendFileSync(process.env.LAB_TRACE, JSON.stringify({ event: 'stable-prefix-passed', label, requests: budgets.length, precedingOrdinaryTurns: label === 'natural' ? 30 : 0, systemSha256: budgets[0].systemSha256, toolsSha256: budgets[0].toolsSha256 }) + '\n');
             appendFileSync(process.env.LAB_TRACE, JSON.stringify({ event: 'entry-case-passed', label, captain: agent.id, member: completed.members[0].id }) + '\n');
         }
+        // #234: exercise the real tool schema and persistence boundary. A
+        // materialized optional string must behave like an omitted field,
+        // while required inputs and owner-declared policies stay validated.
+        const optionalCases = [
+            ['omitted', {}, false],
+            ...['role', 'provider', 'model', 'reasoning_effort', 'tool_policy'].map(field => [`blank-${field}`, { [field]: '  ' }, false]),
+            ['all-blank', { role: '', provider: '', model: '', reasoning_effort: '', tool_policy: '' }, false],
+            ['explicit-route', { provider: 'runtime-lab', model: 'fixture-model', reasoning_effort: 'high' }, false],
+            ['unknown-policy', { tool_policy: 'not-configured' }, true],
+            ['provider-without-model', { provider: 'runtime-lab', model: '' }, true],
+            ['blank-name', { name: '' }, true],
+            ['wrong-type', { model: 23 }, true],
+        ];
+        const optionalObservations = [];
+        let callSeq = 0;
+        const execute = (agent, name, args) => ctx.tools.execute({ name: `agent_teams_${name}`, arguments: args,
+            callId: ToolCallId(`optional-member-${++callSeq}`), agent, signal: new AbortController().signal });
+        for (const [label, plan] of [
+            ['empty-arrays', { members: [], tasks: [] }],
+            ['blank-member', { members: [{ name: '', role: '', provider: '', model: '', reasoning_effort: '', tool_policy: '' }], tasks: [] }],
+        ]) for (const profile of [undefined, 'demo-profile']) {
+            const { agent, cwd } = await create(`shell-${label}-${profile ?? 'plain'}`);
+            const result = await execute(agent, 'create', { name: 'shell', approval: 'required', ...(profile ? { profile } : {}), plan });
+            assert.equal(result.isError, false, JSON.stringify(result));
+            const state = JSON.parse(readFileSync(join(cwd, '.agent-teams/shell/team.json'), 'utf8'));
+            assert.equal(state.phase, 'staged');
+            assert.deepEqual(state.members.map(m => m.name), profile ? ['worker'] : []);
+            assert.equal(state.profile?.name, profile);
+            assert.equal(state.tasks.length, 0);
+            appendFileSync(process.env.LAB_TRACE, JSON.stringify({ event: 'materialized-plan-passed', label, profile }) + '\n');
+        }
+        for (const mode of ['inline', 'add']) for (const [label, fields, expectedError] of optionalCases) {
+            const { agent, cwd } = await create(`optional-${mode}-${label}`);
+            const member = { name: 'worker', ...fields };
+            const statePath = join(cwd, '.agent-teams/optional/team.json');
+            if (mode === 'add') assert.equal((await execute(agent, 'create', { name: 'optional', approval: 'required' })).isError, false);
+            const before = existsSync(statePath) ? readFileSync(statePath, 'utf8') : undefined;
+            const result = await execute(agent, mode === 'inline' ? 'create' : 'add_member', mode === 'inline'
+                ? { name: 'optional', approval: 'required', plan: { members: [member], tasks: [{ id: 'work', subject: 'Verify optional fields', assignee: 'worker' }] } }
+                : member);
+            const after = existsSync(statePath) ? readFileSync(statePath, 'utf8') : undefined;
+            const state = after === undefined ? undefined : JSON.parse(after);
+            const passed = result.isError === expectedError && (expectedError ? after === before
+                : state?.phase === 'staged' && state.members.length === 1 && state.members[0].id === ''
+                    && state.members[0].provider === 'runtime-lab' && state.members[0].model === 'fixture-model'
+                    && state.members[0].toolPolicy === undefined
+                    && (label !== 'explicit-route' || state.members[0].reasoningEffort === 'high'));
+            const observation = { event: 'optional-member-input', mode, label, passed, expectedError, result };
+            optionalObservations.push(observation);
+            appendFileSync(process.env.LAB_TRACE, JSON.stringify(observation) + '\n');
+        }
+        const missing = await create('optional-missing-assignee');
+        const missingResult = await execute(missing.agent, 'create', { name: 'optional', approval: 'required',
+            plan: { members: [{ name: 'worker', model: '' }], tasks: [{ id: 'work', subject: 'Missing assignee' }] } });
+        assert.equal(missingResult.isError, true);
+        assert.match(JSON.stringify(missingResult), /missing an assignee/);
+        assert.equal(existsSync(join(missing.cwd, '.agent-teams/optional/team.json')), false);
+        assert.ok(optionalObservations.every(row => row.passed), JSON.stringify(optionalObservations.filter(row => !row.passed)));
         for (const agent of ctx.agents.list()) {
             await agent.whenIdle();
             // Best effort: a handle may close while this loop awaits an earlier

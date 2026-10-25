@@ -241,9 +241,10 @@ export declare function readArchivedTeam(stateRoot: string, teamId: string): Pro
  */
 export declare function listArchivedTeamIds(stateRoot: string): Promise<string[]>;
 /** Visual task state for the activity panel. */
-export type VisualTaskState = 'blocked' | 'open' | 'running' | 'completed' | 'failed' | 'cancelled';
+export type VisualTaskState = 'blocked' | 'open' | 'claimed' | 'running' | 'completed' | 'failed' | 'cancelled';
 /**
- * The visual state of one task: `running` while in_progress, `completed`
+ * The visual state of one task: `claimed` after assignment, `running` only
+ * after the explicit in_progress update, `completed`
  * when done, `failed`/`cancelled` when terminal without success, `blocked`
  * while any dependency is unfinished, else `open`.
  */

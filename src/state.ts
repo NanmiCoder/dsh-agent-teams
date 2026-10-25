@@ -1235,10 +1235,11 @@ export async function listArchivedTeamIds(stateRoot: string): Promise<string[]> 
 // ── activity snapshot (server-side, like the Claude Code desktop watcher) ──
 
 /** Visual task state for the activity panel. */
-export type VisualTaskState = 'blocked' | 'open' | 'running' | 'completed' | 'failed' | 'cancelled'
+export type VisualTaskState = 'blocked' | 'open' | 'claimed' | 'running' | 'completed' | 'failed' | 'cancelled'
 
 /**
- * The visual state of one task: `running` while in_progress, `completed`
+ * The visual state of one task: `claimed` after assignment, `running` only
+ * after the explicit in_progress update, `completed`
  * when done, `failed`/`cancelled` when terminal without success, `blocked`
  * while any dependency is unfinished, else `open`.
  */
@@ -1251,6 +1252,7 @@ export function taskVisualState(
   if (status === 'failed') return 'failed'
   if (status === 'cancelled') return 'cancelled'
   if (status === 'in_progress') return 'running'
+  if (status === 'claimed') return 'claimed'
   const byId = new Map(tasks.map((task) => [task.id, task]))
   const openDependency = dependencies.some((dependencyId) => {
     const dependency = byId.get(dependencyId)

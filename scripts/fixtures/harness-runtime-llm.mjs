@@ -57,8 +57,18 @@ class FixtureAdapter extends LlmAdapter {
             if (!userText.includes('AgentTeams automatic task assignment') && !userText.includes('COLD_WAKE_FIXTURE'))
                 chunks = textChunks('MEMBER_READY');
             else if (!names.includes('agent_teams_claim_task'))
-                chunks = call('agent_teams_claim_task', { task_id: 't1' });
+                chunks = call('agent_teams_claim_task', { task_id: 't1', ...(process.env.LAB_SCENARIO === 'progressive-entry' ? { assignee: '' } : {}) });
+            else if (process.env.LAB_SCENARIO === 'progressive-entry' && tools.filter(t => t.name === 'agent_teams_claim_task').length === 1)
+                chunks = call('agent_teams_claim_task', { task_id: 't1', assignee: 'worker' });
             else if (tools.filter(t => t.name === 'agent_teams_update_task').length < 2) {
+                if (process.env.LAB_SCENARIO === 'progressive-entry') {
+                    const claims = tools.filter(t => t.name === 'agent_teams_claim_task');
+                    const results = claims.map(t => blocks.find(b => b.type === 'tool-result' && b.toolCallId === t.id));
+                    const attempts = results.map(r => JSON.stringify(r).match(/attempt_id ([^,\s)]+)/)?.[1]);
+                    if (results.some(r => !r || r.isError) || attempts.length !== 2 || !attempts[0] || attempts[0] !== attempts[1])
+                        throw Error('Materialized blank/self claim must keep the same attempt capability');
+                    record({ event: 'materialized-claim-passed', sessionId: options.sessionId, attempt: attempts[0] });
+                }
                 const attempt = toolText.match(/attempt_id ([^,\s)]+)/)?.[1];
                 if (!attempt)
                     throw Error('Fixture could not read model-visible claim capability');

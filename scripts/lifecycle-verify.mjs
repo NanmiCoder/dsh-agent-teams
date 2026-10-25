@@ -15,7 +15,7 @@ import { LlmError } from '@deepseek-ai/dsh-llm'
 import { haltTeamWork, registerAgentTeamsTools } from '../lib/tools.js'
 import { buildActivationDirective, invokedAgentTeamsGoal, invokedAgentTeamsInvocation, installAgentTeamsGestureBoundary, profileCommandName, registerAgentTeamsCommand } from '../lib/command.js'
 import { readArchivedTeam, readMailbox, readTeam, readUnreadMailbox } from '../lib/state.js'
-import { collectArchivedTeamsActivity } from '../lib/snapshot.js'
+import { assembleTeamSnapshot, collectArchivedTeamsActivity } from '../lib/snapshot.js'
 
 const deliveryHarness = process.argv.includes('--delivery-harness')
 const modernHarness = deliveryHarness || process.argv.includes('--modern-harness')
@@ -776,6 +776,17 @@ try {
   const builder = [...liveAgents.values()].find(agent => qualityTeam?.members.some(member => member.id === agent.id && member.name === 'builder'))
   let criticMember
   const implClaim = await call('agent_teams_claim_task', { task_id: impl.task_id }, builder)
+  const claimedSnapshot = await assembleTeamSnapshot(ctx, stateRoot, workspace, await readTeam(stateRoot, 'quality-loop'))
+  const claimedCard = claimedSnapshot.tasks.find(item => item.id === impl.task_id)
+  check('#262 dispatched working member retains a distinct claimed card before in_progress',
+    builder.status === 'running' && implClaim.status === 'claimed'
+      && claimedCard.status === 'claimed' && claimedCard.state === 'claimed',
+    JSON.stringify({ member: builder.status, status: implClaim.status, visual: claimedCard.state }))
+  let directClaimedCompletion = ''
+  try {
+    await call('agent_teams_update_task', { task_id: impl.task_id, status: 'completed', attempt_id: implClaim.attempt_id }, builder)
+  } catch (error) { directClaimedCompletion = String(error.message) }
+  check('#262 claimed still cannot skip in_progress', directClaimedCompletion.includes('cannot move from "claimed" to "completed"'))
   for (const attempt_id of [undefined, '']) {
     let missingAttemptError = ''
     try { await call('agent_teams_update_task', { task_id: impl.task_id, status: 'in_progress', ...(attempt_id === undefined ? {} : { attempt_id }) }, builder) }
@@ -785,6 +796,10 @@ try {
         && (await readTeam(stateRoot, 'quality-loop')).tasks.find(t => t.id === impl.task_id).attemptId === implClaim.attempt_id)
   }
   await call('agent_teams_update_task', { task_id: impl.task_id, status: 'in_progress', attempt_id: implClaim.attempt_id }, builder)
+  const runningSnapshot = await assembleTeamSnapshot(ctx, stateRoot, workspace, await readTeam(stateRoot, 'quality-loop'))
+  check('#262 explicit in_progress changes the same attempt to running',
+    runningSnapshot.tasks.find(item => item.id === impl.task_id).state === 'running'
+      && (await readTeam(stateRoot, 'quality-loop')).tasks.find(item => item.id === impl.task_id).attemptId === implClaim.attempt_id)
   let illegalCompleteRejected = false
   try {
     await call('agent_teams_update_task', {

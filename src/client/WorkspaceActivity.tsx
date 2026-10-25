@@ -8,6 +8,7 @@ import type { AgentTeamsCardData } from './agent-teams-card-definition.ts'
 import { currentSessionId } from './session-navigation.ts'
 import { getActivityMonitorTargetsSnapshot, getActivitySnapshotsSnapshot, startActivityPolling, subscribeActivityMonitorTargets, subscribeActivitySnapshots, updateActivitySnapshots } from './activity-monitor.ts'
 import { createTeamDiscovery, type WorkspaceActivityState } from './workspace-state.ts'
+import { LEAD_ART } from './artwork.ts'
 import css from './WorkspaceActivity.module.css'
 
 export const TEAM_TAB_KIND = 'agent-teams'
@@ -114,6 +115,11 @@ export function WorkspaceActivity({ sessionId, useTabInfo, t, state, modelDirect
   return (
     <div className={css.root} data-agent-teams-workspace data-session-id={sessionId}>
       <div className={css.content}>
+        <header className={css.heading}>
+          <img src={LEAD_ART} alt="" aria-hidden />
+          <h2>AgentTeams</h2>
+          <span>{t('workspace.title')}</span>
+        </header>
         {status === 'error' && <div className={css.error} role="alert"><span>{t('workspace.error')}</span><button onClick={() => setRetry(value => value + 1)}>{t('workspace.retry')}</button></div>}
         {records.length > 1 && <nav className={css.selector} aria-label={t('workspace.title')}>
           {records.map(team => <button key={team.teamId} aria-pressed={selected?.teamId === team.teamId} onClick={() => state.select(sessionId, team.teamId)}>{team.name}<span>{t(live.includes(team) ? 'workspace.current' : 'workspace.history')}</span></button>)}

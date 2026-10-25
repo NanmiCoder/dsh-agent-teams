@@ -14,6 +14,7 @@
 import type { Context } from '@deepseek-ai/cordis';
 import { type Agent, type ModelSelection } from '@deepseek-ai/dsh-agent';
 import type { Session } from '@deepseek-ai/dsh-session';
+import { type SessionFormatBearer } from './harness-compat.ts';
 import type { MemberToolFilter } from './tool-policies.ts';
 import { type TeamMember, type TeamState, type TeamTask } from './types.ts';
 /** Persona snapshot of a profile protocol; the full text lives on team.json. */
@@ -144,7 +145,7 @@ export declare function selectFallbackRoute(current: {
     };
 };
 /** Deliver a durable member report to the live captain at its next model step. */
-export declare function steerCaptainReport(captain: Pick<Agent, 'steer'>, from: string, content: string, receipt?: string): boolean;
+export declare function steerCaptainReport(captain: Pick<Agent, 'steer'> & SessionFormatBearer, from: string, content: string, receipt?: string): boolean;
 interface FailedMemberAttempt {
     readonly captainSessionId: string;
     readonly memberId: string;

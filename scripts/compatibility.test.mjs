@@ -217,6 +217,7 @@ test('doctor detects peer-only drift and a mismatched installed plugin', t => {
 
 test('released target enters the download matrix and replaces the old source prediction', () => {
   assert.equal(policy.recommendedHost, '0.2.1-rc.2')
+  assert.ok(validatePolicy(policy).includes('0.2.1-rc.4'))
   assert.ok(validatePolicy(policy).includes('0.2.1-rc.3'))
   assert.ok(validatePolicy(policy).includes('0.2.1-rc.2'))
   assert.ok(validatePolicy(policy).includes('0.2.1-rc.1'))

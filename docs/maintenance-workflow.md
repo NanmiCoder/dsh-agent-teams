@@ -12,10 +12,11 @@
 
 `scripts/harness-validation.mjs` 从同一清单生成执行目标并校验对应报告。新目标默认 Ubuntu + Windows，并必须通过真实 `plugin-manager-install`；无需更新脚本或 YAML 中的版本数组。旧目标的 `platforms` 与 `legacyDirectInstallReason` 显式记录历史覆盖限制，不能作为新增目标时复制的默认模板。新增例外须说明实际原因并审查。尚未列入支持清单的候选也会运行安装探针；探针通过本身不授予支持资格。
 
-发布前源码预适配记录在同一清单的 `sourceCandidates`，包含预计版本、官方源码完整 SHA 和证据路径。peer 精确枚举已发布支持目标与源码候选；`--github-output` 仍只输出 `supportedHosts`，不会尝试下载尚未发布的 npm 版本。doctor 将候选标为 `source-preview`，保留完整依赖闭包检查，不将文件版本检查当作正式产物验收。发布后核对最终 SHA 与分包产物，完成 npm 和桌面验收，再把该目标从 `sourceCandidates` 移入 `supportedHosts` 并按需要更新开发基线。当前工作见 [0.2.1-rc.3 适配](./harness-0.2.1-rc.3/README.md)。
+发布前源码预适配记录在同一清单的 `sourceCandidates`，包含预计版本、官方源码完整 SHA 和证据路径。peer 精确枚举已发布支持目标与源码候选；`--github-output` 仍只输出 `supportedHosts`，不会尝试下载尚未发布的 npm 版本。doctor 将候选标为 `source-preview`，保留完整依赖闭包检查，不将文件版本检查当作正式产物验收。发布后核对最终 SHA 与分包产物，完成 npm 和桌面验收，再把该目标从 `sourceCandidates` 移入 `supportedHosts` 并按需要更新开发基线。当前工作见 [0.2.1-rc.4 适配](./harness-0.2.1-rc.4/README.md)。
 
 | 当前候选宿主 | 定位 | 安装与支持边界 |
 | --- | --- | --- |
+| `0.2.1-rc.4` | preview | 已发布 npm 精确目标；先进入矩阵，推荐宿主与开发基线仍为 rc.2 |
 | `0.2.1-rc.3` | preview | 已发布 npm 精确目标；先进入矩阵，推荐宿主与开发基线仍为 rc.2 |
 | `0.2.1-rc.2` | recommended | 已发布 npm 精确目标；RC 不是 GA |
 | `0.2.1-rc.1` | legacy | 保留上一推荐 RC |
@@ -106,7 +107,7 @@ runner 为 `scripts/harness-runtime-verify.mjs --host-version <exact> --artifact
 
 CI 仅上传报告、日志和 fixture 状态，不上传 runtime 的 node_modules、缓存、隔离 HOME 或整份 profile 存储。报告保留 14 天；发布维护者应将关键版本、摘要、结果和限制归档到发布记录，不能只留下会过期的临时目录。
 
-当前自动矩阵包括全部 11 个目标的 Ubuntu runtime，以及 rc.2 / rc.3 的 Windows runtime，共 13 个宿主/平台目标。真实模型 API、原生 Desktop 交互和用户数据迁移仍需要额外证据。UI 改动按 Ego Lite 规则验证真实宿主挂载和交互；有凭据的 provider 验证记录结果，不在仓库保存凭据。跳过、不适用和失败应分别记录，不能统一写“全部通过”。
+当前自动矩阵包括全部 12 个目标的 Ubuntu runtime，以及 rc.2 / rc.3 / rc.4 的 Windows runtime，共 15 个宿主/平台目标。真实模型 API、原生 Desktop 交互和用户数据迁移仍需要额外证据。UI 改动按 Ego Lite 规则验证真实宿主挂载和交互；有凭据的 provider 验证记录结果，不在仓库保存凭据。跳过、不适用和失败应分别记录，不能统一写“全部通过”。
 
 ## 发布同一份验收产物
 

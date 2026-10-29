@@ -68,7 +68,7 @@ dsh plugin --profile web add /absolute/path/to/<plugin>
 |---|---|---|
 | `stateDir` | `.agent-teams` | 状态目录名（工作区下） |
 | `memberProvider` | `spawn` | 成员子代理 provider |
-| `memberMaxDepth` | `1` | 成员再委派深度上限（`0` = 禁止） |
+| `memberMaxDepth` | `0` | 成员相对委派深度上限（`0` = 禁止）；需宿主 `subagent.maxDepth` 配合 |
 ```
 
 - **兼容性/部署差异放引用注释块**（可复用模式④），但必须基于目标部署源码：

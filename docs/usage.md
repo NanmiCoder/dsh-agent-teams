@@ -73,7 +73,7 @@
     stateDir: .agent-teams        # 团队状态目录名（工作区下）
     memberProvider: spawn         # 子代理运行后端（spawn / fork），不是 LLM provider
     memberModel: deepseek-v4      # 可选：成员模型覆盖
-    memberMaxDepth: 1             # 成员再委派深度上限（0 = 禁止）
+    memberMaxDepth: 1             # 成员相对委派上限（0=禁止，1=成员的直接子代理）；还需宿主 subagent.maxDepth ≥ 成员深度+1
     maxMembers: 8                 # 团队人数上限
     executionPrompt: |            # 注入成员 persona 与每次任务派工
       The document does not need to record the process; it should only record facts, unless I explicitly request the process to be recorded.
@@ -87,6 +87,8 @@
       implementer:
         deny: [web_search]        # 只移除这些全局工具
 ```
+
+`memberMaxDepth` 是**成员相对**的委派层数上限（`0` = 禁止），而宿主 `subagent.maxDepth` 是**绝对深度**上限（默认 `1`）。成员本身已处于宿主深度 `1`，因此实际可用后代层数为 `min(memberMaxDepth, max(0, hostMaxDepth − memberDepth))`：只把 `memberMaxDepth` 设为 `1` 而不调整宿主设置时，成员仍然无法委派。要放行一层后代，请在 **Plugins → Subagent → Limits → “Maximum recursion depth”** 把宿主递归深度调到至少 `2`（等价于 profile 的 Cordis patch 中 `subagent` 条目写 `config.maxDepth: 2`）；委派工具若显式配置了自己的 `maxDepth`，以工具为准，宿主设置的改动在下一次委派尝试时生效。宿主因深度拒绝时会返回可操作的错误，直接给出本次尝试深度与需要调到的值。
 
 `toolPolicies` 的 id 由部署方声明，成员只能按 id 选择：`agent_teams_add_member` 的 `tool_policy`、内联 `plan` 的成员行，或 profile 成员行的 `tool_policy`。队长模型不能提交原始 allow/deny 列表，也不能在运行时新建策略。队长专属工具始终被拒绝且无法通过 allow 列表重新打开；四个协调工具（`agent_teams_claim_task`、`agent_teams_update_task`、`agent_teams_send_message`、`agent_teams_status`）始终可用，策略也不允许拒绝它们。未知 id、空策略或空列表会在挂载时或写入成员前直接失败，不会留下成员或可恢复的孤儿会话。生效的策略 id 与解析后的过滤器会写入 `team.json`（`toolPolicy` / `toolFilter`），`agent_teams_status` 显示策略 id；重启后由子会话持久 descriptor 重新应用同一过滤器。未配置策略的成员保持原有工具集与记录结构。该能力是全局工具的模型可见性与调用限制，不是 OS 沙箱或授权边界。
 

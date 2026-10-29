@@ -53,7 +53,14 @@ export interface Config {
     executionPrompt?: string;
     /** Plugin-wide fallback route for unavailable member models. */
     fallback?: import('./profiles.ts').TeamModelFallbackConfig;
-    /** Member delegation depth cap (default `0`; `0` forbids delegation entirely). */
+    /**
+     * Member delegation depth cap, relative to the member (default `0`; `0`
+     * forbids delegation entirely; `1` permits a member's direct children). The
+     * Host's absolute subagent depth budget still applies on top of it and is
+     * not raised by this option: a member already occupies Host delegation depth
+     * 1, so one further level needs the Host setting `subagent.maxDepth` to be at
+     * least 2 as well.
+     */
     memberMaxDepth?: number;
     /** Team size cap in members (default `8`). */
     maxMembers?: number;

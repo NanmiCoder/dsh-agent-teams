@@ -19,7 +19,7 @@ import { foldSubagentDescriptor } from '@deepseek-ai/dsh-subagent'
 import { createUserMessage, LlmError, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { Session, SessionId } from '@deepseek-ai/dsh-session'
 import { join } from 'node:path'
-import { agentTeamsSource, observedSessionFormatVersion, type SessionFormatBearer, guardSubagentCreation, startMember, usesManagedActivations, guardSubagentDelivery, installContinuableMemberSetup, memberToolFilter, queueMemberPrompt, restrictableToolNames, startMemberWithLenientFilter, steerMemberPrompt, sessionOwnEvents } from './harness-compat.ts'
+import { agentTeamsSource, observedSessionFormatVersion, type SessionFormatBearer, guardSubagentCreation, startMember, usesManagedActivations, guardSubagentDelivery, installContinuableMemberSetup, memberToolFilter, queueMemberPrompt, restrictableToolNames, startMemberWithLenientFilter, steerMemberPrompt, sessionOwnEvents, hostDelegationBudget, hostDelegationDepth, explainDelegationRefusal } from './harness-compat.ts'
 import { markMailboxDelivered, appendMailbox, CAPTAIN_KEY, createMessage, readRetiredMemberIds, readTeamSync, readTeam, releaseMailboxDelivery, withTeamLock, writeTeam } from './state.ts'
 import { mailboxPrompt } from './mailbox.ts'
 import { nearestLiveLead } from './lineage.ts'
@@ -876,6 +876,39 @@ Current team status: ${team.tasks.length} task(s), ${assigned} pending task(s) a
 Do not start work until the scheduler or captain assigns a task in this turn.`
 }
 
+/** Inputs of the spawn-time delegation advisory. */
+export interface DelegationAdvisoryInput {
+  /** Configured `memberMaxDepth` (member-relative; `0` forbids delegation). */
+  memberMaxDepth: number
+  /** Absolute Host depth the spawned member will occupy. */
+  memberDepth: number
+  /** Host `subagent.maxDepth`, or undefined when the host cannot report it. */
+  hostMaxDepth: number | undefined
+  /** Member name, for the operator-facing warning. */
+  memberName?: string
+}
+
+/**
+ * Explain a spawn-time configuration that cannot delegate at all: the member
+ * budget is positive, but the Host's absolute depth budget admits no child.
+ * Pure and advisory only — it never changes a threshold or blocks a spawn.
+ * @param input - configured budget, the member's absolute depth, host budget.
+ * @returns the warning text, or undefined when the configuration is coherent
+ *   or the host budget is unknown.
+ */
+export function delegationAdvisory(input: DelegationAdvisoryInput): string | undefined {
+  const { memberMaxDepth, memberDepth, hostMaxDepth, memberName } = input
+  if (memberMaxDepth <= 0) return undefined
+  if (hostMaxDepth === undefined) return undefined
+  const childDepth = memberDepth + 1
+  if (hostMaxDepth >= childDepth) return undefined
+  const who = memberName === undefined ? 'a member' : `member "${memberName}"`
+  return `agent-teams: memberMaxDepth=${memberMaxDepth} is configured, but the Host delegation budget is ${hostMaxDepth} `
+    + `and ${who} will be at depth ${memberDepth} (a child would be depth ${childDepth}); members cannot delegate until `
+    + 'the Host setting "Maximum recursion depth" (subagent.maxDepth) is at least '
+    + `${childDepth} — unless the delegation tool sets its own maxDepth.`
+}
+
 /**
  * Spawn one member as a durable continuable subagent of the captain and fill
  * `member.id` with its child session id. On failure nothing is persisted.
@@ -932,6 +965,18 @@ export async function spawnMember(
     throw new Error(`agent-teams: provider "${config.provider}" cannot restrict captain-only tools for members`)
   }
   const label = `${MEMBER_LABEL_PREFIX}${team.id}:${member.name}`
+  // Best-effort visibility only: `memberMaxDepth` is member-relative, while the
+  // Host caps absolute depth. A member occupies depth 1, so the default Host
+  // budget (1) admits no child at all and the configuration can never delegate.
+  // The Host function is optional, and another plugin's delegation tool may
+  // declare its own maxDepth, hence a warning instead of a rejection.
+  const advisory = delegationAdvisory({
+    memberMaxDepth: config.maxDepth ?? 0,
+    memberDepth: hostDelegationDepth(captain) + 1,
+    hostMaxDepth: hostDelegationBudget(ctx.subagents),
+    memberName: member.name,
+  })
+  if (advisory !== undefined) ctx.logger.warn(advisory)
   // The legacy filter of a member without a configured tool policy: the
   // captain-only deny list plus the depth entries this host registers.
   const requestedFilter = resolvedFilter ?? memberToolFilter(config.maxDepth, restrictableToolNames(captain))
@@ -1052,38 +1097,90 @@ export function installRetiredMemberGuard(ctx: Context, stateDir: string): void 
   })
 }
 
+/** Nearest AgentTeams member ancestor of one creation request. */
+interface MemberDelegationTarget {
+  /** Team id encoded in the member descriptor label. */
+  readonly teamId: string
+  /** Member name encoded in the member descriptor label. */
+  readonly memberName: string
+  /** Distance from the caller to that member (the member itself is 1). */
+  readonly relativeDepth: number
+  /** Durable member record, or undefined when the record no longer names it. */
+  readonly member: TeamMember | undefined
+  /** Whether the team was halted. */
+  readonly halted: boolean
+}
+
+/**
+ * Resolve the nearest AgentTeams member ancestor of a creation request and its
+ * member-relative depth. Reads the live descriptor label, then the durable team
+ * record; a state file that exists but cannot be parsed keeps its actionable
+ * error instead of leaking a raw parse failure through the host call.
+ * @param ctx - the plugin context (injects `agents`).
+ * @param stateDir - configured state directory.
+ * @param parent - the agent the creation request descends from.
+ * @returns the member target, or undefined when no member ancestor exists.
+ */
+function resolveMemberLabel(ctx: Context, stateDir: string, parent: Agent): MemberDelegationTarget | undefined {
+  let ancestor: Agent | undefined = parent
+  let depth = 1
+  while (ancestor !== undefined) {
+    const descriptor = foldSubagentDescriptor(sessionOwnEvents(ancestor.session))
+    if (descriptor?.label?.startsWith(MEMBER_LABEL_PREFIX)) {
+      const identity = descriptor.label.slice(MEMBER_LABEL_PREFIX.length)
+      const separator = identity.indexOf(':')
+      const teamId = identity.slice(0, separator)
+      let team: ReturnType<typeof readTeamSync>
+      try {
+        team = readTeamSync(join(ancestor.session.header.cwd ?? process.cwd(), stateDir), teamId)
+      } catch (error: unknown) {
+        // Distinguish "team state unreadable" (e.g. a corrupt team.json) from
+        // the guarded rejections below: reject with an actionable message
+        // instead of leaking the raw parse error through subagents.start.
+        throw new Error(`AgentTeams delegation guard could not read the team state of "${teamId}" (its team.json may be corrupt or unreadable): ${String(error)}`)
+      }
+      return {
+        teamId,
+        memberName: identity.slice(separator + 1),
+        relativeDepth: depth,
+        member: team?.members.find(item => item.id === ancestor!.id && item.name === identity.slice(separator + 1)),
+        halted: team?.halted === true,
+      }
+    }
+    const parentId: SessionId | undefined = ancestor.session.header.parentSession
+    ancestor = parentId === undefined ? undefined : ctx.agents.get(parentId)
+    depth++
+  }
+  return undefined
+}
+
 /** Bound all descendant creation, including renamed tools and code-runtime calls. */
 export function installMemberDelegationGuard(ctx: Context, stateDir: string, maxDepth: number): void {
   let active = true
   const check = (parent: Agent): void => {
     if (!active) return
-    let ancestor: Agent | undefined = parent
-    let depth = 1
-    while (ancestor !== undefined) {
-      const descriptor = foldSubagentDescriptor(sessionOwnEvents(ancestor.session))
-      if (descriptor?.label?.startsWith(MEMBER_LABEL_PREFIX)) {
-        const identity = descriptor.label.slice(MEMBER_LABEL_PREFIX.length)
-        const separator = identity.indexOf(':')
-        let team: ReturnType<typeof readTeamSync>
-        try {
-          team = readTeamSync(join(ancestor.session.header.cwd ?? process.cwd(), stateDir), identity.slice(0, separator))
-        } catch (error: unknown) {
-          // Distinguish "team state unreadable" (e.g. a corrupt team.json) from
-          // the guarded rejections below: reject with an actionable message
-          // instead of leaking the raw parse error through subagents.start.
-          throw new Error(`AgentTeams delegation guard could not read the team state of "${identity.slice(0, separator)}" (its team.json may be corrupt or unreadable): ${String(error)}`)
-        }
-        const member = team?.members.find(item => item.id === ancestor!.id && item.name === identity.slice(separator + 1))
-        if (member === undefined || member.status === 'removed' || member.stopping === true || team?.halted === true) throw new Error('AgentTeams member is no longer admitting delegated work')
-        if (depth > maxDepth) throw new Error(`AgentTeams member delegation limit (${maxDepth}) reached; report to the captain instead of spawning another agent`)
-        return
-      }
-      const parentId: SessionId | undefined = ancestor.session.header.parentSession
-      ancestor = parentId === undefined ? undefined : ctx.agents.get(parentId)
-      depth++
+    const target = resolveMemberLabel(ctx, stateDir, parent)
+    if (target === undefined) return
+    if (target.member === undefined || target.member.status === 'removed' || target.member.stopping === true || target.halted) {
+      throw new Error('AgentTeams member is no longer admitting delegated work')
+    }
+    if (target.relativeDepth > maxDepth) {
+      throw new Error(`AgentTeams member delegation limit (${maxDepth}) reached; report to the captain instead of spawning another agent`)
     }
   }
-  guardSubagentCreation(ctx, check)
+  // The Host rejection is authoritative: it carries the exact attempted/max
+  // depth, including a delegation tool that declares its own maxDepth. Only a
+  // depth refusal is rewritten; every other failure keeps its own text.
+  const onError = (error: unknown, parent: Agent): unknown => {
+    let memberName: string | undefined
+    try {
+      memberName = resolveMemberLabel(ctx, stateDir, parent)?.memberName
+    } catch {
+      // A second state-read failure must not replace the host refusal.
+    }
+    return explainDelegationRefusal(error, memberName)
+  }
+  guardSubagentCreation(ctx, check, onError)
   ctx.effect(() => () => { active = false }, 'agent-teams: delegation guard lifetime')
 }
 

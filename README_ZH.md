@@ -175,7 +175,7 @@ dsh plugin --profile web add github:NanmiCoder/dsh-agent-teams
         deny: [web_search]
 ```
 
-`memberMaxDepth` 默认 `0`，团队成员不能再创建子代理；显式设为 `1` 可允许一层后代，运行时和代码工具调用同样受限。默认成员统一通过团队消息汇报，避免再走宿主消息重复通知队长。无任务成员不调用模型；任务分配开启独立轮次，纠正消息进入最近的模型步骤。消息投递与读取分别记录；移除和归档必须等成员分支及待处理输入清理完成后才报告成功。
+`memberMaxDepth` 默认 `0`，团队成员不能再创建子代理。它按**成员相对**计数：`1` 允许成员的直接子代理，运行时和代码工具调用同样受限。它不能超过宿主的绝对委派深度预算：成员本身已占用宿主委派深度 `1`，因此要放行一层后代，还必须把宿主设置 `subagent.maxDepth`（**Plugins → Subagent → Limits → “Maximum recursion depth”**，或 profile Cordis patch 中 `subagent` 条目的 `config.maxDepth`）调到至少 `2`。实际可用后代层数为 `min(memberMaxDepth, max(0, hostMaxDepth − memberDepth))`；委派工具若显式配置了自己的 `maxDepth`，以工具为准；宿主设置改动在下一次委派尝试时生效。宿主因深度拒绝成员委派时，工具结果会给出本次尝试深度、当前上限以及需要调整的设置。默认成员统一通过团队消息汇报，避免再走宿主消息重复通知队长。无任务成员不调用模型；任务分配开启独立轮次，纠正消息进入最近的模型步骤。消息投递与读取分别记录；移除和归档必须等成员分支及待处理输入清理完成后才报告成功。
 
 `toolPolicies` 是部署方配置：按 id 复用的成员工具策略。成员只能“按 id 选择”——`agent_teams_add_member` 的 `tool_policy`、内联 `plan` 的成员行，或 profile 成员行的 `tool_policy`。队长模型只能选择已声明的策略，不能提交原始 allow/deny 列表，也不能在运行时新建策略。
 

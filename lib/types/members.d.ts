@@ -242,6 +242,26 @@ export declare function memberPersona(team: TeamState, member: TeamMember, state
  * @param memberName - canonical member name used to count assigned pending work.
  */
 export declare function memberWelcome(team: TeamState, memberName: string): string;
+/** Inputs of the spawn-time delegation advisory. */
+export interface DelegationAdvisoryInput {
+    /** Configured `memberMaxDepth` (member-relative; `0` forbids delegation). */
+    memberMaxDepth: number;
+    /** Absolute Host depth the spawned member will occupy. */
+    memberDepth: number;
+    /** Host `subagent.maxDepth`, or undefined when the host cannot report it. */
+    hostMaxDepth: number | undefined;
+    /** Member name, for the operator-facing warning. */
+    memberName?: string;
+}
+/**
+ * Explain a spawn-time configuration that cannot delegate at all: the member
+ * budget is positive, but the Host's absolute depth budget admits no child.
+ * Pure and advisory only — it never changes a threshold or blocks a spawn.
+ * @param input - configured budget, the member's absolute depth, host budget.
+ * @returns the warning text, or undefined when the configuration is coherent
+ *   or the host budget is unknown.
+ */
+export declare function delegationAdvisory(input: DelegationAdvisoryInput): string | undefined;
 /**
  * Spawn one member as a durable continuable subagent of the captain and fill
  * `member.id` with its child session id. On failure nothing is persisted.

@@ -143,6 +143,7 @@ async function mount() {
   }
   return {
     createCaptain,
+    definitions,
     execute,
     executeTool,
     loadTeam,
@@ -302,6 +303,21 @@ async function mountRunningTeam(extraTasks = []) {
   await fixture.saveTeam(team)
   return { fixture, captain, fixer, scout, teamId: team.id }
 }
+
+await test('claim_task no longer advertises the deprecated assignee parameter (follow-up to #242)', async () => {
+  // The model only fills arguments it can see. Publishing a parameter that a
+  // member can only ignore or be rejected for is the defect; the raw-argument
+  // compatibility net is pinned by the materialized-assignee cases below.
+  const fixture = await mount()
+  try {
+    const claim = fixture.definitions.find(definition => definition.name === 'agent_teams_claim_task')
+    assert.ok(claim, 'claim_task must be registered')
+    assert.deepEqual(Object.keys(claim.parameters.properties), ['task_id'])
+    assert.equal(claim.parameters.additionalProperties, undefined)
+  } finally {
+    await fixture.dispose()
+  }
+})
 
 await test('a member claim ignores a blank or self-named materialized assignee (issue #234 follow-up)', async () => {
   const { fixture, fixer, teamId } = await mountRunningTeam()

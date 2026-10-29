@@ -30,8 +30,56 @@ export declare function usesManagedActivations(runtime: Context['subagents']): b
 export declare function startMember(runtime: Context['subagents'], spec: MemberStartSpec): Promise<{
     childId: SessionId;
 }>;
-/** Wrap every available creation API, restoring only this plugin's own methods. */
-export declare function guardSubagentCreation(ctx: Context, check: (parent: Agent) => void): void;
+/**
+ * Effective Host delegation budget, or undefined when this host cannot report
+ * it.
+ *
+ * `resolveMaxDepth()` returns the Host setting (`subagent.maxDepth`); a
+ * delegation tool that declares its own `maxDepth` overrides it, and this
+ * plugin cannot read another plugin's tool configuration. The value is
+ * therefore advisory only (spawn-time warning): it must never pre-empt a
+ * creation the Host itself would admit. The authoritative numbers for the
+ * actionable refusal come from the thrown `SubagentDepthError` instead.
+ * @param runtime - the injected subagents service.
+ * @returns the Host depth setting, or undefined when unavailable/invalid.
+ */
+export declare function hostDelegationBudget(runtime: Context['subagents']): number | undefined;
+/**
+ * Absolute delegation depth of one live agent: the Host function when present,
+ * the persisted session header otherwise. The header is the authoritative,
+ * monotone lower bound the Host itself uses, so the fallback cannot undercount.
+ * @param agent - the agent whose depth is read.
+ * @returns its non-negative depth, or `0` when neither source reports one.
+ */
+export declare function hostDelegationDepth(agent: Agent): number;
+/**
+ * Whether an error is the Host's own depth refusal. Duck-typed on purpose:
+ * older hosts may not export `SubagentDepthError`, and the class name plus the
+ * two numeric fields are the stable part of that contract.
+ * @param error - the error thrown by a creation call.
+ * @returns whether it is a Host depth refusal, narrowed to its numbers.
+ */
+export declare function isHostDepthRefusal(error: unknown): error is {
+    attemptedDepth: number;
+    maxDepth: number;
+};
+/**
+ * Rewrite the Host's terse depth refusal into an actionable AgentTeams error.
+ * Every other error is returned unchanged, so provider, quota and contract
+ * failures keep their own text.
+ * @param error - the error thrown by a creation call.
+ * @param memberName - the delegating member, when the parent chain names one.
+ * @returns a new Error for a Host depth refusal, else the original error.
+ */
+export declare function explainDelegationRefusal(error: unknown, memberName: string | undefined): unknown;
+/**
+ * Wrap every available creation API, restoring only this plugin's own methods.
+ * @param ctx - the plugin context (injects `subagents`).
+ * @param check - the member-relative policy check, run before the Host call.
+ * @param onError - optional translator for a failed creation; the default
+ *   rethrows the Host error untouched.
+ */
+export declare function guardSubagentCreation(ctx: Context, check: (parent: Agent) => void, onError?: (error: unknown, parent: Agent) => unknown): void;
 declare module '@deepseek-ai/dsh-llm' {
     interface MessageSourceMap {
         'agent-teams': {

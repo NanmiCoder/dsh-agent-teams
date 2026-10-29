@@ -13,7 +13,7 @@ import type { ContentBlock, MessageId, MessageSource } from '@deepseek-ai/dsh-ll
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import * as dshSession from '@deepseek-ai/dsh-session'
 import type { Session, SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
-import { SubagentError } from '@deepseek-ai/dsh-subagent'
+import * as dshSubagent from '@deepseek-ai/dsh-subagent'
 import { BUILTIN_DENY_TOOLS, resolveMemberToolFilter, type MemberToolFilter } from './tool-policies.ts'
 
 /**
@@ -82,8 +82,110 @@ export async function startMember(runtime: Context['subagents'], spec: MemberSta
   return host.startContinuable.call(runtime, spec)
 }
 
-/** Wrap every available creation API, restoring only this plugin's own methods. */
-export function guardSubagentCreation(ctx: Context, check: (parent: Agent) => void): void {
+/** Structural view of the Host delegation-depth API (absent on older hosts). */
+interface DelegationDepthView {
+  resolveMaxDepth?: (configured?: number | 'provider-managed') => unknown
+  delegationDepthOf?: (agent: Agent) => unknown
+}
+
+function nonNegativeInteger(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : undefined
+}
+
+/**
+ * Effective Host delegation budget, or undefined when this host cannot report
+ * it.
+ *
+ * `resolveMaxDepth()` returns the Host setting (`subagent.maxDepth`); a
+ * delegation tool that declares its own `maxDepth` overrides it, and this
+ * plugin cannot read another plugin's tool configuration. The value is
+ * therefore advisory only (spawn-time warning): it must never pre-empt a
+ * creation the Host itself would admit. The authoritative numbers for the
+ * actionable refusal come from the thrown `SubagentDepthError` instead.
+ * @param runtime - the injected subagents service.
+ * @returns the Host depth setting, or undefined when unavailable/invalid.
+ */
+export function hostDelegationBudget(runtime: Context['subagents']): number | undefined {
+  const resolve = (runtime as unknown as DelegationDepthView).resolveMaxDepth
+  if (typeof resolve !== 'function') return undefined
+  try {
+    return nonNegativeInteger(resolve.call(runtime))
+  } catch {
+    // A host that refuses the configured shape keeps the advisory silent.
+    return undefined
+  }
+}
+
+/**
+ * Absolute delegation depth of one live agent: the Host function when present,
+ * the persisted session header otherwise. The header is the authoritative,
+ * monotone lower bound the Host itself uses, so the fallback cannot undercount.
+ * @param agent - the agent whose depth is read.
+ * @returns its non-negative depth, or `0` when neither source reports one.
+ */
+export function hostDelegationDepth(agent: Agent): number {
+  const read = (dshSubagent as unknown as DelegationDepthView).delegationDepthOf
+  if (typeof read === 'function') {
+    try {
+      const depth = nonNegativeInteger(read(agent))
+      if (depth !== undefined) return depth
+    } catch {
+      // Strict hosts reject an Agent without runtime options; the header is
+      // still there and carries the same persisted depth.
+    }
+  }
+  return nonNegativeInteger(agent.session?.header?.delegationDepth) ?? 0
+}
+
+/**
+ * Whether an error is the Host's own depth refusal. Duck-typed on purpose:
+ * older hosts may not export `SubagentDepthError`, and the class name plus the
+ * two numeric fields are the stable part of that contract.
+ * @param error - the error thrown by a creation call.
+ * @returns whether it is a Host depth refusal, narrowed to its numbers.
+ */
+export function isHostDepthRefusal(error: unknown): error is { attemptedDepth: number; maxDepth: number } {
+  if (error === null || typeof error !== 'object') return false
+  const candidate = error as { name?: unknown; attemptedDepth?: unknown; maxDepth?: unknown }
+  return candidate.name === 'SubagentDepthError'
+    && nonNegativeInteger(candidate.attemptedDepth) !== undefined
+    && nonNegativeInteger(candidate.maxDepth) !== undefined
+}
+
+/**
+ * Rewrite the Host's terse depth refusal into an actionable AgentTeams error.
+ * Every other error is returned unchanged, so provider, quota and contract
+ * failures keep their own text.
+ * @param error - the error thrown by a creation call.
+ * @param memberName - the delegating member, when the parent chain names one.
+ * @returns a new Error for a Host depth refusal, else the original error.
+ */
+export function explainDelegationRefusal(error: unknown, memberName: string | undefined): unknown {
+  if (!isHostDepthRefusal(error)) return error
+  const who = memberName === undefined ? 'an AgentTeams member' : `member "${memberName}"`
+  const detail = error instanceof Error ? error.message : String(error)
+  return new Error(
+    `AgentTeams: ${who} cannot delegate — the Host refused a child at delegation depth ${error.attemptedDepth} `
+    + `because its limit is ${error.maxDepth}. Raise the Host setting "Maximum recursion depth"`
+    + ` (Plugins → Subagent → Limits, config subagent.maxDepth) to at least ${error.attemptedDepth}. `
+    + 'memberMaxDepth only bounds how far AgentTeams members may go; it cannot raise the Host limit. '
+    + `If the Host limit cannot be changed, report to the captain instead of delegating. (host: ${detail})`,
+    { cause: error },
+  )
+}
+
+/**
+ * Wrap every available creation API, restoring only this plugin's own methods.
+ * @param ctx - the plugin context (injects `subagents`).
+ * @param check - the member-relative policy check, run before the Host call.
+ * @param onError - optional translator for a failed creation; the default
+ *   rethrows the Host error untouched.
+ */
+export function guardSubagentCreation(
+  ctx: Context,
+  check: (parent: Agent) => void,
+  onError?: (error: unknown, parent: Agent) => unknown,
+): void {
   const runtime = ctx.subagents as unknown as CreationBoundary
   ctx.effect(() => {
     const disposers: (() => void)[] = []
@@ -93,8 +195,14 @@ export function guardSubagentCreation(ctx: Context, check: (parent: Agent) => vo
       const descriptor = Object.getOwnPropertyDescriptor(runtime, key)
       const guarded = async (...args: unknown[]): Promise<unknown> => {
         const request = key === 'start' ? args[1] : (args[0] as MemberStartSpec).request
-        check((request as MemberStartSpec['request']).parent)
-        return Reflect.apply(original, ctx.subagents, args)
+        const parent = (request as MemberStartSpec['request']).parent
+        check(parent)
+        try {
+          return await Reflect.apply(original, ctx.subagents, args)
+        } catch (error: unknown) {
+          if (onError === undefined) throw error
+          throw onError(error, parent)
+        }
       }
       Object.defineProperty(runtime, key, { value: guarded, writable: true, configurable: true })
       disposers.push(() => {
@@ -354,7 +462,7 @@ export function guardSubagentDelivery(
     let active = true
     const check = async (sender: Agent, targetId: SessionId): Promise<void> => {
       if (active && await isRetired(sender, targetId)) {
-        throw new SubagentError(`AgentTeams member "${targetId}" was retired and cannot be resumed`, 'NOT_RESUMABLE')
+        throw new dshSubagent.SubagentError(`AgentTeams member "${targetId}" was retired and cannot be resumed`, 'NOT_RESUMABLE')
       }
     }
     const guardedLegacy: Followup = async (parent, childId, content, options) => {

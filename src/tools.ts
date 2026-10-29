@@ -311,6 +311,19 @@ function trimmedOptional(value: string | null | undefined): string | undefined {
   return trimmed === undefined || trimmed === '' ? undefined : trimmed
 }
 
+/**
+ * Read the legacy `assignee` argument a gateway or an older caller may still
+ * send after the parameter was removed from the published schema. Blank values
+ * count as omitted, exactly as before, so a materialized empty string stays a
+ * no-op instead of an error.
+ * @param args - raw tool arguments, whose declared type no longer names it.
+ * @returns the trimmed legacy value, or undefined when absent/blank.
+ */
+function legacyClaimAssignee(args: unknown): string | undefined {
+  const raw = (args as { assignee?: unknown } | null | undefined)?.assignee
+  return typeof raw === 'string' && raw.trim() !== '' ? raw.trim() : undefined
+}
+
 /** Whether one materialized plan member carries no roster content at all. */
 function isEmptyPlanMember(member: unknown): boolean {
   if (member === undefined || member === null) return true
@@ -1763,7 +1776,6 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
     description: 'Members claim their own ready task or read their existing attempt_id. Captains must use reassign_task to assign and wake a member; claim_task does not dispatch work. A member cannot own a second unfinished task. The returned attempt_id is required for updates and becomes stale after retry/reassignment.',
     parameters: {
       task_id: { type: 'string', required: true, description: 'The task id to claim.' },
-      assignee: { type: 'string', description: 'Deprecated: claim_task only supports a member claiming its own task. Captains must use reassign_task.' },
     },
     output: {
       schema: {
@@ -1794,12 +1806,11 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         if (task.reassigning === true) {
           throw new Error(`task ${task.id} is being reassigned; wait for the handoff to finish`)
         }
-        // Gateways materialize this deprecated optional argument, and a model may
-        // also restate its own member name. A blank or self-valued assignee is
-        // harmless: it asks for exactly what a claim does anyway.
-        const requestedAssignee = typeof args.assignee === 'string' && args.assignee.trim() !== ''
-          ? args.assignee.trim()
-          : undefined
+        // The parameter is no longer published, but a gateway may still
+        // materialize it and a model may restate its own member name. A blank
+        // or self-valued assignee is harmless: it asks for exactly what a
+        // claim does anyway.
+        const requestedAssignee = legacyClaimAssignee(args)
         let assignee = task.assignee
         if (identity.kind === 'captain') {
           // A captain may read the capability of its already-started takeover,

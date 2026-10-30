@@ -391,6 +391,9 @@ export function validateCreateTask(team: TeamState, input: CreateTaskInput): Val
   if (!(TASK_KINDS as readonly string[]).includes(kind)) {
     return { ok: false, error: `unknown task kind "${String(kind)}"` }
   }
+  if (!nonemptyString(input.subject)) {
+    return { ok: false, error: 'task subject must not be empty' }
+  }
 
   if (team.halted === true) {
     const reason = input.resumeReason?.trim() ?? ''

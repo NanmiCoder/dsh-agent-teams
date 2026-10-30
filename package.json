@@ -76,6 +76,8 @@
         "@deepseek-ai/dsh-client-ui-layout",
         "@deepseek-ai/dsh-client-ui-sidebar-right",
         "@deepseek-ai/dsh-client-ui-model-selection",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-plugin-manager",
         "@deepseek-ai/dsh-api-session-controller",
         "@deepseek-ai/dsh-client-ui-session",
         "@deepseek-ai/dsh-client-ui-chat"
@@ -126,6 +128,8 @@
     "@deepseek-ai/dsh-client-ui-layout": "*",
     "@deepseek-ai/dsh-client-ui-model-selection": "*",
     "@deepseek-ai/dsh-client-ui-primitives": "*",
+    "@deepseek-ai/dsh-client-ui-plugin-manager": "*",
+    "@deepseek-ai/dsh-client-ui-settings": "*",
     "@deepseek-ai/dsh-client-ui-renderer": "*",
     "@deepseek-ai/dsh-client-ui-session": "*",
     "@deepseek-ai/dsh-client-ui-slots": "*",
@@ -172,6 +176,12 @@
       "optional": true
     },
     "@deepseek-ai/dsh-client-ui-primitives": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-client-ui-plugin-manager": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-client-ui-settings": {
       "optional": true
     },
     "@deepseek-ai/dsh-client-ui-renderer": {
@@ -227,6 +237,8 @@
     "@deepseek-ai/dsh-client-ui-layout": "0.2.1-rc.2",
     "@deepseek-ai/dsh-client-ui-model-selection": "0.2.1-rc.2",
     "@deepseek-ai/dsh-client-ui-primitives": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-client-ui-plugin-manager": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-client-ui-settings": "0.2.1-rc.2",
     "@deepseek-ai/dsh-client-ui-renderer": "0.2.1-rc.2",
     "@deepseek-ai/dsh-client-ui-session": "0.2.1-rc.2",
     "@deepseek-ai/dsh-client-ui-sidebar-right": "0.2.1-rc.2",

@@ -35,7 +35,7 @@ test('hosts released after the plugin pass the official install check; older hos
 
 test('DSH peers stay * because npm checks ranges without prereleases', () => {
   const pkg = readPackage()
-  assert.equal(dshPeers(pkg).length, 21)
+  assert.equal(dshPeers(pkg).length, requiredHostPeers.filter(name => name.startsWith('@deepseek-ai/dsh-')).length)
   for (const name of dshPeers(pkg)) assert.equal(pkg.peerDependencies[name], HOST_PEER_RANGE)
   // npm's peer validation is semver.satisfies(version, range, loose): a lower bound rejects tested hosts,
   // and npm accepts * without consulting semver. The official installer accepts both.

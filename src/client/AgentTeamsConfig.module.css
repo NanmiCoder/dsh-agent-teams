@@ -1,0 +1,4 @@
+/** Bundle configuration page frame: one column, matching the official settings pages. */
+.section {
+  max-width: 760px;
+}

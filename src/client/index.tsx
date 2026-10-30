@@ -28,6 +28,7 @@ import {
   AGENT_TEAMS_LOCALE_NAMESPACE, en, zh, type AgentTeamsLocaleKey,
 } from './locales.ts'
 import { openAgentTeamMember, type AgentTeamsLayoutNavigator, type AgentTeamsWorkspaceNavigator } from './session-navigation.ts'
+import { installAgentTeamsConfigPage } from './AgentTeamsConfig.tsx'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -36,8 +37,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   }
 }
 
-/** Required services: conversation nodes, slots, sessions navigation, and locale. */
-export const inject = ['uiConversation', 'slots', 'sessions', 'locale', 'modelDirectories', 'layout']
+/** Required services: conversation nodes, slots, sessions navigation, locale, and settings forms. */
+export const inject = ['uiConversation', 'slots', 'sessions', 'locale', 'modelDirectories', 'layout', 'configForms']
 
 /** The host supplies this hook for the lifetime of a 0.1.5 root slot. */
 interface PanelNavigationProps {
@@ -62,6 +63,7 @@ export function apply(ctx: ClientContext): void {
     () => ctx.locale.register(AGENT_TEAMS_LOCALE_NAMESPACE, { zh, en }),
     'agent-teams: dictionaries',
   )
+  installAgentTeamsConfigPage(ctx)
   const openMember = (parentId: SessionId, childId: SessionId): void => {
     void openAgentTeamMember(ctx.sessions, parentId, childId, ctx.layout as AgentTeamsLayoutNavigator, ctx.get('uiWorkspace') as AgentTeamsWorkspaceNavigator | undefined).catch((error: unknown) => {
       console.warn(`agent-teams: failed to open member transcript ${childId}: ${String(error)}`)

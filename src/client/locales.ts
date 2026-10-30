@@ -223,6 +223,16 @@ export const zh = {
   'assignment.empty': '暂无任务',
   'archive.label': '已结束 · 历史归档',
   'archive.discardedLabel': '计划已放弃 · 历史归档',
+  'config.maxMembers': '团队人数上限',
+  'config.maxMembersHint': '正整数，最小 1；默认 8。只限制成员数量，不是并发上限。',
+  'config.invalid': '请输入 ≥1 的整数。',
+  'config.overridden': '已覆盖',
+  'config.reset': '恢复默认',
+  'config.save': '保存',
+  'config.saving': '保存中…',
+  'config.saveFailed': '本部署没有接受这些值，已保留供你修改。',
+  'config.readOnly': '本部署的设置为只读。',
+  'config.unavailable': '该插件当前未加载，暂时无法配置。',
 } satisfies Record<string, string>
 
 /** AgentTeams namespace key union. */
@@ -448,6 +458,16 @@ export const en = {
   'assignment.empty': 'No tasks',
   'archive.label': 'Ended · Archived history',
   'archive.discardedLabel': 'Plan discarded · Archived history',
+  'config.maxMembers': 'Maximum team members',
+  'config.maxMembersHint': 'Whole number, 1 or more. Default: 8. Caps the roster; it is not a concurrency limit.',
+  'config.invalid': 'Enter a whole number of 1 or more.',
+  'config.overridden': 'Overridden',
+  'config.reset': 'Reset to default',
+  'config.save': 'Save',
+  'config.saving': 'Saving…',
+  'config.saveFailed': 'The deployment did not accept these values; they were left for you to correct.',
+  'config.readOnly': 'This deployment stores settings read-only.',
+  'config.unavailable': 'This plugin is not loaded, so it cannot be configured right now.',
 } satisfies Record<AgentTeamsLocaleKey, string>
 
 /** Translation function consumed by pure view helpers. */

@@ -80,6 +80,7 @@ import {
 } from '../lib/client/locales.js'
 import { openAgentTeamMember } from '../lib/client/session-navigation.js'
 import { steerCaptainReport } from '../lib/tools.js'
+import { Config, usageSectionText } from '../lib/index.js'
 import { parseProfileInvocation, resolveTeamProfile, formatProfilesForPrompt } from '../lib/profiles.js'
 import { memberPersona, memberWelcome } from '../lib/members.js'
 import { collectCompletedDependencyOutputs, formatDependencyOutputs, assignmentPrompt } from '../lib/scheduler.js'
@@ -101,6 +102,14 @@ function check(label, condition, detail = '') {
 }
 
 console.log('dsh-agent-teams offline verification')
+
+const defaults = Config()
+check('team member cap defaults to 8', defaults.maxMembers === 8, `got ${defaults.maxMembers}`)
+check('team member cap remains configurable', Config({ maxMembers: 3 }).maxMembers === 3)
+check(
+  'captain protocol points to the delegation skill',
+  usageSectionText('agent_teams_status').includes('agent-teams-delegation'),
+)
 
 // Named multi-role profile rules
 const demoProfiles = { ' demo ': { protocol: 'a'.repeat(300), members: [{ name: ' Implementer ', role: 'builder', model: 'm' }, { name: 'Reviewer', model: 'r' }], tasks: [{ id: 'design', subject: 'Design', assignee: 'implementer' }, { id: 'review', subject: 'Review', assignee: ' reviewer ', dependencies: ['design'] }] } }
@@ -201,6 +210,7 @@ const artworkSource = await readFile(new URL('../src/client/artwork.ts', import.
 const hostSource = await readFile(new URL('../src/index.ts', import.meta.url), 'utf8')
 const toolsSource = await readFile(new URL('../src/tools.ts', import.meta.url), 'utf8')
 const localesSource = await readFile(new URL('../src/client/locales.ts', import.meta.url), 'utf8')
+const agentTeamsConfigSource = await readFile(new URL('../src/client/AgentTeamsConfig.tsx', import.meta.url), 'utf8')
 const localeKeys = Object.keys(agentTeamsZh).sort()
 const englishLocaleKeys = Object.keys(agentTeamsEn).sort()
 const placeholders = value => [...value.matchAll(/\{(\w+)\}/gu)].map(match => match[1]).sort()
@@ -218,6 +228,21 @@ check(
     && clientIndexSource.includes('ctx.uiConversation.events.register(agentTeamsCardDefinition)')
     && clientIndexSource.includes('ctx.locale.register(AGENT_TEAMS_LOCALE_NAMESPACE, { zh, en })')
     && clientIndexSource.match(/locale:\s*AGENT_TEAMS_LOCALE_NAMESPACE/gu)?.length === 5,
+)
+check(
+  'team member cap is editable from the Plugins bundle page',
+  clientIndexSource.includes("'configForms'")
+    && clientIndexSource.includes('installAgentTeamsConfigPage(ctx)')
+    && agentTeamsConfigSource.includes("name: 'plugins.bundle.config'")
+    && agentTeamsConfigSource.includes("AGENT_TEAMS_BUNDLE_CONFIG_KEY = '@nanmicoder/dsh-agent-teams'")
+    && agentTeamsConfigSource.includes('ctx.configForms.whileServed([AGENT_TEAMS_CONFIG_ENTRY]'),
+)
+check(
+  'maxMembers edits through the shared numeric field primitive',
+  agentTeamsConfigSource.includes("MAX_MEMBERS_FIELD = 'maxMembers'")
+    && agentTeamsConfigSource.includes('settingsNumberField(MAX_MEMBERS_FIELD)')
+    && agentTeamsConfigSource.includes('Number.isSafeInteger')
+    && agentTeamsConfigSource.includes('SettingsFormModel'),
 )
 check(
   'slash command transcript hides the duplicate pre-message result row',

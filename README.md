@@ -191,6 +191,8 @@ Defaults work without extra setup. A trusted profile can override member behavio
         deny: [web_search]
 ```
 
+`maxMembers` defaults to `8`. Edit it on the Plugins page: **Plugins → AgentTeams → Maximum team members**; a headless or file-based deployment can set any positive integer in the `config` block instead. It caps the roster only; it is not a concurrency budget.
+
 `memberMaxDepth` defaults to `0`: team members cannot create nested subagents. Set `1` to explicitly permit one descendant level; the limit also covers runtime/code-tool calls. Default members report through team messages only, avoiding duplicate native parent reports. Idle roster members make no model requests. Task assignments start distinct turns; coordination joins the nearest model step. Acceptance and consumption are tracked separately. Removal/archive drains the selected branch and its pending input before reporting success.
 
 `toolPolicies` is owner configuration: reusable per-member tool policies keyed by id. A member *selects* one by id — `tool_policy` on `agent_teams_add_member`, a member row of an inline `plan`, or a profile member row. The Captain model can select a declared policy but can never submit raw allow/deny lists or invent one at runtime.

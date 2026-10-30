@@ -6,7 +6,7 @@
 
 10 个上游 skill 来自 [oh-my-dsh/dsh-plugin-upgrade-skill](https://github.com/oh-my-dsh/dsh-plugin-upgrade-skill/tree/eeff1cdcffe4013e094d94c8d9b8651a65fbc79a)，固定 commit `eeff1cdcffe4013e094d94c8d9b8651a65fbc79a`，更新日期 2026-09-25。127 个上游文件保持原样。来源清单及每个文件的 SHA-256 见 [upstream-lock.json](upstream-lock.json)，MIT 许可见 [LICENSE.dsh-plugin-upgrade-skill](LICENSE.dsh-plugin-upgrade-skill)。首次导入基线为 `cd4d497588cdd4f16300622779b62a78fe803169`（2026-09-06，115 文件）。
 
-项目原有 `dsh-plugin-development` 单独维护；其历史 API 示例已加适用范围说明，不包含在上游 hash 清单中。
+项目原有的 `dsh-plugin-development` 与新增的 `agent-teams-delegation` 单独维护；它们的历史 API 示例 / 派活规则不包含在上游 hash 清单中。
 
 更新时先审阅明确 commit 的差异，再更新 skill 目录、来源清单和镜像，并保留清单中 4 个上游脚本的执行权限。不要自动追随上游 `main`。同步器会报告额外镜像文件和已从 canonical 删除的旧 skill 目录，不会自动删除；须审阅来源后单独处理。新增或删除 skill 时也要同步 `.agents/skills/` 的发现链接。
 
@@ -35,6 +35,7 @@ pnpm test:skills-updater
 | 任务 | 项目内 skill | 用法 |
 | --- | --- | --- |
 | 统一编排 | [plugin-workflow](plugin-workflow/SKILL.md) | 组织阶段、验收项和状态；不凭空推定阶段已通过 |
+| 派活与项目归属 | [agent-teams-delegation](agent-teams-delegation/SKILL.md) | 非平凡任务先派专员；一个专员负责一个项目；名额满时复用已有成员 / 让位 |
 | 版本影响与迁移 | [plugin-upgrade](plugin-upgrade/SKILL.md) | 版本变更链、只读扫描、迁移计划和实现验证 |
 | 官方契约核对 | [dsh-upgrade-audit](dsh-upgrade-audit/SKILL.md) | 精确 tag/源码或 npm 产物对比，补全版本卡遗漏 |
 | 产品与包测试 | [plugin-test](plugin-test/SKILL.md) | 七类触点、真实宿主加载、tarball smoke 和自定义功能探针 |

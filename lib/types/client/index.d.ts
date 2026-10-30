@@ -7,7 +7,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
         agentTeams: AgentTeamsLocaleKey;
     }
 }
-/** Required services: conversation nodes, slots, sessions navigation, and locale. */
+/** Required services: conversation nodes, slots, sessions navigation, locale, and settings forms. */
 export declare const inject: string[];
 /**
  * Register the activity monitor in the shell's additive overlay and the

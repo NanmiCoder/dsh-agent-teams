@@ -12,7 +12,8 @@ export const requiredHostPeers = [
   ...[
     'agent', 'api-session-controller', 'client-connection', 'client-locale',
     'client-store', 'client-ui-chat', 'client-ui-conversation', 'client-ui-layout',
-    'client-ui-model-selection', 'client-ui-primitives', 'client-ui-renderer',
+    'client-ui-model-selection', 'client-ui-primitives', 'client-ui-plugin-manager',
+    'client-ui-settings', 'client-ui-renderer',
     'client-ui-session', 'client-ui-slots', 'commands', 'llm', 'session',
     'session-projection', 'subagent', 'system-prompt', 'tools', 'util-values',
   ].map(name => `@deepseek-ai/dsh-${name}`),

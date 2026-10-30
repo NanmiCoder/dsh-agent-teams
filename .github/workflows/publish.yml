@@ -123,9 +123,62 @@ jobs:
           NPM_DIST_TAG: ${{ steps.version.outputs.dist_tag }}
         run: npm publish "$RUNNER_TEMP/candidate/candidate.tgz" --ignore-scripts --access public --tag "$NPM_DIST_TAG"
 
-  release:
-    if: github.event_name == 'push'
+  consumer-resolution:
+    name: Check desktop npm channel readiness
     needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    outputs:
+      ready: ${{ steps.probe.outputs.ready }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Install the desktop package manager
+        run: npm install --prefix "$RUNNER_TEMP/desktop-pnpm" --ignore-scripts pnpm@11.28.5
+      - name: Record actual latest selection without changing the waiting-period policy
+        id: probe
+        env:
+          EXPECTED_VERSION: ${{ needs.publish.outputs.version }}
+          PRERELEASE: ${{ needs.publish.outputs.prerelease }}
+        run: |
+          node --input-type=module <<'JS'
+          import { appendFileSync, writeFileSync } from 'node:fs'
+          import { join } from 'node:path'
+          import { checkInstallChannel } from './scripts/check-install-channel.mjs'
+          const reports = []
+          if (process.env.PRERELEASE !== 'true') {
+            for (const registry of ['https://registry.npmjs.org', 'https://registry.npmmirror.com']) {
+              try {
+                reports.push(await checkInstallChannel({
+                  pnpmCli: join(process.env.RUNNER_TEMP, 'desktop-pnpm/node_modules/pnpm/bin/pnpm.mjs'),
+                  registry, expectedVersion: process.env.EXPECTED_VERSION,
+                }))
+              } catch (error) {
+                reports.push({ registry, ready: false, error: String(error) })
+              }
+            }
+          }
+          const ready = process.env.PRERELEASE === 'true' ? 'not_applicable' : String(reports.length === 2 && reports.every(report => report.ready))
+          appendFileSync(process.env.GITHUB_OUTPUT, `ready=${ready}\n`)
+          writeFileSync(join(process.env.RUNNER_TEMP, 'desktop-channel.json'), JSON.stringify({ checkedAt: new Date().toISOString(), ready, reports }, null, 2))
+          appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### Desktop npm channel selection\n\nReady: ${ready}. This measures pnpm 11 selection, not native Desktop activation.\n\n` + '```json\n' + JSON.stringify(reports, null, 2) + '\n```\n')
+          JS
+      - name: Preserve channel readiness separately from package publication
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: desktop-channel-readiness
+          path: ${{ runner.temp }}/desktop-channel.json
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    if: always() && github.event_name == 'push' && needs.publish.result == 'success'
+    needs: [publish, consumer-resolution]
     permissions:
       contents: write
     runs-on: ubuntu-latest
@@ -133,6 +186,19 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v6
 
+      - name: Include the observed desktop npm readiness in release notes
+        env:
+          PACKAGE_VERSION: ${{ needs.publish.outputs.version }}
+          NPM_READY: ${{ needs.consumer-resolution.result == 'success' && needs.consumer-resolution.outputs.ready || 'unknown' }}
+        run: |
+          node --input-type=module <<'JS'
+          import { readFileSync, writeFileSync } from 'node:fs'
+          const path = `release-notes/v${process.env.PACKAGE_VERSION}.md`
+          if (!['true', 'not_applicable'].includes(process.env.NPM_READY)) {
+            const notice = '**Desktop npm channel readiness was not confirmed at publication verification.** pnpm 11 may still select an older version during its default 24-hour waiting period, or registry checks may be unavailable/incomplete. For immediate installation use `github:NanmiCoder/dsh-agent-teams` in Plugins → Add plugin (requires GitHub access). Do not disable compatibility or global release-age checks.\n\n**桌面端 npm 渠道在发布验收时尚未确认就绪。** pnpm 11 的 24 小时等待期或注册表可用性可能影响版本选择；立即安装可在「添加插件」输入 `github:NanmiCoder/dsh-agent-teams`，需要能访问 GitHub，无需手改配置。\n\n'
+            writeFileSync(path, notice + readFileSync(path, 'utf8'))
+          }
+          JS
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:

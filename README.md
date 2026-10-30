@@ -36,7 +36,7 @@ Ask in natural language. The plugin provides the team protocol, 14 coordination 
 
 ## Releases
 
-[Latest release](https://github.com/NanmiCoder/dsh-agent-teams/releases/latest) adds Harness `0.2.1-rc.3` support, fixes Windows packaging and runtime verification, and prevents missing installation checks when adding future hosts. npm installs use `latest`; Git installs use the default branch. The recommended Harness host remains `0.2.1-rc.2`. See the exact [support matrix](./compatibility.json) and [release notes](./release-notes/v0.1.27.md).
+[Latest release](https://github.com/NanmiCoder/dsh-agent-teams/releases/latest) fixes installation on Harness `0.2.1-rc.4`, `0.2.1-rc.5` (npm `latest`) and later releases. The plugin now declares only a minimum host (`>=0.1.2-alpha.2`) instead of listing tested versions, so a new Harness release no longer blocks installation. Install from npm with the exact version shown below; Git installs use the default branch. The recommended Harness host remains `0.2.1-rc.2`. See the [tested matrix](./compatibility.json) and [release notes](./release-notes/v0.1.28.md).
 
 ## Why AgentTeams?
 
@@ -55,27 +55,38 @@ The conversation card and activity panel use Harness's official locale service. 
 
 ## Install and choose versions
 
-**Recommended pair: DeepSeek Harness `0.2.1-rc.2` + AgentTeams `0.1.27`. The host remains an RC.**
+**Recommended pair: DeepSeek Harness `0.2.1-rc.2` + AgentTeams `0.1.28`. The host remains an RC.**
 
 | Use case | DeepSeek Harness | AgentTeams plugin |
 | --- | --- | --- |
-| **Recommended** | **`0.2.1-rc.2`** | **`0.1.27`** |
-| Preview host | `0.2.1-rc.3` | `0.1.27` |
-| Previous recommended RC | `0.2.1-rc.1`, `0.2.0-rc.2`, `0.1.7-rc.2` | `0.1.27` |
-| Legacy RC | `0.1.5-rc.1`, `0.1.5-rc.2`, `0.1.5-rc.3` | `0.1.27` |
-| Retaining an older RC | `0.1.2-rc.1` | `0.1.27` |
-| Developer Alpha testing | `0.1.2-alpha.5` | `0.1.27` |
-| Retaining an older Alpha | `0.1.2-alpha.2` | `0.1.27` |
+| **Recommended** | **`0.2.1-rc.2`** | **`0.1.28`** |
+| Preview host | `0.2.1-rc.3` | `0.1.28` |
+| Previous recommended RC | `0.2.1-rc.1`, `0.2.0-rc.2`, `0.1.7-rc.2` | `0.1.28` |
+| Legacy RC | `0.1.5-rc.1`, `0.1.5-rc.2`, `0.1.5-rc.3` | `0.1.28` |
+| Retaining an older RC | `0.1.2-rc.1` | `0.1.28` |
+| Developer Alpha testing | `0.1.2-alpha.5` | `0.1.28` |
+| Retaining an older Alpha | `0.1.2-alpha.2` | `0.1.28` |
+| Newer hosts | `0.2.1-rc.4`, `0.2.1-rc.5` and later | `0.1.28` |
+
+All rows except the last are the CI-tested matrix. Harness `0.2.1-rc.4` and later releases can install the plugin directly; `0.2.1-rc.5` passed the full runtime suite locally on macOS but is not yet in the CI matrix.
 
 ### Desktop app
 
-In the app sidebar, open **Plugins → Add plugin** and enter the npm package spec:
+In the app sidebar, open **Plugins → Add plugin**. You can install directly from GitHub by pasting this repository URL into the plugin input, without a version, tag, or commit suffix:
 
 ```text
-@nanmicoder/dsh-agent-teams
+https://github.com/NanmiCoder/dsh-agent-teams
 ```
 
-The package name resolves npm `latest`; no version suffix is needed. Install it, then choose **Enable now**. If the host asks for a restart, restart the desktop app. Use the package spec above for the published build; an npm or GitHub webpage URL is not the same install source. For Git installation, use the default-branch command below.
+This installs from the default branch and is available immediately after release. The equivalent shorthand is also supported:
+
+```text
+github:NanmiCoder/dsh-agent-teams
+```
+
+For npm installation, enter the versioned spec `@nanmicoder/dsh-agent-teams@0.1.28`. Desktop's pnpm 11 defaults to a 24-hour minimum release age: for 24 hours after a release, a bare package name or `@latest` installs the previous version even when the preview shows the newest one, and the installation fails if that version is incompatible with your host. An exact version installs immediately. Changing registry mirrors does not remove this policy. GitHub access is required for the Git route; it may contain newer code than npm.
+
+Install it, then choose **Enable now**. If the host asks for a restart, restart the desktop app. Do not disable compatibility checks or the global release-age policy to install the plugin.
 
 The desktop app supplies its own Harness core and package manager. Upgrading the global CLI does not upgrade that core, and an ordinary standalone CLI cannot manage its desktop profile. The CLI carrier installed by the desktop app can manage that profile in `0.2.1-rc.2`. Check the embedded core against the compatibility list. Harness `0.2.1-rc.2` is now the exact published target; its RC status is unchanged. The earlier source-only `0.2.0` prediction is no longer a support declaration. See the [release migration evidence](./docs/harness-0.2.1-rc.2/README.md).
 
@@ -90,10 +101,10 @@ The command selects the host's npm `latest`; check `dsh --version` against the s
 
 ### CLI / Web: 2. Install the AgentTeams plugin
 
-Install or upgrade from npm using the package name (resolves npm `latest`, currently `0.1.27`):
+Install or upgrade from npm with an exact version (currently `0.1.28`):
 
 ```sh
-dsh plugin --profile web add --save-exact @nanmicoder/dsh-agent-teams@latest
+dsh plugin --profile web add --save-exact @nanmicoder/dsh-agent-teams@0.1.28
 ```
 
 For a CLI-managed installation, replace `web` with your active CLI profile. **Stop and restart that profile's Harness process, then refresh the browser.** Installing the plugin does not upgrade Harness; the host and plugin have independent `latest` channels.
@@ -104,11 +115,11 @@ Alternatively, install or update from the latest GitHub default branch without a
 dsh plugin --profile web add github:NanmiCoder/dsh-agent-teams
 ```
 
-The `@latest` channel explicitly requests the newest published plugin when updating an existing installation; it is not a numeric version pin. A bare package name can retain an already installed exact version. Run the chosen install command again when updating, then restart the profile. If a registry mirror has not synced the release, append `--registry=https://registry.npmjs.org` to the npm command. GitHub default-branch code may be newer than npm `latest`. The default branch includes the verified server, client, and type build outputs in `lib/`. The repository distributes these outputs so installation does not need a `prepare` hook or build-script approval. Source maintainers must run `pnpm build` and update the committed outputs whenever the source changes. Existing npm releases remain immutable.
+To update, run the command again with the new version, then restart the profile; a bare package name can retain an already installed exact version. For 24 hours after a release, a bare package name or `@latest` installs the previous version. If a registry mirror has not synced the release, append `--registry=https://registry.npmjs.org` to the npm command. GitHub default-branch code may be newer than npm `latest`. The default branch includes the verified server, client, and type build outputs in `lib/`. The repository distributes these outputs so installation does not need a `prepare` hook or build-script approval. Source maintainers must run `pnpm build` and update the committed outputs whenever the source changes. Existing npm releases remain immutable.
 
 For a manually cloned checkout, run `pnpm install --frozen-lockfile` and `pnpm build` after pulling, then restart the corresponding Harness process. Updating Git alone does not update local build output. See the [maintenance guide](./docs/maintenance-workflow.md).
 
-> For older `0.1.0-*` / `0.1.1-*` or unlisted hosts, keep a working pair and follow the [older-version and diagnostic guide](./docs/maintenance-workflow.md).
+> For `0.1.0-*` / `0.1.1-*` hosts older than `0.1.2-alpha.2`, keep a working pair and follow the [older-version and diagnostic guide](./docs/maintenance-workflow.md).
 
 See the full [compatibility matrix](./compatibility.json), [source installation and Alpha testing guide](./docs/maintenance-workflow.md), and [verification coverage and platform limits](./docs/maintenance-2026-09-06/release/README.md).
 

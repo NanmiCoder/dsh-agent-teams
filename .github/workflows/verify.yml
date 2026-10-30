@@ -175,10 +175,36 @@ jobs:
             ${{ runner.temp }}/harness-${{ matrix.host }}/*/cold-trace.jsonl
             ${{ runner.temp }}/harness-${{ matrix.host }}/*/team-evidence.json
 
+  desktop-install-policy:
+    name: Desktop package selection (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Install the observed desktop package manager separately from the build toolchain
+        run: npm install --prefix "$RUNNER_TEMP/desktop-pnpm" --ignore-scripts pnpm@11.28.5
+      - name: Reproduce fresh-release fallback and verify readiness detection
+        run: |
+          export DESKTOP_PNPM_CLI="$RUNNER_TEMP/desktop-pnpm/node_modules/pnpm/bin/pnpm.mjs"
+          node --test scripts/check-install-channel.test.mjs
+
   verified:
     name: Complete compatibility gate
     if: always()
-    needs: [build, windows, harness]
+    needs: [build, windows, harness, desktop-install-policy]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -187,10 +213,12 @@ jobs:
           BUILD_RESULT: ${{ needs.build.result }}
           WINDOWS_RESULT: ${{ needs.windows.result }}
           HARNESS_RESULT: ${{ needs.harness.result }}
+          DESKTOP_POLICY_RESULT: ${{ needs.desktop-install-policy.result }}
         run: |
           test "$BUILD_RESULT" = success
           test "$WINDOWS_RESULT" = success
           test "$HARNESS_RESULT" = success
+          test "$DESKTOP_POLICY_RESULT" = success
       - uses: actions/checkout@v6
         with:
           persist-credentials: false

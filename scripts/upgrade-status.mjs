@@ -1,8 +1,20 @@
-/** Read-only release visibility. Registry discovery never grants compatibility. */
+/** Read-only release visibility. Registry discovery never adds a host to the tested matrix. */
 import { pathToFileURL } from 'node:url'
-import { policy, requiredHostPeers, validatePolicy } from './compatibility.mjs'
+import { compareHostVersions, policy, requiredHostPeers, validatePolicy } from './compatibility.mjs'
 
 const exactVersion = value => typeof value === 'string' && /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:alpha|beta|rc)\.(0|[1-9]\d*))?$/.test(value) && value.trim() === value
+
+// Understands the current `>=x` engines.dsh and `*` peers, and the exact lists of releases
+// up to 0.1.27. Anything else requires review instead of a guessed semver answer.
+function parseDeclaration(value) {
+  if (typeof value !== 'string') return undefined
+  if (value === '*') return () => true
+  const lower = /^>=(\S+)$/.exec(value)
+  if (lower && exactVersion(lower[1])) return version => compareHostVersions(version, lower[1]) >= 0
+  const versions = value.split('||').map(v => v.trim())
+  if (!versions.every(exactVersion) || new Set(versions).size !== versions.length) return undefined
+  return version => versions.includes(version)
+}
 
 export function inspectUpgradeStatus({ hostTags, pluginManifest }, support = policy) {
   const supported = validatePolicy(support)
@@ -11,22 +23,24 @@ export function inspectUpgradeStatus({ hostTags, pluginManifest }, support = pol
   if (pluginManifest?.name !== '@nanmicoder/dsh-agent-teams' || !exactVersion(pluginManifest.version)) throw new Error('Registry plugin identity mismatch')
   const channels = Object.fromEntries(['latest', 'next'].filter(tag => hostTags[tag]).map(tag => [tag, hostTags[tag]]))
   const unverifiedChannels = Object.entries(channels).filter(([, version]) => !supported.includes(version)).map(([channel, version]) => ({ channel, version }))
-  // This project publishes exact enumerations. An unfamiliar/wide declaration
-  // requires review; do not guess semver support or execute downloaded code.
   const fields = Object.hasOwn(pluginManifest.engines ?? {}, 'dsh')
     ? { 'engines.dsh': pluginManifest.engines.dsh }
     : Object.fromEntries([
       ...requiredHostPeers.filter(name => name.startsWith('@deepseek-ai/dsh-')),
       ...Object.keys(pluginManifest.peerDependencies ?? {}).filter(name => name === '@deepseek-ai/dsh' || name.startsWith('@deepseek-ai/dsh-')),
     ].map(name => [name, pluginManifest.peerDependencies?.[name]]))
-  const ranges = Object.entries(fields).map(([name, value]) => ({ name, versions: typeof value === 'string' ? value.split('||').map(v => v.trim()) : [] }))
-  const unrecognizedDeclarations = ranges.filter(({ versions }) => !versions.length || !versions.every(exactVersion) || new Set(versions).size !== versions.length).map(({ name }) => name)
-  const unpublishedSupport = unrecognizedDeclarations.length ? null : supported.filter(version => !ranges.every(range => range.versions.includes(version)))
+  const declarations = Object.entries(fields).map(([name, value]) => ({ name, accepts: parseDeclaration(value) }))
+  const unrecognizedDeclarations = declarations.filter(({ accepts }) => !accepts).map(({ name }) => name)
+  const accepted = version => declarations.every(({ accepts }) => accepts(version))
+  // Users on these host channels cannot install the published plugin at all.
+  const blockedChannels = unrecognizedDeclarations.length ? null
+    : Object.entries(channels).filter(([, version]) => !accepted(version)).map(([channel, version]) => ({ channel, version }))
+  const unpublishedSupport = unrecognizedDeclarations.length ? null : supported.filter(version => !accepted(version))
   return {
-    needsAttention: unverifiedChannels.length > 0 || unrecognizedDeclarations.length > 0 || unpublishedSupport?.length > 0,
+    needsAttention: unverifiedChannels.length > 0 || unrecognizedDeclarations.length > 0 || blockedChannels?.length > 0 || unpublishedSupport?.length > 0,
     hostChannels: channels,
     pluginChannel: 'latest', pluginVersion: pluginManifest.version,
-    unverifiedChannels, unpublishedSupport, unrecognizedDeclarations,
+    blockedChannels, unverifiedChannels, unpublishedSupport, unrecognizedDeclarations,
     limits: ['Compares declarations only; does not prove runtime compatibility or publish anything.', 'Checks host latest/next and plugin latest; other tags and untagged releases require an explicit audit.'],
   }
 }

@@ -2878,7 +2878,7 @@ function renderStatus(value: JsonValue): string {
     team.loop_state && team.loop_state !== 'running' && team.loop_state !== 'halted' && team.loop_state !== 'escalated'
       ? team.loop_state
       : undefined,
-  ].filter((item): item is string => item !== undefined)
+  ].filter((item, index, all): item is string => item !== undefined && all.indexOf(item) === index)
   const lines: string[] = [
     `Team "${team.team_name}"${team.description ? ` — ${team.description}` : ''}${flags.length > 0 ? ` [${flags.join(', ')}]` : ''}`,
     ...team.profile === undefined ? [] : [`Profile: ${team.profile.name}${team.profile.task_planning ? ` [${team.profile.task_planning}]` : ''}${team.profile.protocol ? ` — ${team.profile.protocol}` : ''}`],

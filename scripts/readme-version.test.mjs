@@ -47,6 +47,16 @@ test('install commands are extracted regardless of version', () => {
   assert.deepEqual(findPinnedInstallVersions(markdown), ['0.1.16', '0.1.20'])
 })
 
+test('latest updates are allowed while stale pins and undeclared channels remain rejected', () => {
+  const check = spec => checkReadmeVersions({
+    version: '0.1.20', known: KNOWN,
+    files: { 'README.md': `dsh plugin add @nanmicoder/dsh-agent-teams@${spec}` },
+  })
+  assert.deepEqual(check('latest'), [])
+  assert.ok(check('0.1.19').length > 0)
+  assert.ok(check('next').length > 0)
+})
+
 test('published versions come from the release notes themselves', () => {
   const known = publishedVersions(fileURLToPath(new URL('../release-notes', import.meta.url)))
   assert.ok(known.includes('0.1.18') && known.includes('0.1.16-rc.2'), known.join(', '))

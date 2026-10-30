@@ -36,7 +36,7 @@
 
 ## 版本更新
 
-[最新发布](https://github.com/NanmiCoder/dsh-agent-teams/releases/latest) 增加 Harness `0.2.1-rc.3` 支持，修复 Windows 打包与运行验证问题，并补齐新增宿主时容易遗漏的安装检查。npm 安装使用 `latest`，GitHub 安装使用默认分支，不需要填写版本号。推荐宿主仍为 `0.2.1-rc.2`。详见[兼容清单](./compatibility.json)和[发布说明](./release-notes/v0.1.27.md)。
+[最新发布](https://github.com/NanmiCoder/dsh-agent-teams/releases/latest) 修复在 Harness `0.2.1-rc.4`、`0.2.1-rc.5`（npm `latest`）及之后版本上无法安装的问题。插件不再逐个列出已测宿主，只声明最低宿主版本 `>=0.1.2-alpha.2`，Harness 发布新版本不会再挡住安装。npm 安装请写明下方的版本号，GitHub 安装使用默认分支。推荐宿主仍为 `0.2.1-rc.2`。详见[测试矩阵](./compatibility.json)和[发布说明](./release-notes/v0.1.28.md)。
 
 ## 为什么需要 AgentTeams？
 
@@ -54,27 +54,38 @@
 
 ## 安装与版本选择
 
-**推荐组合：DeepSeek Harness `0.2.1-rc.2` + AgentTeams `0.1.27`。宿主仍为 RC 版本。**
+**推荐组合：DeepSeek Harness `0.2.1-rc.2` + AgentTeams `0.1.28`。宿主仍为 RC 版本。**
 
 | 使用场景 | DeepSeek Harness | AgentTeams 插件 |
 | --- | --- | --- |
-| **推荐版本** | **`0.2.1-rc.2`** | **`0.1.27`** |
-| 预览宿主 | `0.2.1-rc.3` | `0.1.27` |
-| 上一推荐 RC | `0.2.1-rc.1`, `0.2.0-rc.2`, `0.1.7-rc.2` | `0.1.27` |
-| 保留旧 RC | `0.1.5-rc.1`, `0.1.5-rc.2`, `0.1.5-rc.3` | `0.1.27` |
-| 保留旧 RC | `0.1.2-rc.1` | `0.1.27` |
-| 开发者测试 Alpha | `0.1.2-alpha.5` | `0.1.27` |
-| 保留旧 Alpha | `0.1.2-alpha.2` | `0.1.27` |
+| **推荐版本** | **`0.2.1-rc.2`** | **`0.1.28`** |
+| 预览宿主 | `0.2.1-rc.3` | `0.1.28` |
+| 上一推荐 RC | `0.2.1-rc.1`, `0.2.0-rc.2`, `0.1.7-rc.2` | `0.1.28` |
+| 保留旧 RC | `0.1.5-rc.1`, `0.1.5-rc.2`, `0.1.5-rc.3` | `0.1.28` |
+| 保留旧 RC | `0.1.2-rc.1` | `0.1.28` |
+| 开发者测试 Alpha | `0.1.2-alpha.5` | `0.1.28` |
+| 保留旧 Alpha | `0.1.2-alpha.2` | `0.1.28` |
+| 更新的宿主 | `0.2.1-rc.4`、`0.2.1-rc.5` 及之后版本 | `0.1.28` |
+
+除最后一行外均为 CI 测试矩阵。`0.2.1-rc.4` 及之后发布的 Harness 都可以直接安装；`0.2.1-rc.5` 已在本地 macOS 跑通完整运行场景，尚未加入 CI 矩阵。
 
 ### 桌面端
 
-在应用侧栏打开「插件 → 添加插件」，输入 npm 包名：
+在应用侧栏打开「插件 → 添加插件」，可以直接通过 GitHub 地址安装。在插件输入框中粘贴下面的仓库地址，无需追加版本号、tag 或 commit：
 
 ```text
-@nanmicoder/dsh-agent-teams
+https://github.com/NanmiCoder/dsh-agent-teams
 ```
 
-不带版本号的包名会安装 npm `latest`，无需填写版本后缀。安装完成后点击「立即启用」；宿主提示需要重启时，重启桌面应用。发布版请使用上面的包名，npm 或 GitHub 网页链接与 npm 包名不是同一种安装来源。从 Git 安装时，使用下方默认分支安装命令。
+此方式从默认分支安装，刚发布后即可使用。也支持下面的等价简写：
+
+```text
+github:NanmiCoder/dsh-agent-teams
+```
+
+从 npm 安装时输入带版本号的包名 `@nanmicoder/dsh-agent-teams@0.1.28`。桌面端的 pnpm 11 默认不自动安装发布未满 24 小时的版本：新版发布后的 24 小时内，不带版本号或使用 `@latest` 都会装到上一个版本，即使预览显示的是新版；如果上一个版本与你的宿主不兼容，安装会失败。写明版本号可以立即安装该版本；更换镜像源不会消除这项规则。GitHub 方式需要能够访问 GitHub，默认分支代码可能先于 npm 发布。
+
+安装完成后点击「立即启用」；宿主提示需要重启时，重启桌面应用。无需关闭兼容检查或全局发布等待期规则。
 
 桌面端自带 Harness 内核与包管理器，升级全局 CLI 不会升级桌面端；普通独立 CLI 不能管理桌面 profile，桌面端自带的 CLI carrier 在此版本可以管理。当前精确目标是已发布的 `0.2.1-rc.2`，仍属于 RC；此前源码预测的 `0.2.0` 已退出支持声明。详见[迁移验收记录](./docs/harness-0.2.1-rc.2/README.md)。
 
@@ -89,10 +100,10 @@ dsh --version
 
 ### CLI / Web：2. 安装 AgentTeams 插件
 
-从 npm 安装或升级插件（不带版本号时使用 npm `latest`，当前为正式版 `0.1.27`）：
+从 npm 安装或升级插件时写明版本号（当前正式版为 `0.1.28`）：
 
 ```sh
-dsh plugin --profile web add --save-exact @nanmicoder/dsh-agent-teams
+dsh plugin --profile web add --save-exact @nanmicoder/dsh-agent-teams@0.1.28
 ```
 
 CLI 管理的安装可将 `web` 换成实际使用的 CLI profile。**安装后，停止并重新启动该 profile 的 Harness 进程，再刷新浏览器。** 安装插件不会自动升级宿主；Harness 的 `latest` 与插件的 `latest` 是两个独立渠道。
@@ -103,11 +114,11 @@ CLI 管理的安装可将 `web` 换成实际使用的 CLI profile。**安装后�
 dsh plugin --profile web add github:NanmiCoder/dsh-agent-teams
 ```
 
-更新时重新运行所选安装命令，再重启对应 profile。GitHub 默认分支的代码可能先于 npm `latest` 发布；默认分支包含已验证的 `lib/` 构建产物。仓库随代码分发服务端、客户端和类型产物，安装时不需要执行 `prepare` 或批准构建脚本。源码维护者每次修改源码后，都需运行 `pnpm build` 并更新已提交的产物。已经发布的 npm 产物保持不变。
+更新时把命令里的版本号换成新版本再运行，然后重启对应 profile；已有安装只重复裸包名时，包管理器可能保留旧的精确版本。不带版本号或使用 `@latest` 时，新版发布后的 24 小时内会装到上一个版本。镜像源尚未同步新发布时，可在 npm 命令后追加 `--registry=https://registry.npmjs.org`。GitHub 默认分支的代码可能先于 npm `latest` 发布；默认分支包含已验证的 `lib/` 构建产物。仓库随代码分发服务端、客户端和类型产物，安装时不需要执行 `prepare` 或批准构建脚本。源码维护者每次修改源码后，都需运行 `pnpm build` 并更新已提交的产物。已经发布的 npm 产物保持不变。
 
 手动克隆源码的用户，拉取代码后需重新运行 `pnpm install --frozen-lockfile` 和 `pnpm build`，再重启对应的 Harness；只更新 Git 不会更新本地构建产物。详见[维护指南](./docs/maintenance-workflow.md)。
 
-> 旧 `0.1.0-*` / `0.1.1-*` 或其他未列出的宿主，请先保留已工作的组合，参考[旧版本与诊断指引](./docs/maintenance-workflow.md)。
+> 低于 `0.1.2-alpha.2` 的旧 `0.1.0-*` / `0.1.1-*` 宿主，请先保留已工作的组合，参考[旧版本与诊断指引](./docs/maintenance-workflow.md)。
 
 完整[兼容清单](./compatibility.json)、[源码安装与 Alpha 验证](./docs/maintenance-workflow.md)、[已验证范围与平台限制](./docs/maintenance-2026-09-06/release/README.md)。
 

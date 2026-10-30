@@ -49,7 +49,8 @@ export function checkReadmeVersions({ version, known, files }) {
       problems.push(`${name} still names ${stale.version} outside a release-notes link`)
     }
     for (const pinned of findPinnedInstallVersions(markdown)) {
-      if (pinned !== version) {
+      // The stable channel requests an update without pinning a numeric version.
+      if (pinned !== version && pinned !== 'latest') {
         problems.push(`${name} pins @nanmicoder/dsh-agent-teams@${pinned} but the package is ${version}`)
       }
     }

@@ -16,9 +16,14 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { Agent, AgentStatus } from '@deepseek-ai/dsh-agent'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import { join } from 'node:path'
-import { deliverToMember } from './members.ts'
+import { deliverToMember, steerCaptainReport } from './members.ts'
+import { nearestLiveLead } from './lineage.ts'
+import { appendTeamEvent, captainSessionOf } from './events.ts'
 import { isCurrentMail, mailboxPrompt } from './mailbox.ts'
 import {
+  appendMailbox,
+  createMessage,
+  readMailbox,
   markMailboxDelivered,
   discardMailboxMessages,
   beginTaskAttempt,
@@ -35,7 +40,7 @@ import {
 } from './state.ts'
 import { contractStaleness, isVerdictKind, taskKindOf, verdictScopePatterns } from './quality-gates.ts'
 import { digestWorkspacePaths, snapshotWorkspacePaths } from './artifacts.ts'
-import type { TeamMember, TeamState, TeamTask } from './types.ts'
+import type { TeamMember, TeamMessage, TeamState, TeamTask } from './types.ts'
 
 /** Per-dependency output cap in the assignment prompt. */
 export const DEPENDENCY_OUTPUT_MAX_CHARS = 2_000
@@ -486,6 +491,55 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
     },
   }
 
+  const notifyParkedAttempt = async (stateRoot: string, teamId: string, agent: Agent): Promise<void> => {
+    const prepared = await withTeamLock(teamLockKey(stateRoot, teamId), async () => {
+      const fresh = await readTeam(stateRoot, teamId)
+      const current = fresh?.members.find(candidate => candidate.id === agent.id && candidate.status !== 'removed')
+      if (fresh === undefined || current === undefined || current.status !== 'idle'
+        || fresh.halted === true || fresh.phase === 'staged' || current.stopping === true) return
+      const owned = ownedOpenTask(fresh.tasks, current.name)
+      if (owned?.attemptId === undefined || owned.attemptId !== parkedAttempts.get(agent.id)
+        || owned.reassigning === true) return
+      // Mail history, not the process-local park marker, dedupes notices
+      // across acknowledgement, re-parking and scheduler replacement.
+      const id = `parked-attempt:${JSON.stringify([current.id, owned.id, owned.attemptId])}`
+      const inbox = await readMailbox(stateRoot, fresh.id, CAPTAIN_KEY)
+      if (inbox.some(item => item.id === id)) return
+      const content = `Member "${current.name}" is idle with open task ${owned.id}`
+        + ` (attempt ${owned.attempt ?? 1}, attempt_id ${owned.attemptId}).`
+        + ' Scheduling is parked; use agent_teams_reassign_task to resume.'
+      const message: TeamMessage = {
+        ...createMessage(current.name, CAPTAIN_KEY, content),
+        id,
+        sourceTaskId: owned.id,
+        sourceAttemptId: owned.attemptId,
+        sourceTaskStatus: owned.status,
+        deliveryClaimedAt: Date.now(),
+      }
+      await appendMailbox(stateRoot, fresh.id, CAPTAIN_KEY, message)
+      appendTeamEvent(ctx, captainSessionOf(ctx, fresh.captainSessionId, agent.session), 'agent-teams/message-sent', {
+        teamId: fresh.id,
+        messageId: message.id,
+        from: current.name,
+        to: CAPTAIN_KEY,
+        content: message.content,
+        ts: message.ts,
+      })
+      return { captainSessionId: fresh.captainSessionId, members: fresh.members, memberName: current.name, message }
+    })
+    // A steer may synchronously start a turn; all host calls stay outside the lock.
+    if (prepared !== undefined) {
+      const captain = nearestLiveLead(ctx, prepared)
+      const delivered = captain !== undefined && steerCaptainReport(
+        captain, prepared.memberName, prepared.message.content,
+        mailboxPrompt(teamId, CAPTAIN_KEY, [prepared.message]),
+      )
+      await withTeamLock(teamLockKey(stateRoot, teamId), () => delivered
+        ? markMailboxDelivered(stateRoot, teamId, CAPTAIN_KEY, [prepared.message.id])
+        : releaseMailboxDelivery(stateRoot, teamId, CAPTAIN_KEY, [prepared.message.id]))
+    }
+  }
+
   const syncMemberStatus = async (agent: Agent, status: AgentStatus): Promise<void> => {
     const workspace = agent.session.header.cwd ?? process.cwd()
     const stateRoot = stateRootOf(workspace, config)
@@ -541,7 +595,11 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
       current.status = next
       await writeTeam(stateRoot, fresh)
     })
-    if (status === 'idle') await runtime.kickMember(workspace, located.id, member.name)
+    if (status === 'idle') {
+      await runtime.kickMember(workspace, located.id, member.name)
+      // Wait for the member lane before deciding whether its attempt stayed parked.
+      await notifyParkedAttempt(stateRoot, located.id, agent)
+    }
   }
 
   ctx.on('agent/status', ({ agent, status }) => {

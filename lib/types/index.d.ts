@@ -20,8 +20,25 @@
  */
 import type { Context } from '@deepseek-ai/cordis';
 import z from '@deepseek-ai/schemastery';
+import type { WorkspaceRegistry } from '@deepseek-ai/dsh-workspace';
 import { type TeamProfileConfig } from './profiles.ts';
 import { type MemberToolPolicy } from './tool-policies.ts';
+/**
+ * Build the activity-panel response body for one `/state` request.
+ *
+ * Polling parameters (GitHub #330). The panel only renders the current
+ * session's teams, so the browser scopes its poll instead of receiving every
+ * team of every registered workspace, and asks for the summary projection that
+ * drops the editing-only text. Both switches stay optional: a request without
+ * them keeps the full, unscoped response.
+ *
+ * @param ctx - the plugin context (live member activity).
+ * @param registry - the workspace registry to enumerate.
+ * @param stateDir - configured state directory name under each workspace.
+ * @param url - the request URL, whose query selects scope and projection.
+ * @returns the JSON body the route answers with.
+ */
+export declare function collectActivityResponse(ctx: Context, registry: Pick<WorkspaceRegistry, 'list'>, stateDir: string, url: URL): Promise<string>;
 export declare const name = "agent-teams";
 export declare const inject: string[];
 /** Plugin configuration. */

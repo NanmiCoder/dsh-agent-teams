@@ -1,4 +1,7 @@
+import { createHash } from 'node:crypto'
+import { realpath } from 'node:fs/promises'
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { resolve } from 'node:path'
 import type { HostConnectionService } from '@deepseek-ai/dsh-client-connection'
 
 /** Public WebServer route surface used by the plugin. */
@@ -65,6 +68,83 @@ export async function readJsonRequest(req: IncomingMessage, maxBytes = 1_000_000
     throw new RequestBodyError('body must be an object', 400)
   }
   return value as Record<string, unknown>
+}
+
+/** Weak validator for one JSON response body. */
+export function jsonEtag(body: string): string {
+  return `W/"${createHash('sha1').update(body).digest('base64url')}"`
+}
+
+/**
+ * Whether an `If-None-Match` header already accepts `etag`.
+ *
+ * Intermediaries (a gzip proxy in front of the host) may rewrite a validator
+ * as weak, so both the weak and the strong spelling of the same tag match.
+ */
+export function ifNoneMatchAccepts(header: string | string[] | undefined, etag: string): boolean {
+  if (header === undefined) return false
+  const value = Array.isArray(header) ? header.join(',') : header
+  const target = etag.replace(/^W\//, '')
+  return value.split(',').some((part) => {
+    const candidate = part.trim()
+    if (candidate === '*') return true
+    return candidate.replace(/^W\//, '') === target
+  })
+}
+
+/**
+ * Send one JSON body with a weak ETag, answering `304 Not Modified` without a
+ * body when the browser already holds these exact bytes.
+ *
+ * The browser client keeps the validator itself: its fetch uses
+ * `cache: 'no-store'`, so no shared cache will add `If-None-Match` for it.
+ */
+export function writeJsonWithEtag(
+  req: IncomingMessage,
+  res: ServerResponse,
+  body: string,
+): void {
+  const etag = jsonEtag(body)
+  const common = {
+    'content-type': 'application/json; charset=utf-8',
+    'cache-control': 'no-store',
+    etag,
+  }
+  if (ifNoneMatchAccepts(req.headers['if-none-match'], etag)) {
+    res.writeHead(304, common)
+    res.end()
+    return
+  }
+  res.writeHead(200, common)
+  res.end(body)
+}
+
+/**
+ * Drop entries whose path resolves to a directory already collected.
+ *
+ * Two workspace registrations can point at the same directory; without this,
+ * every team under it is read and serialized twice per poll (GitHub #330).
+ */
+export async function dedupeByRealPath<T>(
+  items: readonly T[],
+  pathOf: (item: T) => string,
+): Promise<T[]> {
+  const seen = new Set<string>()
+  const unique: T[] = []
+  for (const item of items) {
+    const path = pathOf(item)
+    let key: string
+    try {
+      key = await realpath(path)
+    } catch {
+      // A missing directory still has to be deduped against an identical string.
+      key = resolve(path)
+    }
+    if (seen.has(key)) continue
+    seen.add(key)
+    unique.push(item)
+  }
+  return unique
 }
 
 /** Raw WebServer routes do not inherit Connection's authentication fence. */

@@ -19,7 +19,11 @@ export interface TeamActivityMember {
     readonly provider: string;
     readonly model: string;
     readonly reasoningEffort: string;
-    readonly executionPrompt: string;
+    /**
+     * Editing-only text. The polling projection omits it (GitHub #330); a staged
+     * plan keeps it because the staging editor renders it as a form value.
+     */
+    readonly executionPrompt?: string;
     readonly status: MemberStatus;
     readonly activity: 'working' | 'idle' | 'unknown';
     readonly progress: number;
@@ -32,7 +36,11 @@ export interface TeamActivityMember {
 export interface TeamActivityTask {
     readonly id: string;
     readonly subject: string;
-    readonly description: string;
+    /**
+     * Editing-only text, and the dominant byte cost of a polled snapshot. The
+     * polling projection omits it (GitHub #330); a staged plan keeps it.
+     */
+    readonly description?: string;
     readonly status: string;
     readonly state: VisualTaskState;
     readonly assignee: string;
@@ -85,11 +93,29 @@ export interface TeamSnapshotOptions {
     /** Archived teams have no meaningful live activity after their sessions stop. */
     readonly historic?: boolean;
     /**
+     * Polling projection (GitHub #330): omit the two large editing-only fields,
+     * `tasks[].description` and `members[].executionPrompt`, which only the
+     * staging editor renders. A staged plan always keeps them, because that
+     * editor renders them as form values.
+     */
+    readonly summary?: boolean;
+    /**
      * Absolute workspace path of the owning workspace. When present, the snapshot
      * audits the current bytes behind every recorded verdict, so the panel and
      * the model-facing status tool cannot report different delivery verdicts.
      */
     readonly workspacePath?: string;
+}
+/** Team selection switches shared by the live and archived collectors. */
+export interface TeamCollectionOptions {
+    /**
+     * Only teams whose captain session matches this id. The browser panel only
+     * ever renders the current session's teams, so scoping the request here keeps
+     * unrelated teams (and their tasks) off the wire (GitHub #330).
+     */
+    readonly captainSessionId?: string;
+    /** Polling projection; see {@link TeamSnapshotOptions.summary}. */
+    readonly summary?: boolean;
 }
 /** Compact `provider/model` route for the activity panel, or just the model. */
 export declare function memberModelRoute(member: {
@@ -109,22 +135,24 @@ export declare function assembleTeamSnapshot(ctx: Context, stateRoot: string, wo
  * Collect every team under the given workspace state roots.
  * @param ctx - the plugin context.
  * @param roots - `{ workspace, stateRoot }` pairs (resolved absolute roots).
+ * @param options - captain-session scope and polling projection.
  * @returns the snapshots in stable order (workspace, then team id).
  */
 export declare function collectTeamsActivity(ctx: Context, roots: readonly {
     workspace: string;
     stateRoot: string;
     workspacePath?: string;
-}[]): Promise<TeamActivitySnapshot[]>;
+}[], options?: TeamCollectionOptions): Promise<TeamActivitySnapshot[]>;
 /**
  * Collect every archived team under the given workspace state roots (the
  * `archive/` subdirectory of each state root). Used by the historic panel
  * path to restore full team detail after deletion.
  * @param ctx - the plugin context.
  * @param roots - `{ workspace, stateRoot }` pairs.
+ * @param options - captain-session scope and polling projection.
  * @returns the archived snapshots in stable order.
  */
 export declare function collectArchivedTeamsActivity(ctx: Context, roots: readonly {
     workspace: string;
     stateRoot: string;
-}[]): Promise<TeamActivitySnapshot[]>;
+}[], options?: TeamCollectionOptions): Promise<TeamActivitySnapshot[]>;

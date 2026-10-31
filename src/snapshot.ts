@@ -31,7 +31,11 @@ export interface TeamActivityMember {
   readonly provider: string
   readonly model: string
   readonly reasoningEffort: string
-  readonly executionPrompt: string
+  /**
+   * Editing-only text. The polling projection omits it (GitHub #330); a staged
+   * plan keeps it because the staging editor renders it as a form value.
+   */
+  readonly executionPrompt?: string
   readonly status: MemberStatus
   readonly activity: 'working' | 'idle' | 'unknown'
   readonly progress: number
@@ -45,7 +49,11 @@ export interface TeamActivityMember {
 export interface TeamActivityTask {
   readonly id: string
   readonly subject: string
-  readonly description: string
+  /**
+   * Editing-only text, and the dominant byte cost of a polled snapshot. The
+   * polling projection omits it (GitHub #330); a staged plan keeps it.
+   */
+  readonly description?: string
   readonly status: string
   readonly state: VisualTaskState
   readonly assignee: string
@@ -97,11 +105,30 @@ export interface TeamSnapshotOptions {
   /** Archived teams have no meaningful live activity after their sessions stop. */
   readonly historic?: boolean
   /**
+   * Polling projection (GitHub #330): omit the two large editing-only fields,
+   * `tasks[].description` and `members[].executionPrompt`, which only the
+   * staging editor renders. A staged plan always keeps them, because that
+   * editor renders them as form values.
+   */
+  readonly summary?: boolean
+  /**
    * Absolute workspace path of the owning workspace. When present, the snapshot
    * audits the current bytes behind every recorded verdict, so the panel and
    * the model-facing status tool cannot report different delivery verdicts.
    */
   readonly workspacePath?: string
+}
+
+/** Team selection switches shared by the live and archived collectors. */
+export interface TeamCollectionOptions {
+  /**
+   * Only teams whose captain session matches this id. The browser panel only
+   * ever renders the current session's teams, so scoping the request here keeps
+   * unrelated teams (and their tasks) off the wire (GitHub #330).
+   */
+  readonly captainSessionId?: string
+  /** Polling projection; see {@link TeamSnapshotOptions.summary}. */
+  readonly summary?: boolean
 }
 
 /** The current task of a member: its first unfinished owned task. */
@@ -141,6 +168,9 @@ export async function assembleTeamSnapshot(
   const roster = options.includeRemoved === true
     ? state.members
     : state.members.filter((member) => member.status !== 'removed')
+  // A staged plan is the only surface that renders description/executionPrompt
+  // as editable text, so it always keeps the full payload even under summary.
+  const fullDetail = options.summary !== true || state.phase === 'staged'
   const activity = options.historic === true
     ? new Map<string, 'running' | 'idle' | 'ready'>()
     : memberActivity(ctx, roster.map((member) => member.id))
@@ -163,7 +193,7 @@ export async function assembleTeamSnapshot(
       provider: member.provider?.trim() ?? '',
       model: member.model?.trim() ?? '',
       reasoningEffort: member.reasoningEffort?.trim() ?? '',
-      executionPrompt: member.executionPrompt ?? '',
+      ...fullDetail ? { executionPrompt: member.executionPrompt ?? '' } : {},
       status: member.status,
       activity: options.historic === true
         ? 'idle'
@@ -213,7 +243,7 @@ export async function assembleTeamSnapshot(
     tasks: tasks.map((task) => ({
       id: task.id,
       subject: task.subject,
-      description: task.description ?? '',
+      ...fullDetail ? { description: task.description ?? '' } : {},
       status: task.status,
       state: taskVisualState(task.status, task.dependencies, tasks),
       assignee: task.assignee ?? '',
@@ -239,11 +269,13 @@ export async function assembleTeamSnapshot(
  * Collect every team under the given workspace state roots.
  * @param ctx - the plugin context.
  * @param roots - `{ workspace, stateRoot }` pairs (resolved absolute roots).
+ * @param options - captain-session scope and polling projection.
  * @returns the snapshots in stable order (workspace, then team id).
  */
 export async function collectTeamsActivity(
   ctx: Context,
   roots: readonly { workspace: string; stateRoot: string; workspacePath?: string }[],
+  options: TeamCollectionOptions = {},
 ): Promise<TeamActivitySnapshot[]> {
   const snapshots: TeamActivitySnapshot[] = []
   for (const root of roots) {
@@ -261,8 +293,12 @@ export async function collectTeamsActivity(
       try {
         const state = await readTeam(root.stateRoot, entry.name)
         if (state === undefined) continue
+        // Filter before assembly: an unrelated team must not pay for mailbox
+        // reads, workspace audits and JSON serialization on every poll.
+        if (options.captainSessionId !== undefined && state.captainSessionId !== options.captainSessionId) continue
         snapshots.push(await assembleTeamSnapshot(ctx, root.stateRoot, root.workspace, state, {
           ...root.workspacePath === undefined ? {} : { workspacePath: root.workspacePath },
+          ...options.summary === true ? { summary: true } : {},
         }))
       } catch {
         ctx.logger.warn(`agent-teams: skipped unreadable team state "${entry.name}" in workspace "${root.workspace}"`)
@@ -278,11 +314,13 @@ export async function collectTeamsActivity(
  * path to restore full team detail after deletion.
  * @param ctx - the plugin context.
  * @param roots - `{ workspace, stateRoot }` pairs.
+ * @param options - captain-session scope and polling projection.
  * @returns the archived snapshots in stable order.
  */
 export async function collectArchivedTeamsActivity(
   ctx: Context,
   roots: readonly { workspace: string; stateRoot: string }[],
+  options: TeamCollectionOptions = {},
 ): Promise<TeamActivitySnapshot[]> {
   const snapshots: TeamActivitySnapshot[] = []
   for (const root of roots) {
@@ -290,12 +328,13 @@ export async function collectArchivedTeamsActivity(
       try {
         const state = await readArchivedTeam(root.stateRoot, teamId)
         if (state === undefined) continue
+        if (options.captainSessionId !== undefined && state.captainSessionId !== options.captainSessionId) continue
         snapshots.push(await assembleTeamSnapshot(
           ctx,
           join(root.stateRoot, 'archive'),
           root.workspace,
           state,
-          { includeRemoved: true, historic: true },
+          { includeRemoved: true, historic: true, ...options.summary === true ? { summary: true } : {} },
         ))
       } catch {
         ctx.logger.warn(`agent-teams: skipped unreadable archived team "${teamId}" in workspace "${root.workspace}"`)

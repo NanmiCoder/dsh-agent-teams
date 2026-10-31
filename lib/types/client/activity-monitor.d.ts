@@ -98,11 +98,25 @@ export declare const ACTIVITY_POLL_MS = 1000;
  * every ordinary session into a one-second filesystem scan.
  */
 export declare const ACTIVITY_PROBE_MS = 5000;
+/**
+ * Cadence while the document is hidden. A background tab keeps a working
+ * cadence only when it is the surface the user is looking at (GitHub #330).
+ */
+export declare const ACTIVITY_HIDDEN_POLL_MS = 10000;
 /** Host route serving live and archived team snapshots. */
 export declare const ACTIVITY_STATE_URL = "/plugins/dsh-agent-teams/state";
 export declare const ACTIVITY_HALT_URL = "/plugins/dsh-agent-teams/halt";
 interface ActivityFetchResponse {
     readonly ok: boolean;
+    /**
+     * HTTP status when the transport exposes one. `304` answers a conditional
+     * poll with no body: the held snapshot is already current.
+     */
+    readonly status?: number;
+    /** Response headers; only the validator (`etag`) is read. */
+    readonly headers?: {
+        get(name: string): string | null;
+    };
     json(): Promise<unknown>;
 }
 /** Injectable browser primitives used by the poll controller and its tests. */
@@ -118,11 +132,17 @@ export interface ActivityPollingRuntime {
     readonly fetchState?: (url: string, init: {
         readonly cache: 'no-store';
         readonly signal: AbortSignal;
+        /** `if-none-match`: the validator of the last body this controller holds. */
+        readonly headers?: Record<string, string>;
     }) => Promise<ActivityFetchResponse>;
     readonly schedule?: (callback: () => void, intervalMs: number) => unknown;
     readonly cancel?: (timer: unknown) => void;
     readonly publishSnapshots?: (update: Partial<ActivitySnapshots>) => void;
     readonly settleTargets?: (keys: ReadonlySet<string>) => void;
+    /** Whether the document is hidden; a hidden document polls on the slow cadence. */
+    readonly isHidden?: () => boolean;
+    /** Subscribe to visibility changes; returns an unsubscribe function. */
+    readonly subscribeVisibility?: (listener: () => void) => () => void;
 }
 /** Handle returned by one current-session polling loop. */
 export interface ActivityPollingController {

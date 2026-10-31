@@ -189,12 +189,24 @@ export const ACTIVITY_POLL_MS = 1000
  * every ordinary session into a one-second filesystem scan.
  */
 export const ACTIVITY_PROBE_MS = 5000
+/**
+ * Cadence while the document is hidden. A background tab keeps a working
+ * cadence only when it is the surface the user is looking at (GitHub #330).
+ */
+export const ACTIVITY_HIDDEN_POLL_MS = 10_000
 /** Host route serving live and archived team snapshots. */
 export const ACTIVITY_STATE_URL = '/plugins/dsh-agent-teams/state'
 export const ACTIVITY_HALT_URL = '/plugins/dsh-agent-teams/halt'
 
 interface ActivityFetchResponse {
   readonly ok: boolean
+  /**
+   * HTTP status when the transport exposes one. `304` answers a conditional
+   * poll with no body: the held snapshot is already current.
+   */
+  readonly status?: number
+  /** Response headers; only the validator (`etag`) is read. */
+  readonly headers?: { get(name: string): string | null }
   json(): Promise<unknown>
 }
 
@@ -210,12 +222,21 @@ export interface ActivityPollingRuntime {
   readonly discoverySessionId?: string
   readonly fetchState?: (
     url: string,
-    init: { readonly cache: 'no-store'; readonly signal: AbortSignal },
+    init: {
+      readonly cache: 'no-store'
+      readonly signal: AbortSignal
+      /** `if-none-match`: the validator of the last body this controller holds. */
+      readonly headers?: Record<string, string>
+    },
   ) => Promise<ActivityFetchResponse>
   readonly schedule?: (callback: () => void, intervalMs: number) => unknown
   readonly cancel?: (timer: unknown) => void
   readonly publishSnapshots?: (update: Partial<ActivitySnapshots>) => void
   readonly settleTargets?: (keys: ReadonlySet<string>) => void
+  /** Whether the document is hidden; a hidden document polls on the slow cadence. */
+  readonly isHidden?: () => boolean
+  /** Subscribe to visibility changes; returns an unsubscribe function. */
+  readonly subscribeVisibility?: (listener: () => void) => () => void
 }
 
 /** Handle returned by one current-session polling loop. */
@@ -255,6 +276,13 @@ export function startActivityPolling(
   const cancel = runtime.cancel ?? ((timer) => { clearInterval(timer as ReturnType<typeof setInterval>) })
   const publishSnapshots = runtime.publishSnapshots ?? updateActivitySnapshots
   const settleTargets = runtime.settleTargets ?? settleActivityMonitorTargets
+  const isHidden = runtime.isHidden
+    ?? (() => typeof document !== 'undefined' && document.visibilityState === 'hidden')
+  const subscribeVisibility = runtime.subscribeVisibility ?? ((listener: () => void) => {
+    if (typeof document === 'undefined') return () => {}
+    document.addEventListener('visibilitychange', listener)
+    return () => { document.removeEventListener('visibilitychange', listener) }
+  })
   let cancelled = false
   let inFlight = false
   // Explicit card targets are demanded work: start at the live cadence. A
@@ -264,7 +292,25 @@ export function startActivityPolling(
   let discoveredLiveKeys = new Set<string>()
   let controller: AbortController | undefined
   let timer: unknown
-  const intervalMs = (): number => (hot ? ACTIVITY_POLL_MS : ACTIVITY_PROBE_MS)
+  // Validator of the last body this controller holds, sent back as
+  // `if-none-match` so an unchanged snapshot costs a bodyless 304 (GitHub #330).
+  let liveEtag: string | undefined
+  // The panel only renders the current session's teams, so the poll carries that
+  // scope and asks for the summary projection. A controller with no session
+  // keeps the unscoped, full-shape request.
+  const targetSessions = new Set(monitorTargets.map((target) => target.sessionId))
+  const scopeSessionId = discoverySessionId !== undefined && discoverySessionId !== ''
+    ? discoverySessionId
+    : targetSessions.size === 1
+      ? monitorTargets[0]?.sessionId
+      : undefined
+  const query = new URLSearchParams({ summary: '1' })
+  if (scopeSessionId !== undefined && scopeSessionId !== '') query.set('session', scopeSessionId)
+  const liveUrl = `${ACTIVITY_STATE_URL}?${query.toString()}`
+  const archivedUrl = `${liveUrl}&archived=1`
+  const intervalMs = (): number => (isHidden()
+    ? ACTIVITY_HIDDEN_POLL_MS
+    : hot ? ACTIVITY_POLL_MS : ACTIVITY_PROBE_MS)
   const reschedule = (): void => {
     cancel(timer)
     timer = schedule(() => { void tick() }, intervalMs())
@@ -274,14 +320,23 @@ export function startActivityPolling(
     inFlight = true
     controller = new AbortController()
     try {
-      const liveResponse = await fetchState(ACTIVITY_STATE_URL, {
+      const liveResponse = await fetchState(liveUrl, {
         cache: 'no-store',
         signal: controller.signal,
+        ...liveEtag === undefined ? {} : { headers: { 'if-none-match': liveEtag } },
       })
+      // The host already answered this validator with `304 Not Modified`: the
+      // held snapshot is current, so there is nothing to publish, parse or
+      // probe for archives on this tick.
+      if (liveResponse.status === 304) {
+        if (!cancelled) runtime.onStatus?.('ready')
+        return
+      }
       if (!liveResponse.ok) throw new Error('Activity unavailable')
       const body = (await liveResponse.json()) as { teams?: unknown }
       if (cancelled) return
       if (!Array.isArray(body.teams)) throw new Error('Invalid activity response')
+      liveEtag = liveResponse.headers?.get('etag') ?? liveEtag
       runtime.onStatus?.('ready')
       const liveTeams = body.teams as readonly ActivityTeam[]
       publishSnapshots({ teams: liveTeams })
@@ -312,7 +367,7 @@ export function startActivityPolling(
       // host archive no longer exists; a discovery session that already
       // upgraded keeps polling, and a still-probing one keeps probing, so a
       // team created later in the same session stays discoverable.
-      const archivedResponse = await fetchState(`${ACTIVITY_STATE_URL}?archived=1`, {
+      const archivedResponse = await fetchState(archivedUrl, {
         cache: 'no-store',
         signal: controller.signal,
       })
@@ -333,6 +388,14 @@ export function startActivityPolling(
   }
   const firstTick = tick()
   if (timer === undefined) timer = schedule(() => { void tick() }, intervalMs())
+  // A visibility change re-arms the timer at the cadence that now applies. A
+  // tab returning to the foreground also refreshes immediately instead of
+  // waiting out the slow hidden interval.
+  const stopVisibility = subscribeVisibility(() => {
+    if (cancelled) return
+    reschedule()
+    if (!isHidden()) void tick()
+  })
   return {
     firstTick,
     stop: () => {
@@ -340,6 +403,7 @@ export function startActivityPolling(
       cancelled = true
       controller?.abort()
       cancel(timer)
+      stopVisibility()
     },
   }
 }

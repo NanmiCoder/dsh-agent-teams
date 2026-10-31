@@ -51,8 +51,10 @@ import {
   usesParallelTaskGrid,
 } from '../lib/client/activity-model.js'
 import {
+  ACTIVITY_HIDDEN_POLL_MS,
   ACTIVITY_POLL_MS,
   ACTIVITY_PROBE_MS,
+  ACTIVITY_STATE_URL,
   getActivityMonitorTargetsSnapshot,
   monitorAgentTeam,
   settleActivityMonitorTargets,
@@ -1081,9 +1083,9 @@ discoveryPoller.stop()
 check(
   'a cardless cold session restores live and archive once, then probes at the discovery cadence',
   discoveryUrls.length === 3
-    && discoveryUrls[0] === '/plugins/dsh-agent-teams/state'
-    && discoveryUrls[1]?.endsWith('?archived=1')
-    && discoveryUrls[2] === '/plugins/dsh-agent-teams/state'
+    && discoveryUrls[0] === `${ACTIVITY_STATE_URL}?summary=1&session=cold-captain`
+    && discoveryUrls[1]?.endsWith('&archived=1')
+    && discoveryUrls[2] === `${ACTIVITY_STATE_URL}?summary=1&session=cold-captain`
     && discoveryIntervals.length === 1
     && discoveryIntervals[0] === ACTIVITY_PROBE_MS,
 )
@@ -1102,7 +1104,7 @@ const latePoller = startActivityPolling([], {
   discoverySessionId: 'cold-captain',
   fetchState: async (url) => {
     lateUrls.push(url)
-    if (url === '/plugins/dsh-agent-teams/state') {
+    if (url === `${ACTIVITY_STATE_URL}?summary=1&session=cold-captain`) {
       return { ok: true, json: async () => ({ teams: lateLiveTeams }) }
     }
     return { ok: true, json: async () => ({ teams: [] }) }
@@ -1168,6 +1170,77 @@ check(
   cardIntervals.length === 1 && cardIntervals[0] === ACTIVITY_POLL_MS,
 )
 
+// Regression (GitHub #330): the poll carries the current-session scope and the
+// summary projection, sends the previous validator back, and treats a bodyless
+// 304 as "unchanged" instead of republishing or parsing a body.
+const conditionalUrls = []
+const conditionalValidators = []
+let conditionalPublishes = 0
+let conditionalTick = () => {}
+let conditionalNotModified = false
+const conditionalTeam = { teamId: 'scoped-team', captainSessionId: 'scoped-session' }
+const conditionalPoller = startActivityPolling([{
+  key: 'scoped-target',
+  sessionId: 'scoped-session',
+  teamId: 'scoped-team',
+}], {
+  fetchState: async (url, init) => {
+    conditionalUrls.push(url)
+    conditionalValidators.push(init.headers?.['if-none-match'])
+    if (conditionalNotModified) {
+      return { ok: false, status: 304, headers: { get: () => 'W/"scoped-etag"' }, json: async () => { throw new Error('a 304 body must never be parsed') } }
+    }
+    return { ok: true, status: 200, headers: { get: () => 'W/"scoped-etag"' }, json: async () => ({ teams: [conditionalTeam] }) }
+  },
+  schedule: (callback) => {
+    conditionalTick = callback
+    return 'conditional-timer'
+  },
+  cancel: () => {},
+  isHidden: () => false,
+  subscribeVisibility: () => () => {},
+  publishSnapshots: () => { conditionalPublishes += 1 },
+})
+await conditionalPoller.firstTick
+conditionalNotModified = true
+conditionalTick()
+await new Promise((resolve) => setImmediate(resolve))
+conditionalPoller.stop()
+check(
+  'a scoped poll asks only for the current session summary and sends its validator',
+  conditionalUrls[0] === `${ACTIVITY_STATE_URL}?summary=1&session=scoped-session`
+    && conditionalValidators[0] === undefined
+    && conditionalValidators[1] === 'W/"scoped-etag"',
+)
+check(
+  'an unchanged snapshot answered with 304 publishes nothing',
+  conditionalPublishes === 1,
+)
+
+// A hidden document keeps polling, but on the slow cadence.
+const hiddenIntervals = []
+const hiddenPoller = startActivityPolling([{
+  key: 'hidden-target',
+  sessionId: 'hidden-session',
+  teamId: 'hidden-team',
+}], {
+  fetchState: async () => ({ ok: true, status: 200, headers: { get: () => undefined }, json: async () => ({ teams: [] }) }),
+  schedule: (_callback, intervalMs) => {
+    hiddenIntervals.push(intervalMs)
+    return 'hidden-timer'
+  },
+  cancel: () => {},
+  isHidden: () => true,
+  subscribeVisibility: () => () => {},
+  publishSnapshots: () => {},
+})
+await hiddenPoller.firstTick
+hiddenPoller.stop()
+check(
+  'a hidden document polls on the hidden cadence',
+  hiddenIntervals.length === 1 && hiddenIntervals[0] === ACTIVITY_HIDDEN_POLL_MS,
+)
+
 const pollTarget = { key: 'poll-target', sessionId: 'poll-session', teamId: 'poll-team' }
 let resolveSlowLive
 const slowLive = new Promise((resolve) => { resolveSlowLive = resolve })
@@ -1224,7 +1297,7 @@ fallbackPoller.stop()
 check(
   'a live miss checks archive once and retires even an orphaned legacy card',
   fallbackUrls.length === 2
-    && fallbackUrls[1]?.endsWith('?archived=1')
+    && fallbackUrls[1]?.endsWith('&archived=1')
     && settledFallbackKeys.length === 1
     && settledFallbackKeys[0] === pollTarget.key,
 )

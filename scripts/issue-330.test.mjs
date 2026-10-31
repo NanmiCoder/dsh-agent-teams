@@ -12,6 +12,7 @@ import { collectActivityResponse } from '../lib/index.js'
 import { assembleTeamSnapshot, collectArchivedTeamsActivity, collectTeamsActivity } from '../lib/snapshot.js'
 import { archiveTeamDir, readTeam, writeTeam } from '../lib/state.js'
 import { dedupeByRealPath, ifNoneMatchAccepts, jsonEtag, writeJsonWithEtag } from '../lib/web-routes.js'
+import { teamScopeCache } from '../lib/team-scope-cache.js'
 
 const ctx = { agents: { get: () => undefined }, logger: { warn() {} } }
 const taskText = 'task context '.repeat(40)
@@ -99,6 +100,35 @@ test('the collector keeps only the requested captain session', async (t) => {
   const all = await collectTeamsActivity(ctx, [{ workspace: 'w', stateRoot: root }])
   assert.deepEqual(all.map((team) => team.teamId).sort(), ['mine', 'other'])
   assert.equal(all.find((team) => team.teamId === 'other').tasks[0].description, taskText)
+})
+
+test('a repeated scoped poll reuses the parsed scope, and a rewrite invalidates it', async (t) => {
+  const root = await tempRoot(t)
+  await writeTeamTree(root, teamOf('mine', 'captain-a'))
+  await writeTeamTree(root, teamOf('other', 'captain-b'))
+  teamScopeCache.clear()
+  const first = await collectTeamsActivity(ctx, [{ workspace: 'w', stateRoot: root }], {
+    captainSessionId: 'captain-a',
+    summary: true,
+  })
+  assert.deepEqual(first.map((team) => team.teamId), ['mine'])
+  // The first pass parsed both records; the next one may skip the other team.
+  assert.equal(teamScopeCache.size, 2)
+  const cached = await collectTeamsActivity(ctx, [{ workspace: 'w', stateRoot: root }], {
+    captainSessionId: 'captain-a',
+    summary: true,
+  })
+  assert.deepEqual(cached.map((team) => team.teamId), ['mine'])
+  // A rewritten record must be re-read instead of answering from the cache.
+  const other = await readTeam(root, 'other')
+  assert.ok(other !== undefined)
+  await writeTeam(root, { ...other, captainSessionId: 'captain-a' })
+  const rewritten = await collectTeamsActivity(ctx, [{ workspace: 'w', stateRoot: root }], {
+    captainSessionId: 'captain-a',
+    summary: true,
+  })
+  assert.deepEqual(rewritten.map((team) => team.teamId).sort(), ['mine', 'other'])
+  teamScopeCache.clear()
 })
 
 test('the archived collector applies the same scope and projection', async (t) => {

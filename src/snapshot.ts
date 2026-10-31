@@ -12,6 +12,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { memberActivity } from './members.ts'
+import { teamScopeCache } from './team-scope-cache.ts'
 import { canDeclareDelivery, describeQualityLoop, verdictAuditNotes } from './quality-gates.ts'
 import { auditTeamWorkspace } from './workspace-audit.ts'
 import {
@@ -291,11 +292,20 @@ export async function collectTeamsActivity(
     for (const entry of entries) {
       if (!entry.isDirectory()) continue
       try {
+        const file = join(root.stateRoot, entry.name, 'team.json')
+        const scope = options.captainSessionId
+        // A recorded stamp proves the parsed session is still current, so a
+        // known non-match is skipped before the record is read at all: no
+        // parse of its task descriptions, no mailbox read, no workspace audit.
+        if (scope !== undefined && (await teamScopeCache.matches(file, scope)) === false) continue
         const state = await readTeam(root.stateRoot, entry.name)
         if (state === undefined) continue
-        // Filter before assembly: an unrelated team must not pay for mailbox
-        // reads, workspace audits and JSON serialization on every poll.
-        if (options.captainSessionId !== undefined && state.captainSessionId !== options.captainSessionId) continue
+        if (scope !== undefined) {
+          await teamScopeCache.remember(file, state.captainSessionId)
+          // Filter before assembly: an unrelated team must not pay for mailbox
+          // reads, workspace audits and JSON serialization on every poll.
+          if (state.captainSessionId !== scope) continue
+        }
         snapshots.push(await assembleTeamSnapshot(ctx, root.stateRoot, root.workspace, state, {
           ...root.workspacePath === undefined ? {} : { workspacePath: root.workspacePath },
           ...options.summary === true ? { summary: true } : {},

@@ -5,7 +5,7 @@
 // scripts/verify.mjs.
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, rm, symlink } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rename, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { collectActivityResponse } from '../lib/index.js'
@@ -137,12 +137,33 @@ test('the archived collector applies the same scope and projection', async (t) =
   await writeTeamTree(root, teamOf('archived-other', 'captain-b'))
   await archiveTeamDir(root, 'archived-mine')
   await archiveTeamDir(root, 'archived-other')
+  teamScopeCache.clear()
   const scoped = await collectArchivedTeamsActivity(ctx, [{ workspace: 'w', stateRoot: root }], {
     captainSessionId: 'captain-a',
     summary: true,
   })
   assert.deepEqual(scoped.map((team) => team.teamId), ['archived-mine'])
   assert.equal(scoped[0].tasks[0].description, undefined)
+  // The archive pass is what every session switch pays for, so both archived
+  // records are remembered and the next pass can skip the non-matching one.
+  assert.equal(teamScopeCache.size, 2)
+  const cached = await collectArchivedTeamsActivity(ctx, [{ workspace: 'w', stateRoot: root }], {
+    captainSessionId: 'captain-a',
+    summary: true,
+  })
+  assert.deepEqual(cached.map((team) => team.teamId), ['archived-mine'])
+  // An atomic rewrite invalidates the stamp: the filter follows the new bytes.
+  const archiveFile = join(root, 'archive', 'archived-other', 'team.json')
+  const other = JSON.parse(await readFile(archiveFile, 'utf8'))
+  const temporary = `${archiveFile}.tmp`
+  await writeFile(temporary, JSON.stringify({ ...other, captainSessionId: 'captain-a' }))
+  await rename(temporary, archiveFile)
+  const rewritten = await collectArchivedTeamsActivity(ctx, [{ workspace: 'w', stateRoot: root }], {
+    captainSessionId: 'captain-a',
+    summary: true,
+  })
+  assert.deepEqual(rewritten.map((team) => team.teamId).sort(), ['archived-mine', 'archived-other'])
+  teamScopeCache.clear()
 })
 
 test('the state route response is scoped, summarized and deduplicated', async (t) => {

@@ -336,9 +336,19 @@ export async function collectArchivedTeamsActivity(
   for (const root of roots) {
     for (const teamId of await listArchivedTeamIds(root.stateRoot)) {
       try {
+        // Every session switch starts a fresh polling controller, which restores
+        // history with one archive pass. The same identity stamp that keeps the
+        // live scan cheap also keeps that pass from parsing every archived
+        // record on the way to a no-match (GitHub #330).
+        const file = join(root.stateRoot, 'archive', teamId, 'team.json')
+        const scope = options.captainSessionId
+        if (scope !== undefined && (await teamScopeCache.matches(file, scope)) === false) continue
         const state = await readArchivedTeam(root.stateRoot, teamId)
         if (state === undefined) continue
-        if (options.captainSessionId !== undefined && state.captainSessionId !== options.captainSessionId) continue
+        if (scope !== undefined) {
+          await teamScopeCache.remember(file, state.captainSessionId)
+          if (state.captainSessionId !== scope) continue
+        }
         snapshots.push(await assembleTeamSnapshot(
           ctx,
           join(root.stateRoot, 'archive'),

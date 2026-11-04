@@ -49,3 +49,36 @@ test('workspace DAG keeps real dependency endpoints aligned with enlarged nodes'
  assert.equal(layout.nodes[1].x,200)
  assert.equal(layout.edges[0].path,'M164 38C178 38,186 38,200 38')
 })
+
+test('an unchanged snapshot revalidates with its tag and skips the body',async()=>{
+ let tick;const calls=[],statuses=[],snapshots=[]
+ const respond=(status,etag,teams)=>({
+  ok:status===200,status,
+  headers:{get:(name)=>name.toLowerCase()==='etag'?etag:null},
+  json:async()=>{
+   // A 304 must never be parsed; if it is, this throws instead of silently passing.
+   if(status===304)throw new Error('a 304 response has no body to parse')
+   return {teams}
+  },
+ })
+ let phase=0
+ const poll=startActivityPolling([],{discoverySessionId:'a',
+  fetchState:async(url,init)=>{
+   calls.push({url,validator:init.headers?.['if-none-match']})
+   if(url.includes('archived=1'))return respond(200,'"arch"',[])
+   phase+=1
+   return phase===1?respond(200,'"v1"',[]):respond(304,'"v1"',null)
+  },
+  schedule:fn=>{tick=fn;return 1},cancel:()=>{},
+  onStatus:s=>statuses.push(s),publishSnapshots:s=>snapshots.push(s)})
+ await poll.firstTick
+ assert.equal(calls[0].validator,undefined,'the first poll has nothing to revalidate')
+ assert.deepEqual(statuses,['ready'])
+ const published=snapshots.length
+ tick();await new Promise(resolve=>setImmediate(resolve))
+ const live=calls.filter(call=>!call.url.includes('archived=1'))
+ assert.equal(live[1].validator,'"v1"','the second poll revalidates with the stored tag')
+ assert.equal(snapshots.length,published,'304 publishes nothing new')
+ assert.deepEqual(statuses,['ready','ready'])
+ poll.stop()
+})

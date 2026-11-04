@@ -103,6 +103,11 @@ export declare const ACTIVITY_STATE_URL = "/plugins/dsh-agent-teams/state";
 export declare const ACTIVITY_HALT_URL = "/plugins/dsh-agent-teams/halt";
 interface ActivityFetchResponse {
     readonly ok: boolean;
+    /** Present on a real `Response`; the conditional-request path reads it. */
+    readonly status?: number;
+    readonly headers?: {
+        get(name: string): string | null;
+    };
     json(): Promise<unknown>;
 }
 /** Injectable browser primitives used by the poll controller and its tests. */
@@ -118,6 +123,7 @@ export interface ActivityPollingRuntime {
     readonly fetchState?: (url: string, init: {
         readonly cache: 'no-store';
         readonly signal: AbortSignal;
+        readonly headers?: Readonly<Record<string, string>>;
     }) => Promise<ActivityFetchResponse>;
     readonly schedule?: (callback: () => void, intervalMs: number) => unknown;
     readonly cancel?: (timer: unknown) => void;

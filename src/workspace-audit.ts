@@ -14,7 +14,7 @@
  * @module dsh-agent-teams/workspace-audit
  */
 
-import { readArtifactScope } from './artifacts.ts'
+import { readArtifactScopes } from './artifacts.ts'
 import { deliveryArtifactPaths, deliveryScopePatterns } from './quality-gates.ts'
 import type { DeliveryAudit } from './quality-gates.ts'
 import type { ArtifactDigest, ArtifactScopeGap, TeamState } from './types.ts'
@@ -31,16 +31,19 @@ import type { ArtifactDigest, ArtifactScopeGap, TeamState } from './types.ts'
 export function auditTeamWorkspace(workspace: string, team: TeamState): DeliveryAudit {
   const paths = deliveryArtifactPaths(team)
   const scopePatterns = deliveryScopePatterns(team)
-  const pathRead = paths.length === 0 ? { artifacts: [] as ArtifactDigest[], gaps: [] as ArtifactScopeGap[] } : readArtifactScope(workspace, paths)
-  const scopeRead = scopePatterns.length === 0 ? { artifacts: [] as ArtifactDigest[], gaps: [] as ArtifactScopeGap[] } : readArtifactScope(workspace, scopePatterns)
-  const gaps: ArtifactScopeGap[] = [...pathRead.gaps, ...scopeRead.gaps]
-  const seen = new Set(gaps.map((gap) => `${gap.pattern}\u0000${gap.reason}`))
+  const [pathRead, scopeRead] = readArtifactScopes(workspace, [paths, scopePatterns]) as [
+    { artifacts: ArtifactDigest[]; gaps: ArtifactScopeGap[] },
+    { artifacts: ArtifactDigest[]; gaps: ArtifactScopeGap[] },
+  ]
+  const gaps: ArtifactScopeGap[] = []
+  const seen = new Set<string>()
   const recordGap = (pattern: string, reason: string): void => {
     const key = `${pattern}\u0000${reason}`
     if (seen.has(key)) return
     seen.add(key)
     gaps.push({ pattern, reason })
   }
+  for (const gap of [...pathRead.gaps, ...scopeRead.gaps]) recordGap(gap.pattern, gap.reason)
   for (const artifact of [...pathRead.artifacts, ...scopeRead.artifacts]) {
     // An unreadable path is not a gap in enumeration but a gap in evidence:
     // report it the same way so no surface treats it as a clean read.

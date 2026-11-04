@@ -6,6 +6,8 @@
  */
 import assert from 'node:assert/strict';
 import { appendFileSync, readFileSync } from 'node:fs';
+import fs from 'node:fs';
+import { syncBuiltinESMExports } from 'node:module';
 import { createHash, randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { createUserMessage, LlmAdapter, ToolCallId } from '@deepseek-ai/dsh-llm';
@@ -30,6 +32,57 @@ function call(name, args) {
     return [{ type: 'block-start', index: 0, blockType: 'tool-call' }, { type: 'tool-call-delta', index: 0, id, name, argumentsDelta: arguments_ }, { type: 'block-end', index: 0, block: { type: 'tool-call', id, name, arguments: arguments_ } }, { type: 'usage', usage: { inputTokens: 10, outputTokens: 3 } }, { type: 'finish', reason: { kind: 'tool-calls' } }];
 }
 function sha256(value) { return createHash('sha256').update(value).digest('hex'); }
+/** A persisted reviewed revision consumed through the real authenticated route. */
+async function verifyWorkspaceAudit(baseUrl, cookie, captainSessionId) {
+    const path = 'audit-336/mask.bin', file = join(process.cwd(), path);
+    fs.mkdirSync(join(process.cwd(), 'audit-336'), { recursive: true });
+    const bytes = Buffer.alloc(128 * 1024, 65);
+    fs.writeFileSync(file, bytes);
+    const old = new Date(Date.now() - 10000);
+    fs.utimesSync(file, old, old);
+    const stats = fs.statSync(file), now = Date.now();
+    const team = {
+        id: 'audit-336', name: 'audit-336', captainSessionId, createdAt: now, taskSeq: 2, members: [],
+        tasks: [
+            { id: 't1', subject: 'Generate mask', kind: 'implementation', status: 'completed', dependencies: [], createdAt: now, updatedAt: now, attempt: 1, objective: 'Generate mask', inScope: ['audit-336/'], verify: ['generate mask'], acceptance: ['mask exists'], changedPaths: [path], acceptanceResults: [{ criterion: 'mask exists', status: 'passed' }], commandsRun: [{ command: 'generate mask', status: 'passed', exitCode: 0 }] },
+            { id: 't2', subject: 'Review mask', kind: 'review', status: 'completed', dependencies: ['t1'], createdAt: now, updatedAt: now, attempt: 1, verdict: 'pass', reviewedTaskId: 't1', reviewedAttempt: 1, objective: 'Review mask', acceptance: ['no blockers'], reviewedArtifacts: [{ path, present: true, sha256: sha256(bytes), size: bytes.length, mtimeMs: stats.mtimeMs }], reviewedScope: ['audit-336/'] },
+        ],
+    };
+    const dir = join(process.cwd(), '.agent-teams', team.id);
+    fs.mkdirSync(join(dir, 'inbox'), { recursive: true });
+    const statePath = join(dir, 'team.json'), stateBytes = JSON.stringify(team);
+    fs.writeFileSync(statePath, stateBytes);
+    const original = { openSync: fs.openSync, readSync: fs.readSync, closeSync: fs.closeSync };
+    const resolved = fs.realpathSync(file), handles = new Set();
+    let hostBytesRead = 0;
+    fs.openSync = function(path, ...args) { const fd = original.openSync.call(this, path, ...args); if (String(path) === resolved) handles.add(fd); return fd; };
+    fs.readSync = function(fd, ...args) { const read = original.readSync.call(this, fd, ...args); if (handles.has(fd)) hostBytesRead += read; return read; };
+    fs.closeSync = function(fd) { handles.delete(fd); return original.closeSync.call(this, fd); };
+    syncBuiltinESMExports();
+    try {
+        const poll = async () => {
+            const response = await fetch(baseUrl + '/plugins/dsh-agent-teams/state', { headers: { cookie }, signal: AbortSignal.timeout(10000) });
+            assert.equal(response.status, 200);
+            const snapshot = (await response.json()).teams.find(item => item.teamId === team.id);
+            assert.ok(snapshot, 'The published collector must retain the audit team');
+            return snapshot;
+        };
+        const before = await poll();
+        fs.writeFileSync(file, Buffer.alloc(bytes.length, 66));
+        fs.utimesSync(file, stats.atime, stats.mtime);
+        const after = await poll();
+        assert.equal(readFileSync(statePath, 'utf8'), stateBytes, 'Only the artifact changed');
+        const snapshot = {
+            before: { ok: before.delivery.ok, deliverable: before.deliverable },
+            after: { ok: after.delivery.ok, deliverable: after.deliverable, stale: typeof after.tasks.find(task => task.id === 't2').verdictStale === 'string' },
+            hostBytesRead,
+        };
+        // Stable credential-free snapshot from a real CLI/Loader, actual
+        // published artifact, auth service, HTTP route and worker entry.
+        assert.deepEqual(snapshot, { before: { ok: true, deliverable: true }, after: { ok: false, deliverable: false, stale: true }, hostBytesRead: 0 });
+        record({ event: 'web-workspace-audit', ...snapshot });
+    } finally { Object.assign(fs, original); syncBuiltinESMExports(); }
+}
 async function waitFor(predicate, description) {
     const deadline = Date.now() + 25000;
     while (!predicate()) {
@@ -229,6 +282,7 @@ export function apply(ctx) {
         const memberTools = ['agent_teams_claim_task', 'agent_teams_update_task', 'agent_teams_send_message', 'agent_teams_status'].sort();
         for (const request of memberRequests) assert.deepEqual(request.tools.filter(tool => tool.name.startsWith('agent_teams_')).map(tool => tool.name).sort(), memberTools, 'Every real member request must expose exactly the four member tools');
         record({ event: 'web-headers-stable', sessionId: captain.id, systemSha256, toolsSha256, captainRequests: captainRequests.length, memberRequests: memberRequests.length, memberTeamToolCount: memberTools.length });
+        await verifyWorkspaceAudit(baseUrl, cookie, captain.id);
         record({ event: 'web-approval-passed', sessionId: captain.id, teamId: completed.id, memberId: completed.members[0].id, taskStatus: completed.tasks[0].status, captainRequests: captainRequests.length });
         process.stdout.write('WEB_APPROVAL_OK\n');
         ctx.get('appExit')(0);

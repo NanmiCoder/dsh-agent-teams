@@ -26,7 +26,7 @@
  */
 
 import { createHash } from 'node:crypto'
-import { closeSync, lstatSync, openSync, readSync, readdirSync, realpathSync, statSync } from 'node:fs'
+import { closeSync, fstatSync, lstatSync, openSync, readSync, readdirSync, realpathSync, statSync, type BigIntStats } from 'node:fs'
 import { isAbsolute, join, relative, sep } from 'node:path'
 import { isDefaultExcludedPath, normalizeWorkspacePath } from './quality-gates.ts'
 import type { ArtifactDigest, ArtifactScopeGap, ArtifactSnapshot } from './types.ts'
@@ -54,7 +54,7 @@ export interface ArtifactScopeRead {
 }
 
 type PathOutcome =
-  | { kind: 'file'; digest: ArtifactDigest }
+  | { kind: 'file'; digest: ArtifactDigest; stamp: string }
   | { kind: 'directory' }
   | { kind: 'absent' }
   | { kind: 'unreadable'; reason: string }
@@ -94,14 +94,36 @@ function resolvesInside(root: string, absolute: string): boolean | undefined {
  */
 const HASH_CHUNK_BYTES = 64 * 1024
 
+// These stamps only invalidate a read made in this audit. Matching timestamps
+// never replace hashing, and no stamp/digest is reused by a later audit.
+function fileVersion(stats: BigIntStats): string {
+  return [stats.dev, stats.ino, stats.mode, stats.size, stats.mtimeNs, stats.ctimeNs].join(':')
+}
+
+function changedDuringRead(): Error {
+  return Object.assign(new Error('artifact changed while its bytes were being read'), { code: 'ESTALE' })
+}
+
+function pathStamp(workspaceRoot: string, absolute: string): string {
+  const resolved = realpathSync(absolute)
+  if (!insideRoot(workspaceRoot, resolved)) throw changedDuringRead()
+  return `${resolved}\0${fileVersion(statSync(absolute, { bigint: true }))}`
+}
+
 /**
  * sha256 one file in constant memory (one reusable chunk buffer), never
  * loading the whole artifact. Throws the underlying filesystem error so the
  * caller can distinguish "cannot read" from "absent".
  */
-function hashFileConstantMemory(absolute: string): { sha256: string; size: number } {
-  const handle = openSync(absolute, 'r')
+function hashFileConstantMemory(workspaceRoot: string, absolute: string): { sha256: string; size: number; stamp: string; mtimeMs: number } {
+  const resolved = realpathSync(absolute)
+  if (!insideRoot(workspaceRoot, resolved)) throw changedDuringRead()
+  const expected = statSync(resolved, { bigint: true })
+  const handle = openSync(resolved, 'r')
   try {
+    const before = fstatSync(handle, { bigint: true })
+    const stamp = `${resolved}\0${fileVersion(before)}`
+    if (!before.isFile() || fileVersion(expected) !== fileVersion(before) || pathStamp(workspaceRoot, absolute) !== stamp) throw changedDuringRead()
     const hash = createHash('sha256')
     const buffer = Buffer.allocUnsafe(HASH_CHUNK_BYTES)
     let size = 0
@@ -112,7 +134,8 @@ function hashFileConstantMemory(absolute: string): { sha256: string; size: numbe
       // `update` consumes the bytes synchronously, so the buffer is reused.
       hash.update(read === buffer.byteLength ? buffer : buffer.subarray(0, read))
     }
-    return { sha256: hash.digest('hex'), size }
+    if (fileVersion(before) !== fileVersion(fstatSync(handle, { bigint: true })) || pathStamp(workspaceRoot, absolute) !== stamp) throw changedDuringRead()
+    return { sha256: hash.digest('hex'), size, stamp, mtimeMs: Number(before.mtimeNs) / 1_000_000 }
   } finally {
     closeSync(handle)
   }
@@ -147,15 +170,16 @@ function inspectPath(workspaceRoot: string | undefined, workspace: string, norma
   if (stats.isDirectory()) return { kind: 'directory' }
   if (!stats.isFile()) return { kind: 'unreadable', reason: `${normalized} is not a regular file` }
   try {
-    const { sha256, size } = hashFileConstantMemory(absolute)
+    const { sha256, size, stamp, mtimeMs } = hashFileConstantMemory(workspaceRoot, absolute)
     return {
       kind: 'file',
+      stamp,
       digest: {
         path: normalized,
         present: true,
         sha256,
         size,
-        mtimeMs: stats.mtimeMs,
+        mtimeMs,
       },
     }
   } catch (error) {
@@ -175,6 +199,7 @@ function walkDirectory(input: {
   push: (path: string) => void
   gap: (reason: string) => void
   full: () => boolean
+  observe: (prefix: string, signature: string) => void
 }): void {
   // The prefix itself must be inside the workspace before it is enumerated:
   // `escape/` may be a symlink to an outside directory, and readdir would
@@ -209,7 +234,21 @@ function walkDirectory(input: {
     const current = queue.shift() as string
     let entries: { name: string; isDirectory(): boolean; isFile(): boolean; isSymbolicLink(): boolean }[]
     try {
-      entries = readdirSync(join(input.workspace, current), { withFileTypes: true })
+      const absolute = join(input.workspace, current)
+      // A queued child may have been replaced after its parent was listed.
+      // Recheck containment before enumeration and never follow a new nested
+      // symlink (an explicitly declared, in-workspace prefix remains allowed).
+      if (input.workspaceRoot === undefined || resolvesInside(input.workspaceRoot, absolute) !== true
+        || (current !== input.prefix && lstatSync(absolute).isSymbolicLink())) {
+        input.gap(`${input.pattern}: ${current || '.'} changed or cannot be resolved inside the workspace; refusing to enumerate it`)
+        continue
+      }
+      entries = readdirSync(absolute, { withFileTypes: true })
+      if (resolvesInside(input.workspaceRoot, absolute) !== true) {
+        input.gap(`${input.pattern}: ${current || '.'} changed during enumeration; refusing to use its entries`)
+        continue
+      }
+      input.observe(current, directorySignature(input.workspace, current, entries))
     } catch (error) {
       input.gap(`${input.pattern}: cannot list ${current === '' ? '.' : current} (${errorCode(error)})`)
       continue
@@ -240,7 +279,12 @@ function walkDirectory(input: {
  * keep explicitly named paths even when they do not exist (a later creation is
  * drift too), and report every part that could not be fully resolved.
  */
-export function readArtifactScope(workspace: string, patterns: readonly string[]): ArtifactScopeRead {
+function readScope(
+  workspace: string,
+  patterns: readonly string[],
+  inspect: (normalized: string) => PathOutcome,
+  observe: (prefix: string, signature: string) => void,
+): ArtifactScopeRead {
   const workspaceRoot = workspaceRootOf(workspace)
   const gaps: ArtifactScopeGap[] = []
   const concrete: string[] = []
@@ -289,14 +333,14 @@ export function readArtifactScope(workspace: string, patterns: readonly string[]
       gap(trimmed, `stopped at the ${MAX_EXPANDED_ARTIFACTS}-path cap, so its contents are only partially recorded`)
       continue
     }
-    walkDirectory({ workspace, workspaceRoot, pattern: trimmed, prefix: normalized, push, gap: (reason) => gap(trimmed, reason), full })
+    walkDirectory({ workspace, workspaceRoot, pattern: trimmed, prefix: normalized, push, gap: (reason) => gap(trimmed, reason), full, observe })
   }
   const artifacts: ArtifactDigest[] = []
   // Index-based: expanding an explicitly named directory appends its files to
   // `concrete`, and those must be digested in the same pass.
   for (let index = 0; index < concrete.length; index += 1) {
     const normalized = concrete[index] as string
-    const outcome = inspectPath(workspaceRoot, workspace, normalized)
+    const outcome = inspect(normalized)
     if (outcome.kind === 'file') {
       artifacts.push(outcome.digest)
       continue
@@ -304,7 +348,7 @@ export function readArtifactScope(workspace: string, patterns: readonly string[]
     if (outcome.kind === 'directory') {
       // An explicitly named directory is expanded instead of being reported as
       // unreadable: `src/lib` and `src/lib/` must behave the same.
-      walkDirectory({ workspace, workspaceRoot, pattern: normalized, prefix: normalized, push, gap: (reason) => gap(normalized, reason), full })
+      walkDirectory({ workspace, workspaceRoot, pattern: normalized, prefix: normalized, push, gap: (reason) => gap(normalized, reason), full, observe })
       continue
     }
     if (outcome.kind === 'absent') {
@@ -314,6 +358,78 @@ export function readArtifactScope(workspace: string, patterns: readonly string[]
     artifacts.push({ path: normalized, present: false, unreadable: true, reason: outcome.reason })
   }
   return { artifacts: artifacts.sort((a, b) => a.path.localeCompare(b.path)), gaps }
+}
+
+function directorySignature(workspace: string, prefix: string, entries: readonly { name: string; isDirectory(): boolean; isFile(): boolean; isSymbolicLink(): boolean }[]): string {
+  return `${realpathSync(join(workspace, prefix))}\0${JSON.stringify(entries.map(entry => [entry.name, entry.isSymbolicLink() ? 'link' : entry.isDirectory() ? 'dir' : entry.isFile() ? 'file' : 'other']).sort((a, b) => String(a[0]).localeCompare(String(b[0]))))}`
+}
+
+/**
+ * Read related scopes in one audit. Each scope retains its own expansion cap
+ * and gaps, but overlapping paths hash only once. A final revalidation rejects
+ * changed file identities and changed directory membership instead of handing
+ * out a mixture of revisions as complete evidence.
+ */
+export function readArtifactScopes(workspace: string, scopes: readonly (readonly string[])[]): ArtifactScopeRead[] {
+  const root = workspaceRootOf(workspace)
+  const paths = new Map<string, PathOutcome>()
+  const directories = new Map<string, string>()
+  const changedDirectories = new Set<string>()
+  const inspect = (normalized: string): PathOutcome => {
+    let outcome = paths.get(normalized)
+    if (outcome === undefined) {
+      outcome = inspectPath(root, workspace, normalized)
+      paths.set(normalized, outcome)
+    }
+    return outcome
+  }
+  const observe = (prefix: string, signature: string): void => {
+    const prior = directories.get(prefix)
+    if (prior !== undefined && prior !== signature) changedDirectories.add(prefix)
+    directories.set(prefix, signature)
+  }
+  const reads = scopes.map(patterns => readScope(workspace, patterns, inspect, observe))
+  const changed = new Map<string, string>()
+  for (const [path, outcome] of paths) {
+    try {
+      if (outcome.kind === 'file' && (root === undefined || pathStamp(root, join(workspace, path)) !== outcome.stamp)) {
+        changed.set(path, `${path} changed during the workspace audit; retry a stable revision`)
+      } else if (outcome.kind === 'absent') {
+        try {
+          lstatSync(join(workspace, path))
+          changed.set(path, `${path} appeared during the workspace audit; retry a stable revision`)
+        } catch (error) {
+          if (errorCode(error) !== 'ENOENT' && errorCode(error) !== 'ENOTDIR') throw error
+        }
+      }
+    } catch {
+      changed.set(path, `${path} could not be revalidated after reading; the workspace audit is incomplete`)
+    }
+  }
+  const gaps: ArtifactScopeGap[] = []
+  for (const [prefix, signature] of directories) {
+    try {
+      const absolute = join(workspace, prefix)
+      if (root === undefined || resolvesInside(root, absolute) !== true
+        || directorySignature(workspace, prefix, readdirSync(absolute, { withFileTypes: true })) !== signature) changedDirectories.add(prefix)
+    } catch {
+      changedDirectories.add(prefix)
+    }
+  }
+  for (const prefix of changedDirectories) gaps.push({ pattern: prefix || '.', reason: 'directory membership changed or could not be revalidated during the workspace audit; retry a stable revision' })
+  for (const [path, reason] of changed) gaps.push({ pattern: path, reason })
+  for (const read of reads) {
+    read.artifacts = read.artifacts.map(artifact => changed.has(artifact.path)
+      ? { path: artifact.path, present: false, unreadable: true, reason: changed.get(artifact.path) as string }
+      : artifact)
+    read.gaps.push(...gaps)
+  }
+  return reads
+}
+
+/** Read one scope without retaining byte identities for the next request. */
+export function readArtifactScope(workspace: string, patterns: readonly string[]): ArtifactScopeRead {
+  return readArtifactScopes(workspace, [patterns])[0] as ArtifactScopeRead
 }
 
 /**

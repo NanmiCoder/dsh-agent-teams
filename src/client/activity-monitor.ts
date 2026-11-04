@@ -195,6 +195,9 @@ export const ACTIVITY_HALT_URL = '/plugins/dsh-agent-teams/halt'
 
 interface ActivityFetchResponse {
   readonly ok: boolean
+  /** Present on a real `Response`; the conditional-request path reads it. */
+  readonly status?: number
+  readonly headers?: { get(name: string): string | null }
   json(): Promise<unknown>
 }
 
@@ -210,7 +213,11 @@ export interface ActivityPollingRuntime {
   readonly discoverySessionId?: string
   readonly fetchState?: (
     url: string,
-    init: { readonly cache: 'no-store'; readonly signal: AbortSignal },
+    init: {
+      readonly cache: 'no-store'
+      readonly signal: AbortSignal
+      readonly headers?: Readonly<Record<string, string>>
+    },
   ) => Promise<ActivityFetchResponse>
   readonly schedule?: (callback: () => void, intervalMs: number) => unknown
   readonly cancel?: (timer: unknown) => void
@@ -264,6 +271,12 @@ export function startActivityPolling(
   let discoveredLiveKeys = new Set<string>()
   let controller: AbortController | undefined
   let timer: unknown
+  // Validators for the two snapshot routes. A poll that changes nothing answers 304, so an
+  // unchanged live team costs headers instead of the whole workspace snapshot.
+  let liveEtag: string | undefined
+  let archivedEtag: string | undefined
+  const conditional = (etag: string | undefined): { headers?: Record<string, string> } =>
+    (etag === undefined ? {} : { headers: { 'if-none-match': etag } })
   const intervalMs = (): number => (hot ? ACTIVITY_POLL_MS : ACTIVITY_PROBE_MS)
   const reschedule = (): void => {
     cancel(timer)
@@ -277,8 +290,15 @@ export function startActivityPolling(
       const liveResponse = await fetchState(ACTIVITY_STATE_URL, {
         cache: 'no-store',
         signal: controller.signal,
+        ...conditional(liveEtag),
       })
+      // Unchanged since the last snapshot: keep what is published and skip the parse entirely.
+      if (liveResponse.status === 304) {
+        runtime.onStatus?.('ready')
+        return
+      }
       if (!liveResponse.ok) throw new Error('Activity unavailable')
+      liveEtag = liveResponse.headers?.get('etag') ?? undefined
       const body = (await liveResponse.json()) as { teams?: unknown }
       if (cancelled) return
       if (!Array.isArray(body.teams)) throw new Error('Invalid activity response')
@@ -315,8 +335,15 @@ export function startActivityPolling(
       const archivedResponse = await fetchState(`${ACTIVITY_STATE_URL}?archived=1`, {
         cache: 'no-store',
         signal: controller.signal,
+        ...conditional(archivedEtag),
       })
+      if (archivedResponse.status === 304) {
+        discoveryComplete = true
+        settleTargets(new Set(missing.map((target) => target.key)))
+        return
+      }
       if (!archivedResponse.ok) throw new Error('Archive unavailable')
+      archivedEtag = archivedResponse.headers?.get('etag') ?? undefined
       const archivedBody = (await archivedResponse.json()) as { teams?: unknown }
       if (cancelled) return
       if (!Array.isArray(archivedBody.teams)) throw new Error('Invalid archive response')

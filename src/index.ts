@@ -34,6 +34,7 @@ import {
   type ToolsConfig,
 } from './tools.ts'
 import { installAgentTeamsGestureBoundary, registerAgentTeamsCommand } from './command.ts'
+import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -274,9 +275,23 @@ export function apply(ctx: Context, config: Config): void {
         ? await collectArchivedTeamsActivity(ctx, roots)
         : await collectTeamsActivity(ctx, roots)
       const body = JSON.stringify({ teams: snapshots })
+      // The panel polls this route at a one-second cadence while a team is live, and a snapshot
+      // for several workspaces reaches hundreds of kilobytes. An entity tag lets an unchanged
+      // snapshot answer with headers only; `no-store` stays, because the body must never be reused
+      // without asking again.
+      const etag = `"${createHash('sha1').update(body).digest('hex').slice(0, 32)}"`
+      if (req.headers['if-none-match'] === etag) {
+        res.writeHead(304, {
+          'cache-control': 'no-store',
+          etag,
+        })
+        res.end()
+        return
+      }
       res.writeHead(200, {
         'content-type': 'application/json; charset=utf-8',
         'cache-control': 'no-store',
+        etag,
       })
       res.end(body)
     },

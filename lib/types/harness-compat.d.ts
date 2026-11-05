@@ -111,6 +111,8 @@ export declare function agentTeamsSource(modern: AgentTeamsSource, observed?: nu
 export declare function onAgentReady(ctx: Context, listener: (agent: Agent, vetoable: boolean) => void): () => void;
 /** Read child-owned history, excluding any descriptor inherited from a parent. */
 export declare function sessionOwnEvents(session: Session): readonly SessionEvent[];
+/** Legacy hosts log each chunk separately; current hosts embed the committed stream. */
+export declare function outputLimitTurn(event: SessionEvent): number | undefined;
 /** Install before the first request, including cold resume, with HMR cleanup. */
 export declare function installContinuableMemberSetup(ctx: Context, setup: Setup): void;
 /** Queue a distinct host-authored turn; never substitute model-message steer. */

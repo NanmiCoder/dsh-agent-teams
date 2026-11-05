@@ -9,7 +9,7 @@
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent, AgentOptions } from '@deepseek-ai/dsh-agent'
-import type { ContentBlock, MessageId, MessageSource } from '@deepseek-ai/dsh-llm'
+import type { ContentBlock, MessageId, MessageSource, StreamChunk } from '@deepseek-ai/dsh-llm'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import * as dshSession from '@deepseek-ai/dsh-session'
 import type { Session, SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
@@ -221,6 +221,22 @@ export function sessionOwnEvents(session: Session): readonly SessionEvent[] {
   const legacy = session as unknown as { events?: readonly SessionEvent[]; header: { seedLength?: number } }
   if (!Array.isArray(legacy.events)) return unsupported('missing ownEvents/legacy session log')
   return legacy.events.slice(legacy.header.seedLength ?? 0)
+}
+
+/** Legacy hosts log each chunk separately; current hosts embed the committed stream. */
+export function outputLimitTurn(event: SessionEvent): number | undefined {
+  const record = event as SessionEvent | {
+    type: 'assistant/chunk'
+    data: { turn: number; chunk: StreamChunk }
+  }
+  if (record.type === 'assistant/chunk') {
+    const { chunk, turn } = record.data
+    return chunk.type === 'finish' && chunk.reason.kind === 'max-tokens' ? turn : undefined
+  }
+  if (record.type === 'assistant/message' && record.data.stream?.some(item =>
+    item.type === 'chunk' && item.chunk.type === 'finish' && item.chunk.reason.kind === 'max-tokens')) {
+    return record.data.turn
+  }
 }
 
 /** Install before the first request, including cold resume, with HMR cleanup. */

@@ -9,7 +9,8 @@ import { LlmError } from '@deepseek-ai/dsh-llm'
 import { apply as installRetry } from '@deepseek-ai/dsh-llm-retry'
 import { installMemberSelectionRuntime } from '../lib/members.js'
 import { installTeamScheduler } from '../lib/scheduler.js'
-import { appendMailbox, createMessage, createTeamDir, readTeam, readMailbox, readUnreadMailbox, withTeamLock, writeTeam } from '../lib/state.js'
+import { readCurrentMailbox } from '../lib/mailbox.js'
+import { appendMailbox, beginTaskAttempt, createMessage, createTeamDir, readTeam, readMailbox, readUnreadMailbox, withTeamLock, writeTeam } from '../lib/state.js'
 
 const deliveryHarness = process.argv.includes('--delivery-harness')
 const modernHarness = deliveryHarness || process.argv.includes('--modern-harness')
@@ -256,32 +257,57 @@ await test('a queued error cannot fail a newer attempt created before it gets th
   assert.equal((await h.mailbox()).length, 0)
 })
 
-function outputLimitedStep(h) {
+function outputLimitedStep(h, legacy = false) {
   h.turnEvent('step/start', { turn: 1, step: 1 })
-  h.turnEvent('assistant/message', { turn: 1, step: 1, stream: [
-    { type: 'chunk', chunk: { type: 'finish', reason: { kind: 'max-tokens' } } },
-  ] })
+  const chunk = { type: 'finish', reason: { kind: 'max-tokens' } }
+  if (legacy) h.turnEvent('assistant/chunk', { turn: 1, step: 1, chunk })
+  else h.turnEvent('assistant/message', { turn: 1, step: 1, stream: [{ type: 'chunk', chunk }] })
 }
 
-await test('terminal output limit fails the exact open attempt and reports once', async t => {
-  const h = await fixture(t)
+for (const legacy of [false, true]) {
+  await test(`terminal output limit fails the exact open attempt and reports once (${legacy ? 'legacy chunk' : 'embedded stream'})`, async t => {
+    const h = await fixture(t)
+    outputLimitedStep(h, legacy)
+    assert.equal((await h.state()).tasks[0].status, 'in_progress')
+    assert.equal((await h.mailbox()).length, 0)
+    h.turnEvent('turn/end', { turn: 1, reason: { kind: 'max-tokens' } })
+    h.turnEvent('turn/end', { turn: 1, reason: { kind: 'max-tokens' } })
+    h.settleSilently()
+    await eventually(async () => h.steers.length === 1 && (await h.mailbox())[0]?.deliveredAt !== undefined)
+    const task = (await h.state()).tasks[0]
+    assert.equal(task.status, 'failed')
+    assert.equal(task.attemptId, 'a1')
+    assert.match(task.output, /output-token limit.*MAX_TOKENS/)
+    const reports = await h.mailbox()
+    assert.equal(reports.length, 1)
+    assert.match(reports[0].content, /Task t1 .* was marked failed/)
+    assert.equal(reports[0].sourceTaskId, 't1')
+    assert.equal(reports[0].sourceAttemptId, 'a1')
+    assert.equal(reports[0].sourceTaskStatus, 'failed')
+  })
+}
+
+await test('replacing a failed historical attempt discards its offline output-limit report', async t => {
+  const h = await fixture(t, { captainOffline: true })
+  const initial = await h.state()
+  delete initial.tasks[0].attemptId
+  await writeTeam(h.stateRoot, initial)
   outputLimitedStep(h)
-  assert.equal((await h.state()).tasks[0].status, 'in_progress')
-  assert.equal((await h.mailbox()).length, 0)
   h.turnEvent('turn/end', { turn: 1, reason: { kind: 'max-tokens' } })
-  h.turnEvent('turn/end', { turn: 1, reason: { kind: 'max-tokens' } })
-  h.terminal()
-  await eventually(async () => h.steers.length === 1 && (await h.mailbox())[0]?.deliveredAt !== undefined)
-  const task = (await h.state()).tasks[0]
+  h.settleSilently()
+  await eventually(async () => (await h.mailbox()).length === 1)
+
+  const failed = await h.state()
+  const task = failed.tasks[0]
   assert.equal(task.status, 'failed')
-  assert.equal(task.attemptId, 'a1')
-  assert.match(task.output, /output-token limit.*MAX_TOKENS/)
-  assert.equal((await h.mailbox()).length, 1)
-  const [report] = await h.mailbox()
-  assert.match(report.content, /Task t1 .* was marked failed/)
-  assert.equal(report.sourceTaskId, 't1')
-  assert.equal(report.sourceAttemptId, 'a1')
-  assert.equal(report.sourceTaskStatus, 'failed')
+  assert.equal(task.attempt, initial.tasks[0].attempt)
+  const failedAttemptId = task.attemptId
+  const [report] = await readCurrentMailbox(h.stateRoot, 'team', 'captain')
+  beginTaskAttempt(task, 'worker')
+  await writeTeam(h.stateRoot, failed)
+  assert.deepEqual(await readCurrentMailbox(h.stateRoot, 'team', 'captain'), [])
+  assert.match(failedAttemptId, /^[a-f0-9-]{36}$/)
+  assert.equal(report.sourceAttemptId, failedAttemptId)
 })
 
 for (const [label, reason, continues] of [

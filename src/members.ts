@@ -18,8 +18,9 @@ import { installModelSelection, type Agent, type ModelSelection } from '@deepsee
 import { foldSubagentDescriptor } from '@deepseek-ai/dsh-subagent'
 import { createUserMessage, LlmError, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { Session, SessionId } from '@deepseek-ai/dsh-session'
+import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
-import { agentTeamsSource, observedSessionFormatVersion, type SessionFormatBearer, guardSubagentCreation, startMember, usesManagedActivations, guardSubagentDelivery, installContinuableMemberSetup, memberToolFilter, queueMemberPrompt, restrictableToolNames, startMemberWithLenientFilter, steerMemberPrompt, sessionOwnEvents } from './harness-compat.ts'
+import { agentTeamsSource, observedSessionFormatVersion, outputLimitTurn, type SessionFormatBearer, guardSubagentCreation, startMember, usesManagedActivations, guardSubagentDelivery, installContinuableMemberSetup, memberToolFilter, queueMemberPrompt, restrictableToolNames, startMemberWithLenientFilter, steerMemberPrompt, sessionOwnEvents } from './harness-compat.ts'
 import { markMailboxDelivered, appendMailbox, CAPTAIN_KEY, createMessage, readRetiredMemberIds, readTeamSync, readTeam, releaseMailboxDelivery, withTeamLock, writeTeam } from './state.ts'
 import { mailboxPrompt } from './mailbox.ts'
 import { nearestLiveLead } from './lineage.ts'
@@ -354,6 +355,9 @@ export async function failMemberOpenAttempt(
     })
     if (disposition === 'ignored') return
     if (disposition === 'failed_attempt' && task !== undefined) {
+      // Historical records may lack a capability id. Bind this failure report
+      // to the terminal attempt so a later retry invalidates unread mail.
+      if (observed.openAttemptOnly === true) task.attemptId ??= randomUUID()
       task.status = 'failed'
       task.output = summary
       task.updatedAt = Date.now()
@@ -762,10 +766,10 @@ export function installMemberSelectionRuntime(
       // The host's turn reason stays max-tokens even if fresh steering runs
       // another step. Only the last executed step can leave an attempt stuck.
       if (event.type === 'step/start') cappedAttempt = undefined
-      if (event.type === 'assistant/message' && event.data.stream?.some(record =>
-        record.type === 'chunk' && record.chunk.type === 'finish' && record.chunk.reason.kind === 'max-tokens')) {
+      const turn = outputLimitTurn(event)
+      if (turn !== undefined) {
         const observed = observeFailedAttempt()
-        if (observed?.task !== undefined) cappedAttempt = { turn: event.data.turn, observed }
+        if (observed?.task !== undefined) cappedAttempt = { turn, observed }
       }
       if (event.type !== 'turn/end') return
       const capped = cappedAttempt

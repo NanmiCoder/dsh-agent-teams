@@ -85,9 +85,9 @@ import {
   validateMemberLlmSelections,
   type MemberRuntimeConfig,
 } from './members.ts'
-import { TERMINAL_TASK_STATUSES, type TeamMember, type TeamState, type TeamTask } from './types.ts'
+import { TERMINAL_TASK_STATUSES, type TeamMember, type TeamMessage, type TeamState, type TeamTask } from './types.ts'
 import { collectCompletedDependencyOutputs, formatDependencyOutputs, installTeamScheduler } from './scheduler.ts'
-import { installMailboxAdmission, isCurrentMail, mailboxContent, mailboxPrompt, readCurrentMailbox } from './mailbox.ts'
+import { installMailboxAdmission, isCurrentMail, mailboxContent, mailboxPrompt, readCurrentMailboxLocked } from './mailbox.ts'
 import { resolveTeamProfile } from './profiles.ts'
 import { forkLineageNote, leadIdentityOf, leadIdentityOfAsync, nearestLiveLead, sessionLeadsTeam, sessionLeadsTeamAsync } from './lineage.ts'
 
@@ -2326,10 +2326,36 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
       if (await sessionLeadsTeamAsync(ctx, located, caller.id)) {
         await scheduler.kickTeam(workspace, located.id, await memberOperationParent(ctx, located, caller))
       }
-      const { team, identity } = await withTeamLock(
-        teamLockKey(stateRoot, located.id),
-        () => requireFreshParticipant(ctx, stateRoot, located.id, caller.id),
-      )
+      const {
+        team, identity, captainInbox, ownInbox, memberInboxes, mailboxWarnings, mailboxWarningCount,
+      } = await withTeamLock(teamLockKey(stateRoot, located.id), async () => {
+        // Authorize and read mail under the same lock. A team name can be
+        // reused while the worker audits the previously captured state.
+        const { team, identity } = await requireFreshParticipant(ctx, stateRoot, located.id, caller.id)
+        const mailboxWarnings: string[] = []
+        let mailboxWarningCount = 0
+        const reportMalformed = (agentKey: string) => (lineNumber: number): void => {
+          mailboxWarningCount += 1
+          if (mailboxWarnings.length < 10) mailboxWarnings.push(`${agentKey} mailbox line ${lineNumber}`)
+        }
+        const captainInbox = identity.kind === 'captain'
+          ? (await readCurrentMailboxLocked(stateRoot, team, CAPTAIN_KEY, reportMalformed(CAPTAIN_KEY))).slice(0, 10)
+          : []
+        let ownInbox: TeamMessage[] = []
+        const memberInboxes: Record<string, { count: number; latest: string }> = {}
+        for (const member of team.members) {
+          if (member.status === 'removed' || (identity.kind === 'member' && member.name !== identity.name)) continue
+          const messages = await readCurrentMailboxLocked(stateRoot, team, member.name, reportMalformed(member.name))
+          if (identity.kind === 'member') ownInbox = messages.slice(0, 10)
+          if (messages.length > 0) {
+            memberInboxes[member.name] = {
+              count: messages.length,
+              latest: messages[messages.length - 1]?.content.slice(0, 200) ?? '',
+            }
+          }
+        }
+        return { team, identity, captainInbox, ownInbox, memberInboxes, mailboxWarnings, mailboxWarningCount }
+      })
       const activity = memberActivity(ctx, team.members.map((member) => member.id))
       const audit = await auditor.audit(workspace, team, stateRoot)
       const members = team.members
@@ -2363,36 +2389,6 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         ...task.profileSeedId === undefined ? {} : { seed_id: task.profileSeedId },
         ...task.output !== undefined ? { output: task.output } : {},
       }))
-      const mailboxWarnings: string[] = []
-      let mailboxWarningCount = 0
-      const reportMalformed = (agentKey: string) => (lineNumber: number): void => {
-        mailboxWarningCount += 1
-        if (mailboxWarnings.length < 10) {
-          mailboxWarnings.push(`${agentKey} mailbox line ${lineNumber}`)
-        }
-      }
-      const captainInbox = identity.kind === 'captain'
-        ? await readCurrentMailbox(stateRoot, team.id, CAPTAIN_KEY, reportMalformed(CAPTAIN_KEY))
-        : []
-      const ownInbox = identity.kind === 'member' ? (await readCurrentMailbox(stateRoot, team.id, identity.name)).slice(0, 10) : []
-      const memberInboxes: Record<string, { count: number; latest: string }> = {}
-      const visibleMembers = identity.kind === 'captain'
-        ? members
-        : members.filter((member) => member.name === identity.name)
-      for (const member of visibleMembers) {
-        const messages = await readCurrentMailbox(
-          stateRoot,
-          team.id,
-          member.name,
-          reportMalformed(member.name),
-        )
-        if (messages.length > 0) {
-          memberInboxes[member.name] = {
-            count: messages.length,
-            latest: messages[messages.length - 1]?.content.slice(0, 200) ?? '',
-          }
-        }
-      }
       const coverage = buildCoverageMatrix(
         [...new Set(team.tasks.flatMap((item) => item.coverageOf ?? []))],
         team.tasks,
@@ -2433,7 +2429,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         viewer: identity.name,
         members,
         tasks,
-        captain_inbox: captainInbox.slice(0, 10).map((message) => ({
+        captain_inbox: captainInbox.map((message) => ({
           from: message.from,
           content: mailboxContent(message),
           ts: message.ts,
@@ -2444,12 +2440,18 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         mailbox_warning_count: mailboxWarningCount,
       }
       const acknowledged = identity.kind === 'captain'
-        ? captainInbox.slice(0, 10).map(message => message.id)
+        ? captainInbox.map(message => message.id)
         : ownInbox.map(message => message.id)
       if (acknowledged.length > 0) {
-        await withTeamLock(teamLockKey(stateRoot, team.id), () => (
-          acknowledgeMailbox(stateRoot, team.id, identity.kind === 'captain' ? CAPTAIN_KEY : identity.name, acknowledged)
-        ))
+        await withTeamLock(teamLockKey(stateRoot, team.id), async () => {
+          // Keep acknowledgement after the audit, and never write through
+          // the captured identity if the live team or recipient changed.
+          const current = await readTeam(stateRoot, team.id).catch(() => undefined)
+          if (current === undefined || current.captainSessionId !== team.captainSessionId || current.createdAt !== team.createdAt) return
+          const recipient = await participantIdentityOf(ctx, current, caller.id)
+          if (recipient?.kind !== identity.kind || recipient.name !== identity.name) return
+          await acknowledgeMailbox(stateRoot, team.id, recipient.name, acknowledged)
+        })
       }
       return result
     },

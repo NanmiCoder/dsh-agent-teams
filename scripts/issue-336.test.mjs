@@ -3,7 +3,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
-import fsp, { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import fsp, { appendFile, mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { syncBuiltinESMExports } from 'node:module'
@@ -11,10 +11,11 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { Context } from '@deepseek-ai/cordis'
 import { readArtifactScope } from '../lib/artifacts.js'
 import { collectTeamsActivity } from '../lib/snapshot.js'
-import { writeTeam } from '../lib/state.js'
+import { appendMailbox, createMessage, readMailbox, readTeam, writeTeam } from '../lib/state.js'
 import { canDeclareDelivery } from '../lib/quality-gates.js'
-import { auditTeamWorkspace } from '../lib/workspace-audit.js'
+import { registerAgentTeamsTools } from '../lib/tools.js'
 import { workspaceAuditor } from '../lib/workspace-audit-service.js'
+import { auditTeamWorkspace } from '../lib/workspace-audit.js'
 
 async function fixture() {
   const workspace = await mkdtemp(join(tmpdir(), 'agentteams-336-'))
@@ -57,6 +58,100 @@ test('#336 state polling hashes on a worker while retaining a passing byte-bound
     assert.equal(hostBytesRead, 0, 'state polling performed synchronous artifact reads on the host event loop')
   } finally {
     Object.assign(fs, original); syncBuiltinESMExports(); await f.dispose()
+  }
+})
+
+test('status reads and acknowledges only mail belonging to the authorized participants', async () => {
+  const f = await fixture()
+  const makeAgent = (id, origin) => ({
+    id, status: 'idle', options: { provider: 'fixture', model: 'fixture' },
+    session: {
+      id, header: { cwd: f.workspace, seedLength: 0, origin }, events: [], append() {},
+      requestHeader() { return { config: { provider: 'fixture', model: 'fixture' } } },
+    },
+  })
+  const captain = makeAgent(f.team.captainSessionId)
+  const member = makeAgent('member-old', 'subagent')
+  const replacement = makeAgent('captain-new')
+  const agents = new Map([captain, member, replacement].map(agent => [agent.id, agent]))
+  const tools = new Map()
+  const ctx = {
+    ...f.ctx,
+    agents: { get: id => agents.get(id), list: () => [] },
+    logger: { ...f.ctx.logger, debug() {} },
+    on() { return () => {} },
+    tools: { register: tool => tools.set(tool.name, tool) },
+    subagents: {
+      registerContinuableSetup() {}, list: () => ['spawn'],
+      getProvider: () => ({ prepareContinuable() {}, capabilities: { persona: true, toolFilter: true } }),
+      async listChildren() { return [] }, async listDescendants() { return [] },
+      async drainContinuableChildren() {}, async followup() {}, interrupt() {},
+    },
+  }
+  const call = (name, agent, args = {}) => tools.get(`agent_teams_${name}`).execute(args, { agent, signal: new AbortController().signal })
+  const roster = id => [{ id, name: 'worker', joinedAt: f.team.createdAt, status: 'idle' }]
+  const captainStarted = Promise.withResolvers(), memberStarted = Promise.withResolvers()
+  const release = Promise.withResolvers(), starts = [captainStarted, memberStarted]
+  let captainStatus, memberStatus
+  try {
+    await writeTeam(f.stateRoot, { ...f.team, members: roster(member.id) })
+    const deliveredMail = (from, to, content) => ({ ...createMessage(from, to, content), deliveredAt: Date.now() })
+    const captainMail = deliveredMail('worker', 'captain', 'Captain report')
+    const memberMail = deliveredMail('captain', 'worker', 'Member report')
+    await appendMailbox(f.stateRoot, f.team.id, 'captain', captainMail)
+    await appendMailbox(f.stateRoot, f.team.id, 'worker', memberMail)
+    await appendFile(join(f.stateRoot, f.team.id, 'inbox', 'worker.jsonl'), '{invalid}\n')
+    registerAgentTeamsTools(ctx, { stateDir: '.agent-teams', memberProvider: 'spawn', memberMaxDepth: 1, maxMembers: 8, profiles: {} })
+    const service = workspaceAuditor(ctx)
+    const audit = service.audit.bind(service)
+    service.audit = async (...args) => {
+      starts.shift()?.resolve()
+      await release.promise
+      return audit(...args)
+    }
+
+    captainStatus = call('status', captain)
+    await Promise.race([captainStarted.promise, captainStatus.then(() => { throw Error('captain status did not audit') })])
+    memberStatus = call('status', member)
+    await Promise.race([memberStarted.promise, memberStatus.then(() => { throw Error('member status did not audit') })])
+    for (const mail of [captainMail, memberMail]) {
+      assert.deepEqual(await readMailbox(f.stateRoot, f.team.id, mail.to), [mail])
+    }
+    assert.equal((await call('delete', captain)).deleted, true)
+    await call('create', replacement, { name: f.team.name, description: 'Replacement team' })
+    const nextTeam = await readTeam(f.stateRoot, f.team.id)
+    assert.equal(nextTeam.captainSessionId, replacement.id)
+    await writeTeam(f.stateRoot, { ...nextTeam, members: roster('member-new') })
+    const nextCaptain = deliveredMail('worker', 'captain', 'Replacement captain report')
+    const nextMember = deliveredMail('captain', 'worker', 'Replacement member report')
+    await appendMailbox(f.stateRoot, f.team.id, 'captain', nextCaptain)
+    await appendMailbox(f.stateRoot, f.team.id, 'worker', nextMember)
+    release.resolve()
+
+    const [lead, worker] = await Promise.all([captainStatus, memberStatus])
+    assert.deepEqual(lead.captain_inbox.map(mail => mail.content), [captainMail.content])
+    assert.deepEqual(lead.member_inboxes.worker, { count: 1, latest: memberMail.content })
+    assert.deepEqual(worker.captain_inbox, [])
+    assert.deepEqual(worker.member_inbox.map(mail => mail.content), [memberMail.content])
+    assert.deepEqual(worker.mailbox_warnings, ['worker mailbox line 2'])
+    assert.equal(lead.delivery.ok, false)
+    assert.equal(worker.delivery.ok, false)
+    for (const mail of [nextCaptain, nextMember]) {
+      assert.deepEqual(await readMailbox(f.stateRoot, f.team.id, mail.to), [mail])
+    }
+    for (const mail of [captainMail, memberMail]) {
+      const [record] = await readMailbox(join(f.stateRoot, 'archive'), f.team.id, mail.to)
+      assert.equal(record.id, mail.id)
+      assert.equal(record.readAt, undefined)
+    }
+    const current = await call('status', replacement)
+    assert.deepEqual(current.captain_inbox.map(mail => mail.content), [nextCaptain.content])
+    const [read] = await readMailbox(f.stateRoot, f.team.id, 'captain')
+    assert.equal(typeof read.readAt, 'number')
+  } finally {
+    release.resolve()
+    await Promise.allSettled([captainStatus, memberStatus])
+    await f.dispose()
   }
 })
 

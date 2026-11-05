@@ -195,7 +195,24 @@ export const ACTIVITY_HALT_URL = '/plugins/dsh-agent-teams/halt'
 
 interface ActivityFetchResponse {
   readonly ok: boolean
+  readonly status?: number
+  readonly headers?: { get(name: string): string | null }
   json(): Promise<unknown>
+}
+
+interface PublishedActivitySnapshot {
+  readonly teams: readonly ActivityTeam[]
+  readonly tag: string | undefined
+}
+
+async function readActivityTeams(response: ActivityFetchResponse): Promise<readonly ActivityTeam[]> {
+  if (!response.ok) throw new Error('Activity unavailable')
+  const body = (await response.json()) as { teams?: unknown } | null
+  if (!Array.isArray(body?.teams) || body.teams.some(team =>
+    typeof team?.teamId !== 'string' || typeof team?.captainSessionId !== 'string')) {
+    throw new Error('Invalid activity response')
+  }
+  return body.teams as readonly ActivityTeam[]
 }
 
 /** Injectable browser primitives used by the poll controller and its tests. */
@@ -210,11 +227,17 @@ export interface ActivityPollingRuntime {
   readonly discoverySessionId?: string
   readonly fetchState?: (
     url: string,
-    init: { readonly cache: 'no-store'; readonly signal: AbortSignal },
+    init: {
+      readonly cache: 'no-store'
+      readonly signal: AbortSignal
+      readonly headers?: Readonly<Record<string, string>>
+    },
   ) => Promise<ActivityFetchResponse>
   readonly schedule?: (callback: () => void, intervalMs: number) => unknown
   readonly cancel?: (timer: unknown) => void
   readonly publishSnapshots?: (update: Partial<ActivitySnapshots>) => void
+  /** Read back the shared store when supplying a custom publisher for it. */
+  readonly getPublishedSnapshots?: () => ActivitySnapshots
   readonly settleTargets?: (keys: ReadonlySet<string>) => void
 }
 
@@ -254,14 +277,33 @@ export function startActivityPolling(
   const schedule = runtime.schedule ?? ((callback, intervalMs) => setInterval(callback, intervalMs))
   const cancel = runtime.cancel ?? ((timer) => { clearInterval(timer as ReturnType<typeof setInterval>) })
   const publishSnapshots = runtime.publishSnapshots ?? updateActivitySnapshots
+  const getPublishedSnapshots = runtime.getPublishedSnapshots
+    ?? (runtime.publishSnapshots === undefined ? getActivitySnapshotsSnapshot : undefined)
   const settleTargets = runtime.settleTargets ?? settleActivityMonitorTargets
+  const owners = new Set(monitorTargets.map(target => target.sessionId))
+  if (discoverySessionId) owners.add(discoverySessionId)
+  const scope = owners.size === 1 ? owners.values().next().value : undefined
+  const sessionQuery = scope ? new URLSearchParams({ session: scope }).toString() : ''
+  const liveUrl = sessionQuery === '' ? ACTIVITY_STATE_URL : `${ACTIVITY_STATE_URL}?${sessionQuery}&summary=1`
+  const archiveUrl = `${ACTIVITY_STATE_URL}?archived=1${sessionQuery === '' ? '' : `&${sessionQuery}`}`
+  const conditionalHeaders = (tag: string | undefined) =>
+    tag === undefined ? {} : { headers: { 'if-none-match': tag } }
+  // A manual retry can publish to the same store. A 304 only validates the
+  // body this controller applied, so send its tag while that body is shown.
+  const stillPublished = (field: keyof ActivitySnapshots, snapshot: PublishedActivitySnapshot | undefined) =>
+    getPublishedSnapshots === undefined || getPublishedSnapshots()[field] === snapshot?.teams
   let cancelled = false
   let inFlight = false
   // Explicit card targets are demanded work: start at the live cadence. A
   // discovery session starts probing low-frequency and upgrades on detection.
   let hot = monitorTargets.length > 0
-  let discoveryComplete = false
   let discoveredLiveKeys = new Set<string>()
+  // Archive work stays pending after a failed request, even when the next live
+  // request is a 304 and does not publish or recompute the live snapshot.
+  let archiveRefreshPending = Boolean(discoverySessionId)
+  let missingTargets: ReadonlySet<string> = new Set()
+  let publishedLive: PublishedActivitySnapshot | undefined
+  let publishedArchive: PublishedActivitySnapshot | undefined
   let controller: AbortController | undefined
   let timer: unknown
   const intervalMs = (): number => (hot ? ACTIVITY_POLL_MS : ACTIVITY_PROBE_MS)
@@ -274,55 +316,66 @@ export function startActivityPolling(
     inFlight = true
     controller = new AbortController()
     try {
-      const liveResponse = await fetchState(ACTIVITY_STATE_URL, {
+      const liveTag = stillPublished('teams', publishedLive) ? publishedLive?.tag : undefined
+      const liveResponse = await fetchState(liveUrl, {
         cache: 'no-store',
         signal: controller.signal,
+        ...conditionalHeaders(liveTag),
       })
-      if (!liveResponse.ok) throw new Error('Activity unavailable')
-      const body = (await liveResponse.json()) as { teams?: unknown }
       if (cancelled) return
-      if (!Array.isArray(body.teams)) throw new Error('Invalid activity response')
-      runtime.onStatus?.('ready')
-      const liveTeams = body.teams as readonly ActivityTeam[]
-      publishSnapshots({ teams: liveTeams })
-      const previousDiscoveredKeys = discoveredLiveKeys
-      discoveredLiveKeys = new Set(discoverySessionId === undefined || discoverySessionId === ''
-        ? []
-        : liveTeams
-          .filter((team) => team.captainSessionId === discoverySessionId)
-          .map((team) => team.teamId))
-      // A discovery session found its first team: upgrade from the low-frequency
-      // probe to the live cadence for the rest of the controller lifetime.
-      if (!hot && discoveredLiveKeys.size > 0) {
-        hot = true
-        reschedule()
+      if (liveResponse.status !== 304 || liveTag === undefined) {
+        const liveTeams = await readActivityTeams(liveResponse)
+        if (cancelled) return
+        publishSnapshots({ teams: liveTeams })
+        if (cancelled) return
+        publishedLive = { teams: liveTeams, tag: liveResponse.headers?.get('etag') ?? undefined }
+
+        const previousDiscoveredKeys = discoveredLiveKeys
+        discoveredLiveKeys = new Set(discoverySessionId
+          ? liveTeams.filter(team => team.captainSessionId === discoverySessionId).map(team => team.teamId)
+          : [])
+        archiveRefreshPending ||= [...previousDiscoveredKeys].some(teamId => !discoveredLiveKeys.has(teamId))
+        missingTargets = new Set(monitorTargets.filter(target => !liveTeams.some(team =>
+          team.captainSessionId === target.sessionId && team.teamId === target.teamId,
+        )).map(target => target.key))
+        // A discovery session found its first team: keep the live cadence.
+        if (!hot && discoveredLiveKeys.size > 0) {
+          hot = true
+          reschedule()
+        }
+      } else if (!stillPublished('teams', publishedLive)) {
+        // A concurrent write landed while the conditional request was in flight.
+        return
       }
-      const discoveredTeamArchived = [...previousDiscoveredKeys]
-        .some((teamId) => !discoveredLiveKeys.has(teamId))
-      const missing = monitorTargets.filter((target) => !liveTeams.some((team) =>
-        team.captainSessionId === target.sessionId && team.teamId === target.teamId,
-      ))
-      const needsDiscoveryArchive = discoverySessionId !== undefined
-        && discoverySessionId !== ''
-        && !discoveryComplete
-      if (missing.length === 0 && !needsDiscoveryArchive && !discoveredTeamArchived) return
+      runtime.onStatus?.('ready')
+      const archiveReplaced = publishedArchive !== undefined && !stillPublished('archivedTeams', publishedArchive)
+      if (cancelled || (missingTargets.size === 0 && !archiveRefreshPending && !archiveReplaced)) return
 
       // Archives are immutable per team generation. A successful fallback
       // retires every missing explicit target, including legacy cards whose
       // host archive no longer exists; a discovery session that already
       // upgraded keeps polling, and a still-probing one keeps probing, so a
       // team created later in the same session stays discoverable.
-      const archivedResponse = await fetchState(`${ACTIVITY_STATE_URL}?archived=1`, {
+      const archiveTag = archiveReplaced ? undefined : publishedArchive?.tag
+      const archivedResponse = await fetchState(archiveUrl, {
         cache: 'no-store',
         signal: controller.signal,
+        ...conditionalHeaders(archiveTag),
       })
-      if (!archivedResponse.ok) throw new Error('Archive unavailable')
-      const archivedBody = (await archivedResponse.json()) as { teams?: unknown }
       if (cancelled) return
-      if (!Array.isArray(archivedBody.teams)) throw new Error('Invalid archive response')
-      publishSnapshots({ archivedTeams: archivedBody.teams as readonly ActivityTeam[] })
-      discoveryComplete = true
-      settleTargets(new Set(missing.map((target) => target.key)))
+      if (archivedResponse.status !== 304 || archiveTag === undefined) {
+        const archivedTeams = await readActivityTeams(archivedResponse)
+        if (cancelled) return
+        publishSnapshots({ archivedTeams })
+        if (cancelled) return
+        publishedArchive = { teams: archivedTeams, tag: archivedResponse.headers?.get('etag') ?? undefined }
+      } else if (!stillPublished('archivedTeams', publishedArchive)) {
+        return
+      }
+      archiveRefreshPending = false
+      const settled = missingTargets
+      missingTargets = new Set()
+      settleTargets(settled)
     } catch (error: unknown) {
       if ((error as { name?: unknown })?.name === 'AbortError') return
       if (!cancelled) runtime.onStatus?.('error')

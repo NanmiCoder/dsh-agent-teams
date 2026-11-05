@@ -47,6 +47,7 @@ function WorkspaceMonitor({ sessionsList, sidebar, state }: ActivityPanelProps &
     state.status(current, 'loading')
     const controller = startActivityPolling(currentTargets, {
       discoverySessionId: current,
+      getPublishedSnapshots: getActivitySnapshotsSnapshot,
       onStatus(status) {
         state.status(current, status)
       },

@@ -1058,6 +1058,7 @@ check(
 )
 
 const discoveryUrls = []
+const coldLiveUrl = '/plugins/dsh-agent-teams/state?session=cold-captain&summary=1'
 const discoveryIntervals = []
 let scheduledDiscoveryTick
 const discoveryPoller = startActivityPolling([], {
@@ -1081,9 +1082,9 @@ discoveryPoller.stop()
 check(
   'a cardless cold session restores live and archive once, then probes at the discovery cadence',
   discoveryUrls.length === 3
-    && discoveryUrls[0] === '/plugins/dsh-agent-teams/state'
-    && discoveryUrls[1]?.endsWith('?archived=1')
-    && discoveryUrls[2] === '/plugins/dsh-agent-teams/state'
+    && discoveryUrls[0] === coldLiveUrl
+    && discoveryUrls[1] === '/plugins/dsh-agent-teams/state?archived=1&session=cold-captain'
+    && discoveryUrls[2] === coldLiveUrl
     && discoveryIntervals.length === 1
     && discoveryIntervals[0] === ACTIVITY_PROBE_MS,
 )
@@ -1102,7 +1103,7 @@ const latePoller = startActivityPolling([], {
   discoverySessionId: 'cold-captain',
   fetchState: async (url) => {
     lateUrls.push(url)
-    if (url === '/plugins/dsh-agent-teams/state') {
+    if (url === coldLiveUrl) {
       return { ok: true, json: async () => ({ teams: lateLiveTeams }) }
     }
     return { ok: true, json: async () => ({ teams: [] }) }
@@ -1224,7 +1225,7 @@ fallbackPoller.stop()
 check(
   'a live miss checks archive once and retires even an orphaned legacy card',
   fallbackUrls.length === 2
-    && fallbackUrls[1]?.endsWith('?archived=1')
+    && fallbackUrls[1] === '/plugins/dsh-agent-teams/state?archived=1&session=poll-session'
     && settledFallbackKeys.length === 1
     && settledFallbackKeys[0] === pollTarget.key,
 )

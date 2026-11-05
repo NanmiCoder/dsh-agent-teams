@@ -140,6 +140,9 @@ async function fixture(t, { captainStatus = 'idle', fallback, captainOffline = f
   settleOnCleanup = settleSilently
   return {
     stateRoot, steers, deliveries, warnings, listeners, child, sessionEvents, memberError, payload, settleSilently,
+    turnEvent(type, data) {
+      pendingFailures.push(listeners.get('session/event')?.(child.session, { type, data }))
+    },
     state: () => readTeam(stateRoot, 'team'),
     mailbox: () => readMailbox(stateRoot, 'team', 'captain'),
     unread: () => readUnreadMailbox(stateRoot, 'team', 'captain'),
@@ -252,3 +255,66 @@ await test('a queued error cannot fail a newer attempt created before it gets th
   assert.equal((await h.state()).tasks[0].attemptId, 'a2')
   assert.equal((await h.mailbox()).length, 0)
 })
+
+function outputLimitedStep(h) {
+  h.turnEvent('step/start', { turn: 1, step: 1 })
+  h.turnEvent('assistant/message', { turn: 1, step: 1, stream: [
+    { type: 'chunk', chunk: { type: 'finish', reason: { kind: 'max-tokens' } } },
+  ] })
+}
+
+await test('terminal output limit fails the exact open attempt and reports once', async t => {
+  const h = await fixture(t)
+  outputLimitedStep(h)
+  assert.equal((await h.state()).tasks[0].status, 'in_progress')
+  assert.equal((await h.mailbox()).length, 0)
+  h.turnEvent('turn/end', { turn: 1, reason: { kind: 'max-tokens' } })
+  h.turnEvent('turn/end', { turn: 1, reason: { kind: 'max-tokens' } })
+  h.terminal()
+  await eventually(async () => h.steers.length === 1 && (await h.mailbox())[0]?.deliveredAt !== undefined)
+  const task = (await h.state()).tasks[0]
+  assert.equal(task.status, 'failed')
+  assert.equal(task.attemptId, 'a1')
+  assert.match(task.output, /output-token limit.*MAX_TOKENS/)
+  assert.equal((await h.mailbox()).length, 1)
+  const [report] = await h.mailbox()
+  assert.match(report.content, /Task t1 .* was marked failed/)
+  assert.equal(report.sourceTaskId, 't1')
+  assert.equal(report.sourceAttemptId, 'a1')
+  assert.equal(report.sourceTaskStatus, 'failed')
+})
+
+for (const [label, reason, continues] of [
+  ['a later model step', 'max-tokens', true],
+  ['a cancelled turn', 'aborted', false],
+  ['an ordinary parked turn', 'completed', false],
+]) {
+  await test(`output-limit observation keeps the attempt open after ${label}`, async t => {
+    const h = await fixture(t)
+    if (reason !== 'completed') outputLimitedStep(h)
+    if (continues) h.turnEvent('step/start', { turn: 1, step: 2 })
+    h.turnEvent('turn/end', { turn: 1, reason: { kind: reason } })
+    h.settleSilently()
+    await withTeamLock(`team:${h.stateRoot}:team`, async () => {})
+    assert.equal((await h.state()).tasks[0].status, 'in_progress')
+    assert.equal((await h.mailbox()).length, 0)
+  })
+}
+
+for (const [label, update] of [
+  ['replacement', { attempt: 2, attemptId: 'a2' }],
+  ['completion', { status: 'completed', output: 'Recorded result' }],
+]) {
+  await test(`output limit cannot change or report an attempt after ${label}`, async t => {
+    const h = await fixture(t)
+    outputLimitedStep(h)
+    const team = await h.state()
+    Object.assign(team.tasks[0], update)
+    await writeTeam(h.stateRoot, team)
+    h.turnEvent('turn/end', { turn: 1, reason: { kind: 'max-tokens' } })
+    h.settleSilently()
+    await withTeamLock(`team:${h.stateRoot}:team`, async () => {})
+    assert.deepEqual((await h.state()).tasks[0], team.tasks[0])
+    assert.equal((await h.mailbox()).length, 0)
+  })
+}

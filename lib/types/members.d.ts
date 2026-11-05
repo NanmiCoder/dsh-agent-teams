@@ -140,6 +140,7 @@ interface FailedMemberAttempt {
     readonly captainSessionId: string;
     readonly memberId: string;
     readonly task?: Pick<TeamTask, 'id' | 'attempt' | 'attemptId'>;
+    readonly openAttemptOnly?: boolean;
 }
 /** How a final member turn failure relates to the durable record. */
 export type MemberFailureDisposition = 

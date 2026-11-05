@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { HostConnectionService } from '@deepseek-ai/dsh-client-connection'
 
@@ -65,6 +66,35 @@ export async function readJsonRequest(req: IncomingMessage, maxBytes = 1_000_000
     throw new RequestBodyError('body must be an object', 400)
   }
   return value as Record<string, unknown>
+}
+
+function matchesEntityTagList(header: string | undefined, tag: string): boolean {
+  if (header === undefined) return false
+  if (header.trim() === '*') return true
+  // A comma can be part of the quoted opaque tag. Consume whole list entries
+  // and compare their quoted values, accepting either weak or strong spelling.
+  const entry = /[ \t]*(?:(?:W\/)?("[\x21\x23-\x7e\x80-\xff]*"))?[ \t]*(?:,|$)/y
+  let matched = false
+  while (entry.lastIndex < header.length) {
+    const parsed = entry.exec(header)
+    if (parsed === null) return false
+    matched ||= parsed[1] === tag
+  }
+  return matched
+}
+
+/** Revalidate a current JSON representation across both identity and gzip delivery. */
+export function writeJsonWithEtag(req: IncomingMessage, res: ServerResponse, body: string): void {
+  const tag = `"${createHash('sha256').update(body).digest('base64url')}"`
+  const headers = { 'cache-control': 'no-store', etag: `W/${tag}` }
+  if ((req.method === 'GET' || req.method === 'HEAD')
+    && matchesEntityTagList(req.headers['if-none-match'], tag)) {
+    res.writeHead(304, headers)
+    res.end()
+    return
+  }
+  res.writeHead(200, { ...headers, 'content-type': 'application/json; charset=utf-8' })
+  res.end(body)
 }
 
 /** Raw WebServer routes do not inherit Connection's authentication fence. */

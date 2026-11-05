@@ -15,5 +15,7 @@ export declare class RequestBodyError extends Error {
 }
 /** Bound memory while draining oversized requests so the route can return 413. */
 export declare function readJsonRequest(req: IncomingMessage, maxBytes?: number): Promise<Record<string, unknown>>;
+/** Revalidate a current JSON representation across both identity and gzip delivery. */
+export declare function writeJsonWithEtag(req: IncomingMessage, res: ServerResponse, body: string): void;
 /** Raw WebServer routes do not inherit Connection's authentication fence. */
 export declare function authenticatedWebRoutes(server: WebRouteHost, connection: () => BrowserRequestGate | undefined): WebRouteHost;

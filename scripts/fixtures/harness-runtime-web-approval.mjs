@@ -60,17 +60,21 @@ async function verifyWorkspaceAudit(baseUrl, cookie, captainSessionId) {
     fs.closeSync = function(fd) { handles.delete(fd); return original.closeSync.call(this, fd); };
     syncBuiltinESMExports();
     try {
-        const poll = async () => {
-            const response = await fetch(baseUrl + '/plugins/dsh-agent-teams/state', { headers: { cookie }, signal: AbortSignal.timeout(10000) });
+        const query = new URLSearchParams({ session: captainSessionId, summary: '1' });
+        const poll = async (tag) => {
+            const headers = tag === undefined ? { cookie } : { cookie, 'if-none-match': tag };
+            const response = await fetch(`${baseUrl}/plugins/dsh-agent-teams/state?${query}`, { headers, signal: AbortSignal.timeout(10000) });
             assert.equal(response.status, 200);
             const snapshot = (await response.json()).teams.find(item => item.teamId === team.id);
             assert.ok(snapshot, 'The published collector must retain the audit team');
-            return snapshot;
+            return { snapshot, tag: response.headers.get('etag') };
         };
-        const before = await poll();
+        const { snapshot: before, tag } = await poll();
+        assert.match(tag, /^W\/"/);
         fs.writeFileSync(file, Buffer.alloc(bytes.length, 66));
         fs.utimesSync(file, stats.atime, stats.mtime);
-        const after = await poll();
+        const { snapshot: after, tag: changedTag } = await poll(tag);
+        assert.notEqual(changedTag, tag, 'artifact drift must invalidate an otherwise unchanged snapshot');
         assert.equal(readFileSync(statePath, 'utf8'), stateBytes, 'Only the artifact changed');
         const snapshot = {
             before: { ok: before.delivery.ok, deliverable: before.deliverable },
@@ -200,6 +204,30 @@ export function apply(ctx) {
         assert.equal(auth.status, 303, 'The real browser token exchange must issue a cookie');
         const cookie = auth.headers.get('set-cookie')?.split(';', 1)[0];
         assert.ok(cookie, 'The real connection must mint a browser cookie');
+        const stateUrl = baseUrl + '/plugins/dsh-agent-teams/state';
+        const stateQuery = new URLSearchParams({ session: captain.id, summary: '1' });
+        const getState = (query = '', tag) => fetch(query ? `${stateUrl}?${query}` : stateUrl, {
+            headers: tag === undefined ? { cookie } : { cookie, 'if-none-match': tag },
+            signal: AbortSignal.timeout(10000),
+        });
+        const draftResponse = await getState(stateQuery);
+        assert.equal(draftResponse.status, 200);
+        const draftTag = draftResponse.headers.get('etag');
+        assert.match(draftTag, /^W\/"/);
+        const draftTeams = (await draftResponse.json()).teams;
+        assert.deepEqual(draftTeams.map(team => team.teamId), [staged.id]);
+        assert.equal(draftTeams[0].tasks[0].description, staged.tasks[0].description);
+        assert.equal(draftTeams[0].members[0].executionPrompt, staged.members[0].executionPrompt);
+        const unchanged = await getState(stateQuery, `"other,tag", ${draftTag.slice(2)}`);
+        assert.equal(unchanged.status, 304);
+        assert.equal(unchanged.headers.get('etag'), draftTag);
+        assert.equal(await unchanged.text(), '');
+        const malformed = await getState(stateQuery, `${draftTag}, invalid`);
+        assert.equal(malformed.status, 200);
+        await malformed.arrayBuffer();
+        const otherSession = await getState(new URLSearchParams({ session: 'another-captain', summary: '1' }), draftTag);
+        assert.equal(otherSession.status, 200);
+        assert.deepEqual(await otherSession.json(), { teams: [] });
         const postApproval = teamId => fetch(baseUrl + '/plugins/dsh-agent-teams/plan', { method: 'POST', headers: { 'content-type': 'application/json', origin: baseUrl, cookie }, body: JSON.stringify({ sessionId: captain.id, teamId, action: 'approve' }), signal: AbortSignal.timeout(10000) });
         const beforeInvalidRequests = events.filter(event => event.event === 'web-request' && !event.isMember).length;
         const invalid = await postApproval('missing-team-' + randomUUID());
@@ -235,8 +263,9 @@ export function apply(ctx) {
         // #262: the real member is awaiting model output, before in_progress.
         // The panel route must preserve this claim rather than call it ready/running.
         await waitFor(() => events.some(event => event.event === 'web-request' && event.isMember), 'Member request starts before checking claimed state');
-        const activityResponse = await fetch(baseUrl + '/plugins/dsh-agent-teams/state', { headers: { cookie }, signal: AbortSignal.timeout(10000) });
+        const activityResponse = await getState(stateQuery, draftTag);
         assert.equal(activityResponse.status, 200);
+        assert.notEqual(activityResponse.headers.get('etag'), draftTag);
         const activityBody = await activityResponse.json();
         const activityTeam = activityBody.teams.find(team => team.teamId === staged.id);
         assert.ok(activityTeam, 'Real activity route must discover the staged team after approval');
@@ -244,6 +273,13 @@ export function apply(ctx) {
         assert.equal(activityTeam.tasks[0].status, 'claimed');
         assert.equal(activityTeam.tasks[0].state, 'claimed');
         assert.equal(activityTeam.members[0].activity, 'working');
+        assert.equal(Object.hasOwn(activityTeam.tasks[0], 'description'), false);
+        assert.equal(Object.hasOwn(activityTeam.members[0], 'executionPrompt'), false);
+        const legacyResponse = await getState();
+        assert.equal(legacyResponse.status, 200);
+        const legacyTeam = (await legacyResponse.json()).teams.find(team => team.teamId === staged.id);
+        assert.equal(legacyTeam.tasks[0].description, staged.tasks[0].description);
+        assert.equal(legacyTeam.members[0].executionPrompt, staged.members[0].executionPrompt);
         record({ event: 'web-claimed-projection', taskStatus: activityTeam.tasks[0].status, visualState: activityTeam.tasks[0].state, memberActivity: activityTeam.members[0].activity });
         record({ event: 'web-member-output-released' });
         releaseMember();
@@ -283,6 +319,17 @@ export function apply(ctx) {
         for (const request of memberRequests) assert.deepEqual(request.tools.filter(tool => tool.name.startsWith('agent_teams_')).map(tool => tool.name).sort(), memberTools, 'Every real member request must expose exactly the four member tools');
         record({ event: 'web-headers-stable', sessionId: captain.id, systemSha256, toolsSha256, captainRequests: captainRequests.length, memberRequests: memberRequests.length, memberTeamToolCount: memberTools.length });
         await verifyWorkspaceAudit(baseUrl, cookie, captain.id);
+        const archivedId = 'runtime-lab-history';
+        const archiveDir = join(process.cwd(), '.agent-teams/archive', archivedId);
+        fs.mkdirSync(archiveDir, { recursive: true });
+        fs.writeFileSync(join(archiveDir, 'team.json'), JSON.stringify({ ...completed, id: archivedId }));
+        const archiveQuery = new URLSearchParams({ session: captain.id, archived: '1' });
+        const archive = await getState(archiveQuery, draftTag);
+        assert.equal(archive.status, 200);
+        const archivedTeams = (await archive.json()).teams;
+        assert.deepEqual(archivedTeams.map(team => team.teamId), [archivedId]);
+        assert.equal(archivedTeams[0].tasks[0].description, staged.tasks[0].description);
+        assert.equal(archivedTeams[0].members[0].executionPrompt, staged.members[0].executionPrompt);
         record({ event: 'web-approval-passed', sessionId: captain.id, teamId: completed.id, memberId: completed.members[0].id, taskStatus: completed.tasks[0].status, captainRequests: captainRequests.length });
         process.stdout.write('WEB_APPROVAL_OK\n');
         ctx.get('appExit')(0);

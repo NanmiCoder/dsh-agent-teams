@@ -19,7 +19,7 @@ export interface TeamActivityMember {
     readonly provider: string;
     readonly model: string;
     readonly reasoningEffort: string;
-    readonly executionPrompt: string;
+    readonly executionPrompt?: string;
     readonly status: MemberStatus;
     readonly activity: 'working' | 'idle' | 'unknown';
     readonly progress: number;
@@ -32,7 +32,7 @@ export interface TeamActivityMember {
 export interface TeamActivityTask {
     readonly id: string;
     readonly subject: string;
-    readonly description: string;
+    readonly description?: string;
     readonly status: string;
     readonly state: VisualTaskState;
     readonly assignee: string;
@@ -80,6 +80,8 @@ export interface TeamActivitySnapshot {
 }
 /** Snapshot projection switches for live and archived teams. */
 export interface TeamSnapshotOptions {
+    /** Running panels omit the long text used only by the staging editor. */
+    readonly summary?: boolean;
     /** Historic review must retain members that were marked removed at shutdown. */
     readonly includeRemoved?: boolean;
     /** Archived teams have no meaningful live activity after their sessions stop. */
@@ -106,25 +108,28 @@ export declare function memberModelRoute(member: {
  */
 export declare function assembleTeamSnapshot(ctx: Context, stateRoot: string, workspace: string, state: TeamState, options?: TeamSnapshotOptions): Promise<TeamActivitySnapshot>;
 /**
- * Collect every team under the given workspace state roots.
+ * Collect live teams under the given workspace state roots.
  * @param ctx - the plugin context.
  * @param roots - `{ workspace, stateRoot }` pairs (resolved absolute roots).
+ * @param captainSessionId - when present, assemble only the requested captain's teams.
+ * @param summary - omit editor-only text from running teams.
  * @returns the snapshots in stable order (workspace, then team id).
  */
 export declare function collectTeamsActivity(ctx: Context, roots: readonly {
     workspace: string;
     stateRoot: string;
     workspacePath?: string;
-}[]): Promise<TeamActivitySnapshot[]>;
+}[], captainSessionId?: string, summary?: boolean): Promise<TeamActivitySnapshot[]>;
 /**
- * Collect every archived team under the given workspace state roots (the
+ * Collect archived teams under the given workspace state roots (the
  * `archive/` subdirectory of each state root). Used by the historic panel
  * path to restore full team detail after deletion.
  * @param ctx - the plugin context.
  * @param roots - `{ workspace, stateRoot }` pairs.
+ * @param captainSessionId - when present, assemble only the requested captain's teams.
  * @returns the archived snapshots in stable order.
  */
 export declare function collectArchivedTeamsActivity(ctx: Context, roots: readonly {
     workspace: string;
     stateRoot: string;
-}[]): Promise<TeamActivitySnapshot[]>;
+}[], captainSessionId?: string): Promise<TeamActivitySnapshot[]>;

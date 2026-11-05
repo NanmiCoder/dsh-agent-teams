@@ -49,3 +49,108 @@ test('workspace DAG keeps real dependency endpoints aligned with enlarged nodes'
  assert.equal(layout.nodes[1].x,200)
  assert.equal(layout.edges[0].path,'M164 38C178 38,186 38,200 38')
 })
+
+function scriptedPoller(targets, discoverySessionId, responses) {
+  let tick
+  const requests = [], snapshots = [], statuses = [], settled = []
+  const poll = startActivityPolling(targets, {
+    discoverySessionId,
+    async fetchState(url, init) {
+      requests.push({ url, tag: init.headers?.['if-none-match'] })
+      return responses.shift()
+    },
+    schedule(callback) { tick = callback; return 1 },
+    cancel() {},
+    publishSnapshots(update) { snapshots.push(update) },
+    onStatus(status) { statuses.push(status) },
+    settleTargets(keys) { settled.push([...keys]) },
+  })
+  return {
+    poll, requests, snapshots, statuses, settled,
+    async advance() { tick(); await new Promise(resolve => setImmediate(resolve)) },
+  }
+}
+
+function stateResponse(teams, tag) {
+  return Response.json({ teams }, { headers: tag === undefined ? {} : { etag: tag } })
+}
+
+test('a poll is scoped only when every discovery and card target has one owner', async () => {
+  const sessionId = 'captain+A/&'
+  const team = { teamId: 'team', captainSessionId: sessionId }
+  const target = { teamId: team.teamId, sessionId, key: 'card' }
+  const scoped = scriptedPoller([target], sessionId, [stateResponse([team]), stateResponse([])])
+  const mixed = scriptedPoller([target], 'another-captain', [stateResponse([team]), stateResponse([])])
+  try {
+    await Promise.all([scoped.poll.firstTick, mixed.poll.firstTick])
+    const [live, archived] = scoped.requests.map(({ url }) => new URL(url, 'http://fixture').searchParams)
+    assert.equal(live.get('session'), sessionId)
+    assert.equal(live.get('summary'), '1')
+    assert.equal(archived.get('session'), sessionId)
+    assert.equal(archived.get('archived'), '1')
+    assert.equal(archived.has('summary'), false)
+    assert.deepEqual(mixed.requests.map(({ url }) => url), [
+      '/plugins/dsh-agent-teams/state', '/plugins/dsh-agent-teams/state?archived=1',
+    ])
+  } finally {
+    scoped.poll.stop()
+    mixed.poll.stop()
+  }
+})
+
+test('a truncated or invalid body never becomes the held validator', async () => {
+  const tag = 'W/"live"'
+  const lab = scriptedPoller([], 'captain', [
+    new Response('{"teams":', { headers: { etag: tag } }),
+    stateResponse([null], tag),
+    stateResponse([], tag), stateResponse([], 'W/"archive"'),
+    new Response(null, { status: 304 }),
+  ])
+  try {
+    await lab.poll.firstTick
+    await lab.advance()
+    await lab.advance()
+    await lab.advance()
+    assert.deepEqual(lab.requests.map(({ tag }) => tag), [undefined, undefined, undefined, undefined, tag])
+    assert.deepEqual(lab.snapshots, [{ teams: [] }, { archivedTeams: [] }])
+    assert.deepEqual(lab.statuses, ['error', 'error', 'ready', 'ready'])
+  } finally { lab.poll.stop() }
+})
+
+test('304 still retries initial archive discovery and settles the missing card', async () => {
+  const history = { teamId: 'finished', captainSessionId: 'captain' }
+  const target = { teamId: history.teamId, sessionId: history.captainSessionId, key: 'card' }
+  const lab = scriptedPoller([target], 'captain', [
+    stateResponse([], 'W/"live"'), new Response(null, { status: 503 }),
+    new Response(null, { status: 304 }), stateResponse([history], 'W/"archive"'),
+    new Response(null, { status: 304 }),
+  ])
+  try {
+    await lab.poll.firstTick
+    await lab.advance()
+    await lab.advance()
+    assert.deepEqual(lab.requests.map(({ tag }) => tag), [undefined, undefined, 'W/"live"', undefined, 'W/"live"'])
+    assert.deepEqual(lab.snapshots, [{ teams: [] }, { archivedTeams: [history] }])
+    assert.deepEqual(lab.settled, [['card']])
+  } finally { lab.poll.stop() }
+})
+
+test('304 retries an archive refresh after a previously live team disappears', async () => {
+  const team = { teamId: 'running', captainSessionId: 'captain' }
+  const lab = scriptedPoller([], 'captain', [
+    stateResponse([team], 'W/"running"'), stateResponse([], 'W/"empty-archive"'),
+    stateResponse([], 'W/"finished"'), new Response(null, { status: 503 }),
+    new Response(null, { status: 304 }), stateResponse([team], 'W/"archived"'),
+    new Response(null, { status: 304 }),
+  ])
+  try {
+    await lab.poll.firstTick
+    await lab.advance()
+    await lab.advance()
+    await lab.advance()
+    assert.deepEqual(lab.requests.map(({ tag }) => tag), [
+      undefined, undefined, 'W/"running"', 'W/"empty-archive"', 'W/"finished"', 'W/"empty-archive"', 'W/"finished"',
+    ])
+    assert.deepEqual(lab.snapshots, [{ teams: [team] }, { archivedTeams: [] }, { teams: [] }, { archivedTeams: [team] }])
+  } finally { lab.poll.stop() }
+})

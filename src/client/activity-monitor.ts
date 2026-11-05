@@ -87,6 +87,13 @@ const targetListeners = new Set<() => void>()
 const snapshotListeners = new Set<() => void>()
 let targetSnapshot: readonly ActivityMonitorTarget[] = []
 let activitySnapshots: ActivitySnapshots = { teams: [], archivedTeams: [] }
+// Keep recent successful visits during reconnects without retaining every
+// conversation's activity and full archive for the life of the tab.
+const MAX_RETAINED_SCOPES = 8
+const scopedSnapshots = {
+  teams: new Map<string, readonly ActivityTeam[]>(),
+  archivedTeams: new Map<string, readonly ActivityTeam[]>(),
+}
 
 function targetKey(sessionId: string, teamId: string): string {
   return `${sessionId}\u0000${teamId}`
@@ -169,11 +176,41 @@ export function getActivitySnapshotsSnapshot(): ActivitySnapshots {
   return activitySnapshots
 }
 
-/** Publish one or both successful state-route responses. */
-export function updateActivitySnapshots(update: Partial<ActivitySnapshots>): void {
+/** Read the rows owned by one route and optional scope for ETag comparison. */
+export function getPublishedActivityRows(
+  field: keyof ActivitySnapshots,
+  scope?: string,
+): readonly ActivityTeam[] | undefined {
+  return scope === undefined ? activitySnapshots[field] : scopedSnapshots[field].get(scope)
+}
+
+function replaceActivityRows(
+  field: keyof ActivitySnapshots,
+  rows: readonly ActivityTeam[] | undefined,
+  scope: string | undefined,
+): readonly ActivityTeam[] {
+  const current = activitySnapshots[field]
+  if (rows === undefined) return current
+  const recent = scopedSnapshots[field]
+  if (scope === undefined) {
+    recent.clear()
+    return rows
+  }
+  const previous = recent.get(scope)
+  recent.delete(scope)
+  recent.set(scope, rows)
+  const oldest = recent.size > MAX_RETAINED_SCOPES ? recent.keys().next().value : undefined
+  if (oldest !== undefined) recent.delete(oldest)
+  if (previous === rows) return current
+  const otherRows = current.filter(team => team.captainSessionId !== scope && team.captainSessionId !== oldest)
+  return otherRows.length === current.length && rows.length === 0 ? current : [...otherRows, ...rows]
+}
+
+/** Publish full state-route responses or replace the rows for just one captain. */
+export function updateActivitySnapshots(update: Partial<ActivitySnapshots>, scope?: string): void {
   const next = {
-    teams: update.teams ?? activitySnapshots.teams,
-    archivedTeams: update.archivedTeams ?? activitySnapshots.archivedTeams,
+    teams: replaceActivityRows('teams', update.teams, scope),
+    archivedTeams: replaceActivityRows('archivedTeams', update.archivedTeams, scope),
   }
   if (next.teams === activitySnapshots.teams && next.archivedTeams === activitySnapshots.archivedTeams) return
   activitySnapshots = next
@@ -205,14 +242,16 @@ interface PublishedActivitySnapshot {
   readonly tag: string | undefined
 }
 
-async function readActivityTeams(response: ActivityFetchResponse): Promise<readonly ActivityTeam[]> {
+async function readActivityTeams(response: ActivityFetchResponse, scope: string | undefined): Promise<readonly ActivityTeam[]> {
   if (!response.ok) throw new Error('Activity unavailable')
   const body = (await response.json()) as { teams?: unknown } | null
   if (!Array.isArray(body?.teams) || body.teams.some(team =>
     typeof team?.teamId !== 'string' || typeof team?.captainSessionId !== 'string')) {
     throw new Error('Invalid activity response')
   }
-  return body.teams as readonly ActivityTeam[]
+  const teams = body.teams as readonly ActivityTeam[]
+  // Older hosts can ignore the query and send every team's row.
+  return scope === undefined ? teams : teams.filter(team => team.captainSessionId === scope)
 }
 
 /** Injectable browser primitives used by the poll controller and its tests. */
@@ -235,9 +274,9 @@ export interface ActivityPollingRuntime {
   ) => Promise<ActivityFetchResponse>
   readonly schedule?: (callback: () => void, intervalMs: number) => unknown
   readonly cancel?: (timer: unknown) => void
-  readonly publishSnapshots?: (update: Partial<ActivitySnapshots>) => void
+  readonly publishSnapshots?: (update: Partial<ActivitySnapshots>, scope?: string) => void
   /** Read back the shared store when supplying a custom publisher for it. */
-  readonly getPublishedSnapshots?: () => ActivitySnapshots
+  readonly getPublishedRows?: typeof getPublishedActivityRows
   readonly settleTargets?: (keys: ReadonlySet<string>) => void
 }
 
@@ -277,8 +316,8 @@ export function startActivityPolling(
   const schedule = runtime.schedule ?? ((callback, intervalMs) => setInterval(callback, intervalMs))
   const cancel = runtime.cancel ?? ((timer) => { clearInterval(timer as ReturnType<typeof setInterval>) })
   const publishSnapshots = runtime.publishSnapshots ?? updateActivitySnapshots
-  const getPublishedSnapshots = runtime.getPublishedSnapshots
-    ?? (runtime.publishSnapshots === undefined ? getActivitySnapshotsSnapshot : undefined)
+  const getPublishedRows = runtime.getPublishedRows
+    ?? (runtime.publishSnapshots === undefined ? getPublishedActivityRows : undefined)
   const settleTargets = runtime.settleTargets ?? settleActivityMonitorTargets
   const owners = new Set(monitorTargets.map(target => target.sessionId))
   if (discoverySessionId) owners.add(discoverySessionId)
@@ -291,7 +330,7 @@ export function startActivityPolling(
   // A manual retry can publish to the same store. A 304 only validates the
   // body this controller applied, so send its tag while that body is shown.
   const stillPublished = (field: keyof ActivitySnapshots, snapshot: PublishedActivitySnapshot | undefined) =>
-    getPublishedSnapshots === undefined || getPublishedSnapshots()[field] === snapshot?.teams
+    getPublishedRows === undefined || getPublishedRows(field, scope) === snapshot?.teams
   let cancelled = false
   let inFlight = false
   // Explicit card targets are demanded work: start at the live cadence. A
@@ -324,9 +363,9 @@ export function startActivityPolling(
       })
       if (cancelled) return
       if (liveResponse.status !== 304 || liveTag === undefined) {
-        const liveTeams = await readActivityTeams(liveResponse)
+        const liveTeams = await readActivityTeams(liveResponse, scope)
         if (cancelled) return
-        publishSnapshots({ teams: liveTeams })
+        publishSnapshots({ teams: liveTeams }, scope)
         if (cancelled) return
         publishedLive = { teams: liveTeams, tag: liveResponse.headers?.get('etag') ?? undefined }
 
@@ -364,9 +403,9 @@ export function startActivityPolling(
       })
       if (cancelled) return
       if (archivedResponse.status !== 304 || archiveTag === undefined) {
-        const archivedTeams = await readActivityTeams(archivedResponse)
+        const archivedTeams = await readActivityTeams(archivedResponse, scope)
         if (cancelled) return
-        publishSnapshots({ archivedTeams })
+        publishSnapshots({ archivedTeams }, scope)
         if (cancelled) return
         publishedArchive = { teams: archivedTeams, tag: archivedResponse.headers?.get('etag') ?? undefined }
       } else if (!stillPublished('archivedTeams', publishedArchive)) {

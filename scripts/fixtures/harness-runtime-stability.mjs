@@ -229,18 +229,19 @@ export function apply(ctx) {
     assert.equal(requests.filter(r => r.sessionId === captainId).length, parentAfterReport, 'a delivered completion must not wake the parent again');
     record({ event: 'stability-settlement-dedup-passed', reportWakes: parentAfterReport - parentBeforeReport, duplicateModelRequests: 0 });
     await run(cmd('delete'));
-    if (typeof ctx.subagents.startActivation === 'function') {
-      await run(cmd('create', { name: 'output-limit', description: 'Output limit settlement',
-        plan: { members: [{ name: 'worker' }], tasks: [{ id: 'job', subject: 'Open task', assignee: 'worker' }] } }));
-      const limitDir = join(root, 'output-limit');
-      const limitState = () => JSON.parse(readFileSync(join(limitDir, 'team.json'), 'utf8'));
-      const limitedId = limitState().members[0].id;
-      await until(() => gates.has(limitedId), 'output-limit member ready');
+    await run(cmd('create', { name: 'output-limit', description: 'Output limit settlement',
+      plan: { members: [{ name: 'worker' }], tasks: [{ id: 'job', subject: 'Open task', assignee: 'worker' }] } }));
+    const limitDir = join(root, 'output-limit');
+    const limitState = () => JSON.parse(readFileSync(join(limitDir, 'team.json'), 'utf8'));
+    const limitedId = limitState().members[0].id;
+    await until(() => gates.has(limitedId), 'output-limit member ready');
+    const attemptId = limitState().tasks[0].attemptId;
+    memberResponses.set(limitedId, { name: 'agent_teams_update_task', args: { task_id: 't1', attempt_id: attemptId, status: 'in_progress' } });
+    gates.get(limitedId)();
+    await until(() => gates.has(limitedId), 'open attempt reaches the model');
+    const managedActivation = typeof ctx.subagents.startActivation === 'function';
+    if (managedActivation) {
       const original = ctx.agents.get(limitedId);
-      const attemptId = limitState().tasks[0].attemptId;
-      memberResponses.set(limitedId, { name: 'agent_teams_update_task', args: { task_id: 't1', attempt_id: attemptId, status: 'in_progress' } });
-      gates.get(limitedId)();
-      await until(() => gates.has(limitedId), 'open attempt reaches the model');
       // One capped response can receive steering before its turn closes. The
       // host retains max-tokens as the turn reason even after a normal step.
       const stopSteering = original.ctx.on('agent/turn-stopping', () => {
@@ -260,18 +261,18 @@ export function apply(ctx) {
       await run(cmd('send_message', { to: 'worker', content: 'Resume the parked attempt.' }));
       await until(() => gates.has(limitedId), 'same member receives a cold continuation');
       assert.notEqual(ctx.agents.get(limitedId), original);
-      memberResponses.set(limitedId, { outputLimit: true });
-      gates.get(limitedId)();
-      await until(() => limitState().tasks[0].status === 'failed', 'output limit settles the open attempt');
-      const task = limitState().tasks[0];
-      assert.equal(task.attemptId, attemptId);
-      assert.match(task.output, /output-token limit.*MAX_TOKENS/);
-      await until(() => requests.some(request => request.sessionId === captainId && request.userText.includes('MAX_TOKENS')), 'captain receives failure');
-      const reports = readFileSync(join(limitDir, 'inbox/captain.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
-      assert.equal(reports.filter(report => report.content.includes('MAX_TOKENS')).length, 1);
-      record({ event: 'stability-output-limit-passed', steeredAttemptParked: true, coldMember: limitedId, attemptId, taskStatus: task.status });
-      await run(cmd('delete'));
     }
+    memberResponses.set(limitedId, { outputLimit: true });
+    gates.get(limitedId)();
+    await until(() => limitState().tasks[0].status === 'failed', 'output limit settles the open attempt');
+    const task = limitState().tasks[0];
+    assert.equal(task.attemptId, attemptId);
+    assert.match(task.output, /output-token limit.*MAX_TOKENS/);
+    await until(() => requests.some(request => request.sessionId === captainId && request.userText.includes('MAX_TOKENS')), 'captain receives failure');
+    const reports = readFileSync(join(limitDir, 'inbox/captain.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
+    assert.equal(reports.filter(report => report.content.includes('MAX_TOKENS')).length, 1);
+    record({ event: 'stability-output-limit-passed', steeredAttemptParked: managedActivation, memberId: limitedId, attemptId, taskStatus: task.status });
+    await run(cmd('delete'));
     await ctx.sessions.flush(captain.agent.session);
     await captain.dispose();
     process.stdout.write('STABILITY_OK\n'); ctx.get('appExit')(0);

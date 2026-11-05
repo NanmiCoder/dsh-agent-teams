@@ -6,16 +6,18 @@ recorded paths and a reviewed scope was hashed twice. Constant-memory chunks
 bounded memory but did not yield the event loop.
 
 The activity collector and `agent_teams_status` now share a lazy, owner-scoped
-worker service. One worker executes audits; identical in-flight requests share
-their result, and the service bounds pending jobs at 16 with a 120-second active
-job timeout. Unload cancels work and late callbacks keep a closed service.
+worker service. One worker executes audits. Identical requests can share a
+queued audit until it is dispatched. The service bounds pending jobs at 16
+with a 120-second active job timeout. Unload cancels work and late callbacks
+keep a closed service.
 Idle workers retire after ten seconds. Queue exhaustion, worker failures,
 timeouts and invalid replies produce explicit audit gaps, never a partial pass.
 
 The artifact reader shares reads only within one audit. Each scope retains its
 own expansion cap, exclusions and gaps. Every subsequent audit reads the bytes
 again. File descriptors are checked before and after hashing, identities are
-revalidated after the combined read, and directory membership is rechecked.
+revalidated after the combined read, and directory membership is rechecked
+using the same exclusions as the scope traversal.
 Changed or unreadable evidence remains incomplete. The host also rereads the
 team record after worker completion; an edit, replacement attempt, archive or
 corrupt record invalidates the old result.
@@ -53,9 +55,9 @@ Validation on the final source/build:
 - The host-read and duplicate-read regressions both fail on the base artifact
   (262,144 host bytes instead of zero; two opens instead of one).
 - `pnpm typecheck`, `pnpm build`, `pnpm verify`, `git diff --check`, and the three
-  CI fixture-test files pass. The new regression file has 15 passing tests,
+  CI fixture-test files pass. The regression file has 19 passing tests,
   including same-size edits with restored mtime, read-time mutations, new scope
-  files, source-record changes/archival/corruption, in-flight coalescing, bounded
+  files, source-record changes/archival/corruption, queue coalescing, bounded
   queues, worker failure/timeout, and Cordis unload/reload.
 - The related quality-gate suite passes 68 tests, retaining cap, unreadability,
   new-file, deletion, exclusion and symlink coverage.

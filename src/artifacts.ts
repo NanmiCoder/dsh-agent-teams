@@ -191,6 +191,29 @@ function isSkipped(relativePath: string): boolean {
   return relativePath.split('/').some((segment) => SKIPPED_SEGMENTS.has(segment)) || isDefaultExcludedPath(relativePath)
 }
 
+interface ScopeEntry {
+  path: string
+  directory: boolean
+}
+
+/** Enumeration and revalidation must apply the same scope boundaries. */
+function listScopeEntries(absolute: string, prefix: string): ScopeEntry[] {
+  const entries: ScopeEntry[] = []
+  for (const entry of readdirSync(absolute, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+    const path = prefix === '' ? entry.name : `${prefix}/${entry.name}`
+    // Traversal never follows symlinks: a symlinked directory can point
+    // outside the workspace or form a cycle.
+    if (entry.isSymbolicLink() || isSkipped(path)) continue
+    if (entry.isDirectory()) entries.push({ path, directory: true })
+    else if (entry.isFile()) entries.push({ path, directory: false })
+  }
+  return entries
+}
+
+function directorySignature(absolute: string, entries: readonly ScopeEntry[]): string {
+  return `${realpathSync(absolute)}\0${JSON.stringify(entries)}`
+}
+
 function walkDirectory(input: {
   workspace: string
   workspaceRoot: string | undefined
@@ -232,7 +255,7 @@ function walkDirectory(input: {
   const queue = input.prefix === '' ? [''] : [input.prefix]
   while (queue.length > 0) {
     const current = queue.shift() as string
-    let entries: { name: string; isDirectory(): boolean; isFile(): boolean; isSymbolicLink(): boolean }[]
+    let entries: ScopeEntry[]
     try {
       const absolute = join(input.workspace, current)
       // A queued child may have been replaced after its parent was listed.
@@ -243,33 +266,26 @@ function walkDirectory(input: {
         input.gap(`${input.pattern}: ${current || '.'} changed or cannot be resolved inside the workspace; refusing to enumerate it`)
         continue
       }
-      entries = readdirSync(absolute, { withFileTypes: true })
+      entries = listScopeEntries(absolute, current)
       if (resolvesInside(input.workspaceRoot, absolute) !== true) {
         input.gap(`${input.pattern}: ${current || '.'} changed during enumeration; refusing to use its entries`)
         continue
       }
-      input.observe(current, directorySignature(input.workspace, current, entries))
+      input.observe(current, directorySignature(absolute, entries))
     } catch (error) {
       input.gap(`${input.pattern}: cannot list ${current === '' ? '.' : current} (${errorCode(error)})`)
       continue
     }
-    for (const entry of [...entries].sort((a, b) => a.name.localeCompare(b.name))) {
-      const relativePath = `${current === '' ? '' : `${current}/`}${entry.name}`
-      // Traversal never follows symlinks: a symlinked directory can point
-      // outside the workspace or form a cycle, and neither may become a read
-      // or an unbounded walk.
-      if (entry.isSymbolicLink()) continue
-      if (isSkipped(relativePath)) continue
-      if (entry.isDirectory()) {
-        queue.push(relativePath)
+    for (const entry of entries) {
+      if (entry.directory) {
+        queue.push(entry.path)
         continue
       }
-      if (!entry.isFile()) continue
       if (input.full()) {
         input.gap(`${input.pattern}: stopped at the ${MAX_EXPANDED_ARTIFACTS}-file cap, so its contents are only partially recorded`)
         return
       }
-      input.push(relativePath)
+      input.push(entry.path)
     }
   }
 }
@@ -360,10 +376,6 @@ function readScope(
   return { artifacts: artifacts.sort((a, b) => a.path.localeCompare(b.path)), gaps }
 }
 
-function directorySignature(workspace: string, prefix: string, entries: readonly { name: string; isDirectory(): boolean; isFile(): boolean; isSymbolicLink(): boolean }[]): string {
-  return `${realpathSync(join(workspace, prefix))}\0${JSON.stringify(entries.map(entry => [entry.name, entry.isSymbolicLink() ? 'link' : entry.isDirectory() ? 'dir' : entry.isFile() ? 'file' : 'other']).sort((a, b) => String(a[0]).localeCompare(String(b[0]))))}`
-}
-
 /**
  * Read related scopes in one audit. Each scope retains its own expansion cap
  * and gaps, but overlapping paths hash only once. A final revalidation rejects
@@ -411,7 +423,7 @@ export function readArtifactScopes(workspace: string, scopes: readonly (readonly
     try {
       const absolute = join(workspace, prefix)
       if (root === undefined || resolvesInside(root, absolute) !== true
-        || directorySignature(workspace, prefix, readdirSync(absolute, { withFileTypes: true })) !== signature) changedDirectories.add(prefix)
+        || directorySignature(absolute, listScopeEntries(absolute, prefix)) !== signature) changedDirectories.add(prefix)
     } catch {
       changedDirectories.add(prefix)
     }

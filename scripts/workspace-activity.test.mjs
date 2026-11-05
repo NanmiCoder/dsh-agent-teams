@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {createWorkspaceState,createTeamDiscovery} from '../lib/client/workspace-state.js'
-import {getActivitySnapshotsSnapshot, startActivityPolling, updateActivitySnapshots} from '../lib/client/activity-monitor.js'
+import {getActivitySnapshotsSnapshot, getPublishedActivityRows, startActivityPolling, updateActivitySnapshots} from '../lib/client/activity-monitor.js'
 
 test('restored, closed, updated and newly created teams have distinct discovery semantics',()=>{
  const discover=createTeamDiscovery()
@@ -172,8 +172,8 @@ for (const pauseAt of ['live', 'archive']) {
       stateResponse(newLive, liveTag), stateResponse([moved], archiveTag),
       revalidate(newLive, liveTag), revalidate([moved], archiveTag), revalidate(newLive, liveTag),
     ], pauseAt === 'live' ? { publishSnapshots: undefined } : {
-      publishSnapshots: update => updateActivitySnapshots(update),
-      getPublishedSnapshots: getActivitySnapshotsSnapshot,
+      publishSnapshots: (update, scope) => updateActivitySnapshots(update, scope),
+      getPublishedRows: getPublishedActivityRows,
     })
     let retry
     try {
@@ -231,4 +231,116 @@ test('a stopped controller cannot publish its delayed archive response', async (
     lab.poll.stop()
     updateActivitySnapshots(initial)
   }
+})
+
+test('switching back during a restart keeps the last successful live and archived rows', async () => {
+  const initial = getActivitySnapshotsSnapshot()
+  const a = { captainSessionId: 'captain-a', teamId: 'live-a' }
+  const b = { captainSessionId: 'captain-b', teamId: 'live-b' }
+  const archivedA = { ...a, teamId: 'history-a' }
+  const archivedB = { ...b, teamId: 'history-b' }
+  const controllers = []
+  async function visit(owner, responses) {
+    const lab = scriptedPoller([], owner, responses, { publishSnapshots: undefined })
+    controllers.push(lab.poll)
+    await lab.poll.firstTick
+    return lab
+  }
+  try {
+    updateActivitySnapshots({ teams: [], archivedTeams: [] })
+    const firstA = await visit(a.captainSessionId, [stateResponse([a]), stateResponse([archivedA])])
+    firstA.poll.stop()
+    const firstB = await visit(b.captainSessionId, [stateResponse([b]), stateResponse([archivedB])])
+    firstB.poll.stop()
+    const returned = await visit(a.captainSessionId, [
+      () => { throw new Error('host restarting') }, stateResponse([]), stateResponse([]),
+    ])
+    assert.deepEqual(returned.statuses, ['error'])
+    assert.deepEqual(getActivitySnapshotsSnapshot(), { teams: [a, b], archivedTeams: [archivedA, archivedB] })
+    await returned.advance()
+    assert.deepEqual(getActivitySnapshotsSnapshot(), { teams: [b], archivedTeams: [archivedB] })
+  } finally {
+    for (const controller of controllers) controller.stop()
+    updateActivitySnapshots(initial)
+  }
+})
+
+test('an older full-table response updates only the requested scope and preserves another validator', async () => {
+  const initial = getActivitySnapshotsSnapshot()
+  updateActivitySnapshots({ teams: [], archivedTeams: [] })
+  const a = { captainSessionId: 'captain-a', teamId: 'live-a' }
+  const b = { captainSessionId: 'captain-b', teamId: 'live-b' }
+  const archivedA = { ...a, teamId: 'history-a' }
+  const archivedB = { ...b, teamId: 'history-b' }
+  const tag = 'W/"scope-a"'
+  const activeA = scriptedPoller([], a.captainSessionId, [
+    stateResponse([a], tag), stateResponse([archivedA], 'W/"archive-a"'), new Response(null, { status: 304 }),
+  ], { publishSnapshots: undefined })
+  let activeB
+  try {
+    await activeA.poll.firstTick
+    activeB = scriptedPoller([], b.captainSessionId, [
+      stateResponse([{ ...a, name: 'stale' }, b]), stateResponse([{ ...archivedA, name: 'stale' }, archivedB]),
+    ], { publishSnapshots: undefined })
+    await activeB.poll.firstTick
+    const shown = getActivitySnapshotsSnapshot()
+    assert.deepEqual(shown, { teams: [a, b], archivedTeams: [archivedA, archivedB] })
+    await activeA.advance()
+    assert.deepEqual(activeA.requests.map(({ tag }) => tag), [undefined, undefined, tag])
+    assert.equal(getActivitySnapshotsSnapshot(), shown, 'another session must not invalidate a held snapshot')
+  } finally {
+    activeA.poll.stop()
+    activeB?.poll.stop()
+    updateActivitySnapshots(initial)
+  }
+})
+
+test('an unscoped poll still replaces the full result and invalidates superseded scoped tags', async () => {
+  const initial = getActivitySnapshotsSnapshot()
+  updateActivitySnapshots({ teams: [], archivedTeams: [] })
+  const a = { captainSessionId: 'captain-a', teamId: 'live-a' }
+  const c = { captainSessionId: 'captain-c', teamId: 'live-c' }
+  const archivedA = { ...a, teamId: 'history-a' }
+  const archivedC = { ...c, teamId: 'history-c' }
+  const tag = 'W/"scope-a"'
+  const activeA = scriptedPoller([], a.captainSessionId, [
+    stateResponse([a], tag), stateResponse([archivedA], 'W/"archive-a"'),
+    stateResponse([a], tag), stateResponse([archivedA], 'W/"archive-a"'),
+  ], { publishSnapshots: undefined })
+  let unscoped
+  try {
+    await activeA.poll.firstTick
+    unscoped = scriptedPoller([
+      { key: 'a', sessionId: 'captain-a', teamId: 'missing' },
+      { key: 'b', sessionId: 'captain-b', teamId: 'missing' },
+    ], undefined, [stateResponse([c]), stateResponse([archivedC])], { publishSnapshots: undefined })
+    await unscoped.poll.firstTick
+    assert.deepEqual(getActivitySnapshotsSnapshot(), { teams: [c], archivedTeams: [archivedC] })
+    await activeA.advance()
+    assert.deepEqual(activeA.requests.map(({ tag }) => tag), [undefined, undefined, undefined, undefined])
+    assert.deepEqual(getActivitySnapshotsSnapshot(), { teams: [c, a], archivedTeams: [archivedC, archivedA] })
+  } finally {
+    activeA.poll.stop()
+    unscoped?.poll.stop()
+    updateActivitySnapshots(initial)
+  }
+})
+
+test('scoped live and archived rows retain only the eight most recently published sessions', () => {
+  const initial = getActivitySnapshotsSnapshot()
+  function publish(index) {
+    const owner = `captain-${index}`
+    const row = { captainSessionId: owner, teamId: `team-${index}` }
+    updateActivitySnapshots({ teams: [row], archivedTeams: [{ ...row, teamId: `history-${index}` }] }, owner)
+  }
+  try {
+    updateActivitySnapshots({ teams: [], archivedTeams: [] })
+    for (let index = 0; index < 8; index++) publish(index)
+    publish(0)
+    publish(8)
+    const shown = getActivitySnapshotsSnapshot()
+    for (const rows of [shown.teams, shown.archivedTeams]) {
+      assert.deepEqual(rows.map(({ captainSessionId }) => captainSessionId), [2, 3, 4, 5, 6, 7, 0, 8].map(index => `captain-${index}`))
+    }
+  } finally { updateActivitySnapshots(initial) }
 })

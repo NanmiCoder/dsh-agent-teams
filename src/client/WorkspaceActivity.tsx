@@ -6,7 +6,7 @@ import { ActivityPanel, TeamSection, historicCardTeam, type ActivityPanelProps }
 import { OPEN_PANEL_EVENT } from './AgentTeamsCard.tsx'
 import type { AgentTeamsCardData } from './agent-teams-card-definition.ts'
 import { currentSessionId } from './session-navigation.ts'
-import { getActivityMonitorTargetsSnapshot, getActivitySnapshotsSnapshot, startActivityPolling, subscribeActivityMonitorTargets, subscribeActivitySnapshots, updateActivitySnapshots } from './activity-monitor.ts'
+import { getActivityMonitorTargetsSnapshot, getActivitySnapshotsSnapshot, getPublishedActivityRows, startActivityPolling, subscribeActivityMonitorTargets, subscribeActivitySnapshots, updateActivitySnapshots } from './activity-monitor.ts'
 import { createTeamDiscovery, type WorkspaceActivityState } from './workspace-state.ts'
 import { LEAD_ART } from './artwork.ts'
 import css from './WorkspaceActivity.module.css'
@@ -47,12 +47,12 @@ function WorkspaceMonitor({ sessionsList, sidebar, state }: ActivityPanelProps &
     state.status(current, 'loading')
     const controller = startActivityPolling(currentTargets, {
       discoverySessionId: current,
-      getPublishedSnapshots: getActivitySnapshotsSnapshot,
+      getPublishedRows: getPublishedActivityRows,
       onStatus(status) {
         state.status(current, status)
       },
-      publishSnapshots(update) {
-        updateActivitySnapshots(update)
+      publishSnapshots(update, scope) {
+        updateActivitySnapshots(update, scope)
         if (update.teams === undefined) return
         const added = discover(update.teams.filter(team => team.captainSessionId === current))
         // Do not replace a file/terminal, or navigate a session whose surface is not bound.

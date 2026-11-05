@@ -3,7 +3,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import fsp, { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { syncBuiltinESMExports } from 'node:module'
@@ -14,6 +14,7 @@ import { collectTeamsActivity } from '../lib/snapshot.js'
 import { writeTeam } from '../lib/state.js'
 import { canDeclareDelivery } from '../lib/quality-gates.js'
 import { auditTeamWorkspace } from '../lib/workspace-audit.js'
+import { workspaceAuditor } from '../lib/workspace-audit-service.js'
 
 async function fixture() {
   const workspace = await mkdtemp(join(tmpdir(), 'agentteams-336-'))
@@ -91,6 +92,50 @@ test('#336 the next poll detects same-size rewrites with a restored mtime and no
   } finally { await f.dispose() }
 })
 
+test('#336 a poll after an artifact edit cannot join a result awaiting team revalidation', { timeout: 5000 }, async () => {
+  const f = await fixture()
+  const stateFile = join(f.stateRoot, f.team.id, 'team.json')
+  const originalRead = fsp.readFile
+  const revalidating = Promise.withResolvers()
+  const resumeRevalidation = Promise.withResolvers()
+  const submittedSecond = Promise.withResolvers()
+  let reads = 0
+  let submissions = 0
+  const service = workspaceAuditor(f.ctx)
+  const audit = service.audit.bind(service)
+  service.audit = (...args) => {
+    const result = audit(...args)
+    if (++submissions === 2) submittedSecond.resolve()
+    return result
+  }
+  fsp.readFile = async function(path, ...args) {
+    if (path === stateFile && ++reads === 2) {
+      revalidating.resolve()
+      await resumeRevalidation.promise
+    }
+    return originalRead.call(this, path, ...args)
+  }
+  syncBuiltinESMExports()
+  try {
+    const first = collectTeamsActivity(f.ctx, f.roots, 'captain', true)
+    await revalidating.promise
+    await writeFile(f.file, Buffer.alloc(128 * 1024, 66))
+    const second = collectTeamsActivity(f.ctx, f.roots, 'captain', true)
+    await submittedSecond.promise
+    resumeRevalidation.resolve()
+    const [[before], [after]] = await Promise.all([first, second])
+    assert.equal(before.delivery.ok, true)
+    assert.equal(after.delivery.ok, false)
+    assert.equal(after.deliverable, false)
+    assert.match(after.tasks.find(task => task.id === 't2').verdictStale, /changed/)
+  } finally {
+    resumeRevalidation.resolve()
+    fsp.readFile = originalRead
+    syncBuiltinESMExports()
+    await f.dispose()
+  }
+})
+
 test('#336 a mutation between read chunks yields incomplete evidence, not a mixed digest', async () => {
   const f = await fixture()
   const original = { openSync: fs.openSync, readSync: fs.readSync, closeSync: fs.closeSync }
@@ -115,18 +160,36 @@ test('#336 a mutation between read chunks yields incomplete evidence, not a mixe
   } finally { Object.assign(fs, original); syncBuiltinESMExports(); await f.dispose() }
 })
 
-test('#336 a file appearing after scope enumeration is an audit gap', async () => {
-  const f = await fixture()
-  const original = fs.readSync
-  let changed = false
-  fs.readSync = function(fd, ...args) { const read = original.call(this, fd, ...args); if (!changed && read > 0) { changed = true; fs.writeFileSync(join(f.workspace, 'outputs', 'late.bin'), 'unreviewed') } return read }
-  syncBuiltinESMExports()
-  try {
-    const read = readArtifactScope(f.workspace, ['outputs/'])
-    assert(changed)
-    assert(read.gaps.some(gap => gap.reason.includes('directory membership')))
-  } finally { fs.readSync = original; syncBuiltinESMExports(); await f.dispose() }
-})
+for (const [name, directory, audited] of [
+  ['late.bin', false, true],
+  ['new-results', true, true],
+  ['node_modules', true, false],
+  ['.env', false, false],
+]) {
+  test(`#336 scope membership uses audit exclusions when ${name} appears`, async () => {
+    const f = await fixture()
+    const outputs = join(f.workspace, 'outputs')
+    const original = fs.readdirSync
+    let changed = false
+    fs.readdirSync = function(path, ...args) {
+      const entries = original.call(this, path, ...args)
+      if (!changed && path === outputs) {
+        changed = true
+        const added = join(outputs, name)
+        if (directory) fs.mkdirSync(added)
+        else fs.writeFileSync(added, 'new file')
+      }
+      return entries
+    }
+    syncBuiltinESMExports()
+    try {
+      const audit = auditTeamWorkspace(f.workspace, f.team)
+      assert(changed)
+      assert.equal(audit.gaps?.some(gap => gap.reason.includes('directory membership')) ?? false, audited)
+      assert.equal(canDeclareDelivery(f.team, audit).ok, !audited)
+    } finally { fs.readdirSync = original; syncBuiltinESMExports(); await f.dispose() }
+  })
+}
 
 async function waitForFile(path) {
   const deadline = Date.now() + 5000
@@ -143,19 +206,22 @@ function controlledWorker(f, mode = 'barrier') {
   return { url: new URL('data:text/javascript,' + encodeURIComponent(`import ${JSON.stringify(url.href)}`)), started, release }
 }
 
-test('#336 identical in-flight audits coalesce; a new poll after completion hashes the new bytes', async () => {
+test('#336 identical queued audits share a fresh read after a dispatched job', async () => {
   const f = await fixture()
   const { WorkspaceAuditService } = await import('../lib/workspace-audit-service.js')
   const control = controlledWorker(f)
   const service = new WorkspaceAuditService({ workerUrl: control.url })
   try {
     const first = service.audit(f.workspace, f.team, f.stateRoot)
-    assert.equal(service.audit(f.workspace, f.team, f.stateRoot), first)
-    await waitForFile(control.started); await writeFile(control.release, '')
-    assert.equal(canDeclareDelivery(f.team, await first).ok, true)
-    assert.equal(fs.readFileSync(control.started, 'utf8').trim().split('\n').length, 1)
+    await waitForFile(control.started)
     await writeFile(f.file, Buffer.alloc(128 * 1024, 66))
-    assert.equal(canDeclareDelivery(f.team, await service.audit(f.workspace, f.team, f.stateRoot)).ok, false)
+    const queued = service.audit(f.workspace, f.team, f.stateRoot)
+    const joined = service.audit(f.workspace, f.team, f.stateRoot)
+    assert.notEqual(queued, first)
+    assert.equal(joined, queued)
+    await writeFile(control.release, '')
+    assert.equal(canDeclareDelivery(f.team, await first).ok, true)
+    assert.equal(canDeclareDelivery(f.team, await queued).ok, false)
     assert.equal(fs.readFileSync(control.started, 'utf8').trim().split('\n').length, 2)
   } finally { await service.dispose(); await f.dispose() }
 })
@@ -182,7 +248,9 @@ test('#336 queue capacity and disposal explicitly block delivery instead of retu
   const service = new WorkspaceAuditService({ workerUrl: controlledWorker(f).url, maxPending: 1 })
   try {
     const active = service.audit(f.workspace, f.team, f.stateRoot)
-    const overflow = await service.audit(f.workspace, { ...f.team, description: 'different generation' }, f.stateRoot)
+    const second = service.audit(f.workspace, f.team, f.stateRoot)
+    assert.notEqual(second, active)
+    const overflow = await second
     assert.equal(canDeclareDelivery(f.team, overflow).ok, false)
     assert(overflow.gaps.some(gap => gap.reason.includes('queue is full')))
     await service.dispose()

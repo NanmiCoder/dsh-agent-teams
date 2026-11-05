@@ -42,16 +42,16 @@ function isAudit(value: unknown): value is DeliveryAudit {
 }
 
 /**
- * One lazy, reusable worker per plugin owner. Only in-flight requests for the
- * exact same workspace/team record are shared; completed digests are never
- * cached by timestamps. Every later poll reads the current bytes again.
+ * One lazy, reusable worker per plugin owner. Identical requests may share a
+ * queued audit until it is dispatched. Every later request needs a read that
+ * starts after it arrives.
  */
 export class WorkspaceAuditService {
   private worker: Worker | undefined
   private active: AuditJob | undefined
   private timer: ReturnType<typeof setTimeout> | undefined
   private idleTimer: ReturnType<typeof setTimeout> | undefined
-  private readonly jobs = new Map<string, AuditJob>()
+  private readonly jobs = new Set<AuditJob>()
   private readonly queue: AuditJob[] = []
   private sequence = 0
   private closed = false
@@ -65,7 +65,7 @@ export class WorkspaceAuditService {
     }
     const source = JSON.stringify(team)
     const key = `${resolve(workspace)}\0${resolve(stateRoot)}\0${team.id}\0${createHash('sha256').update(source).digest('hex')}`
-    const existing = this.jobs.get(key)
+    const existing = this.queue.find(job => job.key === key)
     if (existing !== undefined) return existing.promise
     if (this.jobs.size >= (this.options.maxPending ?? 16)) {
       return Promise.resolve(incomplete('workspace audit queue is full; retry instead of treating unaudited bytes as verified'))
@@ -73,7 +73,7 @@ export class WorkspaceAuditService {
     let complete!: AuditJob['complete']
     const promise = new Promise<DeliveryAudit>(done => { complete = done })
     const job: AuditJob = { id: ++this.sequence, key, workspace, stateRoot, source, team: JSON.parse(source) as TeamState, promise, complete }
-    this.jobs.set(key, job)
+    this.jobs.add(job)
     this.queue.push(job)
     this.pump()
     return promise
@@ -139,8 +139,7 @@ export class WorkspaceAuditService {
     } catch (error) {
       audit = { ...audit, gaps: [...audit.gaps ?? [], { pattern: '(team revision)', reason: `team state could not be revalidated after the workspace audit: ${String(error)}` }] }
     }
-    if (this.jobs.get(job.key) !== job) return
-    this.jobs.delete(job.key)
+    if (!this.jobs.delete(job)) return
     job.complete(this.closed ? incomplete('workspace audit service was disposed before its result could be applied') : audit)
   }
 
@@ -153,7 +152,7 @@ export class WorkspaceAuditService {
     this.timer = undefined
     this.idleTimer = undefined
     this.queue.length = 0
-    for (const job of this.jobs.values()) job.complete(incomplete(reason))
+    for (const job of this.jobs) job.complete(incomplete(reason))
     this.jobs.clear()
     return worker?.terminate()
   }

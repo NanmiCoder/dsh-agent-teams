@@ -9,9 +9,9 @@ export interface WorkspaceAuditOptions {
     maxPending?: number;
 }
 /**
- * One lazy, reusable worker per plugin owner. Only in-flight requests for the
- * exact same workspace/team record are shared; completed digests are never
- * cached by timestamps. Every later poll reads the current bytes again.
+ * One lazy, reusable worker per plugin owner. Identical requests may share a
+ * queued audit until it is dispatched. Every later request needs a read that
+ * starts after it arrives.
  */
 export declare class WorkspaceAuditService {
     private readonly options;

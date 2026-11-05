@@ -214,6 +214,7 @@ interface FailedMemberAttempt {
   readonly captainSessionId: string
   readonly memberId: string
   readonly task?: Pick<TeamTask, 'id' | 'attempt' | 'attemptId'>
+  readonly openAttemptOnly?: boolean
 }
 
 /** How a final member turn failure relates to the durable record. */
@@ -257,6 +258,7 @@ export function classifyMemberFailure(
   if (member === undefined || member.id !== observed.memberId) return 'ignored'
   const task = current.task
   if (task === undefined) {
+    if (observed.openAttemptOnly === true) return 'ignored'
     // No open attempt is owned by this generation any more, so nothing here may
     // be mutated — but the failure itself must still be recorded. `working` is
     // NOT evidence of newer work: `syncMemberStatus` writes it as soon as the
@@ -366,6 +368,9 @@ export async function failMemberOpenAttempt(
       : undefined
     const message = {
       ...createMessage(memberName, CAPTAIN_KEY, memberFailureMessage(memberName, summary, disposition, task, settledRecord)),
+      ...observed.openAttemptOnly === true && task?.attemptId !== undefined
+        ? { sourceTaskId: task.id, sourceAttemptId: task.attemptId, sourceTaskStatus: 'failed' as const }
+        : {},
       deliveryClaimedAt: Date.now(),
     }
     if (disposition === 'failed_attempt') await writeTeam(stateRoot, team)
@@ -695,31 +700,30 @@ export function installMemberSelectionRuntime(
       }
     }
 
-    let lastFailedTurn: number | undefined
-    // Harness emits agent/error only after request recovery is exhausted. In
-    // particular, llm-retry's "always" policy calls downstream request-error
-    // listeners before it retries; that waterfall cannot declare a turn dead.
-    const disposeFailure = childCtx.on('agent/error', async (payload) => {
-      if (payload.agent.id !== child.id || payload.turn === lastFailedTurn) return
-      lastFailedTurn = payload.turn
+    const observeFailedAttempt = (): FailedMemberAttempt | undefined => {
       try {
-        // Capture the attempt synchronously at the event, before any lock wait
-        // can let a captain reassign it or replace the member/team generation.
+        // Capture the capability synchronously, before a handoff or lock wait
+        // can move the member to another task attempt.
         const snapshot = readTeamSync(stateRoot, teamId)
         if (snapshot?.captainSessionId !== parentSessionId) return
         const member = snapshot.members.find(item => item.id === child.id && item.name === memberName && item.status !== 'removed')
         if (member === undefined) return
         const task = snapshot.tasks.find(item => item.assignee === memberName
           && (item.status === 'claimed' || item.status === 'in_progress'))
-        const failure = payload.error instanceof LlmError ? payload.error.failure : {
-          code: 'UNKNOWN',
-          message: payload.error instanceof Error ? payload.error.message : String(payload.error),
-        }
-        const recorded = await failMemberOpenAttempt(ctx, stateRoot, teamId, memberName, failure, child.session, {
-          captainSessionId: parentSessionId, memberId: child.id, task,
-        })
+        return { captainSessionId: parentSessionId, memberId: child.id, task }
+      } catch (error: unknown) {
+        ctx.logger.warn(`agent-teams: failed to observe member turn failure: ${String(error)}`)
+      }
+    }
+
+    let lastFailedTurn: number | undefined
+    const recordFailure = async (turn: number, failure: { code: string; message: string }, observed: FailedMemberAttempt): Promise<void> => {
+      if (turn === lastFailedTurn) return
+      lastFailedTurn = turn
+      try {
+        const recorded = await failMemberOpenAttempt(ctx, stateRoot, teamId, memberName, failure, child.session, observed)
         if (!recorded) return
-        // The final-error event precedes driver quiescence. Observe the real
+        // The failure event precedes driver quiescence. Observe the real
         // lifecycle and kick explicitly even if its idle event was missed.
         // Never force an active Agent's status to idle or retry the failed task.
         await child.whenIdle()
@@ -736,9 +740,46 @@ export function installMemberSelectionRuntime(
       } catch (error: unknown) {
         ctx.logger.warn(`agent-teams: failed to record member turn failure: ${String(error)}`)
       }
+    }
+
+    // Harness emits agent/error only after request recovery is exhausted. In
+    // particular, llm-retry's "always" policy calls downstream request-error
+    // listeners before it retries; that waterfall cannot declare a turn dead.
+    const disposeFailure = childCtx.on('agent/error', (payload) => {
+      if (payload.agent.id !== child.id || payload.turn === lastFailedTurn) return
+      const observed = observeFailedAttempt()
+      if (observed === undefined) return
+      const failure = payload.error instanceof LlmError ? payload.error.failure : {
+        code: 'UNKNOWN',
+        message: payload.error instanceof Error ? payload.error.message : String(payload.error),
+      }
+      return recordFailure(payload.turn, failure, observed)
     })
+
+    let cappedAttempt: { turn: number; observed: FailedMemberAttempt } | undefined
+    const disposeOutputLimit = childCtx.on('session/event', (session, event) => {
+      if (session !== child.session) return
+      // The host's turn reason stays max-tokens even if fresh steering runs
+      // another step. Only the last executed step can leave an attempt stuck.
+      if (event.type === 'step/start') cappedAttempt = undefined
+      if (event.type === 'assistant/message' && event.data.stream?.some(record =>
+        record.type === 'chunk' && record.chunk.type === 'finish' && record.chunk.reason.kind === 'max-tokens')) {
+        const observed = observeFailedAttempt()
+        if (observed?.task !== undefined) cappedAttempt = { turn: event.data.turn, observed }
+      }
+      if (event.type !== 'turn/end') return
+      const capped = cappedAttempt
+      cappedAttempt = undefined
+      if (capped?.turn !== event.data.turn || event.data.reason?.kind !== 'max-tokens') return
+      return recordFailure(capped.turn, {
+        code: 'MAX_TOKENS',
+        message: 'Model output-token limit reached before the member closed this task',
+      }, { ...capped.observed, openAttemptOnly: true })
+    })
+
+    const cleanupFailure = (): void => { disposeOutputLimit(); disposeFailure(); cleanupAdmission() }
     // Legacy teams still need failure reporting even without a saved route.
-    if (selection === undefined) return () => { disposeFailure(); cleanupAdmission() }
+    if (selection === undefined) return cleanupFailure
     const selectionRef = { current: modelSelection(selection), assembled: undefined as ModelSelection | undefined }
     const disposeSelection = installModelSelection(childCtx, selectionRef)
     const fallback = selection.fallback
@@ -766,8 +807,7 @@ export function installMemberSelectionRuntime(
     return () => {
       disposeFallback()
       disposeSelection()
-      disposeFailure()
-      cleanupAdmission()
+      cleanupFailure()
     }
   })
 

@@ -127,6 +127,8 @@ export interface ActivityPollingRuntime {
     readonly schedule?: (callback: () => void, intervalMs: number) => unknown;
     readonly cancel?: (timer: unknown) => void;
     readonly publishSnapshots?: (update: Partial<ActivitySnapshots>) => void;
+    /** Read back the shared store when supplying a custom publisher for it. */
+    readonly getPublishedSnapshots?: () => ActivitySnapshots;
     readonly settleTargets?: (keys: ReadonlySet<string>) => void;
 }
 /** Handle returned by one current-session polling loop. */

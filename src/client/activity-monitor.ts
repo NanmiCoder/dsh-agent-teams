@@ -200,6 +200,11 @@ interface ActivityFetchResponse {
   json(): Promise<unknown>
 }
 
+interface PublishedActivitySnapshot {
+  readonly teams: readonly ActivityTeam[]
+  readonly tag: string | undefined
+}
+
 async function readActivityTeams(response: ActivityFetchResponse): Promise<readonly ActivityTeam[]> {
   if (!response.ok) throw new Error('Activity unavailable')
   const body = (await response.json()) as { teams?: unknown } | null
@@ -231,6 +236,8 @@ export interface ActivityPollingRuntime {
   readonly schedule?: (callback: () => void, intervalMs: number) => unknown
   readonly cancel?: (timer: unknown) => void
   readonly publishSnapshots?: (update: Partial<ActivitySnapshots>) => void
+  /** Read back the shared store when supplying a custom publisher for it. */
+  readonly getPublishedSnapshots?: () => ActivitySnapshots
   readonly settleTargets?: (keys: ReadonlySet<string>) => void
 }
 
@@ -270,6 +277,8 @@ export function startActivityPolling(
   const schedule = runtime.schedule ?? ((callback, intervalMs) => setInterval(callback, intervalMs))
   const cancel = runtime.cancel ?? ((timer) => { clearInterval(timer as ReturnType<typeof setInterval>) })
   const publishSnapshots = runtime.publishSnapshots ?? updateActivitySnapshots
+  const getPublishedSnapshots = runtime.getPublishedSnapshots
+    ?? (runtime.publishSnapshots === undefined ? getActivitySnapshotsSnapshot : undefined)
   const settleTargets = runtime.settleTargets ?? settleActivityMonitorTargets
   const owners = new Set(monitorTargets.map(target => target.sessionId))
   if (discoverySessionId) owners.add(discoverySessionId)
@@ -279,6 +288,10 @@ export function startActivityPolling(
   const archiveUrl = `${ACTIVITY_STATE_URL}?archived=1${sessionQuery === '' ? '' : `&${sessionQuery}`}`
   const conditionalHeaders = (tag: string | undefined) =>
     tag === undefined ? {} : { headers: { 'if-none-match': tag } }
+  // A manual retry can publish to the same store. A 304 only validates the
+  // body this controller applied, so send its tag while that body is shown.
+  const stillPublished = (field: keyof ActivitySnapshots, snapshot: PublishedActivitySnapshot | undefined) =>
+    getPublishedSnapshots === undefined || getPublishedSnapshots()[field] === snapshot?.teams
   let cancelled = false
   let inFlight = false
   // Explicit card targets are demanded work: start at the live cadence. A
@@ -289,8 +302,8 @@ export function startActivityPolling(
   // request is a 304 and does not publish or recompute the live snapshot.
   let archiveRefreshPending = Boolean(discoverySessionId)
   let missingTargets: ReadonlySet<string> = new Set()
-  let liveTag: string | undefined
-  let archiveTag: string | undefined
+  let publishedLive: PublishedActivitySnapshot | undefined
+  let publishedArchive: PublishedActivitySnapshot | undefined
   let controller: AbortController | undefined
   let timer: unknown
   const intervalMs = (): number => (hot ? ACTIVITY_POLL_MS : ACTIVITY_PROBE_MS)
@@ -303,6 +316,7 @@ export function startActivityPolling(
     inFlight = true
     controller = new AbortController()
     try {
+      const liveTag = stillPublished('teams', publishedLive) ? publishedLive?.tag : undefined
       const liveResponse = await fetchState(liveUrl, {
         cache: 'no-store',
         signal: controller.signal,
@@ -314,7 +328,7 @@ export function startActivityPolling(
         if (cancelled) return
         publishSnapshots({ teams: liveTeams })
         if (cancelled) return
-        liveTag = liveResponse.headers?.get('etag') ?? undefined
+        publishedLive = { teams: liveTeams, tag: liveResponse.headers?.get('etag') ?? undefined }
 
         const previousDiscoveredKeys = discoveredLiveKeys
         discoveredLiveKeys = new Set(discoverySessionId
@@ -329,15 +343,20 @@ export function startActivityPolling(
           hot = true
           reschedule()
         }
+      } else if (!stillPublished('teams', publishedLive)) {
+        // A concurrent write landed while the conditional request was in flight.
+        return
       }
       runtime.onStatus?.('ready')
-      if (cancelled || (missingTargets.size === 0 && !archiveRefreshPending)) return
+      const archiveReplaced = publishedArchive !== undefined && !stillPublished('archivedTeams', publishedArchive)
+      if (cancelled || (missingTargets.size === 0 && !archiveRefreshPending && !archiveReplaced)) return
 
       // Archives are immutable per team generation. A successful fallback
       // retires every missing explicit target, including legacy cards whose
       // host archive no longer exists; a discovery session that already
       // upgraded keeps polling, and a still-probing one keeps probing, so a
       // team created later in the same session stays discoverable.
+      const archiveTag = archiveReplaced ? undefined : publishedArchive?.tag
       const archivedResponse = await fetchState(archiveUrl, {
         cache: 'no-store',
         signal: controller.signal,
@@ -349,7 +368,9 @@ export function startActivityPolling(
         if (cancelled) return
         publishSnapshots({ archivedTeams })
         if (cancelled) return
-        archiveTag = archivedResponse.headers?.get('etag') ?? undefined
+        publishedArchive = { teams: archivedTeams, tag: archivedResponse.headers?.get('etag') ?? undefined }
+      } else if (!stillPublished('archivedTeams', publishedArchive)) {
+        return
       }
       archiveRefreshPending = false
       const settled = missingTargets

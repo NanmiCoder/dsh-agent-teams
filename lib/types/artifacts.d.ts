@@ -38,10 +38,13 @@ export interface ArtifactScopeRead {
     gaps: ArtifactScopeGap[];
 }
 /**
- * Read a declared scope: expand directory patterns to their current files,
- * keep explicitly named paths even when they do not exist (a later creation is
- * drift too), and report every part that could not be fully resolved.
+ * Read related scopes in one audit. Each scope retains its own expansion cap
+ * and gaps, but overlapping paths hash only once. A final revalidation rejects
+ * changed file identities and changed directory membership instead of handing
+ * out a mixture of revisions as complete evidence.
  */
+export declare function readArtifactScopes(workspace: string, scopes: readonly (readonly string[])[]): ArtifactScopeRead[];
+/** Read one scope without retaining byte identities for the next request. */
 export declare function readArtifactScope(workspace: string, patterns: readonly string[]): ArtifactScopeRead;
 /**
  * Read the current bytes of workspace-relative paths (directories expand).

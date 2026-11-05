@@ -67,7 +67,7 @@ import {
   verdictScopePatterns,
 } from './quality-gates.ts'
 import type { DeliveryAudit } from './quality-gates.ts'
-import { auditTeamWorkspace } from './workspace-audit.ts'
+import { workspaceAuditor } from './workspace-audit-service.ts'
 import { readArtifactScope, snapshotWorkspacePaths, workspacePathExists } from './artifacts.ts'
 import { agentTeamsSource, observedSessionFormatVersion, restrictableToolNames } from './harness-compat.ts'
 import { memberSpawnRelaxableDeny, optionalToolPolicy, requireToolPolicy, resolveMemberToolFilter, type MemberToolFilter, type MemberToolPolicy } from './tool-policies.ts'
@@ -662,6 +662,9 @@ export function stagedPlanFeedbackContext(teamName: string): string {
  * @param config - resolved tool config.
  */
 export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): AgentTeamsRuntime {
+  // Own the lazy worker before any asynchronous tool/route callback can race
+  // with unload. Late callbacks retain a closed service and fail safely.
+  const auditor = workspaceAuditor(ctx)
   installRetiredMemberGuard(ctx, config.stateDir)
   installMemberDelegationGuard(ctx, config.stateDir, config.memberMaxDepth ?? 0)
   installMailboxAdmission(ctx, config.stateDir)
@@ -2328,7 +2331,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         () => requireFreshParticipant(ctx, stateRoot, located.id, caller.id),
       )
       const activity = memberActivity(ctx, team.members.map((member) => member.id))
-      const audit = auditTeamWorkspace(workspace, team)
+      const audit = await auditor.audit(workspace, team, stateRoot)
       const members = team.members
         .filter((member) => member.status !== 'removed')
         .map((member) => ({

@@ -13,7 +13,7 @@ import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { memberActivity } from './members.ts'
 import { canDeclareDelivery, describeQualityLoop, verdictAuditNotes } from './quality-gates.ts'
-import { auditTeamWorkspace } from './workspace-audit.ts'
+import { workspaceAuditor } from './workspace-audit-service.ts'
 import {
   CAPTAIN_KEY, listArchivedTeamIds, readArchivedTeam, readUnreadMailbox, readTeam,
   taskDepthsById, taskVisualState,
@@ -184,7 +184,7 @@ export async function assembleTeamSnapshot(
   const captainInbox = await readUnreadMailbox(stateRoot, state.id, CAPTAIN_KEY)
   // The panel must reach the same delivery conclusion as the status tool, so
   // it reads the same current bytes instead of trusting task records alone.
-  const audit = options.workspacePath === undefined ? undefined : auditTeamWorkspace(options.workspacePath, state)
+  const audit = options.workspacePath === undefined ? undefined : await workspaceAuditor(ctx).audit(options.workspacePath, state, stateRoot)
   const deliveryCheck = audit === undefined ? canDeclareDelivery(state) : canDeclareDelivery(state, audit)
   const loop = audit === undefined ? describeQualityLoop(state) : describeQualityLoop(state, audit)
   const staleById = new Map<string, string[]>()

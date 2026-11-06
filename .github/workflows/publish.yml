@@ -10,6 +10,12 @@ on:
         description: Package version to publish
         required: true
         type: string
+      verified_run_id:
+        description: Successful main-branch Verify run that produced the installed candidate
+        type: string
+      candidate_sha256:
+        description: SHA-256 of the installed candidate.tgz from that run
+        type: string
 
 permissions:
   contents: read
@@ -22,14 +28,19 @@ concurrency:
 
 jobs:
   verify:
-    if: github.repository == 'NanmiCoder/dsh-agent-teams'
+    if: github.repository == 'NanmiCoder/dsh-agent-teams' && inputs.verified_run_id == '' && inputs.candidate_sha256 == ''
     uses: ./.github/workflows/verify.yml
 
   publish:
-    if: github.repository == 'NanmiCoder/dsh-agent-teams'
+    if: >-
+      ${{ !cancelled() && github.repository == 'NanmiCoder/dsh-agent-teams' &&
+        (needs.verify.result == 'success' ||
+          (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' &&
+           inputs.verified_run_id != '' && inputs.candidate_sha256 != '')) }}
     needs: verify
     runs-on: ubuntu-latest
     permissions:
+      actions: read
       contents: read
       id-token: write
     outputs:
@@ -55,16 +66,38 @@ jobs:
       - name: Set up package managers
         run: npm install --global npm@11.19.0 pnpm@10.33.0
 
+      - name: Require a complete Verify run for this main commit
+        if: inputs.verified_run_id != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERIFIED_RUN_ID: ${{ inputs.verified_run_id }}
+          CANDIDATE_SHA256: ${{ inputs.candidate_sha256 }}
+        shell: bash
+        run: |
+          [[ "$VERIFIED_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          [[ "$CANDIDATE_SHA256" =~ ^[a-f0-9]{64}$ ]]
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$VERIFIED_RUN_ID" | jq -e \
+            --arg sha "$GITHUB_SHA" --arg repo "$GITHUB_REPOSITORY" '
+              .head_sha == $sha and .head_repository.full_name == $repo and
+              .head_branch == "main" and .event == "push" and .path == ".github/workflows/verify.yml" and
+              .status == "completed" and .conclusion == "success"
+            '
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$VERIFIED_RUN_ID/jobs?per_page=100" | jq -e \
+            'any(.jobs[]; .name == "Complete compatibility gate" and .conclusion == "success")'
+
       - name: Download the exact candidate that passed the full matrix
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0; reviewed download source
         with:
-          name: ${{ needs.verify.outputs.artifact_name }}
+          name: ${{ needs.verify.outputs.artifact_name || 'agent-teams-candidate' }}
+          run-id: ${{ inputs.verified_run_id || github.run_id }}
+          github-token: ${{ inputs.verified_run_id != '' && github.token || '' }}
           path: ${{ runner.temp }}/candidate
 
       - name: Verify candidate identity and complete host coverage
         env:
-          EXPECTED_SHA256: ${{ needs.verify.outputs.artifact_sha256 }}
+          EXPECTED_SHA256: ${{ inputs.candidate_sha256 || needs.verify.outputs.artifact_sha256 }}
           VERIFIED_HOSTS: ${{ needs.verify.outputs.hosts }}
+          VERIFIED_RUN_ID: ${{ inputs.verified_run_id }}
           NPM_DIST_TAG: ${{ steps.version.outputs.dist_tag }}
         run: |
           node --input-type=module <<'JS'
@@ -75,7 +108,8 @@ jobs:
           import { policy, validatePackageCompatibility } from './scripts/compatibility.mjs'
           const pkg = JSON.parse(readFileSync('package.json', 'utf8'))
           const hosts = validatePackageCompatibility(pkg)
-          assert.deepEqual(hosts, JSON.parse(process.env.VERIFIED_HOSTS))
+          // A prior main run must have passed its report/digest gate above.
+          if (!process.env.VERIFIED_RUN_ID) assert.deepEqual(hosts, JSON.parse(process.env.VERIFIED_HOSTS))
           const artifact = readFileSync(join(process.env.RUNNER_TEMP, 'candidate/candidate.tgz'))
           assert.equal(createHash('sha256').update(artifact).digest('hex'), process.env.EXPECTED_SHA256)
           if (process.env.NPM_DIST_TAG === 'latest') {
@@ -91,13 +125,17 @@ jobs:
         env:
           RELEASE_VERSION: ${{ inputs.version }}
           PACKAGE_VERSION: ${{ steps.version.outputs.value }}
+          VERIFIED_RUN_ID: ${{ inputs.verified_run_id }}
         shell: bash
         run: |
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             test "${GITHUB_REF_NAME}" = "v${PACKAGE_VERSION}"
-            test -f "release-notes/v${PACKAGE_VERSION}.md"
           else
             test "${RELEASE_VERSION}" = "${PACKAGE_VERSION}"
+          fi
+          if [[ "${GITHUB_REF_TYPE}" == "tag" || -n "$VERIFIED_RUN_ID" ]]; then
+            test -f "release-notes/v${PACKAGE_VERSION}.md"
+            node scripts/release-metadata.mjs --verify-tag-target
           fi
 
       - name: Prevent an older stable release from moving latest backwards
@@ -177,7 +215,7 @@ jobs:
           retention-days: 14
 
   release:
-    if: always() && github.event_name == 'push' && needs.publish.result == 'success'
+    if: always() && needs.publish.result == 'success' && (github.event_name == 'push' || inputs.verified_run_id != '')
     needs: [publish, consumer-resolution]
     permissions:
       contents: write
@@ -185,6 +223,9 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+
+      - name: Confirm the release tag targets this commit
+        run: node scripts/release-metadata.mjs --verify-tag-target
 
       - name: Include the observed desktop npm readiness in release notes
         env:
@@ -203,6 +244,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.publish.outputs.version }}
+          target_commitish: ${{ github.sha }}
           name: AgentTeams v${{ needs.publish.outputs.version }}
           body_path: release-notes/v${{ needs.publish.outputs.version }}.md
           draft: false

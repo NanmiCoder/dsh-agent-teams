@@ -101,6 +101,13 @@ class ProtocolAdapter extends LlmAdapter {
     }
 }
 
+async function enablePtc(agent) {
+    if (typeof agent.ctx.tools.presentAs === 'function') return agent.ctx.tools.presentAs('ptc');
+    const ptc = await import('@deepseek-ai/dsh-tool-executor-ptc');
+    const fork = agent.ctx.plugin({ name: ptc.name, inject: ptc.inject, Config: ptc.Config, apply: ptc.apply });
+    return () => fork.dispose();
+}
+
 export const name = 'runtime-lab-protocol-compatibility';
 export const inject = ['llm', 'agents', 'sessions', 'systemPrompt', 'compaction', 'toolResultPruner', 'tools'];
 export function apply(ctx) {
@@ -119,7 +126,7 @@ export function apply(ctx) {
             ctx.effect(() => () => handle.dispose());
             let agent = handle.agent; await agent.whenIdle();
             const scenario = { label, ptc, phase: 'plan', step: 0 }; cases.set(agent.id, scenario);
-            let restore = ptc ? agent.ctx.tools.presentAs('ptc') : agent.ctx.tools.restrict({ allow: businessNames });
+            let restore = ptc ? await enablePtc(agent) : agent.ctx.tools.restrict({ allow: businessNames });
             const beforeUsage = await usage(agent); assertProtocol(beforeUsage);
             if (!ptc) {
                 const exposed = (await ctx.systemPrompt.assemble({ agent, scope: agent })).tools.map(tool => tool.name);
@@ -145,7 +152,7 @@ export function apply(ctx) {
                 record({ event: 'protocol-pruned', label, result: pruned });
             } else {
                 const id = agent.id;
-                await ctx.sessions.flush(agent.session); restore(); await handle.dispose();
+                await ctx.sessions.flush(agent.session); await restore(); await handle.dispose();
                 handle = await ctx.agents.resume({ resumeSessionId: id, agentOptions: { provider: 'runtime-lab', model: 'fixture-model' } });
                 agent = handle.agent; await agent.whenIdle();
                 restore = agent.ctx.tools.restrict({ allow: businessNames });
@@ -172,7 +179,7 @@ export function apply(ctx) {
             assert.equal(new Set(captured.map(request => request.systemSha256)).size, 1, 'System prefix changed across planning, restore or compaction');
             assert.equal(new Set(captured.map(request => request.toolsSha256)).size, 1, 'Tools prefix changed across planning, restore or compaction');
             record({ event: 'protocol-case-passed', label, requests: captured.length, compactedHistory: true, persistedSubject: finalState.tasks[0].subject, archived: true, ...finalState.profile ? { profile: finalState.profile.name } : {} });
-            restore(); await ctx.sessions.flush(agent.session); await handle.dispose();
+            await restore(); await ctx.sessions.flush(agent.session); await handle.dispose();
         }
         process.stdout.write('PROTOCOL_COMPATIBILITY_OK\n');
         ctx.get('appExit')(0);

@@ -1,3 +1,4 @@
+import { executeTool } from './fixture-tools.mjs';
 /** Published CLI + Loader entry benchmark. Only the LLM is deterministic.
  * Tests transport and business behavior; it does not measure model intent accuracy.
  */
@@ -113,7 +114,7 @@ export function apply(ctx) {
         ];
         const optionalObservations = [];
         let callSeq = 0;
-        const execute = (agent, name, args) => ctx.tools.execute({ name: `agent_teams_${name}`, arguments: args,
+        const execute = (agent, name, args) => executeTool(ctx.tools, { name: `agent_teams_${name}`, arguments: args,
             callId: ToolCallId(`optional-member-${++callSeq}`), agent, signal: new AbortController().signal });
         for (const [label, plan] of [
             ['empty-arrays', { members: [], tasks: [] }],

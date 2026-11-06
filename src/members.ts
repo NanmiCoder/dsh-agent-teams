@@ -179,7 +179,11 @@ export async function validateMemberLlmSelections(
 }
 
 const MEMBER_LABEL_PREFIX = 'agent-teams:'
-const FALLBACK_FAILURE_CODES = new Set(['QUOTA', 'RATE_LIMIT', 'AUTH', 'MISSING_CREDENTIAL', 'NO_ADAPTER'])
+const FALLBACK_FAILURE_CODES = new Set([
+  'QUOTA', 'RATE_LIMIT', 'AUTH', 'MISSING_CREDENTIAL', 'NO_ADAPTER',
+  // The account-backed DeepSeek adapter remaps equivalent provider failures.
+  'ACCOUNT_QUOTA', 'ACCOUNT_TOKEN_INVALID', 'ACCOUNT_SIGN_IN_REQUIRED',
+])
 
 export function isFallbackFailureCode(code: string): boolean {
   return FALLBACK_FAILURE_CODES.has(code)
@@ -405,24 +409,38 @@ export async function failMemberOpenAttempt(
   return true
 }
 
-async function updateFallbackState(
+async function commitFallbackRoute(
   stateRoot: string,
   teamId: string,
   memberName: string,
+  child: Agent,
   fallback: { provider: string; model: string },
+  signal: AbortSignal,
   ctx: Context,
-): Promise<void> {
-  await withTeamLock(`team:${stateRoot}:${teamId}`, async () => {
+  activate: () => void,
+): Promise<boolean> {
+  return withTeamLock(`team:${stateRoot}:${teamId}`, async () => {
     const team = await readTeam(stateRoot, teamId)
-    if (team === undefined) return
-    const member = team.members.find(candidate => candidate.name === memberName)
-    if (member === undefined) return
+    if (signal.aborted || team === undefined || team.captainSessionId !== child.session.header.parentSession || team.halted === true) return false
+    const member = team.members.find(candidate => candidate.name === memberName && candidate.id === child.id)
+    if (member === undefined || member.status === 'removed' || member.stopping === true) return false
     member.activeProvider = fallback.provider
     member.activeModel = fallback.model
     member.fallbackActive = true
-    await writeTeam(stateRoot, team)
+    let committed = false
+    const onCommit = (): void => {
+      committed = true
+      activate()
+    }
+    try {
+      await writeTeam(stateRoot, team, { signal, onCommit })
+    } catch (error: unknown) {
+      if (committed) throw error
+      ctx.logger.warn(`agent-teams: failed to persist fallback route: ${String(error)}`)
+      if (!signal.aborted) onCommit()
+    }
+    return committed
   })
-  void ctx
 }
 
 function pendingSelectionKey(parentSessionId: string, label: string): string {
@@ -785,30 +803,59 @@ export function installMemberSelectionRuntime(
     // Legacy teams still need failure reporting even without a saved route.
     if (selection === undefined) return cleanupFailure
     const selectionRef = { current: modelSelection(selection), assembled: undefined as ModelSelection | undefined }
+    // Newer Harness owns the next-step selection in the Agent's durable model
+    // API. Its installModelSelection hook now only contributes switch notices.
+    const model = (child as Agent & { model?: { select(selection: Readonly<ModelSelection>): void } }).model
+    const nativeModel = typeof model?.select === 'function' ? model : undefined
+    nativeModel?.select(selectionRef.current)
     const disposeSelection = installModelSelection(childCtx, selectionRef)
     const fallback = selection.fallback
     let switched = false
+    const recoveryLifetime = new AbortController()
     const disposeFallback = childCtx.on('agent/request-error', async (payload, next) => {
-      if (payload.agent.id !== child.id || payload.signal.aborted) return next()
-      const transition = selectFallbackRoute(selectionRef.current ?? { provider: selection.provider, model: selection.model }, fallback, payload.failure.code, switched)
-      // selectFallbackRoute only retries when a fallback route exists; the
-      // explicit guard narrows that fact for the compiler.
-      if (fallback !== undefined && transition.retry) {
+      if (payload.agent.id !== child.id) return next()
+      const transition = selectFallbackRoute(selectionRef.current, fallback, payload.failure.code, switched)
+      if (fallback === undefined || !transition.retry) return next()
+      // The turn can survive plugin unload. Stop any queued recovery when
+      // this child setup is disposed while waiting for the team lock.
+      const signal = AbortSignal.any([payload.signal, recoveryLifetime.signal])
+      if (signal.aborted) return next()
+      const committed = await commitFallbackRoute(stateRoot, teamId, memberName, child, fallback, signal, ctx, () => {
         switched = transition.switched
         selectionRef.current = transition.selection
-        // Request recovery repeats buildRequest inside the current step; it
-        // does not re-run prompt assembly. Override that captured route too,
-        // otherwise the authorized retry would hit the failed primary again.
-        selectionRef.assembled = transition.selection
-        await updateFallbackState(stateRoot, teamId, memberName, fallback, ctx).catch((error: unknown) => {
-          ctx.logger.warn(`agent-teams: failed to persist fallback route: ${String(error)}`)
-        })
         ctx.logger.warn(`agent-teams: member ${child.id} switching to fallback ${fallback.provider}/${fallback.model} after ${payload.failure.code}`)
-        return { kind: 'retry' as const }
-      }
-      return next()
+        if (nativeModel === undefined) {
+          // Legacy recovery rebuilds the request without rerunning assembly.
+          selectionRef.assembled = transition.selection
+          return
+        }
+
+        // Modern recovery fixes the route for all retries of a prepared step.
+        // Close that step without failing its task, then wake the same member in
+        // a new turn. The assignment and any completed calls are already in its
+        // session history, so there is no task retry or replay of input.
+        nativeModel.select(transition.selection)
+        const continuation = createUserMessage({
+          content: [{ type: 'text', text: 'AgentTeams switched to the configured fallback model. Continue the current work from the conversation history and recorded task state.' }],
+          source: agentTeamsSource({ kind: 'agent-teams' }, observedSessionFormatVersion(child)),
+        })
+        if (signal.aborted) return
+        child.cancel({ kind: 'hook', reason: 'agent-teams/model-fallback' }, { keepInbox: true })
+        try {
+          child.followup(continuation)
+        } catch (error) {
+          // Cancellation suppresses the host's agent/error event, so a rejected
+          // continuation still needs to settle the observed attempt.
+          const observed = observeFailedAttempt()
+          if (observed !== undefined) void recordFailure(payload.turn, payload.failure, observed)
+          throw error
+        }
+      })
+      if (!committed) return next()
+      return nativeModel === undefined ? { kind: 'retry' as const } : undefined
     })
     return () => {
+      recoveryLifetime.abort()
       disposeFallback()
       disposeSelection()
       cleanupFailure()

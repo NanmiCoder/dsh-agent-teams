@@ -41,7 +41,10 @@ check('prompt is present in assignment', assignment.includes(prompt))
 check('prompt is present in persona', persona.includes(prompt))
 check('assignment does not require process disclosure', !assignment.includes('record the process') || assignment.includes(prompt))
 
-const allowed = ['QUOTA', 'RATE_LIMIT', 'AUTH', 'MISSING_CREDENTIAL', 'NO_ADAPTER']
+const allowed = [
+  'QUOTA', 'RATE_LIMIT', 'AUTH', 'MISSING_CREDENTIAL', 'NO_ADAPTER',
+  'ACCOUNT_QUOTA', 'ACCOUNT_TOKEN_INVALID', 'ACCOUNT_SIGN_IN_REQUIRED',
+]
 const denied = ['CONTEXT_WINDOW_EXCEEDED', 'INVALID_CREDENTIAL', 'INVALID_ARGS', 'TASK_FAILED']
 for (const code of allowed) check(`fallback whitelist includes ${code}`, isFallbackFailureCode(code))
 for (const code of denied) check(`fallback whitelist excludes ${code}`, !isFallbackFailureCode(code))

@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { policy, validatePackageCompatibility } from './compatibility.mjs'
@@ -17,9 +18,28 @@ export function releaseMetadata(pkg, support = policy, workspace) {
   return { value: pkg.version, dist_tag: distTag, prerelease: Boolean(match[4]) }
 }
 
+export function assertReleaseTagTarget(version, refs, commit) {
+  if (!/^[a-f0-9]{40}$/.test(commit)) throw new Error('Expected the full release commit SHA')
+  const tag = `refs/tags/v${version}`
+  const targets = new Map(refs.trim().split('\n').filter(Boolean).map(line => {
+    const [sha, ref] = line.split('\t')
+    return [ref, sha]
+  }))
+  const actual = targets.get(`${tag}^{}`) ?? targets.get(tag)
+  if (actual !== undefined && actual !== commit) {
+    throw new Error(`Release tag v${version} points to ${actual}, expected ${commit}`)
+  }
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
-  for (const [key, value] of Object.entries(releaseMetadata(pkg))) {
-    console.log(`${key}=${value}`)
+  const metadata = releaseMetadata(pkg)
+  if (process.argv[2] === '--verify-tag-target') {
+    const tag = `refs/tags/v${metadata.value}`
+    const commit = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
+    const refs = execFileSync('git', ['ls-remote', 'origin', tag, `${tag}^{}`], { encoding: 'utf8' })
+    assertReleaseTagTarget(metadata.value, refs, commit)
+  } else {
+    for (const [key, value] of Object.entries(metadata)) console.log(`${key}=${value}`)
   }
 }

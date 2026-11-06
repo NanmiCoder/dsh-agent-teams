@@ -58,6 +58,7 @@ import {
   taskKindOf,
 } from './state.ts'
 import { appendTaskEvidence } from './quality-gates.ts'
+import { archiveMemberSessions } from './member-sessions.ts'
 import {
   artifactDrift,
   bindReviewToRevision,
@@ -2512,7 +2513,12 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
   ctx.tools.register(defineTool({
     name: 'agent_teams_delete',
     description: 'End and archive your team: interrupts members and moves the current tasks and mailboxes out of active state for later inspection. Use when the work is done or explicitly abandoned. A same-name archive replaces its previous generation.',
-    parameters: {},
+    parameters: {
+      archive_member_sessions: {
+        type: 'boolean',
+        description: 'Also archive each member subagent session in the host session store, so a finished team stops adding rows to the session list. Reversible with the host unarchive action; transcripts are never deleted.',
+      },
+    },
     output: {
       schema: {
         type: 'object',
@@ -2520,14 +2526,17 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         properties: {
           deleted: { type: 'boolean', required: true },
           team_name: { type: 'string', required: true },
+          archived_member_sessions: { type: 'number' },
         },
       },
       render: (args, value) => [{
         type: 'text',
-        text: `Team "${value.team_name}" ended and archived.`,
+        text: value.archived_member_sessions === undefined
+          ? `Team "${value.team_name}" ended and archived.`
+          : `Team "${value.team_name}" ended and archived; ${value.archived_member_sessions} member session(s) archived.`,
       }],
     },
-    async execute(_args, exec) {
+    async execute(args, exec) {
       const captain = requireCaptain(exec)
       const workspace = workspaceOf(captain)
       const stateRoot = stateRootOf(workspace, config)
@@ -2559,7 +2568,18 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         // mailboxes stay on disk for later review and dependency rebuilds.
         await archiveTeamDir(stateRoot, fresh.id)
       })
-      return { deleted: true, team_name: team.name }
+      // The member sessions live in the host's store, not in the team state,
+      // so ending the team does not reach them. Opt-in: a host that composes
+      // no archive surface, or an operator that wants the transcripts to stay
+      // listable, keeps the previous behaviour (GitHub #333).
+      const archivedMemberSessions = args.archive_member_sessions === true
+        ? await archiveMemberSessions(ctx, members.map((member) => member.id))
+        : 0
+      return {
+        deleted: true,
+        team_name: team.name,
+        ...archivedMemberSessions === 0 ? {} : { archived_member_sessions: archivedMemberSessions },
+      }
     },
   }))
   // Live-member hydration validates saved filters against registered tools.

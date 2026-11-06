@@ -135,6 +135,7 @@ jobs:
           fi
           if [[ "${GITHUB_REF_TYPE}" == "tag" || -n "$VERIFIED_RUN_ID" ]]; then
             test -f "release-notes/v${PACKAGE_VERSION}.md"
+            node scripts/release-metadata.mjs --verify-tag-target
           fi
 
       - name: Prevent an older stable release from moving latest backwards
@@ -222,6 +223,9 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+
+      - name: Confirm the release tag targets this commit
+        run: node scripts/release-metadata.mjs --verify-tag-target
 
       - name: Include the observed desktop npm readiness in release notes
         env:

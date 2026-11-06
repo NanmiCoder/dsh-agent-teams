@@ -1,7 +1,8 @@
 /** Terminal member failures, composed with Harness's actual retry plugin. */
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { mkdtemp, rm } from 'node:fs/promises'
+import fsPromises, { mkdtemp, rm } from 'node:fs/promises'
+import { syncBuiltinESMExports } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -241,6 +242,49 @@ await test('disposed setup cannot resume fallback after the team lock is release
   assert.deepEqual(h.recovery, [{ selection: { provider: 'fake', model: 'primary' } }])
   assert.equal((await h.state()).members[0].fallbackActive, undefined)
 })
+
+for (const cancel of ['turn', 'setup']) {
+  await test(`canceling the ${cancel} during a staged fallback write preserves the saved route`, { timeout: 5000 }, async t => {
+    const fallback = { provider: 'backup', model: 'backup-model' }
+    const h = await fixture(t, { fallback, nativeRecovery: true })
+    const prior = await h.state()
+    Object.assign(prior.members[0], { activeProvider: 'fake', activeModel: 'primary', fallbackActive: false })
+    await writeTeam(h.stateRoot, prior)
+    const abort = new AbortController()
+    const staged = Promise.withResolvers()
+    const release = Promise.withResolvers()
+    const target = join(h.stateRoot, 'team', 'team.json')
+    const writeFile = fsPromises.writeFile
+    fsPromises.writeFile = async (file, ...args) => {
+      await writeFile(file, ...args)
+      if (typeof file === 'string' && file.startsWith(target + '.') && file.endsWith('.tmp')) {
+        staged.resolve()
+        await release.promise
+      }
+    }
+    syncBuiltinESMExports()
+    try {
+      const request = h.memberError(h.payload(undefined, 'AUTH', abort.signal))
+      await staged.promise
+      if (cancel === 'turn') abort.abort()
+      else h.dispose()
+      release.resolve()
+      assert.equal(await request, undefined)
+    } finally {
+      release.resolve()
+      fsPromises.writeFile = writeFile
+      syncBuiltinESMExports()
+    }
+    assert.deepEqual(await h.state(), prior)
+    assert.deepEqual(h.recovery, [{ selection: { provider: 'fake', model: 'primary' } }])
+    if (cancel === 'turn') {
+      // An interrupted write must leave the one-shot recovery available.
+      assert.equal(await h.memberError(h.payload(undefined, 'AUTH')), undefined)
+      assert.deepEqual(h.recovery[1], { selection: fallback })
+      assert.equal((await h.state()).members[0].fallbackActive, true)
+    }
+  })
+}
 
 await test('native continuation rejection settles the open task after hook cancellation', async t => {
   const h = await fixture(t, {

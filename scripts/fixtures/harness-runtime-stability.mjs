@@ -1,3 +1,4 @@
+import { executeTool } from './fixture-tools.mjs';
 /** Real Loader, Agent loops, tools and continuation forest; only the LLM is scripted. */
 import assert from 'node:assert/strict';
 import { appendFileSync, readFileSync, existsSync } from 'node:fs';
@@ -74,7 +75,7 @@ export function apply(ctx) {
     const workerId = state().members.find(m => m.name === 'worker').id;
     await until(() => gates.has(workerId), 'first actual assignment');
     const assertMemberDenied = async label => {
-      const result = await ctx.tools.execute({ name: 'agent_teams_create', arguments: { name: 'Forbidden nested team', description: 'Must be rejected', approval: 'required' },
+      const result = await executeTool(ctx.tools, { name: 'agent_teams_create', arguments: { name: 'Forbidden nested team', description: 'Must be rejected', approval: 'required' },
         callId: ToolCallId(`denied-${label}`), agent: ctx.agents.get(workerId), signal: new AbortController().signal });
       assert.equal(result.isError, true, 'captain-only tool must reject actual member execution');
       assert.match(JSON.stringify(result), /unknown tool|UNKNOWN_TOOL/, 'must fail at tool admission, not business validation');
@@ -87,7 +88,7 @@ export function apply(ctx) {
       assert.equal(ctx.tools.get('lab_forbidden', live), undefined);
       const prompt = await ctx.systemPrompt.assemble({ agent: live, scope: live });
       assert.equal(prompt.sections.filter(section => section.text.includes('HMR_ROLE_MARKER')).length, 1);
-      const result = await ctx.tools.execute({ name: 'lab_forbidden', arguments: {}, callId: ToolCallId('hmr-denied'), agent: live, signal: new AbortController().signal });
+      const result = await executeTool(ctx.tools, { name: 'lab_forbidden', arguments: {}, callId: ToolCallId('hmr-denied'), agent: live, signal: new AbortController().signal });
       assert.equal(result.isError, true);
       assert.match(JSON.stringify(result), /unknown tool|UNKNOWN_TOOL/);
     };

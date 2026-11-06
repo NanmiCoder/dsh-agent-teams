@@ -57,15 +57,17 @@ for (const scenario of selectedScenarios) {
         writeFileSync(join(profile, 'cordis.patch.yml'), readFileSync(join(profile, 'cordis.patch.yml'), 'utf8') + '- id: tool-subagent\n  name: \'@deepseek-ai/dsh-tool-subagent\'\n  config:\n    provider: spawn\n    toolName: subagent_legacy\n    backgroundMode: continuable\n');
     if (scenario === 'fallback')
         writeFileSync(join(profile, 'cordis.patch.yml'), readFileSync(join(profile, 'cordis.patch.yml'), 'utf8') + '- id: agent-teams\n  config:\n    stateDir: .agent-teams\n    memberProvider: spawn\n    fallback:\n      provider: runtime-lab\n      model: fixture-fallback\n');
+    // Custom drivers replace the task runner, while startup still provides
+    // the host's filesystem and sandbox setup on newer Harness versions.
     if (scenario === 'captain-idle-wakeup') {
         copyFileSync(join(dirname(fileURLToPath(import.meta.url)), 'fixtures/harness-runtime-idle.mjs'), join(profile, 'fixture-idle.mjs'));
-        writeFileSync(join(profile, 'cordis.patch.yml'), readFileSync(join(profile, 'cordis.patch.yml'), 'utf8') + '- id: headless-startup\n  disabled: true\n- id: headless-runner\n  disabled: true\n- insert:\n    - id: runtime-lab-idle-captain\n      name: ./fixture-idle.mjs\n');
+        writeFileSync(join(profile, 'cordis.patch.yml'), readFileSync(join(profile, 'cordis.patch.yml'), 'utf8') + '- id: headless-runner\n  disabled: true\n- insert:\n    - id: runtime-lab-idle-captain\n      name: ./fixture-idle.mjs\n');
     }
+    if (scenario === 'progressive-entry' || scenario === 'stability')
+        copyFileSync(join(dirname(fileURLToPath(import.meta.url)), 'fixtures/harness-runtime-tools.mjs'), join(profile, 'fixture-tools.mjs'));
     if (scenario === 'progressive-entry') {
         copyFileSync(join(dirname(fileURLToPath(import.meta.url)), 'fixtures/harness-runtime-entry.mjs'), join(profile, 'fixture-entry.mjs'));
-        writeFileSync(join(profile, 'cordis.patch.yml'), readFileSync(join(profile, 'cordis.patch.yml'), 'utf8') + `- id: headless-startup
-  disabled: true
-- id: headless-runner
+        writeFileSync(join(profile, 'cordis.patch.yml'), readFileSync(join(profile, 'cordis.patch.yml'), 'utf8') + `- id: headless-runner
   disabled: true
 - id: agent-teams
   config:
@@ -86,8 +88,6 @@ for (const scenario of selectedScenarios) {
     if (scenario === 'web-approval') {
         copyFileSync(join(dirname(fileURLToPath(import.meta.url)), 'fixtures/harness-runtime-web-approval.mjs'), join(profile, 'fixture-web-approval.mjs'));
         writeFileSync(join(profile, 'cordis.patch.yml'), readFileSync(join(profile, 'cordis.patch.yml'), 'utf8') + `- id: runtime-lab-fixture
-  disabled: true
-- id: headless-startup
   disabled: true
 - id: headless-runner
   disabled: true
@@ -110,8 +110,6 @@ for (const scenario of selectedScenarios) {
     if (scenario === 'protocol-compatibility') {
         copyFileSync(join(dirname(fileURLToPath(import.meta.url)), 'fixtures/harness-runtime-protocol.mjs'), join(profile, 'fixture-protocol.mjs'));
         writeFileSync(join(profile, 'cordis.patch.yml'), readFileSync(join(profile, 'cordis.patch.yml'), 'utf8') + `- id: runtime-lab-fixture
-  disabled: true
-- id: headless-startup
   disabled: true
 - id: headless-runner
   disabled: true
@@ -142,8 +140,6 @@ for (const scenario of selectedScenarios) {
     if (scenario === 'stability') {
         copyFileSync(join(dirname(fileURLToPath(import.meta.url)), 'fixtures/harness-runtime-stability.mjs'), join(profile, 'fixture-stability.mjs'));
         writeFileSync(join(profile, 'cordis.patch.yml'), readFileSync(join(profile, 'cordis.patch.yml'), 'utf8') + `- id: runtime-lab-fixture
-  disabled: true
-- id: headless-startup
   disabled: true
 - id: headless-runner
   disabled: true
@@ -225,9 +221,10 @@ for (const scenario of selectedScenarios) {
         json(join(report, scenario, 'team-evidence.json'), state);
     if (passed && !isFailure && scenario !== 'captain-idle-wakeup') {
         copyFileSync(join(dirname(fileURLToPath(import.meta.url)), 'fixtures/harness-runtime-resume.mjs'), join(profile, 'fixture-resume.mjs'));
-        writeFileSync(join(profile, 'cordis.patch.yml'), readFileSync(join(profile, 'cordis.patch.yml'), 'utf8') + '- id: headless-startup\n  disabled: true\n- id: headless-runner\n  disabled: true\n- insert:\n    - id: runtime-lab-cold-resume\n      name: ./fixture-resume.mjs\n');
+        writeFileSync(join(profile, 'cordis.patch.yml'), readFileSync(join(profile, 'cordis.patch.yml'), 'utf8') + '- id: headless-runner\n  disabled: true\n- insert:\n    - id: runtime-lab-cold-resume\n      name: ./fixture-resume.mjs\n');
         const coldTrace = join(report, scenario, 'cold-trace.jsonl');
-        const cold = await command([process.execPath, join(runtime, 'node_modules/@deepseek-ai/dsh/lib/bin.js'), '--profile', 'headless'], workspace, environment({ DSH_HOME: home, DSH_PERMISSION_MODE: 'danger-full-access', DSH_TELEMETRY_DISABLED: '1', LAB_TRACE: coldTrace, LAB_TEAMS: '1', LAB_COLD: '1', LAB_SCENARIO: scenario, LAB_PARENT_SESSION: state.captainSessionId }), scenario + '-cold', 90000);
+        // Older startup parsers require a task even when the runner is disabled.
+        const cold = await command([process.execPath, join(runtime, 'node_modules/@deepseek-ai/dsh/lib/bin.js'), '--profile', 'headless', 'Run the deterministic cold restore fixture.'], workspace, environment({ DSH_HOME: home, DSH_PERMISSION_MODE: 'danger-full-access', DSH_TELEMETRY_DISABLED: '1', LAB_TRACE: coldTrace, LAB_TEAMS: '1', LAB_COLD: '1', LAB_SCENARIO: scenario, LAB_PARENT_SESSION: state.captainSessionId }), scenario + '-cold', 90000);
         const coldEvents = existsSync(coldTrace) ? readFileSync(coldTrace, 'utf8').trim().split('\n').filter(Boolean).map(s => JSON.parse(s)) : [];
         const coldMember = coldEvents.find(x => x.event === 'cold-member-completed');
         const coldAssertions = { memberToolsRestricted: memberToolsRestricted(coldEvents.filter(x => x.event === 'request' && x.isMember && x.purpose === undefined)), exit0: cold.code === 0 && !cold.timedOut, driverCompleted: cold.stdout.includes('COLD_RESTORE_DRIVER_DONE'), sameMemberRestored: coldMember?.sessionId === state.members.find(m => m.name === 'worker')?.id, routeRestored: coldMember?.model === (scenario === 'fallback' ? 'fixture-fallback' : 'fixture-model'), reasoningRestored: coldMember?.reasoningEffort === (scenario === 'fallback' ? 'low' : 'high') };

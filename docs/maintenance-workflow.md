@@ -24,6 +24,7 @@
 
 | 当前候选宿主 | 定位 | 安装与支持边界 |
 | --- | --- | --- |
+| `0.2.2-rc.1` | preview | 在 Ubuntu 和 Windows 验证精确 CLI 分包、安装和运行场景 |
 | `0.2.1-rc.3` | preview | 已发布 npm 精确目标；先进入矩阵，推荐宿主与开发基线仍为 rc.2 |
 | `0.2.1-rc.2` | recommended | 已发布 npm 精确目标；RC 不是 GA |
 | `0.2.1-rc.1` | legacy | 保留上一推荐 RC |
@@ -118,7 +119,9 @@ CI 仅上传报告、日志和 fixture 状态，不上传 runtime 的 node_modul
 
 ## 发布同一份验收产物
 
-[publish.yml](../.github/workflows/publish.yml) 必须等待整个 `verify` 可复用工作流成功。发布 job 下载该 run 的候选 tgz，重新核验 SHA-256、版本和完整宿主清单，再通过现有 npm OIDC trusted publishing 发布该文件；发布 job 不重新构建，也不以 `pack --dry-run` 作为门禁。
+[publish.yml](../.github/workflows/publish.yml) 只发布通过完整 Verify 的候选 tgz。发布 job 下载该归档，重新核验 SHA-256 和版本，再通过现有 npm OIDC trusted publishing 发布该文件。
+
+如果已实装验证主分支 Verify 生成的归档，从 `main` 手动运行 Publish Package，填写 `version`、`verified_run_id` 和实装归档的 `candidate_sha256`。工作流要求 Verify 与发布提交一致，并确认完整兼容性门禁成功。npm 发布成功后，GitHub Release 使用同一提交创建标签。
 
 - 新的预发布插件版本（alpha / beta / rc）首次发布进入项目的 `next` 渠道；已验收的 RC 产物可经维护者明确决定，用 `npm dist-tag add` 将同一不可变版本提升为 `latest`，不重新打包。
 - 无后缀插件首次发布及 RC 产物提升到 `latest` 时，开发基线必须是清单中的 recommended 宿主，全部支持目标都要通过。当前 recommended 为 `0.2.1-rc.2`，不得把只在 Alpha 通过的包提升为普通用户默认版本。

@@ -1,0 +1,40 @@
+{
+  "$schema": "https://dsh.dev/schemas/dsh-plugin-0.15.schema.json",
+  "manifestVersion": "0.15",
+  "id": "com.nanmicoder.agent-teams",
+  "name": "@nanmicoder/dsh-agent-teams",
+  "version": "0.1.20",
+  "license": "MIT",
+  "source": "npm:@nanmicoder/dsh-agent-teams@0.1.20",
+  "facets": {
+    "host": {
+      "entry": "lib/index.js",
+      "apiVersion": "v1alpha1"
+    }
+  },
+  "requires": {
+    "contracts": [
+      { "apiVersion": "tool.dsh/v1", "kind": "Tool" },
+      { "apiVersion": "command.dsh/v1", "kind": "CommandRuntime" },
+      { "apiVersion": "session.dsh/v1alpha1", "kind": "Session" },
+      { "apiVersion": "model.dsh/v1", "kind": "ModelCatalog" },
+      { "apiVersion": "presentation.dsh/v1alpha1", "kind": "Presentation" }
+    ]
+  },
+  "permissions": [
+    { "name": "storage.local.read", "scope": "workspace", "reason": "读取工作区内 .agent-teams/ 团队状态（team.json、任务与邮箱）" },
+    { "name": "storage.local.write", "scope": "workspace", "reason": "持久化团队/成员/任务/消息状态" },
+    { "name": "session.create", "scope": "session", "reason": "为每个成员派生子智能体会话（成员即子智能体）" },
+    { "name": "messages.observe.read", "scope": "session", "reason": "观察队长与成员的消息以推进调度" }
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "id": "com.nanmicoder.agent-teams",
+        "title": "AgentTeams",
+        "description": "多智能体团队协作：队长/成员、带依赖的任务 DAG、邮箱消息与审查循环"
+      }
+    ]
+  },
+  "subscriptions": []
+}

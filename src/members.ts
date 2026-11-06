@@ -179,7 +179,11 @@ export async function validateMemberLlmSelections(
 }
 
 const MEMBER_LABEL_PREFIX = 'agent-teams:'
-const FALLBACK_FAILURE_CODES = new Set(['QUOTA', 'RATE_LIMIT', 'AUTH', 'MISSING_CREDENTIAL', 'NO_ADAPTER'])
+const FALLBACK_FAILURE_CODES = new Set([
+  'QUOTA', 'RATE_LIMIT', 'AUTH', 'MISSING_CREDENTIAL', 'NO_ADAPTER',
+  // The account-backed DeepSeek adapter remaps equivalent provider failures.
+  'ACCOUNT_QUOTA', 'ACCOUNT_TOKEN_INVALID', 'ACCOUNT_SIGN_IN_REQUIRED',
+])
 
 export function isFallbackFailureCode(code: string): boolean {
   return FALLBACK_FAILURE_CODES.has(code)

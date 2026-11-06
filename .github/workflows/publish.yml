@@ -97,6 +97,7 @@ jobs:
         env:
           EXPECTED_SHA256: ${{ inputs.candidate_sha256 || needs.verify.outputs.artifact_sha256 }}
           VERIFIED_HOSTS: ${{ needs.verify.outputs.hosts }}
+          VERIFIED_RUN_ID: ${{ inputs.verified_run_id }}
           NPM_DIST_TAG: ${{ steps.version.outputs.dist_tag }}
         run: |
           node --input-type=module <<'JS'
@@ -108,7 +109,7 @@ jobs:
           const pkg = JSON.parse(readFileSync('package.json', 'utf8'))
           const hosts = validatePackageCompatibility(pkg)
           // A prior main run must have passed its report/digest gate above.
-          if (process.env.VERIFIED_HOSTS) assert.deepEqual(hosts, JSON.parse(process.env.VERIFIED_HOSTS))
+          if (!process.env.VERIFIED_RUN_ID) assert.deepEqual(hosts, JSON.parse(process.env.VERIFIED_HOSTS))
           const artifact = readFileSync(join(process.env.RUNNER_TEMP, 'candidate/candidate.tgz'))
           assert.equal(createHash('sha256').update(artifact).digest('hex'), process.env.EXPECTED_SHA256)
           if (process.env.NPM_DIST_TAG === 'latest') {

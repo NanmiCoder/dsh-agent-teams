@@ -36,7 +36,7 @@
 
 ## 版本更新
 
-[最新发布](https://github.com/NanmiCoder/dsh-agent-teams/releases/latest) 修复在 Harness `0.2.1-rc.4`、`0.2.1-rc.5`（npm `latest`）及之后版本上无法安装的问题。插件不再逐个列出已测宿主，只声明最低宿主版本 `>=0.1.2-alpha.2`，Harness 发布新版本不会再挡住安装。npm 安装请写明下方的版本号，GitHub 安装使用默认分支。推荐宿主仍为 `0.2.1-rc.2`。详见[测试矩阵](./compatibility.json)和[发布说明](./release-notes/v0.1.28.md)。
+[最新发布](https://github.com/NanmiCoder/dsh-agent-teams/releases/latest) 恢复 Harness `0.2.2-rc.1` 的成员模型回退，并改进任务收尾、活动更新和交付物审计。推荐宿主为 Harness `0.2.1-rc.2`。详见[测试矩阵](./compatibility.json)和[发布说明](./release-notes/v0.1.29.md)。
 
 ## 为什么需要 AgentTeams？
 
@@ -54,20 +54,20 @@
 
 ## 安装与版本选择
 
-**推荐组合：DeepSeek Harness `0.2.1-rc.2` + AgentTeams `0.1.28`。宿主仍为 RC 版本。**
+**推荐组合：DeepSeek Harness `0.2.1-rc.2` + AgentTeams `0.1.29`。宿主仍为 RC 版本。**
 
 | 使用场景 | DeepSeek Harness | AgentTeams 插件 |
 | --- | --- | --- |
-| **推荐版本** | **`0.2.1-rc.2`** | **`0.1.28`** |
-| 预览宿主 | `0.2.1-rc.3` | `0.1.28` |
-| 上一推荐 RC | `0.2.1-rc.1`, `0.2.0-rc.2`, `0.1.7-rc.2` | `0.1.28` |
-| 保留旧 RC | `0.1.5-rc.1`, `0.1.5-rc.2`, `0.1.5-rc.3` | `0.1.28` |
-| 保留旧 RC | `0.1.2-rc.1` | `0.1.28` |
-| 开发者测试 Alpha | `0.1.2-alpha.5` | `0.1.28` |
-| 保留旧 Alpha | `0.1.2-alpha.2` | `0.1.28` |
-| 更新的宿主 | `0.2.1-rc.4`、`0.2.1-rc.5` 及之后版本 | `0.1.28` |
+| **推荐版本** | **`0.2.1-rc.2`** | **`0.1.29`** |
+| 预览宿主 | `0.2.2-rc.1`、`0.2.1-rc.3` | `0.1.29` |
+| 上一推荐 RC | `0.2.1-rc.1`, `0.2.0-rc.2`, `0.1.7-rc.2` | `0.1.29` |
+| 保留旧 RC | `0.1.5-rc.1`, `0.1.5-rc.2`, `0.1.5-rc.3` | `0.1.29` |
+| 保留旧 RC | `0.1.2-rc.1` | `0.1.29` |
+| 开发者测试 Alpha | `0.1.2-alpha.5` | `0.1.29` |
+| 保留旧 Alpha | `0.1.2-alpha.2` | `0.1.29` |
+| 其他可安装宿主 | `0.1.2-alpha.2` 及以上 | `0.1.29` |
 
-除最后一行外均为 CI 测试矩阵。`0.2.1-rc.4` 及之后发布的 Harness 都可以直接安装；`0.2.1-rc.5` 已在本地 macOS 跑通完整运行场景，尚未加入 CI 矩阵。
+CI 验证表中最后一行之前的精确宿主版本。安装器也接受达到最低版本要求的其他宿主。
 
 ### 桌面端
 
@@ -83,7 +83,7 @@ https://github.com/NanmiCoder/dsh-agent-teams
 github:NanmiCoder/dsh-agent-teams
 ```
 
-从 npm 安装时输入带版本号的包名 `@nanmicoder/dsh-agent-teams@0.1.28`。桌面端的 pnpm 11 默认不自动安装发布未满 24 小时的版本：新版发布后的 24 小时内，不带版本号或使用 `@latest` 都会装到上一个版本，即使预览显示的是新版；如果上一个版本与你的宿主不兼容，安装会失败。写明版本号可以立即安装该版本；更换镜像源不会消除这项规则。GitHub 方式需要能够访问 GitHub，默认分支代码可能先于 npm 发布。
+从 npm 安装时输入带版本号的包名 `@nanmicoder/dsh-agent-teams@0.1.29`。桌面端的 pnpm 11 默认不自动安装发布未满 24 小时的版本：新版发布后的 24 小时内，不带版本号或使用 `@latest` 都会装到上一个版本，即使预览显示的是新版；如果上一个版本与你的宿主不兼容，安装会失败。写明版本号可以立即安装该版本；更换镜像源不会消除这项规则。GitHub 方式需要能够访问 GitHub，默认分支代码可能先于 npm 发布。
 
 安装完成后点击「立即启用」；宿主提示需要重启时，重启桌面应用。无需关闭兼容检查或全局发布等待期规则。
 
@@ -100,10 +100,10 @@ dsh --version
 
 ### CLI / Web：2. 安装 AgentTeams 插件
 
-从 npm 安装或升级插件时写明版本号（当前正式版为 `0.1.28`）：
+从 npm 安装或升级插件时写明版本号（当前正式版为 `0.1.29`）：
 
 ```sh
-dsh plugin --profile web add --save-exact @nanmicoder/dsh-agent-teams@0.1.28
+dsh plugin --profile web add --save-exact @nanmicoder/dsh-agent-teams@0.1.29
 ```
 
 CLI 管理的安装可将 `web` 换成实际使用的 CLI profile。**安装后，停止并重新启动该 profile 的 Harness 进程，再刷新浏览器。** 安装插件不会自动升级宿主；Harness 的 `latest` 与插件的 `latest` 是两个独立渠道。

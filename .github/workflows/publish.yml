@@ -163,6 +163,7 @@ jobs:
 
   consumer-resolution:
     name: Check desktop npm channel readiness
+    if: ${{ !cancelled() && needs.publish.result == 'success' }}
     needs: publish
     runs-on: ubuntu-latest
     timeout-minutes: 6

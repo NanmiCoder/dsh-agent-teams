@@ -794,15 +794,20 @@ export function installMemberSelectionRuntime(
     const disposeSelection = installModelSelection(childCtx, selectionRef)
     const fallback = selection.fallback
     let switched = false
+    const recoveryLifetime = new AbortController()
     const disposeFallback = childCtx.on('agent/request-error', async (payload, next) => {
-      if (payload.agent.id !== child.id || payload.signal.aborted) return next()
+      if (payload.agent.id !== child.id) return next()
       const transition = selectFallbackRoute(selectionRef.current, fallback, payload.failure.code, switched)
       if (fallback === undefined || !transition.retry) return next()
-      const eligible = await updateFallbackState(stateRoot, teamId, memberName, child, fallback, payload.signal).catch((error: unknown) => {
+      // The turn can survive plugin unload. Stop any queued recovery when
+      // this child setup is disposed while waiting for the team lock.
+      const signal = AbortSignal.any([payload.signal, recoveryLifetime.signal])
+      if (signal.aborted) return next()
+      const eligible = await updateFallbackState(stateRoot, teamId, memberName, child, fallback, signal).catch((error: unknown) => {
         ctx.logger.warn(`agent-teams: failed to persist fallback route: ${String(error)}`)
         return true
       })
-      if (!eligible || payload.signal.aborted) return next()
+      if (!eligible || signal.aborted) return next()
       switched = transition.switched
       selectionRef.current = transition.selection
       ctx.logger.warn(`agent-teams: member ${child.id} switching to fallback ${fallback.provider}/${fallback.model} after ${payload.failure.code}`)
@@ -821,7 +826,7 @@ export function installMemberSelectionRuntime(
         content: [{ type: 'text', text: 'AgentTeams switched to the configured fallback model. Continue the current work from the conversation history and recorded task state.' }],
         source: agentTeamsSource({ kind: 'agent-teams' }, observedSessionFormatVersion(child)),
       })
-      if (payload.signal.aborted) return next()
+      if (signal.aborted) return next()
       child.cancel({ kind: 'hook', reason: 'agent-teams/model-fallback' }, { keepInbox: true })
       try {
         child.followup(continuation)
@@ -835,6 +840,7 @@ export function installMemberSelectionRuntime(
       return undefined
     })
     return () => {
+      recoveryLifetime.abort()
       disposeFallback()
       disposeSelection()
       cleanupFailure()

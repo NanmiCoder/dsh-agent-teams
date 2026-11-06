@@ -149,7 +149,7 @@ async function fixture(t, { captainStatus = 'idle', fallback, captainOffline = f
   }
   settleOnCleanup = settleSilently
   return {
-    stateRoot, steers, deliveries, warnings, listeners, child, sessionEvents, memberError, payload, settleSilently, recovery,
+    stateRoot, steers, deliveries, warnings, listeners, child, sessionEvents, memberError, payload, settleSilently, recovery, dispose,
     turnEvent(type, data) {
       pendingFailures.push(listeners.get('session/event')?.(child.session, { type, data }))
     },
@@ -222,6 +222,24 @@ await test('native fallback continues once with default effort and reports a lat
   h.terminal({ turn: 2 })
   await eventually(async () => (await h.state()).tasks[0].status === 'failed' && (await h.mailbox()).length === 1)
   assert.equal((await h.state()).tasks[0].attemptId, 'a1')
+})
+
+await test('disposed setup cannot resume fallback after the team lock is released', async t => {
+  const h = await fixture(t, { fallback: { provider: 'backup', model: 'backup-model' }, nativeRecovery: true })
+  const entered = Promise.withResolvers()
+  const release = Promise.withResolvers()
+  const lock = withTeamLock(`team:${h.stateRoot}:team`, async () => {
+    entered.resolve()
+    await release.promise
+  })
+  await entered.promise
+  const request = h.memberError(h.payload(undefined, 'AUTH'))
+  h.dispose()
+  release.resolve()
+  await lock
+  await request
+  assert.deepEqual(h.recovery, [{ selection: { provider: 'fake', model: 'primary' } }])
+  assert.equal((await h.state()).members[0].fallbackActive, undefined)
 })
 
 await test('native continuation rejection settles the open task after hook cancellation', async t => {

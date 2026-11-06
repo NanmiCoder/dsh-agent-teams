@@ -24,7 +24,7 @@ async function eventually(predicate) {
   assert.fail('terminal failure did not settle')
 }
 
-async function fixture(t, { captainStatus = 'idle', fallback, captainOffline = false, rejectDelivery = false } = {}) {
+async function fixture(t, { captainStatus = 'idle', fallback, captainOffline = false, rejectDelivery = false, nativeRecovery = false, rejectContinuation = false } = {}) {
   const workspace = await mkdtemp(join(tmpdir(), 'dsh-member-failure-'))
   const pendingFailures = []
   let settleOnCleanup = () => {}
@@ -61,6 +61,15 @@ async function fixture(t, { captainStatus = 'idle', fallback, captainOffline = f
       } }],
       append(type, data) { sessionEvents.push({ type, data }) },
     },
+  }
+  const recovery = []
+  if (nativeRecovery) {
+    child.model = { select(selection) { recovery.push({ selection }) } }
+    child.cancel = (cause, options) => recovery.push({ cause, options })
+    child.followup = message => {
+      if (rejectContinuation) throw new Error('continuation refused')
+      recovery.push({ continuation: message })
+    }
   }
   await createTeamDir(stateRoot, {
     id: 'team', name: 'Team', captainSessionId: captain.id, createdAt: 1, taskSeq: 1,
@@ -140,7 +149,7 @@ async function fixture(t, { captainStatus = 'idle', fallback, captainOffline = f
   }
   settleOnCleanup = settleSilently
   return {
-    stateRoot, steers, deliveries, warnings, listeners, child, sessionEvents, memberError, payload, settleSilently,
+    stateRoot, steers, deliveries, warnings, listeners, child, sessionEvents, memberError, payload, settleSilently, recovery,
     turnEvent(type, data) {
       pendingFailures.push(listeners.get('session/event')?.(child.session, { type, data }))
     },
@@ -189,6 +198,40 @@ await test('aborted request does not fail a task or consume its fallback route',
   assert.equal(await h.memberError(h.payload(undefined, 'AUTH', abort.signal)), undefined)
   assert.deepEqual(await h.memberError(h.payload(undefined, 'AUTH')), { kind: 'retry' })
   assert.equal((await h.state()).tasks[0].status, 'in_progress')
+})
+
+await test('native fallback continues once with default effort and reports a later terminal failure', async t => {
+  const fallback = { provider: 'backup', model: 'backup-model' }
+  const h = await fixture(t, { fallback, nativeRecovery: true })
+  const abort = new AbortController()
+  abort.abort()
+  assert.equal(await h.memberError(h.payload(undefined, 'AUTH', abort.signal)), undefined)
+  assert.deepEqual(h.recovery, [{ selection: { provider: 'fake', model: 'primary' } }])
+  assert.equal((await h.state()).members[0].fallbackActive, undefined)
+  assert.equal(await h.memberError(h.payload(undefined, 'AUTH')), undefined)
+  assert.deepEqual(h.recovery[1], { selection: fallback })
+  assert.deepEqual(h.recovery[2], {
+    cause: { kind: 'hook', reason: 'agent-teams/model-fallback' }, options: { keepInbox: true },
+  })
+  assert.match(h.recovery[3].continuation.content[0].text, /Continue the current work/)
+  assert.equal((await h.state()).tasks[0].status, 'in_progress')
+  assert.equal((await h.mailbox()).length, 0)
+  const delegated = { kind: 'retry' }
+  assert.equal(await h.memberError(h.payload(undefined, 'RATE_LIMIT'), async () => delegated), delegated)
+  assert.equal(h.recovery.length, 4)
+  h.terminal({ turn: 2 })
+  await eventually(async () => (await h.state()).tasks[0].status === 'failed' && (await h.mailbox()).length === 1)
+  assert.equal((await h.state()).tasks[0].attemptId, 'a1')
+})
+
+await test('native continuation rejection settles the open task after hook cancellation', async t => {
+  const h = await fixture(t, {
+    fallback: { provider: 'backup', model: 'backup-model' }, nativeRecovery: true, rejectContinuation: true,
+  })
+  await assert.rejects(h.memberError(h.payload(undefined, 'AUTH')), /continuation refused/)
+  h.settleSilently()
+  await eventually(async () => (await h.state()).tasks[0].status === 'failed' && (await h.mailbox()).length === 1)
+  assert.equal((await h.state()).tasks[0].attemptId, 'a1')
 })
 
 for (const captainStatus of ['idle', 'running']) {

@@ -409,20 +409,21 @@ async function updateFallbackState(
   stateRoot: string,
   teamId: string,
   memberName: string,
+  child: Agent,
   fallback: { provider: string; model: string },
-  ctx: Context,
-): Promise<void> {
-  await withTeamLock(`team:${stateRoot}:${teamId}`, async () => {
+  signal: AbortSignal,
+): Promise<boolean> {
+  return withTeamLock(`team:${stateRoot}:${teamId}`, async () => {
     const team = await readTeam(stateRoot, teamId)
-    if (team === undefined) return
-    const member = team.members.find(candidate => candidate.name === memberName)
-    if (member === undefined) return
+    if (signal.aborted || team === undefined || team.captainSessionId !== child.session.header.parentSession || team.halted === true) return false
+    const member = team.members.find(candidate => candidate.name === memberName && candidate.id === child.id)
+    if (member === undefined || member.status === 'removed' || member.stopping === true) return false
     member.activeProvider = fallback.provider
     member.activeModel = fallback.model
     member.fallbackActive = true
     await writeTeam(stateRoot, team)
+    return true
   })
-  void ctx
 }
 
 function pendingSelectionKey(parentSessionId: string, label: string): string {
@@ -785,28 +786,53 @@ export function installMemberSelectionRuntime(
     // Legacy teams still need failure reporting even without a saved route.
     if (selection === undefined) return cleanupFailure
     const selectionRef = { current: modelSelection(selection), assembled: undefined as ModelSelection | undefined }
+    // Newer Harness owns the next-step selection in the Agent's durable model
+    // API. Its installModelSelection hook now only contributes switch notices.
+    const model = (child as Agent & { model?: { select(selection: Readonly<ModelSelection>): void } }).model
+    const nativeModel = typeof model?.select === 'function' ? model : undefined
+    nativeModel?.select(selectionRef.current)
     const disposeSelection = installModelSelection(childCtx, selectionRef)
     const fallback = selection.fallback
     let switched = false
     const disposeFallback = childCtx.on('agent/request-error', async (payload, next) => {
       if (payload.agent.id !== child.id || payload.signal.aborted) return next()
-      const transition = selectFallbackRoute(selectionRef.current ?? { provider: selection.provider, model: selection.model }, fallback, payload.failure.code, switched)
-      // selectFallbackRoute only retries when a fallback route exists; the
-      // explicit guard narrows that fact for the compiler.
-      if (fallback !== undefined && transition.retry) {
-        switched = transition.switched
-        selectionRef.current = transition.selection
-        // Request recovery repeats buildRequest inside the current step; it
-        // does not re-run prompt assembly. Override that captured route too,
-        // otherwise the authorized retry would hit the failed primary again.
+      const transition = selectFallbackRoute(selectionRef.current, fallback, payload.failure.code, switched)
+      if (fallback === undefined || !transition.retry) return next()
+      const eligible = await updateFallbackState(stateRoot, teamId, memberName, child, fallback, payload.signal).catch((error: unknown) => {
+        ctx.logger.warn(`agent-teams: failed to persist fallback route: ${String(error)}`)
+        return true
+      })
+      if (!eligible || payload.signal.aborted) return next()
+      switched = transition.switched
+      selectionRef.current = transition.selection
+      ctx.logger.warn(`agent-teams: member ${child.id} switching to fallback ${fallback.provider}/${fallback.model} after ${payload.failure.code}`)
+      if (nativeModel === undefined) {
+        // Legacy recovery rebuilds the request without rerunning assembly.
         selectionRef.assembled = transition.selection
-        await updateFallbackState(stateRoot, teamId, memberName, fallback, ctx).catch((error: unknown) => {
-          ctx.logger.warn(`agent-teams: failed to persist fallback route: ${String(error)}`)
-        })
-        ctx.logger.warn(`agent-teams: member ${child.id} switching to fallback ${fallback.provider}/${fallback.model} after ${payload.failure.code}`)
         return { kind: 'retry' as const }
       }
-      return next()
+
+      // Modern recovery fixes the route for all retries of a prepared step.
+      // Close that step without failing its task, then wake the same member in
+      // a new turn. The assignment and any completed calls are already in its
+      // session history, so there is no task retry or replay of input.
+      nativeModel.select(transition.selection)
+      const continuation = createUserMessage({
+        content: [{ type: 'text', text: 'AgentTeams switched to the configured fallback model. Continue the current work from the conversation history and recorded task state.' }],
+        source: agentTeamsSource({ kind: 'agent-teams' }, observedSessionFormatVersion(child)),
+      })
+      if (payload.signal.aborted) return next()
+      child.cancel({ kind: 'hook', reason: 'agent-teams/model-fallback' }, { keepInbox: true })
+      try {
+        child.followup(continuation)
+      } catch (error) {
+        // Cancellation suppresses the host's agent/error event, so a rejected
+        // continuation still needs to settle the observed attempt.
+        const observed = observeFailedAttempt()
+        if (observed !== undefined) void recordFailure(payload.turn, payload.failure, observed)
+        throw error
+      }
+      return undefined
     })
     return () => {
       disposeFallback()

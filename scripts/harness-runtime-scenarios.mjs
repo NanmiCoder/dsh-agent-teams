@@ -214,6 +214,14 @@ for (const scenario of selectedScenarios) {
     if (scenario === 'fallback') {
         assertions.fallbackActivated = memberRequests.some(x => x.model === 'fixture-fallback') && state?.members?.some(m => m.fallbackActive && m.activeModel === 'fixture-fallback');
         assertions.fallbackReasoningReset = memberRequests.some(x => x.model === 'fixture-fallback') && memberRequests.filter(x => x.model === 'fixture-fallback').every(x => x.reasoningEffort === 'low');
+        const primaryFailures = trace.filter(x => x.event === 'fallback-primary-auth');
+        const firstFallback = memberRequests.find(x => x.model === 'fixture-fallback');
+        const task = state?.tasks?.find(task => task.id === 't1');
+        assertions.fallbackPreservedAttempt = primaryFailures.length === 1 && firstFallback !== undefined
+            && firstFallback.sessionId === primaryFailures[0].sessionId
+            && task?.attemptId === primaryFailures[0].attemptId && task.attempt === 1
+            && firstFallback.called.filter(name => name === 'agent_teams_claim_task').length === 1
+            && firstFallback.called.filter(name => name === 'agent_teams_update_task').length === 1;
     }
     const passed = Object.values(assertions).every(Boolean);
     runs.push({ scenario, passed, exit: { code: result.code, signal: result.signal, timedOut: result.timedOut }, assertions, requests: requests.length, memberRequests: memberRequests.length });

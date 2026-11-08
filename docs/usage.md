@@ -61,7 +61,7 @@
 | `agent_teams_resume` | 显式恢复 halted 团队，必须带非空 reason；不重建已取消任务 |
 | `agent_teams_delete` | 结束团队：打断成员，团队目录**归档保留**（任务与依赖图、邮箱完整留存） |
 
-`agent_teams_add_member` 默认不需要模型参数：成员沿用队长当前 LLM provider/model 时，会一并快照队长当前思考强度。用户明确要求某个角色使用其他模型时，可以同时传入可选的 `provider` + `model`；只覆盖 `model` 时沿用队长当前 LLM provider。provider 或 model 任一改变时，思考强度自动使用目标模型默认档；用户明确要求某个成员使用特定强度时，可以传入可选的 `reasoning_effort`（目标模型支持的档位 id，或 `"default"` 表示强制使用模型自身默认档）。插件不会为每个成员发起二次选择或弹窗。
+`agent_teams_add_member` 默认不需要模型参数：没有点名任何路由的成员使用内置默认 `magpie/group/deepseek-v4.1-flash-1017` + `reasoning_effort: max`；要沿用队长路由就显式传入队长的 `provider` + `model`，此时会一并快照队长当前思考强度。用户明确要求某个角色使用其他模型时，可以同时传入可选的 `provider` + `model`；只覆盖 `model` 时沿用队长当前 LLM provider。provider 或 model 任一改变时，思考强度自动使用目标模型默认档；用户明确要求某个成员使用特定强度时，可以传入可选的 `reasoning_effort`（目标模型支持的档位 id，或 `"default"` 表示强制使用模型自身默认档）。成员还可以用可选的 `agentPreset` 挂注册预设（真预设自带系统提示词、tools 与 skill）。插件不会为每个成员发起二次选择或弹窗。
 
 ## 配置
 
@@ -72,7 +72,8 @@
   config:
     stateDir: .agent-teams        # 团队状态目录名（工作区下）
     memberProvider: spawn         # 子代理运行后端（spawn / fork），不是 LLM provider
-    memberModel: deepseek-v4      # 可选：成员模型覆盖
+    # memberLlmProvider: magpie             # 可选：成员 LLM provider 覆盖
+    # memberModel: group/deepseek-v4.1-flash-1017   # 可选：成员模型覆盖（未指定时用内置默认）
     memberMaxDepth: 1             # 成员再委派深度上限（0 = 禁止）
     maxMembers: 8                 # 团队人数上限
     executionPrompt: |            # 注入成员 persona 与每次任务派工
@@ -90,7 +91,7 @@
 
 `toolPolicies` 的 id 由部署方声明，成员只能按 id 选择：`agent_teams_add_member` 的 `tool_policy`、内联 `plan` 的成员行，或 profile 成员行的 `tool_policy`。队长模型不能提交原始 allow/deny 列表，也不能在运行时新建策略。队长专属工具始终被拒绝且无法通过 allow 列表重新打开；四个协调工具（`agent_teams_claim_task`、`agent_teams_update_task`、`agent_teams_send_message`、`agent_teams_status`）始终可用，策略也不允许拒绝它们。未知 id、空策略或空列表会在挂载时或写入成员前直接失败，不会留下成员或可恢复的孤儿会话。生效的策略 id 与解析后的过滤器会写入 `team.json`（`toolPolicy` / `toolFilter`），`agent_teams_status` 显示策略 id；重启后由子会话持久 descriptor 重新应用同一过滤器。未配置策略的成员保持原有工具集与记录结构。该能力是全局工具的模型可见性与调用限制，不是 OS 沙箱或授权边界。
 
-最终优先级为：成员显式 `provider` + `model` / `model` → `memberModel` → 队长当前路由。成员沿用队长当前 provider/model 时继承队长的思考强度；provider 或 model 任一改变时自动使用目标模型的默认档。显式 `reasoning_effort`（目标模型支持的档位 id，或 `"default"`）优先，并在目标 provider/model 上创建前校验；不兼容时成员创建会明确失败。最终生效的 provider/model/思考强度会写入 `team.json`，供状态查询和成员冷恢复使用。
+最终优先级为：成员显式 `provider` + `model` / `model` → profile 成员行 → `memberModel` → 内置默认 `magpie/group/deepseek-v4.1-flash-1017` + `reasoning_effort: max`。也就是说，**没有点名任何路由的成员不再沿用队长路由，而是用内置默认模型**；显式点名的路由沿用队长当前 provider/model 时继承队长的思考强度，provider 或 model 任一改变时自动使用目标模型的默认档（内置 `max` 只属于内置模型，不会强加给调用方点名的其它模型）。显式 `reasoning_effort`（目标模型支持的档位 id，或 `"default"`）优先，并在目标 provider/model 上创建前校验；不兼容时成员创建会明确失败。最终生效的 provider/model/思考强度会写入 `team.json`，供状态查询和成员冷恢复使用。成员同时可声明 `agentPreset`（真预设，自带系统提示词 + tools + skill），完整示例见[成员 agent preset 与模型配置](./agent-preset-model-config.md)。
 
 ## 使用协议
 
@@ -110,7 +111,7 @@ profiles:
         model: gpt-5.6-sol
         role: 分析需求
       - name: implementer
-        model: gpt-5.6-terra
+        agentPreset: implementer   # 挂注册预设（自带系统提示词 + tools + skill）
         role: 实现方案
     tasks:
       - id: requirements
@@ -121,6 +122,8 @@ profiles:
         assignee: implementer
         dependencies: [requirements]
 ```
+
+成员路由与预设的完整优先级、`agentPreset` 写法与覆盖示例见[成员 agent preset 与模型配置](./agent-preset-model-config.md)。
 
 通过 `/agent-teams --profile demo-delivery 实现这个功能` 显式点名模板；不要使用首 token 隐式 profile。seed 模式提供模板任务，captain 模式只提供阵容与约束，由 Captain 在 staged 阶段设计 DAG。面板允许编辑成员 provider/model/reasoning/角色提示词和任务负责人/依赖，批准前不会创建成员或派工。依赖 output 会传给下游；failed 的审查/测试不会解锁后续，自动 repair/review 不依赖 failed review。`memberProvider` 是 spawn/fork 后端，不是模型 provider。
 

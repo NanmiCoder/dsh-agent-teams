@@ -46,6 +46,8 @@ export type StagedPlanMutation = {
     model: string;
     reasoningEffort?: string | null;
     executionPrompt?: string | null;
+    /** Registered agent-preset name; an empty string clears it back to persona-only. */
+    agentPreset?: string;
     /** Selected tool-policy id; an empty string clears it back to no policy. */
     toolPolicy?: string;
 } | {

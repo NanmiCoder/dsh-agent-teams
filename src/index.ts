@@ -148,6 +148,10 @@ export const Config: z<Config> = z.object({
       model: z.string(),
       reasoning_effort: z.string(),
       executionPrompt: z.string(),
+      // Registered agent preset (own system prompt, tools and skills) this
+      // profile member starts under. Declared so the config boundary validates
+      // the type; `profiles.ts` still enforces non-empty and trims once.
+      agentPreset: z.string(),
       fallback: fallbackRouteConfig,
       // Owner-declared tool-policy id this profile member selects (#59).
       tool_policy: z.string(),
@@ -179,7 +183,7 @@ export const Config: z<Config> = z.object({
 export function usageSectionText(toolNames: string, profilesText = ''): string {
   return `AgentTeams captain protocol:
 1. Inspect current team state when needed, using agent_teams_status. Continue existing work without duplicating its roster/tasks. Create only when no current team exists, with the user's goal as description and approval="required"; automatic approval requires an explicit request to run immediately. Staged plans never spawn or schedule work.
-2. Add each needed role once; members inherit your model route unless another is requested/needed. A requested profile goes to create({profile}); it supplies its roster. Seed profiles also supply tasks; captain-planning profiles require your DAG. Do not duplicate either. A member may also select one owner-declared tool policy by id (tool_policy on add_member, a plan member, or a profile member): it is the only way to change which global tools that member sees and may invoke, and you can never pass raw allow/deny lists.
+2. Add each needed role once; a member without a requested route takes the configured member default (magpie/group/deepseek-v4.1-flash-1017 at reasoning effort max), so pass provider+model only when the user asks for a different one. A requested profile goes to create({profile}); it supplies its roster. Seed profiles also supply tasks; captain-planning profiles require your DAG. Do not duplicate either. A member may also select one owner-declared tool policy by id (tool_policy on add_member, a plan member, or a profile member): it is the only way to change which global tools that member sees and may invoke, and you can never pass raw allow/deny lists.
 3. Build the complete smallest useful DAG while staged. For an ordinary research/audit plan, pass the roster and dependency graph together in create({plan:{members,tasks}}) to avoid repeated setup rounds. Every task needs a subject; pass kind and assignee explicitly when the plan specifies them. Titles, descriptions and member roles do not set these fields. Dependencies represent prerequisites. Give every required contributor a task or explicit message. Present the plan and end your turn for review; never approve in that planning turn. Approve only after a later explicit user approval or the Web action.
 4. Respect Web approve/return/discard control messages. On return, ask what to change before editing; after the answer, use one atomic agent_teams_edit_plan batch (edit downstream references before removals), summarize and await review again. Never inspect or edit .agent-teams state files or plugin source code to revise plans. Discard does not authorize a replacement.
 5. The scheduler dispatches ready tasks after approval. Delegate; do not duplicate slow work or send messages merely to start a stage. Handle reports/user work, then yield when waiting is all that remains: reports wake you automatically. Use status after a delivery or user request, never busy-poll or wait for unassigned members.
@@ -189,6 +193,33 @@ export function usageSectionText(toolNames: string, profilesText = ''): string {
 9. Halted means the user stopped work (including the captain turn). Resume only on a later explicit user request with a reason, via agent_teams_resume or create_task({resume:true,resumeReason}); creating tasks alone never resumes. Escalated means the review loop hit its limit, not a halt. Deployment requires explicit user confirmation.
 10. Wait for all required tasks to be terminal and members idle/ready, present results, then delete/archive unless the user wants to continue. Never discard unfinished work without authorization.
 Tools: ${toolNames}${profilesText === '' ? '' : `\n\n${profilesText}`}`
+}
+
+/**
+ * Read the member agent-preset field out of a Web staged-plan payload.
+ *
+ * The browser roster editor mirrors `agent_teams_edit_plan`: an omitted key
+ * keeps whatever preset the plan already has, an empty string returns the
+ * member to persona-only. That is exactly what the `StagedPlanMutation` field
+ * means downstream, so this helper only adapts the transport shape — a text
+ * field cleared in the browser posts `null`, which maps to the same empty
+ * string. Camel-case wins because every other roster field in this payload is
+ * camel-case; the snake-case alias is accepted because this payload already
+ * spells the tool policy that way, so a client written against either name
+ * cannot silently drop an edited preset.
+ * @param payload - the parsed request body.
+ * @returns the mutation field, or `{}` when the client did not send the key.
+ */
+export function readPlanMemberAgentPreset(payload: Record<string, unknown>): { agentPreset?: string } {
+  const camel = payload['agentPreset']
+  // An explicit camel-case value wins — including `null`, a text field being
+  // cleared — so a stale snake-case alias can never resurrect a preset the
+  // browser just removed.
+  const named = camel === undefined ? payload['agent_preset'] : camel
+  if (named === undefined) return {}
+  if (named === null) return { agentPreset: '' }
+  if (typeof named !== 'string') throw new Error('agentPreset must be a string')
+  return { agentPreset: named }
 }
 
 export function apply(ctx: Context, config: Config): void {
@@ -424,6 +455,10 @@ export function apply(ctx: Context, config: Config): void {
               ...typeof payload['executionPrompt'] === 'string' || payload['executionPrompt'] === null
                 ? { executionPrompt: payload['executionPrompt'] as string | null }
                 : {},
+              // A preset edited in the Web roster must reach the same mutation
+              // the model-facing edit_plan tool builds: omitted keeps it, ''
+              // returns the member to persona-only.
+              ...readPlanMemberAgentPreset(payload),
               ...typeof payload['tool_policy'] === 'string' ? { toolPolicy: payload['tool_policy'] } : {},
             }
           } else if (action === 'update_task') {

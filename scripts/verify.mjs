@@ -1318,13 +1318,15 @@ const routeDefaultEfforts = new Map([
   ['captain-provider/captain-model', 'high'],
   ['captain-provider/configured-member-model', 'medium'],
   ['other-provider/other-model', 'low'],
+  ['magpie/group/deepseek-v4.1-flash-1017', 'max'],
 ])
 const selectionContext = {
   llm: {
     resolveCallConfig: async (config) => {
       resolvedCalls.push(config)
       const route = `${config.provider}/${config.model}`
-      if (route !== 'captain-provider/captain-model' && config.reasoningEffort === 'max') {
+      const acceptsMax = route === 'captain-provider/captain-model' || route === 'magpie/group/deepseek-v4.1-flash-1017'
+      if (!acceptsMax && config.reasoningEffort === 'max') {
         const error = new Error(`provider/model route ${route} does not support reasoning effort "max"`)
         error.code = 'UNSUPPORTED_REASONING_EFFORT'
         throw error
@@ -1338,10 +1340,21 @@ const selectionContext = {
 }
 const inheritedSelection = await resolveMemberLlmSelection(selectionContext, captain, {})
 check(
-  'ordinary member snapshots the captain current route and effort',
-  inheritedSelection.provider === 'captain-provider'
-    && inheritedSelection.model === 'captain-model'
+  'a member whose route nobody names takes the built-in magpie/deepseek default at max effort',
+  inheritedSelection.provider === 'magpie'
+    && inheritedSelection.model === 'group/deepseek-v4.1-flash-1017'
     && inheritedSelection.reasoningEffort === 'max',
+)
+const keptRouteSelection = await resolveMemberLlmSelection(selectionContext, captain, {
+  provider: 'captain-provider',
+  model: 'captain-model',
+})
+check(
+  'a caller that names the captain route snapshots the captain effort',
+  keptRouteSelection.provider === 'captain-provider'
+    && keptRouteSelection.model === 'captain-model'
+    && keptRouteSelection.reasoningEffort === 'max'
+    && resolvedCalls.at(-1)?.reasoningEffort === 'max',
 )
 const overriddenSelection = await resolveMemberLlmSelection(selectionContext, captain, {
   provider: 'other-provider',
@@ -1375,6 +1388,8 @@ check(
     && resolvedCalls.at(-1)?.reasoningEffort === 'high',
 )
 const forcedDefaultSelection = await resolveMemberLlmSelection(selectionContext, captain, {
+  provider: 'captain-provider',
+  model: 'captain-model',
   reasoningEffort: 'default',
 })
 check(
@@ -1383,6 +1398,16 @@ check(
     && forcedDefaultSelection.model === 'captain-model'
     && forcedDefaultSelection.reasoningEffort === 'high'
     && resolvedCalls.at(-1)?.reasoningEffort === undefined,
+)
+const builtInEffortOverride = await resolveMemberLlmSelection(selectionContext, captain, {
+  reasoningEffort: 'high',
+})
+check(
+  'an explicit effort alone still overrides the built-in max while keeping the built-in route',
+  builtInEffortOverride.provider === 'magpie'
+    && builtInEffortOverride.model === 'group/deepseek-v4.1-flash-1017'
+    && builtInEffortOverride.reasoningEffort === 'high'
+    && resolvedCalls.at(-1)?.reasoningEffort === 'high',
 )
 let providerWithoutModelRejected = false
 try {

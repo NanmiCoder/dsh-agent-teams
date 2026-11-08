@@ -144,7 +144,7 @@ Team and task content starts immediately: wide panes use columns and narrow pane
 
 Team state is stored under `<workspace>/.agent-teams/`; the Web panel reads that disk truth and combines it with live sub-agent activity.
 
-Member creation is zero-interaction by default: a member on the captain's current LLM route snapshots that provider, model, and reasoning effort, while a member on a requested alternative route snapshots the target model's default effort; later continuations restore the resolved snapshot. Only an explicit heterogeneous-team request (for example, “backend on provider A/model X, frontend on provider B/model Y”) supplies a member-specific `provider` + `model`; there is no per-member model or reasoning prompt.
+Member creation is zero-interaction by default: a member with no requested route uses the built-in `magpie/group/deepseek-v4.1-flash-1017` at `reasoning_effort: "max"`; a member explicitly placed on the captain's current LLM route snapshots that provider, model, and reasoning effort, while a member on a requested alternative route snapshots the target model's default effort; later continuations restore the resolved snapshot. Only an explicit heterogeneous-team request (for example, “backend on provider A/model X, frontend on provider B/model Y”) supplies a member-specific `provider` + `model`; there is no per-member model or reasoning prompt.
 
 Captain sessions keep the concise core protocol and the original 14 native team tools from their first request. All business tools are directly available; no loading tool or extra activation call is needed. Configured profiles retain their bounded directory in the fixed system prompt. Creating, approving, continuing or ending a team does not rewrite the system prompt or tool schemas. Core rules remain available after history compaction or discarded code-mode tool results. Members receive four team tools, fixed member instructions, and their ordinary coding/research tools. Web approval wakes the captain with a control message; later member reports wake it again. See the [fixed protocol and benchmark contract](./docs/progressive-loading.md).
 
@@ -181,7 +181,9 @@ Defaults work without extra setup. A trusted profile can override member behavio
   config:
     stateDir: .agent-teams
     memberProvider: spawn
-    memberModel: deepseek-v4
+    # Optional: override the built-in member model default for every member.
+    # memberLlmProvider: magpie
+    # memberModel: group/deepseek-v4.1-flash-1017
     memberMaxDepth: 0
     maxMembers: 8
     toolPolicies:
@@ -190,6 +192,8 @@ Defaults work without extra setup. A trusted profile can override member behavio
       implementer:
         deny: [web_search]
 ```
+
+Without an explicit route, every member starts on the built-in default `magpie/group/deepseek-v4.1-flash-1017` with `reasoning_effort: max`. A profile member row or the `provider` / `model` / `reasoning_effort` fields of `agent_teams_add_member` override it per member; `memberModel` / `memberLlmProvider` override it for the whole deployment. An explicit effort always wins, and a caller-named model that is not the built-in one uses that model's own default effort instead of `max`.
 
 `memberMaxDepth` defaults to `0`: team members cannot create nested subagents. Set `1` to explicitly permit one descendant level; the limit also covers runtime/code-tool calls. Default members report through team messages only, avoiding duplicate native parent reports. Idle roster members make no model requests. Task assignments start distinct turns; coordination joins the nearest model step. Acceptance and consumption are tracked separately. Removal/archive drains the selected branch and its pending input before reporting success.
 
@@ -204,7 +208,7 @@ Defaults work without extra setup. A trusted profile can override member behavio
 
 This is model tool visibility and invocation policy for global tools, not an OS sandbox or an authorization boundary.
 
-`memberProvider` is the sub-agent runtime backend (`spawn` / `fork`), not an LLM provider. Cross-LLM-provider routing uses the optional `provider` + `model` fields of `agent_teams_add_member`; `memberModel` is only a model default for all members. A member on the captain's current provider/model inherits the captain's reasoning effort, while a changed provider or model automatically uses the target model's default. To request a particular effort, pass the optional `reasoning_effort` field — one of the target model's supported effort ids, or `"default"` to force the model's own default.
+`memberProvider` is the sub-agent runtime backend (`spawn` / `fork`), not an LLM provider. Cross-LLM-provider routing uses the optional `provider` + `model` fields of `agent_teams_add_member`; `memberModel` is only a model default for all members. A member with no requested route uses the built-in `magpie/group/deepseek-v4.1-flash-1017` at `reasoning_effort: "max"`. A member on the captain's current provider/model inherits the captain's reasoning effort, while a changed provider or model automatically uses the target model's default. To request a particular effort, pass the optional `reasoning_effort` field — one of the target model's supported effort ids, or `"default"` to force the model's own default.
 
 `slashCommand: false` disables the deterministic `/agent-teams` activation surfaces (slash command and gesture boundary), leaving the natural-language trigger as the only entry point.
 
@@ -232,6 +236,7 @@ npx skills add NanmiCoder/dsh-agent-teams --skill dsh-plugin-development
 | Guide | Covers |
 | --- | --- |
 | [Usage](./docs/usage.md) | Architecture, UI behavior, tools, configuration, limits, and validation |
+| [Agent preset & model config](./docs/agent-preset-model-config.md) | Real agent-preset members, built-in model default, and override examples |
 | [Verification](./docs/verification-guide.md) | Offline, composition, real e2e, and GUI verification |
 | [Plugin development](./docs/developing-dsh-plugins.md) | Human-readable guide built from this plugin |
 | [README writing](./docs/readme-writing-guide.md) | Repository documentation conventions |
@@ -246,7 +251,7 @@ pnpm verify
 
 ## Named multi-role profiles
 
-Configure one or more complete team profiles in `cordis.patch.yml`. A profile always supplies the roster (independent provider/model/role/reasoning effort). Set `taskPlanning: captain` when the Captain should derive the DAG from the user's goal; omit it or set `taskPlanning: seed` to keep a fixed template workflow:
+Configure one or more complete team profiles in `cordis.patch.yml`. A profile always supplies the roster (independent agent preset/provider/model/role/reasoning effort). Set `taskPlanning: captain` when the Captain should derive the DAG from the user's goal; omit it or set `taskPlanning: seed` to keep a fixed template workflow:
 
 ```yaml
 profiles:
@@ -258,7 +263,7 @@ profiles:
         model: gpt-5.6-sol
         role: Analyze requirements
       - name: implementer
-        model: gpt-5.6-terra
+        agentPreset: implementer   # mount a registered preset (its own prompt, tools, skills)
         role: Implement the approved solution
     tasks:
       - id: requirements

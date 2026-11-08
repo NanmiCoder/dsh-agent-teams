@@ -43,6 +43,14 @@ interface RuntimeBoundary {
   [hostPromptDeliver]?: Deliver
 }
 
+/**
+ * Event a 0.2.x host logs into the child's own session when its creator
+ * selected a preset, rather than inheriting the parent's composition. The
+ * event type map of older hosts does not declare it, so the name stays a
+ * widened comparison inside this seam.
+ */
+const PRESET_SELECTION_EVENT = 'agent-preset/selected'
+
 /** Version-independent creation contract; legacy-only options stay at this seam. */
 export interface MemberStartSpec {
   provider: string
@@ -51,6 +59,13 @@ export interface MemberStartSpec {
     parent: Agent
     prompt: ContentBlock[]
     agentOptions?: AgentOptions
+    /**
+     * Named agent preset the host mounts into the child's own scope: the preset
+     * supplies the child's system prompt and tool surface. Only the managed
+     * activation contract (`startActivation`) can mount one; omission keeps the
+     * `persona` override as the child's identity.
+     */
+    agentPreset?: string
     persona?: string
     toolFilter?: MemberToolFilter
   }
@@ -72,14 +87,46 @@ export async function startMember(runtime: Context['subagents'], spec: MemberSta
   const host = runtime as unknown as CreationBoundary
   if (typeof host.startActivation === 'function') {
     const { persona: _persona, toolFilter: _filter, ...request } = spec.request
+    // persona/toolFilter are installed by the continuable setup, which can
+    // restore them on a cold resume. The preset must travel in the request so
+    // the host mounts it into the child's scope before the first request.
     const activation = await host.startActivation.call(runtime, { ...spec, request, delivery: 'parent' })
     // Preserve native settlement as the missing-report/error fallback on both
     // fresh and resumed activations. mailbox.ts deduplicates successful reports.
     void activation.result.catch(() => undefined)
     return activation
   }
+  // A legacy creation API cannot mount a preset, and silently ignoring one
+  // would leave the child with neither the preset nor its persona identity.
+  if (spec.request.agentPreset !== undefined) {
+    throw new Error(
+      `agent-teams: member agent preset "${spec.request.agentPreset}" requires the managed activation contract (startActivation), `
+      + 'which this Harness does not expose; unset agentPreset on this host',
+    )
+  }
   if (typeof host.startContinuable !== 'function') return unsupported('missing member creation API')
   return host.startContinuable.call(runtime, spec)
+}
+
+/**
+ * Name of the agent preset this child was explicitly created under, from its
+ * own session log: present only when its creator selected one, absent for a
+ * child that inherited the parent's composition. Used to decide whether the
+ * member persona is still the child's identity (see `memberPersona` in
+ * members.ts) or would shadow a mounted preset's own deployment prompt.
+ * @param session - the child's live session, fresh or cold-resumed.
+ */
+export function selectedAgentPreset(session: Session): string | undefined {
+  for (const event of sessionOwnEvents(session)) {
+    // Mirrors the host's own restore rule: a creation-time selection precedes
+    // the descriptor, so a selection appended after it is a later fork intent
+    // and does not make the child run under an independently mounted preset.
+    if (event.type === 'subagent/descriptor') return undefined
+    if ((event.type as string) !== PRESET_SELECTION_EVENT) continue
+    const preset = (event as { data?: { agentPreset?: unknown } }).data?.agentPreset
+    return typeof preset === 'string' && preset !== '' ? preset : undefined
+  }
+  return undefined
 }
 
 /** Wrap every available creation API, restoring only this plugin's own methods. */

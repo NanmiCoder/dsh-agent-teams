@@ -81,4 +81,22 @@ export interface Config {
 export declare const Config: z<Config>;
 /** The model-facing usage policy: when and how to drive AgentTeams. */
 export declare function usageSectionText(toolNames: string, profilesText?: string): string;
+/**
+ * Read the member agent-preset field out of a Web staged-plan payload.
+ *
+ * The browser roster editor mirrors `agent_teams_edit_plan`: an omitted key
+ * keeps whatever preset the plan already has, an empty string returns the
+ * member to persona-only. That is exactly what the `StagedPlanMutation` field
+ * means downstream, so this helper only adapts the transport shape — a text
+ * field cleared in the browser posts `null`, which maps to the same empty
+ * string. Camel-case wins because every other roster field in this payload is
+ * camel-case; the snake-case alias is accepted because this payload already
+ * spells the tool policy that way, so a client written against either name
+ * cannot silently drop an edited preset.
+ * @param payload - the parsed request body.
+ * @returns the mutation field, or `{}` when the client did not send the key.
+ */
+export declare function readPlanMemberAgentPreset(payload: Record<string, unknown>): {
+    agentPreset?: string;
+};
 export declare function apply(ctx: Context, config: Config): void;

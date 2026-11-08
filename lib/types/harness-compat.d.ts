@@ -21,6 +21,13 @@ export interface MemberStartSpec {
         parent: Agent;
         prompt: ContentBlock[];
         agentOptions?: AgentOptions;
+        /**
+         * Named agent preset the host mounts into the child's own scope: the preset
+         * supplies the child's system prompt and tool surface. Only the managed
+         * activation contract (`startActivation`) can mount one; omission keeps the
+         * `persona` override as the child's identity.
+         */
+        agentPreset?: string;
         persona?: string;
         toolFilter?: MemberToolFilter;
     };
@@ -30,6 +37,15 @@ export declare function usesManagedActivations(runtime: Context['subagents']): b
 export declare function startMember(runtime: Context['subagents'], spec: MemberStartSpec): Promise<{
     childId: SessionId;
 }>;
+/**
+ * Name of the agent preset this child was explicitly created under, from its
+ * own session log: present only when its creator selected one, absent for a
+ * child that inherited the parent's composition. Used to decide whether the
+ * member persona is still the child's identity (see `memberPersona` in
+ * members.ts) or would shadow a mounted preset's own deployment prompt.
+ * @param session - the child's live session, fresh or cold-resumed.
+ */
+export declare function selectedAgentPreset(session: Session): string | undefined;
 /** Wrap every available creation API, restoring only this plugin's own methods. */
 export declare function guardSubagentCreation(ctx: Context, check: (parent: Agent) => void): void;
 declare module '@deepseek-ai/dsh-llm' {

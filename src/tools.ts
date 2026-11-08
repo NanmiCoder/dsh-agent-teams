@@ -127,6 +127,8 @@ export type StagedPlanMutation =
       model: string
       reasoningEffort?: string | null
       executionPrompt?: string | null
+      /** Registered agent-preset name; an empty string clears it back to persona-only. */
+      agentPreset?: string
       /** Selected tool-policy id; an empty string clears it back to no policy. */
       toolPolicy?: string
     }
@@ -749,6 +751,11 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
           member.model = selection.model
           member.reasoningEffort = selection.reasoningEffort
           member.executionPrompt = trimmedOptional(mutation.executionPrompt)
+          // Same keep-on-omit rule as the tool policy: a roster edit that does
+          // not name a preset must not silently drop one the plan established.
+          if (mutation.agentPreset !== undefined) {
+            member.agentPreset = trimmedOptional(mutation.agentPreset)
+          }
           // The roster editor replaces route/prompt fields; the tool policy is
           // only touched when the mutation names one, so a plan revision cannot
           // silently widen a member's tool set.
@@ -956,6 +963,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
             name: { type: 'string', required: true }, role: { type: 'string' },
             provider: { type: 'string' }, model: { type: 'string' }, reasoning_effort: { type: 'string' },
             tool_policy: { type: 'string', description: 'Optional owner-declared tool-policy id for this member.' },
+            agentPreset: { type: 'string', description: 'Optional registered agent-preset name this member starts under (its own system prompt, tools and skills). Omit for a persona-only member.' },
           } } },
           tasks: { type: 'array', required: true, items: { type: 'object', additionalProperties: false, properties: {
             id: { type: 'string', required: true, description: 'Local reference used by dependencies in this plan; the result maps it to a durable task id.' },
@@ -982,7 +990,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
           phase: { type: 'string', required: true },
           profile: { type: 'string' },
           task_planning: { type: 'string' },
-          members: { type: 'array', items: { type: 'object', additionalProperties: false, properties: { member_name: { type: 'string', required: true }, member_id: { type: 'string', required: true }, member_role: { type: 'string' }, provider: { type: 'string', required: true }, model: { type: 'string', required: true }, reasoning_effort: { type: 'string' }, tool_policy: { type: 'string' }, status: { type: 'string', required: true } } } },
+          members: { type: 'array', items: { type: 'object', additionalProperties: false, properties: { member_name: { type: 'string', required: true }, member_id: { type: 'string', required: true }, member_role: { type: 'string' }, provider: { type: 'string', required: true }, model: { type: 'string', required: true }, reasoning_effort: { type: 'string' }, tool_policy: { type: 'string' }, agent_preset: { type: 'string' }, status: { type: 'string', required: true } } } },
           tasks: { type: 'array', items: { type: 'object', additionalProperties: false, properties: { task_id: { type: 'string', required: true }, seed_id: { type: 'string', required: true }, subject: { type: 'string', required: true }, status: { type: 'string', required: true }, kind: { type: 'string' }, assignee: { type: 'string' }, dependencies: { type: 'array', items: { type: 'string' }, required: true } } } },
         },
       },
@@ -1138,6 +1146,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
           model: member.model ?? '',
           ...member.reasoningEffort === undefined ? {} : { reasoning_effort: member.reasoningEffort },
           ...member.toolPolicy === undefined ? {} : { tool_policy: member.toolPolicy },
+          ...member.agentPreset === undefined ? {} : { agent_preset: member.agentPreset },
           status: member.status,
         })),
         tasks: snapshot.tasks.map((task) => ({
@@ -1182,6 +1191,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
             reasoning_effort: { type: 'string', description: 'Optional member reasoning effort.' },
             execution_prompt: { type: 'string', description: 'Optional member-specific execution prompt.' },
             tool_policy: { type: 'string', description: 'Optional owner-declared tool-policy id for this member; an empty string clears it back to the unchanged default tool set.' },
+            agentPreset: { type: 'string', description: 'Optional registered agent-preset name for this member; an empty string clears it back to the persona-only member.' },
           },
         },
       },
@@ -1228,6 +1238,9 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
             // Omitted means "keep the current policy": a route/prompt revision
             // must not silently change what the member may do.
             ...operation.tool_policy === undefined ? {} : { toolPolicy: operation.tool_policy },
+            // Same keep-on-omit rule for the preset: an empty string is the
+            // explicit "go back to persona-only" request.
+            ...operation.agentPreset === undefined ? {} : { agentPreset: operation.agentPreset },
           }
         }
         if (operation.action === 'update_task') {
@@ -1315,10 +1328,11 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
     parameters: {
       name: { type: 'string', required: true, description: 'Unique member name inside the team.' },
       role: { type: 'string', description: 'Role of the member (e.g. researcher, engineer, reviewer).' },
-      provider: { type: 'string', description: 'Optional LLM provider route. Use only when the user explicitly requests a different provider; requires model. Omit to use the configured member route (memberLlmProvider/memberModel) or the captain\'s current route.' },
-      model: { type: 'string', description: 'Optional model override (used verbatim, including any "/" in the id). Omit for the configured memberModel default (paired with memberLlmProvider when set) or the captain\'s current model.' },
-      reasoning_effort: { type: 'string', description: 'Optional reasoning effort override: one of the target model\'s supported effort ids, or "default" to force its default. When omitted, the captain\'s effort is inherited only for the same provider/model; a changed route uses the target default.' },
+      provider: { type: 'string', description: 'Optional LLM provider route. Use only when the user explicitly requests a different provider; requires model. Omit to use the configured member route (memberLlmProvider/memberModel) or the built-in member default (magpie/group/deepseek-v4.1-flash-1017).' },
+      model: { type: 'string', description: 'Optional model override (used verbatim, including any "/" in the id). Omit for the configured memberModel default (paired with memberLlmProvider when set) or the built-in member model (group/deepseek-v4.1-flash-1017).' },
+      reasoning_effort: { type: 'string', description: 'Optional reasoning effort override: one of the target model\'s supported effort ids, or "default" to force its default. When omitted on the built-in member route the effort is "max"; a named route keeps the captain\'s effort only on the captain\'s own route and otherwise uses the target default.' },
       executionPrompt: { type: 'string', description: 'Optional member-specific execution prompt. It remains editable while staged.' },
+      agentPreset: { type: 'string', description: 'Optional registered agent-preset name. The member session then mounts that preset (its own system prompt, tools and skills) instead of using prompt-only role text; the execution prompt still applies on top. Omit for the unchanged persona-only member.' },
       tool_policy: { type: 'string', description: 'Optional id of a tool policy declared by the deployment owner (config toolPolicies). It restricts which global tools this member sees and may invoke: a policy allow-list also keeps the four coordination tools, and captain-only tools can never be reopened. Omit for the unchanged default tool set.' },
     },
     output: {
@@ -1332,6 +1346,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
           model: { type: 'string', required: true },
           reasoning_effort: { type: 'string' },
           tool_policy: { type: 'string' },
+          agent_preset: { type: 'string' },
           status: { type: 'string', required: true },
           phase: { type: 'string', required: true },
         },
@@ -1341,7 +1356,8 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         text: (value.phase === 'staged'
           ? `Member "${value.member_name}" added to the staged roster (${value.provider}/${value.model}); no child was spawned.`
           : `Member "${value.member_name}" added (session ${value.member_id || 'starts with first ready task'}, ${value.provider}/${value.model}${value.reasoning_effort === undefined ? '' : `, reasoning ${value.reasoning_effort}`}, status ${value.status}).`)
-          + (value.tool_policy === undefined ? '' : ` Tool policy "${value.tool_policy}" applies to this member.`),
+          + (value.tool_policy === undefined ? '' : ` Tool policy "${value.tool_policy}" applies to this member.`)
+          + (value.agent_preset === undefined ? '' : ` Agent preset "${value.agent_preset}" is mounted when this member starts.`),
       }],
     },
     async execute(args, exec) {
@@ -1372,6 +1388,9 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
           fallback: config.fallback,
         }, exec.signal)
         const toolSelection = memberToolSelection(config, captain, trimmedOptional(args.tool_policy))
+        // A blank preset is "no preset", not a preset named "": tool gateways
+        // materialize omitted optional strings as blanks (#234).
+        const agentPreset = trimmedOptional(args.agentPreset)
         const member: TeamMember = {
           id: '',
           name: memberName,
@@ -1381,6 +1400,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
           reasoningEffort: selection.reasoningEffort,
           ...selection.fallback === undefined ? {} : { fallback: selection.fallback },
           executionPrompt: trimmedOptional(args.executionPrompt),
+          ...agentPreset === undefined ? {} : { agentPreset },
           ...toolSelection,
           joinedAt: Date.now(),
           status: 'idle',
@@ -1403,6 +1423,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
             ? {}
             : { reasoning_effort: selection.reasoningEffort },
           ...member.toolPolicy === undefined ? {} : { tool_policy: member.toolPolicy },
+          ...member.agentPreset === undefined ? {} : { agent_preset: member.agentPreset },
           status: member.status,
           phase: fresh.phase ?? 'running',
         }
@@ -2367,6 +2388,7 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
           model: member.model ?? '',
           reasoning_effort: member.reasoningEffort ?? '',
           tool_policy: member.toolPolicy ?? '',
+          agent_preset: member.agentPreset ?? '',
           status: member.status,
           activity: member.id !== '' ? (activity.get(member.id) ?? 'unknown') : 'unspawned',
           ...member.spawnError === undefined ? {} : { spawn_error: member.spawnError },
@@ -2604,6 +2626,7 @@ async function initializeProfileTeam(input: {
       provider: trimmedOptional(member.provider),
       model: trimmedOptional(member.model),
       reasoning_effort: trimmedOptional(member.reasoning_effort),
+      agentPreset: trimmedOptional(member.agentPreset),
       tool_policy: trimmedOptional(member.tool_policy),
     })),
   }
@@ -2652,6 +2675,7 @@ async function initializeProfileTeam(input: {
         model: selection.model,
         reasoningEffort: selection.reasoningEffort,
         executionPrompt: template.executionPrompt ?? profile.executionPrompt ?? input.config.executionPrompt,
+        ...template.agentPreset === undefined ? {} : { agentPreset: template.agentPreset },
         ...selection.fallback === undefined ? {} : { fallback: selection.fallback },
         ...toolSelection,
         joinedAt: now,
@@ -2857,6 +2881,7 @@ function renderStatus(value: JsonValue): string {
       model: string
       reasoning_effort: string
       tool_policy: string
+      agent_preset: string
       status: string
       activity: string
       spawn_error?: string
@@ -2895,7 +2920,8 @@ function renderStatus(value: JsonValue): string {
       const effort = member.reasoning_effort ? ` · reasoning ${member.reasoning_effort}` : ''
       const failure = member.spawn_error === undefined ? '' : `\n      start failed: ${member.spawn_error.slice(0, 400)}`
       const policy = member.tool_policy ? ` · policy ${member.tool_policy}` : ''
-      return `  - ${member.name} [${member.role}] ${member.status}/${member.activity}${route}${effort}${policy}${failure}`
+      const preset = member.agent_preset ? ` · preset ${member.agent_preset}` : ''
+      return `  - ${member.name} [${member.role}] ${member.status}/${member.activity}${route}${effort}${policy}${preset}${failure}`
     }),
     `Tasks (${team.tasks.length}):`,
     ...team.tasks.map((task) => {

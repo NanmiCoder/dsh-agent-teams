@@ -1371,11 +1371,15 @@ try {
     archivedSnapshot?.members.length === 3
       && ['alpha', 'beta', 'gamma'].every(name => archivedSnapshot.members.some(member => member.name === name))
       && archivedSnapshot.members.every(member => member.activity === 'idle'))
+  // Members added without an explicit route take the built-in member default
+  // (magpie/group/deepseek-v4.1-flash-1017), not the captain's fake route.
   check('archived activity projects each member model onto assigned tasks',
-    archivedSnapshot?.members.every(member => member.provider === 'fake' && member.model === 'fake-model')
+    archivedSnapshot?.members.every(member => member.provider === 'magpie'
+      && member.model === 'group/deepseek-v4.1-flash-1017'
+      && member.reasoningEffort === 'max')
       && archivedSnapshot.tasks
         .filter(task => ['alpha', 'beta', 'gamma'].includes(task.assignee))
-        .every(task => task.model === 'fake/fake-model'))
+        .every(task => task.model === 'magpie/group/deepseek-v4.1-flash-1017'))
   check('team shutdown keeps retired members catalog-visible for historical transcripts',
     (await ctx.subagents.listChildren(captain.id))
       .filter(child => child.kind === 'child'

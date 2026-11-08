@@ -33,6 +33,18 @@ export interface MemberRuntimeConfig {
         model: string;
     };
 }
+/**
+ * Built-in member route used when neither the owner configuration nor the
+ * captain names one: this machine's primary model outlet, with its strongest
+ * reasoning effort. A configured `memberModel`/`memberLlmProvider`, a profile
+ * member row, or the `provider`/`model`/`reasoning_effort` tool arguments all
+ * still win, so the default never overrides an explicit choice.
+ */
+export declare const DEFAULT_MEMBER_LLM_SELECTION: {
+    readonly provider: "magpie";
+    readonly model: "group/deepseek-v4.1-flash-1017";
+    readonly reasoningEffort: "max";
+};
 /** Durable provider/model/reasoning snapshot for one member. */
 export interface MemberLlmSelection {
     /** Registered LLM provider route. */
@@ -200,13 +212,18 @@ export declare function failMemberOpenAttempt(ctx: Context, stateRoot: string, t
     readonly message: string;
 }, fallbackSession: Session, observed: FailedMemberAttempt): Promise<boolean>;
 /**
- * Resolve one member's complete model selection. Ordinary members snapshot the
- * captain's current request route and reasoning effort. When provider or model
- * changes, effort is intentionally omitted so the target model materializes
- * its own default instead of receiving an adapter-owned id from another route.
- * An explicit effort overrides either policy; the sentinel "default" also
- * selects the target model's default. The final effort is validated against
- * the target model before a child is created.
+ * Resolve one member's complete model selection. A member whose route nobody
+ * names — no tool argument, no profile member row, no `memberModel` — takes
+ * {@link DEFAULT_MEMBER_LLM_SELECTION}: this machine's primary model at its
+ * strongest reasoning effort. A named route instead follows the caller: an
+ * explicit request pair wins over the configured default, which wins over the
+ * captain's current route. A caller that explicitly keeps the captain's own
+ * route also snapshots its reasoning effort, while any other named route keeps
+ * the target model's own default effort — the built-in `max` belongs to the
+ * built-in model, never to a model somebody else chose. An explicit effort
+ * overrides every policy, including the built-in default; the sentinel
+ * "default" selects the target model's own default. The final effort is
+ * validated against the target model before a child is created.
  *
  * A configured `memberModel` is a route preference, not a blind model-id
  * override: it is paired with `memberLlmProvider` (or its own `provider/model`
@@ -246,6 +263,12 @@ export declare function memberWelcome(team: TeamState, memberName: string): stri
 /**
  * Spawn one member as a durable continuable subagent of the captain and fill
  * `member.id` with its child session id. On failure nothing is persisted.
+ *
+ * A member that names an agent preset runs under that preset's own system
+ * prompt and tool surface (mounted by the host into the child's scope), so the
+ * `persona` text is not forwarded as well. A member without one keeps the
+ * prompt-text persona as its identity, exactly as before this option existed;
+ * `agentOptions` and the tool filter are applied on both paths.
  * @param ctx - the plugin context (injects `subagents`).
  * @param config - member runtime knobs.
  * @param selections - fresh/cold child model-selection bridge.

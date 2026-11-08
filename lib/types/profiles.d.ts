@@ -26,6 +26,13 @@ export interface TeamProfileMemberConfig {
     model?: string;
     reasoning_effort?: string;
     executionPrompt?: string;
+    /**
+     * Name of a registered agent preset (its own system prompt, tools and
+     * skills) this profile member starts under. Omitted keeps the unchanged
+     * persona-only member; an unknown preset fails loud at start, never silently
+     * falls back to persona text.
+     */
+    agentPreset?: string;
     fallback?: TeamModelFallbackConfig;
     /**
      * Owner-declared tool-policy id this profile member selects (#59). The
@@ -65,6 +72,7 @@ export interface NormalizedProfileMember {
     model?: string;
     reasoningEffort?: string;
     executionPrompt?: string;
+    agentPreset?: string;
     fallback?: TeamModelFallbackConfig;
     toolPolicy?: string;
 }

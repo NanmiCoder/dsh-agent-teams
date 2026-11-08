@@ -20,7 +20,7 @@ export const PROFILE_PROTOCOL_PROMPT_LIMIT = 240
 
 const PROFILE_KEYS = ['description', 'protocol', 'executionPrompt', 'fallback', 'members', 'tasks', 'taskPlanning', 'reviewPolicy'] as const
 const REVIEW_POLICY_KEYS = ['requirementsMinRounds', 'requirementsMaxRounds', 'codeMaxRounds', 'maxRepairAttempts', 'requiredReviewers'] as const
-const MEMBER_KEYS = ['name', 'role', 'provider', 'model', 'reasoning_effort', 'executionPrompt', 'fallback', 'tool_policy'] as const
+const MEMBER_KEYS = ['name', 'role', 'provider', 'model', 'reasoning_effort', 'executionPrompt', 'agentPreset', 'fallback', 'tool_policy'] as const
 const FALLBACK_KEYS = ['provider', 'model'] as const
 const TASK_KEYS = ['id', 'subject', 'description', 'assignee', 'dependencies'] as const
 
@@ -37,6 +37,13 @@ export interface TeamProfileMemberConfig {
   model?: string
   reasoning_effort?: string
   executionPrompt?: string
+  /**
+   * Name of a registered agent preset (its own system prompt, tools and
+   * skills) this profile member starts under. Omitted keeps the unchanged
+   * persona-only member; an unknown preset fails loud at start, never silently
+   * falls back to persona text.
+   */
+  agentPreset?: string
   fallback?: TeamModelFallbackConfig
   /**
    * Owner-declared tool-policy id this profile member selects (#59). The
@@ -79,6 +86,7 @@ export interface NormalizedProfileMember {
   model?: string
   reasoningEffort?: string
   executionPrompt?: string
+  agentPreset?: string
   fallback?: TeamModelFallbackConfig
   toolPolicy?: string
 }
@@ -465,12 +473,13 @@ function normalizeMember(
   const model = optionalNonEmptyString(raw['model'], `${path}.model`)
   const reasoningEffort = optionalNonEmptyString(raw['reasoning_effort'], `${path}.reasoning_effort`)
   const executionPrompt = optionalNonEmptyString(raw['executionPrompt'], `${path}.executionPrompt`)
+  const agentPreset = optionalNonEmptyString(raw['agentPreset'], `${path}.agentPreset`)
   const fallback = normalizeFallback(raw['fallback'], `${path}.fallback`)
   const toolPolicy = optionalNonEmptyString(raw['tool_policy'], `${path}.tool_policy`)
   if (provider !== undefined && model === undefined) {
     throw new Error(`profile member "${name}" sets provider without model`)
   }
-  return omitUndefined({ name, role, provider, model, reasoningEffort, executionPrompt, fallback, toolPolicy })
+  return omitUndefined({ name, role, provider, model, reasoningEffort, executionPrompt, agentPreset, fallback, toolPolicy })
 }
 
 function normalizeFallback(value: unknown, path: string): TeamModelFallbackConfig | undefined {

@@ -274,6 +274,14 @@ export interface TeamMember {
   reasoningEffort?: string
   /** Prompt specific to this member's execution turns. */
   executionPrompt?: string
+  /**
+   * Name of a registered agent preset (its own system prompt, tools and
+   * skills) this member's session mounts on start. The preset supplies the
+   * member's identity, so the persona text only refines it; absent keeps the
+   * unchanged persona-only behavior. The name is resolved by the host at mount
+   * time, which fails loud on a preset this deployment does not register.
+   */
+  agentPreset?: string
   /** Configured second-choice route. */
   fallback?: TeamModelFallback
   /** Active route after fallback, without changing the primary descriptor route. */

@@ -12,7 +12,7 @@ function textChunks(text) { return [{ type: 'block-start', index: 0, blockType: 
 function call(name, args) { const id = ToolCallId('lab-' + Date.now().toString(36) + '-' + (++seq)), arguments_ = JSON.stringify(args); return [{ type: 'block-start', index: 0, blockType: 'tool-call' }, { type: 'tool-call-delta', index: 0, id, name, argumentsDelta: arguments_ }, { type: 'block-end', index: 0, block: { type: 'tool-call', id, name, arguments: arguments_ } }, { type: 'usage', usage: { inputTokens: 10, outputTokens: 3 } }, { type: 'finish', reason: { kind: 'tool-calls' } }]; }
 function history(options) { return options.messages.flatMap(m => m.role === 'tool' ? [{ type: 'tool-result', content: m.content, isError: m.isError, toolCallId: m.toolCallId }] : m.content ?? []); }
 class FixtureAdapter extends LlmAdapter {
-    async listModels() { return [model, { ...model, id: 'fixture-failing' }, { ...model, id: 'fixture-fallback' }]; }
+    async listModels() { return [model, { ...model, id: 'fixture-failing' }, { ...model, id: 'fixture-fallback' }, { ...model, id: 'fixture-rerouted' }]; }
     async resolveModel(provider, id) { return { ...model, provider, id }; }
     async *stream(options) {
         const system = options.system ?? options.messages.filter(message => message.role === 'system').flatMap(message => message.content.filter(block => block.type === 'text').map(block => block.text)).join('\n');
@@ -37,8 +37,8 @@ class FixtureAdapter extends LlmAdapter {
         if (isMember && options.model === 'fixture-failing' && userText.includes('AgentTeams automatic task assignment')) {
             // In the fallback scenario, fail after the primary has already
             // committed a tool effect to the open attempt.
-            if (process.env.LAB_SCENARIO !== 'fallback' || names.includes('agent_teams_update_task')) {
-                if (process.env.LAB_SCENARIO === 'fallback') {
+            if (!['fallback', 'fallback-high'].includes(process.env.LAB_SCENARIO) || names.includes('agent_teams_update_task')) {
+                if (['fallback', 'fallback-high'].includes(process.env.LAB_SCENARIO)) {
                     const team = JSON.parse(readFileSync(join(process.cwd(), '.agent-teams/runtime-lab/team.json'), 'utf8'));
                     const task = team.tasks.find(task => task.id === 't1');
                     if (task?.status !== 'in_progress' || !task.attemptId)
@@ -55,6 +55,16 @@ class FixtureAdapter extends LlmAdapter {
         else if (process.env.LAB_SCENARIO === 'progressive-entry' && lastUserText.includes('ENTRY_NO_ACTIVATION'))
             chunks = textChunks('ORDINARY_ENTRY_OK');
         else if (isMember) {
+            if (process.env.LAB_SCENARIO === 'reroute' && !process.env.LAB_RELEASE && options.model === 'fixture-model') {
+                record({ event: 'reroute-first-request-paused', sessionId: options.sessionId, model: options.model, reasoningEffort: options.reasoningEffort });
+                const releasePath = process.env.LAB_RELEASE_FILE;
+                const deadline = Date.now() + 20000;
+                while (Date.now() < deadline && !existsSync(releasePath)) {
+                    options.signal?.throwIfAborted();
+                    await new Promise(resolve => setTimeout(resolve, 10));
+                }
+                if (!existsSync(releasePath)) throw Error('Reroute fixture timed out before captain edit_plan release');
+            }
             if (userText.includes('COLD_WAKE_FIXTURE')) {
                 for (const chunk of textChunks('COLD_MEMBER_OK'))
                     yield chunk;
@@ -138,7 +148,7 @@ class FixtureAdapter extends LlmAdapter {
         else if (!names.includes('agent_teams_create'))
             chunks = call('agent_teams_create', { name: 'runtime-lab', description: 'Deterministic real Harness test', approval: 'automatic' });
         else if (!names.includes('agent_teams_add_member'))
-            chunks = call('agent_teams_add_member', { name: 'worker', role: 'MEMBER_FIXTURE', executionPrompt: 'MEMBER_FIXTURE: complete the assigned task and report.', reasoning_effort: 'high', ...(process.env.LAB_SCENARIO === 'fallback' || process.env.LAB_SCENARIO === 'failure' ? { model: 'fixture-failing' } : {}) });
+            chunks = call('agent_teams_add_member', { name: 'worker', role: 'MEMBER_FIXTURE', executionPrompt: 'MEMBER_FIXTURE: complete the assigned task and report.', reasoning_effort: 'high', ...(['fallback', 'fallback-high'].includes(process.env.LAB_SCENARIO) || process.env.LAB_SCENARIO === 'failure' ? { model: 'fixture-failing' } : {}) });
         else if (!names.includes('agent_teams_create_task'))
             chunks = call('agent_teams_create_task', { subject: 'Runtime fixture task', description: 'MEMBER_FIXTURE: complete the deterministic task', assignee: 'worker' });
         else if (process.env.LAB_SCENARIO === 'captain-idle-wakeup') {
@@ -151,7 +161,7 @@ class FixtureAdapter extends LlmAdapter {
         }
         else if (process.env.LAB_SCENARIO === 'failure' && toolText.includes('AUTH'))
             chunks = textChunks('AGENTTEAMS_EXPECTED_FAILURE_OK');
-        else if (process.env.LAB_SCENARIO === 'fallback' && toolText.includes('AUTH'))
+        else if (['fallback', 'fallback-high'].includes(process.env.LAB_SCENARIO) && toolText.includes('AUTH'))
             chunks = textChunks('FALLBACK_NOT_RECOVERED');
         else if (process.env.LAB_SCENARIO === 'lifecycle' && !tools.some(t => t.name === 'agent_teams_send_message' && t.arguments.includes('FIFO_FIRST'))) {
             for (let i = 0; i < 100 && !memberStarted; i++)

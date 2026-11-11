@@ -31,6 +31,7 @@ export interface MemberRuntimeConfig {
     fallback?: {
         provider: string;
         model: string;
+        reasoningEffort?: string;
     };
 }
 /** Durable provider/model/reasoning snapshot for one member. */
@@ -45,6 +46,7 @@ export interface MemberLlmSelection {
     fallback?: {
         provider: string;
         model: string;
+        reasoningEffort?: string;
     };
 }
 /** Optional member-level route requested by the captain. */
@@ -63,6 +65,7 @@ export interface MemberLlmSelectionRequest {
     fallback?: {
         provider: string;
         model: string;
+        reasoningEffort?: string;
     };
 }
 /** A composed member route plus where each half came from. */
@@ -108,7 +111,10 @@ export declare function composeMemberRoute(request: Pick<MemberLlmSelectionReque
 export interface MemberSelectionRuntime {
     /** Trusted fresh-child admission, before the durable member id is written. */
     isPendingMember(agent: Agent): boolean;
-    /** Make one selection visible while Harness materializes the fresh child. */
+    /** Whether an active child has completed setup and can accept a live route update. */
+    canUpdateResident(memberId: string): boolean;
+    /** Update an already-resident member's next-step route after the durable commit. */
+    updateResident(memberId: string, selection: MemberLlmSelection, routeRevision: number): boolean;
     withPending<T>(parentSessionId: string, label: string, selection: MemberLlmSelection, operation: () => Promise<T>, setup?: TeamMember['runtimeSetup']): Promise<T>;
 }
 /**
@@ -123,15 +129,18 @@ export declare function isFallbackFailureCode(code: string): boolean;
 export declare function selectFallbackRoute(current: {
     provider: string;
     model: string;
+    reasoningEffort?: string;
 }, fallback: {
     provider: string;
     model: string;
+    reasoningEffort?: string;
 } | undefined, failureCode: string, alreadySwitched: boolean): {
     retry: boolean;
     switched: boolean;
     selection: {
         provider: string;
         model: string;
+        reasoningEffort?: string;
     };
 };
 /** Deliver a durable member report to the live captain at its next model step. */

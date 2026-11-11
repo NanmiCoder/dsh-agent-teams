@@ -8,14 +8,14 @@
  * rounds, removal recovery, mailbox fallback and concurrent claims.
  */
 
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { LlmError } from '@deepseek-ai/dsh-llm'
-import { haltTeamWork, registerAgentTeamsTools } from '../lib/tools.js'
-import { buildActivationDirective, invokedAgentTeamsGoal, invokedAgentTeamsInvocation, installAgentTeamsGestureBoundary, profileCommandName, registerAgentTeamsCommand } from '../lib/command.js'
-import { readArchivedTeam, readMailbox, readTeam, readUnreadMailbox } from '../lib/state.js'
-import { assembleTeamSnapshot, collectArchivedTeamsActivity } from '../lib/snapshot.js'
+import { haltTeamWork, registerAgentTeamsTools } from '../src/tools.ts'
+import { buildActivationDirective, invokedAgentTeamsGoal, invokedAgentTeamsInvocation, installAgentTeamsGestureBoundary, profileCommandName, registerAgentTeamsCommand } from '../src/command.ts'
+import { readArchivedTeam, readMailbox, readTeam, readUnreadMailbox } from '../src/state.ts'
+import { assembleTeamSnapshot, collectArchivedTeamsActivity } from '../src/snapshot.ts'
 
 const deliveryHarness = process.argv.includes('--delivery-harness')
 const modernHarness = deliveryHarness || process.argv.includes('--modern-harness')
@@ -30,6 +30,7 @@ const deliveries = []
 const listeners = new Map()
 const childListeners = new Map()
 const continuableSetups = []
+const memberSetupDisposers = new Map()
 const failNextDelivery = new Set()
 const failNextDrain = new Set()
 const failures = []
@@ -59,6 +60,7 @@ function makeAgent(id, parentSession) {
     id,
     status: 'idle',
     options: { provider: 'fake', model: 'fake-model' },
+    model: { selection: undefined, select(selection) { this.selection = { ...selection } } },
     session: session(parentSession),
     followups: [],
     steers: [],
@@ -144,6 +146,7 @@ function emitTurnError(child, failure) {
 const captain = makeAgent('captain-session')
 liveAgents.set(captain.id, captain)
 let advertisedModels = []
+let resolveCallBarrier
 // A non-AgentTeams continuable sibling must survive every team lifecycle
 // operation untouched.
 children.push({ id: 'foreign-session', label: 'unrelated continuable', mode: 'continuable' })
@@ -168,6 +171,10 @@ const ctx = {
   },
   llm: {
     async resolveCallConfig(config) {
+      if (resolveCallBarrier?.provider === config.provider) {
+        resolveCallBarrier.entered()
+        await resolveCallBarrier.wait
+      }
       return config
     },
     async listModels(provider) {
@@ -210,7 +217,10 @@ const ctx = {
       if (modernHarness) {
         for (const listener of listeners.get('agent/session-start') ?? []) listener({ agent: child, source: 'startup' })
       } else {
-        for (const setup of continuableSetups) setup(child.ctx)
+        for (const setup of continuableSetups) {
+          const dispose = setup(child.ctx)
+          if (typeof dispose === 'function') memberSetupDisposers.set(child.id, dispose)
+        }
       }
       deliveries.push({ childId: id, content: spec.request.prompt, mode: 'initial' })
       return { childId: id, messageId: `initial-${childSeq}` }
@@ -283,7 +293,7 @@ function directPrompt(parent, childId, content, options) {
 const agentTeamsRuntime = registerAgentTeamsTools(ctx, {
   stateDir: '.agent-teams',
   memberProvider: 'spawn',
-  fallback: { provider: 'backup', model: 'backup-model' },
+  fallback: { provider: 'backup', model: 'backup-model', reasoningEffort: 'high' },
   memberMaxDepth: 1,
   maxMembers: 8,
   profiles: {
@@ -773,7 +783,162 @@ try {
   }
   check('quality implementation without contract is rejected', missingContractRejected)
   const qualityTeam = await readTeam(stateRoot, 'quality-loop')
-  const builder = [...liveAgents.values()].find(agent => qualityTeam?.members.some(member => member.id === agent.id && member.name === 'builder'))
+  let builder = [...liveAgents.values()].find(agent => qualityTeam?.members.some(member => member.id === agent.id && member.name === 'builder'))
+  const builderRecord = qualityTeam.members.find(member => member.name === 'builder')
+  const originalAttempt = qualityTeam.tasks.find(item => item.id === impl.task_id)
+  const originalSelection = builder?.model.selection
+  check('spawned member starts with its resolved primary selection',
+    builder !== undefined && originalSelection?.provider === builderRecord.provider
+      && originalSelection?.model === builderRecord.model && originalSelection?.reasoningEffort === builderRecord.reasoningEffort)
+
+  // Hold a route edit inside the team lock while an older request-error handler
+  // queues its fallback transition. The fallback must lose its revision CAS.
+  let enteredRouteResolve
+  let releaseRouteResolve
+  let enteredRouteResolvePromise
+  const routeResolved = new Promise(resolve => { enteredRouteResolve = resolve })
+  const routeGate = new Promise(resolve => { releaseRouteResolve = resolve })
+  resolveCallBarrier = { provider: 'route-provider', entered: () => enteredRouteResolve(), wait: routeGate }
+  const routeEdit = call('agent_teams_edit_plan', { operations: [{ action: 'update_member', member_name: 'builder', provider: 'route-provider', model: 'route-model' }] })
+  await routeResolved
+  const olderFallback = emitRequestError(builder, { code: 'QUOTA', message: 'simulated quota failure' })
+  releaseRouteResolve()
+  await routeEdit
+  resolveCallBarrier = undefined
+  await olderFallback
+  let rerouted = await readTeam(stateRoot, 'quality-loop')
+  let reroutedBuilder = rerouted.members.find(member => member.name === 'builder')
+  check('resident route changes apply to the next selection without replacing member or task attempt',
+    builder.id === builderRecord.id && reroutedBuilder.id === builderRecord.id
+      && rerouted.tasks.find(item => item.id === impl.task_id).attemptId === originalAttempt.attemptId
+      && builder.model.selection.provider === 'route-provider' && builder.model.selection.model === 'route-model'
+      && reroutedBuilder.routeRevision === 1 && !reroutedBuilder.fallbackActive)
+  const routeStatus = await call('agent_teams_status', {})
+  check('status reports the active rerouted selection rather than the spawn descriptor route',
+    routeStatus.members.find(member => member.name === 'builder').provider === 'route-provider'
+      && routeStatus.members.find(member => member.name === 'builder').model === 'route-model')
+
+  const orderedBatch = await call('agent_teams_edit_plan', { operations: [
+    { action: 'update_member', member_name: 'builder', provider: 'batch-provider', model: 'batch-model' },
+    { action: 'update_member', member_name: 'builder', reasoning_effort: 'high' },
+  ] })
+  rerouted = await readTeam(stateRoot, 'quality-loop')
+  reroutedBuilder = rerouted.members.find(member => member.name === 'builder')
+  check('ordered batch merges second effort-only edit against first route edit',
+    orderedBatch.members === rerouted.members.length && reroutedBuilder.activeProvider === 'batch-provider'
+      && reroutedBuilder.activeModel === 'batch-model' && reroutedBuilder.activeReasoningEffort === 'high'
+      && builder.model.selection.provider === 'batch-provider' && builder.model.selection.model === 'batch-model'
+      && builder.model.selection.reasoningEffort === 'high')
+
+  await call('agent_teams_edit_plan', { operations: [{ action: 'update_member', member_name: 'builder', reasoning_effort: 'low' }] })
+  await call('agent_teams_edit_plan', { operations: [{ action: 'update_member', member_name: 'builder', reasoning_effort: 'minimal' }] })
+  rerouted = await readTeam(stateRoot, 'quality-loop')
+  reroutedBuilder = rerouted.members.find(member => member.name === 'builder')
+  check('consecutive effort-only edits preserve the current model route',
+    reroutedBuilder.activeProvider === 'batch-provider' && reroutedBuilder.activeModel === 'batch-model'
+      && reroutedBuilder.activeReasoningEffort === 'minimal' && builder.model.selection.provider === 'batch-provider'
+      && builder.model.selection.model === 'batch-model' && builder.model.selection.reasoningEffort === 'minimal')
+
+  const beforeRejectedBatch = JSON.stringify(reroutedBuilder)
+  const beforeRejectedSelection = JSON.stringify(builder.model.selection)
+  let rejectedMixedBatch = false
+  try {
+    await call('agent_teams_edit_plan', { operations: [
+      { action: 'update_member', member_name: 'builder', provider: 'must-not-commit', model: 'must-not-commit' },
+      { action: 'update_task', task_id: impl.task_id, subject: 'cannot edit active task' },
+    ] })
+  } catch { rejectedMixedBatch = true }
+  rerouted = await readTeam(stateRoot, 'quality-loop')
+  reroutedBuilder = rerouted.members.find(member => member.name === 'builder')
+  check('invalid mixed batch leaves durable and resident selections unchanged', rejectedMixedBatch
+    && JSON.stringify(reroutedBuilder) === beforeRejectedBatch
+    && JSON.stringify(builder.model.selection) === beforeRejectedSelection)
+
+  const disposer = memberSetupDisposers.get(builder.id)
+  disposer?.()
+  memberSetupDisposers.delete(builder.id)
+  liveAgents.delete(builder.id)
+  const resumedBuilder = makeAgent(builder.id, captain.id)
+  resumedBuilder.session = builder.session
+  resumedBuilder.ctx = childContext(resumedBuilder)
+  liveAgents.set(resumedBuilder.id, resumedBuilder)
+  if (modernHarness) {
+    for (const listener of listeners.get('agent/session-start') ?? []) listener({ agent: resumedBuilder, source: 'resume' })
+  } else {
+    for (const setup of continuableSetups) {
+      const coldSetup = setup(resumedBuilder.ctx)
+      if (typeof coldSetup === 'function') memberSetupDisposers.set(resumedBuilder.id, coldSetup)
+    }
+  }
+  builder = resumedBuilder
+  check('cold recovery restores the committed route and effort from team state',
+    builder.model.selection.provider === 'batch-provider' && builder.model.selection.model === 'batch-model'
+      && builder.model.selection.reasoningEffort === 'minimal')
+  // The fixture resumes a new Agent object but keeps the current claimed attempt.
+  builder.status = 'running'
+
+  const fallbackAction = await emitRequestError(builder, { code: 'QUOTA', message: 'simulated quota failure' })
+  let fallbackState = await readTeam(stateRoot, 'quality-loop')
+  const fallbackMember = fallbackState.members.find(member => member.name === 'builder')
+  check('configured fallback survives reroutes and handles a simulated quota failure',
+    fallbackAction === undefined && fallbackMember.fallback.provider === 'backup'
+      && fallbackMember.fallback.model === 'backup-model' && fallbackMember.fallback.reasoningEffort === 'high'
+      && fallbackMember.fallbackActive === true && builder.model.selection.provider === 'backup'
+      && builder.model.selection.model === 'backup-model' && builder.model.selection.reasoningEffort === 'high'
+      && fallbackMember.activeReasoningEffort === 'high')
+
+  await call('agent_teams_edit_plan', { operations: [{ action: 'update_member', member_name: 'builder', provider: 'reroute-after-fallback', model: 'rerouted-primary' }] })
+  const reroutedAfterFallback = await readTeam(stateRoot, 'quality-loop')
+  const memberAfterReroute = reroutedAfterFallback.members.find(member => member.name === 'builder')
+  check('reroute after fallback restores primary route and opens a fresh fallback opportunity',
+    memberAfterReroute.fallbackActive === false && memberAfterReroute.activeProvider === 'reroute-after-fallback'
+      && builder.model.selection.provider === 'reroute-after-fallback'
+      && builder.model.selection.model === 'rerouted-primary')
+  await emitRequestError(builder, { code: 'QUOTA', message: 'simulated second quota failure' })
+  fallbackState = await readTeam(stateRoot, 'quality-loop')
+  const refallbackMember = fallbackState.members.find(member => member.name === 'builder')
+  check('same resident can fallback again after fallback-to-reroute',
+    refallbackMember.fallbackActive === true && refallbackMember.activeProvider === 'backup'
+      && refallbackMember.routeRevision === memberAfterReroute.routeRevision + 1
+      && builder.model.selection.provider === 'backup' && builder.model.selection.model === 'backup-model'
+      && builder.model.selection.reasoningEffort === 'high')
+
+  const fallbackDisposer = memberSetupDisposers.get(builder.id)
+  fallbackDisposer?.()
+  memberSetupDisposers.delete(builder.id)
+  liveAgents.delete(builder.id)
+  const fallbackResumedBuilder = makeAgent(builder.id, captain.id)
+  fallbackResumedBuilder.session = builder.session
+  fallbackResumedBuilder.ctx = childContext(fallbackResumedBuilder)
+  liveAgents.set(fallbackResumedBuilder.id, fallbackResumedBuilder)
+  if (modernHarness) {
+    for (const listener of listeners.get('agent/session-start') ?? []) listener({ agent: fallbackResumedBuilder, source: 'resume' })
+  } else {
+    for (const setup of continuableSetups) {
+      const coldSetup = setup(fallbackResumedBuilder.ctx)
+      if (typeof coldSetup === 'function') memberSetupDisposers.set(fallbackResumedBuilder.id, coldSetup)
+    }
+  }
+  builder = fallbackResumedBuilder
+  builder.status = 'running'
+  check('cold recovery restores the fallback route and its configured high effort',
+    builder.model.selection.provider === 'backup' && builder.model.selection.model === 'backup-model'
+      && builder.model.selection.reasoningEffort === 'high')
+
+  const malformedTeam = structuredClone(fallbackState)
+  malformedTeam.members.find(member => member.name === 'builder').activeReasoningEffort = 7
+  await writeFile(join(stateRoot, 'quality-loop', 'team.json'), JSON.stringify(malformedTeam))
+  let malformedRouteRejected = false
+  try { await readTeam(stateRoot, 'quality-loop') } catch (error) { malformedRouteRejected = error.message.includes('invalid AgentTeams state') }
+  await writeFile(join(stateRoot, 'quality-loop', 'team.json'), JSON.stringify(fallbackState, null, 2))
+  const malformedFallbackEffort = structuredClone(fallbackState)
+  malformedFallbackEffort.members.find(member => member.name === 'builder').fallback.reasoningEffort = 7
+  await writeFile(join(stateRoot, 'quality-loop', 'team.json'), JSON.stringify(malformedFallbackEffort))
+  let malformedFallbackRejected = false
+  try { await readTeam(stateRoot, 'quality-loop') } catch (error) { malformedFallbackRejected = error.message.includes('invalid AgentTeams state') }
+  await writeFile(join(stateRoot, 'quality-loop', 'team.json'), JSON.stringify(fallbackState, null, 2))
+  check('durable validator rejects invalid active and configured fallback effort types', malformedRouteRejected && malformedFallbackRejected)
+
   let criticMember
   const implClaim = await call('agent_teams_claim_task', { task_id: impl.task_id }, builder)
   const claimedSnapshot = await assembleTeamSnapshot(ctx, stateRoot, workspace, await readTeam(stateRoot, 'quality-loop'))

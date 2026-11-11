@@ -18,6 +18,8 @@ export declare const PROFILE_PROTOCOL_PROMPT_LIMIT = 240;
 export interface TeamModelFallbackConfig {
     provider: string;
     model: string;
+    /** Optional effort validated against the fallback target model. */
+    reasoningEffort?: string;
 }
 export interface TeamProfileMemberConfig {
     name: string;

@@ -279,6 +279,10 @@ export interface TeamMember {
   /** Active route after fallback, without changing the primary descriptor route. */
   activeProvider?: string
   activeModel?: string
+  /** Effort paired with the active route (reroute or fallback). */
+  activeReasoningEffort?: string
+  /** Monotonic generation for active route changes, used to reject stale fallback writes. */
+  routeRevision?: number
   /** Whether the fallback route is currently active. */
   fallbackActive?: boolean
   /**
@@ -338,6 +342,7 @@ export interface TeamMessage {
 export interface TeamModelFallback {
   provider: string
   model: string
+  reasoningEffort?: string
 }
 
 export interface TeamProfileSnapshot {

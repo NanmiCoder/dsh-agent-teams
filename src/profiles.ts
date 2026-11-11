@@ -21,13 +21,15 @@ export const PROFILE_PROTOCOL_PROMPT_LIMIT = 240
 const PROFILE_KEYS = ['description', 'protocol', 'executionPrompt', 'fallback', 'members', 'tasks', 'taskPlanning', 'reviewPolicy'] as const
 const REVIEW_POLICY_KEYS = ['requirementsMinRounds', 'requirementsMaxRounds', 'codeMaxRounds', 'maxRepairAttempts', 'requiredReviewers'] as const
 const MEMBER_KEYS = ['name', 'role', 'provider', 'model', 'reasoning_effort', 'executionPrompt', 'fallback', 'tool_policy'] as const
-const FALLBACK_KEYS = ['provider', 'model'] as const
+const FALLBACK_KEYS = ['provider', 'model', 'reasoningEffort'] as const
 const TASK_KEYS = ['id', 'subject', 'description', 'assignee', 'dependencies'] as const
 
 /** One member row in a named team-profile template (unresolved). */
 export interface TeamModelFallbackConfig {
   provider: string
   model: string
+  /** Optional effort validated against the fallback target model. */
+  reasoningEffort?: string
 }
 
 export interface TeamProfileMemberConfig {
@@ -479,7 +481,8 @@ function normalizeFallback(value: unknown, path: string): TeamModelFallbackConfi
   assertAllowedKeys(raw, FALLBACK_KEYS, path)
   const provider = requiredNonEmptyString(raw['provider'], `${path}.provider`, `${path}.provider must not be empty`)
   const model = requiredNonEmptyString(raw['model'], `${path}.model`, `${path}.model must not be empty`)
-  return { provider, model }
+  const reasoningEffort = optionalNonEmptyString(raw['reasoningEffort'], `${path}.reasoningEffort`)
+  return omitUndefined({ provider, model, reasoningEffort })
 }
 
 function normalizeTask(

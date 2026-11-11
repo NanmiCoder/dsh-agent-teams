@@ -129,6 +129,8 @@ export type StagedPlanMutation =
       executionPrompt?: string | null
       /** Selected tool-policy id; an empty string clears it back to no policy. */
       toolPolicy?: string
+      /** Fields explicitly supplied by the caller; used to distinguish route-only edits. */
+      touched?: { provider?: boolean; model?: boolean; reasoningEffort?: boolean; role?: boolean; executionPrompt?: boolean; toolPolicy?: boolean }
     }
   | {
       action: 'update_task'
@@ -731,12 +733,55 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
       const staged = fresh.phase === 'staged'
       if (!staged && !allowPendingEdits) requireStagedTeam(fresh)
       if (fresh.halted === true) throw new Error('team is halted; resume before editing tasks')
-      if (!staged && mutations.some(mutation => mutation.action !== 'update_task')) {
-        throw new Error('a running team only permits update_task edits to pending, never-started tasks; roster and removal edits require a staged plan')
+      const routeOnly = (mutation: StagedPlanMutation): boolean => mutation.action === 'update_member'
+        && mutation.touched !== undefined
+        && mutation.touched.role !== true
+        && mutation.touched.executionPrompt !== true
+        && mutation.touched.toolPolicy !== true
+      if (!staged && mutations.some(mutation => mutation.action !== 'update_task' && !routeOnly(mutation))) {
+        throw new Error('a running team only permits pending update_task edits and route-only update_member reroutes; other roster/removal edits require a staged plan')
       }
+      const residentUpdates: Array<{ id: string; selection: import('./members.ts').MemberLlmSelection; routeRevision: number }> = []
       for (const mutation of mutations) {
         if (mutation.action === 'update_member') {
           const member = requireMember(fresh, mutation.memberName)
+          if (!staged && member.id === '') {
+            throw new Error(`running team member "${member.name}" has not spawned; only spawned members may be rerouted`)
+          }
+          if (member.id !== '' && !staged) {
+            if (member.stopping === true || fresh.tasks.some(task => task.reassigning === true && task.assignee === member.name)) {
+              throw new Error(`member "${member.name}" is stopping or being reassigned; retry the route change after it settles`)
+            }
+            if (!routeOnly(mutation)) throw new Error(`spawned member "${member.name}" supports route-only changes`)
+            if (ctx.agents.get(member.id as SessionId) !== undefined && !memberSelections.canUpdateResident(member.id)) {
+              throw new Error(`member "${member.name}" is resident but its selection bridge is not ready; retry when its runtime setup is active`)
+            }
+            const touched = mutation.touched!
+            if (touched.provider !== true && touched.model !== true && touched.reasoningEffort !== true) {
+              throw new Error(`spawned member "${member.name}" requires provider, model, or reasoning_effort`)
+            }
+            const oldProvider = (member.activeProvider ?? member.provider ?? '').trim()
+            const oldModel = (member.activeModel ?? member.model ?? '').trim()
+            const provider = touched.provider === true ? mutation.provider : oldProvider
+            const model = touched.model === true ? mutation.model : oldModel
+            const routeChanged = provider !== oldProvider || model !== oldModel
+            const effort = touched.reasoningEffort === true
+              ? trimmedOptional(mutation.reasoningEffort)
+              : routeChanged ? undefined
+                : member.activeProvider !== undefined || member.activeModel !== undefined
+                  ? member.activeReasoningEffort
+                  : member.reasoningEffort
+            const selection = await resolveMemberLlmSelection(ctx, captain, {
+              provider, model, reasoningEffort: effort, fallback: member.fallback,
+            }, signal)
+            member.routeRevision = (member.routeRevision ?? 0) + 1
+            member.activeProvider = selection.provider
+            member.activeModel = selection.model
+            member.activeReasoningEffort = selection.reasoningEffort
+            member.fallbackActive = false
+            residentUpdates.push({ id: member.id, selection, routeRevision: member.routeRevision })
+            continue
+          }
           if (member.id !== '') throw new Error(`staged member "${member.name}" was already spawned`)
           const selection = await resolveMemberLlmSelection(ctx, captain, {
             provider: mutation.provider,
@@ -815,6 +860,11 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
       } else fresh.planReviewState = 'awaiting_review'
       signal?.throwIfAborted()
       await writeTeam(stateRoot, fresh)
+      for (const update of residentUpdates) {
+        if (!memberSelections.updateResident(update.id, update.selection, update.routeRevision)) {
+          ctx.logger.warn(`agent-teams: member ${update.id} route was committed but its live selection bridge is unavailable; cold recovery will apply it`)
+        }
+      }
       return fresh
     })
   }
@@ -1134,9 +1184,9 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
           member_name: member.name,
           member_id: member.id,
           ...member.role === undefined ? {} : { member_role: member.role },
-          provider: member.provider ?? '',
-          model: member.model ?? '',
-          ...member.reasoningEffort === undefined ? {} : { reasoning_effort: member.reasoningEffort },
+          provider: member.activeProvider ?? member.provider ?? '',
+          model: member.activeModel ?? member.model ?? '',
+          ...((member.activeProvider !== undefined || member.activeModel !== undefined) ? member.activeReasoningEffort : member.reasoningEffort) === undefined ? {} : { reasoning_effort: (member.activeProvider !== undefined || member.activeModel !== undefined) ? member.activeReasoningEffort : member.reasoningEffort },
           ...member.toolPolicy === undefined ? {} : { tool_policy: member.toolPolicy },
           status: member.status,
         })),
@@ -1155,12 +1205,12 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
 
   ctx.tools.register(defineTool({
     name: 'agent_teams_edit_plan',
-    description: 'Atomically revise an AgentTeams plan. While staged, edit tasks and roster without starting work. While running, only update_task is allowed, and only for pending tasks with no prior attempt: correct dependencies, assignees or descriptions before they start; newly ready work is scheduled after commit. Never edit active/finished attempts. Submit dependent edits in order. Never modify .agent-teams files directly.',
+    description: 'Atomically revise an AgentTeams plan. While staged, edit tasks and roster without starting work. While running, update_task is limited to pending tasks with no prior attempt, and update_member may change only provider, model, or reasoning_effort for an already-spawned member; the new route applies at its next model-step boundary. Other roster edits remain staged-only. Never edit active/finished task attempts. Submit dependent edits in order. Never modify .agent-teams files directly.',
     parameters: {
       operations: {
         type: 'array',
         required: true,
-        description: 'One atomic, ordered batch. Running teams allow only update_task for never-started pending tasks. If any operation is invalid, none of the edits are saved.',
+        description: 'One atomic, ordered batch. Running teams allow update_task for never-started pending tasks and route-only update_member edits for spawned members. If any operation is invalid, none of the edits are saved.',
         items: {
           type: 'object',
           additionalProperties: false,
@@ -1228,6 +1278,14 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
             // Omitted means "keep the current policy": a route/prompt revision
             // must not silently change what the member may do.
             ...operation.tool_policy === undefined ? {} : { toolPolicy: operation.tool_policy },
+            touched: {
+              provider: operation.provider !== undefined,
+              model: operation.model !== undefined,
+              reasoningEffort: operation.reasoning_effort !== undefined,
+              role: operation.role !== undefined,
+              executionPrompt: operation.execution_prompt !== undefined,
+              toolPolicy: operation.tool_policy !== undefined,
+            },
           }
         }
         if (operation.action === 'update_task') {
@@ -2363,9 +2421,9 @@ export function registerAgentTeamsTools(ctx: Context, config: ToolsConfig): Agen
         .map((member) => ({
           name: member.name,
           role: member.role ?? '',
-          provider: member.provider ?? '',
-          model: member.model ?? '',
-          reasoning_effort: member.reasoningEffort ?? '',
+          provider: member.activeProvider ?? member.provider ?? '',
+          model: member.activeModel ?? member.model ?? '',
+          reasoning_effort: (member.activeProvider !== undefined || member.activeModel !== undefined) ? member.activeReasoningEffort ?? '' : member.reasoningEffort ?? '',
           tool_policy: member.toolPolicy ?? '',
           status: member.status,
           activity: member.id !== '' ? (activity.get(member.id) ?? 'unknown') : 'unspawned',

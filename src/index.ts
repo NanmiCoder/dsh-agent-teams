@@ -115,7 +115,7 @@ export interface Config {
 // are optional, so model absence explicitly; otherwise a missing route is
 // validated as an empty object and fails on the required provider/model keys.
 const fallbackRouteConfig = z.union([
-  z.object({ provider: z.string().required(), model: z.string().required() }),
+  z.object({ provider: z.string().required(), model: z.string().required(), reasoningEffort: z.string() }),
   z.const(undefined),
 ])
 

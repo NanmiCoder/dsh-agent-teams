@@ -21,7 +21,7 @@ export const linkDirectory = (target, path) => {
     symlinkSync(target, path, process.platform === 'win32' ? 'junction' : 'dir');
 };
 
-export const runtimeScenarios = ['lifecycle', 'fallback', 'failure', 'captain-idle-wakeup', 'progressive-entry', 'web-approval', 'protocol-compatibility', 'stability'];
+export const runtimeScenarios = ['lifecycle', 'fallback', 'failure', 'captain-idle-wakeup', 'progressive-entry', 'web-approval', 'protocol-compatibility', 'stability', 'reroute', 'fallback-high'];
 
 /** The direct fixture link cannot prove that a user's plugin install is accepted. */
 export async function runPluginInstallation({ version, pluginVersion, artifact, runtime, report, command, environment }) {
@@ -55,13 +55,18 @@ for (const scenario of selectedScenarios) {
         // Patch entries replace a same-id entry wholesale, so repeat the
         // full dsh-base configuration and change only the tool name.
         writeFileSync(join(profile, 'cordis.patch.yml'), readFileSync(join(profile, 'cordis.patch.yml'), 'utf8') + '- id: tool-subagent\n  name: \'@deepseek-ai/dsh-tool-subagent\'\n  config:\n    provider: spawn\n    toolName: subagent_legacy\n    backgroundMode: continuable\n');
-    if (scenario === 'fallback')
-        writeFileSync(join(profile, 'cordis.patch.yml'), readFileSync(join(profile, 'cordis.patch.yml'), 'utf8') + '- id: agent-teams\n  config:\n    stateDir: .agent-teams\n    memberProvider: spawn\n    fallback:\n      provider: runtime-lab\n      model: fixture-fallback\n');
+    if (scenario === 'fallback' || scenario === 'fallback-high')
+        writeFileSync(join(profile, 'cordis.patch.yml'), readFileSync(join(profile, 'cordis.patch.yml'), 'utf8') + `- id: agent-teams\n  config:\n    stateDir: .agent-teams\n    memberProvider: spawn\n    fallback:\n      provider: runtime-lab\n      model: fixture-fallback\n${scenario === 'fallback-high' ? '      reasoningEffort: high\n' : ''}`);
     // Custom drivers replace the task runner, while startup still provides
     // the host's filesystem and sandbox setup on newer Harness versions.
     if (scenario === 'captain-idle-wakeup') {
         copyFileSync(join(dirname(fileURLToPath(import.meta.url)), 'fixtures/harness-runtime-idle.mjs'), join(profile, 'fixture-idle.mjs'));
         writeFileSync(join(profile, 'cordis.patch.yml'), readFileSync(join(profile, 'cordis.patch.yml'), 'utf8') + '- id: headless-runner\n  disabled: true\n- insert:\n    - id: runtime-lab-idle-captain\n      name: ./fixture-idle.mjs\n');
+    }
+    if (scenario === 'reroute') {
+        copyFileSync(join(dirname(fileURLToPath(import.meta.url)), 'fixtures/harness-runtime-reroute.mjs'), join(profile, 'fixture-reroute.mjs'));
+        copyFileSync(join(dirname(fileURLToPath(import.meta.url)), 'fixtures/harness-runtime-tools.mjs'), join(profile, 'fixture-tools.mjs'));
+        writeFileSync(join(profile, 'cordis.patch.yml'), readFileSync(join(profile, 'cordis.patch.yml'), 'utf8') + '- id: headless-runner\n  disabled: true\n- insert:\n    - id: runtime-lab-reroute\n      name: ./fixture-reroute.mjs\n');
     }
     if (scenario === 'progressive-entry' || scenario === 'stability')
         copyFileSync(join(dirname(fileURLToPath(import.meta.url)), 'fixtures/harness-runtime-tools.mjs'), join(profile, 'fixture-tools.mjs'));
@@ -155,7 +160,7 @@ for (const scenario of selectedScenarios) {
 `);
     }
     const tracePath = join(report, scenario, 'trace.jsonl');
-    const result = await command([process.execPath, join(runtime, 'node_modules/@deepseek-ai/dsh/lib/bin.js'), '--profile', 'headless', 'Run the authorized deterministic AgentTeams fixture immediately.'], workspace, environment({ DSH_HOME: home, DSH_PERMISSION_MODE: 'danger-full-access', DSH_TELEMETRY_DISABLED: '1', LAB_TRACE: tracePath, LAB_TEAMS: '1', LAB_SCENARIO: scenario }), scenario, 90000);
+    const result = await command([process.execPath, join(runtime, 'node_modules/@deepseek-ai/dsh/lib/bin.js'), '--profile', 'headless', 'Run the authorized deterministic AgentTeams fixture immediately.'], workspace, environment({ DSH_HOME: home, DSH_PERMISSION_MODE: 'danger-full-access', DSH_TELEMETRY_DISABLED: '1', LAB_TRACE: tracePath, LAB_TEAMS: '1', LAB_SCENARIO: scenario, ...(scenario === 'reroute' ? { LAB_RELEASE_FILE: join(report, scenario, 'release') } : {}) }), scenario, 90000);
     const trace = existsSync(tracePath) ? readFileSync(tracePath, 'utf8').trim().split('\n').filter(Boolean).map(s => JSON.parse(s)) : [];
     if (scenario === 'stability') {
         const checks = ['hmr', 'lazy-start', 'running-plan-correction', 'steering', 'read-receipt-continuation', 'reassign', 'archive', 'batch-plan', 'terminal-evidence', 'report-retry', 'settlement-dedup'];
@@ -195,8 +200,22 @@ for (const scenario of selectedScenarios) {
     const requests = trace.filter(x => x.event === 'request' && x.purpose === undefined), memberRequests = requests.filter(x => x.isMember);
     const isFailure = scenario === 'failure';
     const memberToolsRestricted = rows => rows.length > 0 && rows.every(x => !x.toolNames.includes('agent_teams_create') && x.toolNames.includes('agent_teams_claim_task'));
-    const assertions = { exit0: result.code === 0 && !result.timedOut, productMarker: result.stdout.includes(isFailure ? 'AGENTTEAMS_EXPECTED_FAILURE_OK' : scenario === 'captain-idle-wakeup' ? 'CAPTAIN_IDLE_WAKEUP_OK' : 'AGENTTEAMS_PRODUCT_TURN_OK'), pluginToolsVisible: requests.some(x => x.toolNames.includes('agent_teams_create')), memberExecuted: memberRequests.length > 0, memberToolsRestricted: memberToolsRestricted(memberRequests), explicitReasoning: memberRequests.length > 0 && memberRequests.some(x => x.model !== 'fixture-fallback') && memberRequests.filter(x => x.model !== 'fixture-fallback').every(x => x.reasoningEffort === 'high'), taskTerminal: state?.tasks?.find(t => t.id === 't1')?.status === (isFailure ? 'failed' : 'completed') };
-    if (!isFailure && scenario !== 'captain-idle-wakeup')
+    const rerouteEvents = trace.filter(x => x.event === 'request' && x.isMember && !x.purpose);
+    const rerouteState = state;
+    const firstAttempt = rerouteEvents[0] && trace.find(x => x.event === 'reroute-first-attempt');
+    const rerouteMember = rerouteState?.members?.find(m => m.name === 'worker');
+    const rerouteTask = rerouteState?.tasks?.find(t => t.id === 't1');
+    const rerouteNext = rerouteEvents.find(x => x.model === 'fixture-rerouted');
+    const assertions = { exit0: result.code === 0 && !result.timedOut, productMarker: result.stdout.includes(isFailure ? 'AGENTTEAMS_EXPECTED_FAILURE_OK' : scenario === 'captain-idle-wakeup' ? 'CAPTAIN_IDLE_WAKEUP_OK' : scenario === 'reroute' ? 'REROUTE_RUNTIME_OK' : 'AGENTTEAMS_PRODUCT_TURN_OK'), pluginToolsVisible: requests.some(x => x.toolNames.includes('agent_teams_create')), memberExecuted: memberRequests.length > 0, memberToolsRestricted: memberToolsRestricted(memberRequests), explicitReasoning: memberRequests.length > 0 && memberRequests.some(x => x.model !== 'fixture-fallback') && (scenario === 'reroute' ? memberRequests.some(x => x.model === 'fixture-rerouted' && x.reasoningEffort === 'high') : memberRequests.filter(x => x.model !== 'fixture-fallback').every(x => x.reasoningEffort === 'high')),  taskTerminal: state?.tasks?.find(t => t.id === 't1')?.status === (isFailure ? 'failed' : 'completed') };
+    if (scenario === 'reroute') {
+        assertions.sameMemberSession = Boolean(firstAttempt && rerouteNext && firstAttempt.sessionId === rerouteNext.sessionId && firstAttempt.memberId === rerouteNext.sessionId);
+        assertions.newRouteAndEffortOnNextRequest = Boolean(rerouteNext?.model === 'fixture-rerouted' && rerouteNext?.reasoningEffort === 'high');
+        const assignmentAttemptId = rerouteEvents[0]?.userText.match(/Attempt id: ([a-f0-9-]+)/)?.[1];
+        assertions.attemptCapabilityPreserved = Boolean(assignmentAttemptId && rerouteTask?.attemptId === assignmentAttemptId && rerouteTask?.attempt === 1);
+        assertions.runningTeamReroutedMember = Boolean(rerouteMember?.activeModel === 'fixture-rerouted' && rerouteMember?.activeReasoningEffort === 'high');
+        assertions.taskCompleted = rerouteTask?.status === 'completed';
+    }
+    if (!isFailure && scenario !== 'captain-idle-wakeup' && scenario !== 'reroute')
         assertions.secondWake = memberRequests.some(x => x.userText.includes('SECOND_WAKE_FIXTURE'));
     if (scenario === 'captain-idle-wakeup') {
         const idle = trace.find(x => x.event === 'captain-idle-observed');
@@ -211,9 +230,10 @@ for (const scenario of selectedScenarios) {
         const busySend = trace.find(x => x.event === 'request' && !x.isMember && x.called.includes('agent_teams_send_message'));
         assertions.messagesSentWhileBusy = Boolean(firstMember && firstResponse && busySend && firstMember.time <= busySend.time && busySend.time < firstResponse.time);
     }
-    if (scenario === 'fallback') {
+    if (scenario === 'fallback' || scenario === 'fallback-high') {
         assertions.fallbackActivated = memberRequests.some(x => x.model === 'fixture-fallback') && state?.members?.some(m => m.fallbackActive && m.activeModel === 'fixture-fallback');
-        assertions.fallbackReasoningReset = memberRequests.some(x => x.model === 'fixture-fallback') && memberRequests.filter(x => x.model === 'fixture-fallback').every(x => x.reasoningEffort === 'low');
+        const expectedFallbackEffort = scenario === 'fallback-high' ? 'high' : 'low';
+        assertions.fallbackReasoningReset = memberRequests.some(x => x.model === 'fixture-fallback') && memberRequests.filter(x => x.model === 'fixture-fallback').every(x => x.reasoningEffort === expectedFallbackEffort);
         const primaryFailures = trace.filter(x => x.event === 'fallback-primary-auth');
         const firstFallback = memberRequests.find(x => x.model === 'fixture-fallback');
         const task = state?.tasks?.find(task => task.id === 't1');
@@ -227,7 +247,7 @@ for (const scenario of selectedScenarios) {
     runs.push({ scenario, passed, exit: { code: result.code, signal: result.signal, timedOut: result.timedOut }, assertions, requests: requests.length, memberRequests: memberRequests.length });
     if (state)
         json(join(report, scenario, 'team-evidence.json'), state);
-    if (passed && !isFailure && scenario !== 'captain-idle-wakeup') {
+    if (passed && !isFailure && scenario !== 'captain-idle-wakeup' && scenario !== 'reroute') {
         copyFileSync(join(dirname(fileURLToPath(import.meta.url)), 'fixtures/harness-runtime-resume.mjs'), join(profile, 'fixture-resume.mjs'));
         writeFileSync(join(profile, 'cordis.patch.yml'), readFileSync(join(profile, 'cordis.patch.yml'), 'utf8') + '- id: headless-runner\n  disabled: true\n- insert:\n    - id: runtime-lab-cold-resume\n      name: ./fixture-resume.mjs\n');
         const coldTrace = join(report, scenario, 'cold-trace.jsonl');
@@ -235,7 +255,7 @@ for (const scenario of selectedScenarios) {
         const cold = await command([process.execPath, join(runtime, 'node_modules/@deepseek-ai/dsh/lib/bin.js'), '--profile', 'headless', 'Run the deterministic cold restore fixture.'], workspace, environment({ DSH_HOME: home, DSH_PERMISSION_MODE: 'danger-full-access', DSH_TELEMETRY_DISABLED: '1', LAB_TRACE: coldTrace, LAB_TEAMS: '1', LAB_COLD: '1', LAB_SCENARIO: scenario, LAB_PARENT_SESSION: state.captainSessionId }), scenario + '-cold', 90000);
         const coldEvents = existsSync(coldTrace) ? readFileSync(coldTrace, 'utf8').trim().split('\n').filter(Boolean).map(s => JSON.parse(s)) : [];
         const coldMember = coldEvents.find(x => x.event === 'cold-member-completed');
-        const coldAssertions = { memberToolsRestricted: memberToolsRestricted(coldEvents.filter(x => x.event === 'request' && x.isMember && x.purpose === undefined)), exit0: cold.code === 0 && !cold.timedOut, driverCompleted: cold.stdout.includes('COLD_RESTORE_DRIVER_DONE'), sameMemberRestored: coldMember?.sessionId === state.members.find(m => m.name === 'worker')?.id, routeRestored: coldMember?.model === (scenario === 'fallback' ? 'fixture-fallback' : 'fixture-model'), reasoningRestored: coldMember?.reasoningEffort === (scenario === 'fallback' ? 'low' : 'high') };
+        const coldAssertions = { memberToolsRestricted: memberToolsRestricted(coldEvents.filter(x => x.event === 'request' && x.isMember && x.purpose === undefined)), exit0: cold.code === 0 && !cold.timedOut, driverCompleted: cold.stdout.includes('COLD_RESTORE_DRIVER_DONE'), sameMemberRestored: coldMember?.sessionId === state.members.find(m => m.name === 'worker')?.id, routeRestored: coldMember?.model === (['fallback', 'fallback-high'].includes(scenario) ? 'fixture-fallback' : 'fixture-model'), reasoningRestored: coldMember?.reasoningEffort === (scenario === 'fallback-high' ? 'high' : scenario === 'fallback' ? 'low' : 'high') };
         runs.push({ scenario: scenario + '-cold-restore', passed: Object.values(coldAssertions).every(Boolean), assertions: coldAssertions, exit: { code: cold.code, signal: cold.signal, timedOut: cold.timedOut } });
     }
 }

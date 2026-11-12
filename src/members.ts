@@ -50,7 +50,7 @@ export interface MemberRuntimeConfig {
   /** Plugin-wide execution prompt. */
   executionPrompt?: string
   /** Plugin-wide fallback route. */
-  fallback?: { provider: string; model: string }
+  fallback?: { provider: string; model: string; reasoningEffort?: string }
 }
 
 /** Durable provider/model/reasoning snapshot for one member. */
@@ -62,7 +62,7 @@ export interface MemberLlmSelection {
   /** Adapter-owned reasoning effort, absent when the target has no explicit/default effort. */
   reasoningEffort?: string
   /** Configured second-choice route. */
-  fallback?: { provider: string; model: string }
+  fallback?: { provider: string; model: string; reasoningEffort?: string }
 }
 
 /** Optional member-level route requested by the captain. */
@@ -78,7 +78,7 @@ export interface MemberLlmSelectionRequest {
   /** Explicit reasoning effort; "default" selects the target model's default effort. */
   reasoningEffort?: string
   /** Configured fallback route. */
-  fallback?: { provider: string; model: string }
+  fallback?: { provider: string; model: string; reasoningEffort?: string }
 }
 
 /** A composed member route plus where each half came from. */
@@ -140,7 +140,10 @@ export function composeMemberRoute(
 export interface MemberSelectionRuntime {
   /** Trusted fresh-child admission, before the durable member id is written. */
   isPendingMember(agent: Agent): boolean
-  /** Make one selection visible while Harness materializes the fresh child. */
+  /** Whether an active child has completed setup and can accept a live route update. */
+  canUpdateResident(memberId: string): boolean
+  /** Update an already-resident member's next-step route after the durable commit. */
+  updateResident(memberId: string, selection: MemberLlmSelection, routeRevision: number): boolean
   withPending<T>(
     parentSessionId: string,
     label: string,
@@ -191,11 +194,11 @@ export function isFallbackFailureCode(code: string): boolean {
 
 /** Pure state transition used by the request-error handler and TDD tests. */
 export function selectFallbackRoute(
-  current: { provider: string; model: string },
-  fallback: { provider: string; model: string } | undefined,
+  current: { provider: string; model: string; reasoningEffort?: string },
+  fallback: { provider: string; model: string; reasoningEffort?: string } | undefined,
   failureCode: string,
   alreadySwitched: boolean,
-): { retry: boolean; switched: boolean; selection: { provider: string; model: string } } {
+): { retry: boolean; switched: boolean; selection: { provider: string; model: string; reasoningEffort?: string } } {
   if (alreadySwitched || fallback === undefined || !isFallbackFailureCode(failureCode)) {
     return { retry: false, switched: alreadySwitched, selection: current }
   }
@@ -414,7 +417,8 @@ async function commitFallbackRoute(
   teamId: string,
   memberName: string,
   child: Agent,
-  fallback: { provider: string; model: string },
+  fallback: { provider: string; model: string; reasoningEffort?: string },
+  expectedRouteRevision: number,
   signal: AbortSignal,
   ctx: Context,
   activate: () => void,
@@ -423,9 +427,12 @@ async function commitFallbackRoute(
     const team = await readTeam(stateRoot, teamId)
     if (signal.aborted || team === undefined || team.captainSessionId !== child.session.header.parentSession || team.halted === true) return false
     const member = team.members.find(candidate => candidate.name === memberName && candidate.id === child.id)
-    if (member === undefined || member.status === 'removed' || member.stopping === true) return false
+    if (member === undefined || member.status === 'removed' || member.stopping === true
+      || (member.routeRevision ?? 0) !== expectedRouteRevision) return false
+    member.routeRevision = expectedRouteRevision + 1
     member.activeProvider = fallback.provider
     member.activeModel = fallback.model
+    member.activeReasoningEffort = fallback.reasoningEffort
     member.fallbackActive = true
     let committed = false
     const onCommit = (): void => {
@@ -454,7 +461,9 @@ function selectionFromMember(member: TeamMember | undefined): MemberLlmSelection
   if (provider === '' || model === '') return undefined
   // Effort ids belong to the original model. After a fallback, its own
   // provider default remains authoritative, including after cold recovery.
-  const reasoningEffort = member.fallbackActive === true ? undefined : member.reasoningEffort?.trim()
+  const reasoningEffort = member.activeProvider !== undefined || member.activeModel !== undefined
+    ? member.activeReasoningEffort?.trim()
+    : member.fallbackActive === true ? undefined : member.reasoningEffort?.trim()
   return {
     provider,
     model,
@@ -575,13 +584,39 @@ export async function resolveMemberLlmSelection(
   } catch (error: unknown) {
     throw new Error(describeMemberRouteFailure(provider, model, error), { cause: error })
   }
+  let resolvedFallback = fallback
+  if (fallback !== undefined) {
+    const fallbackEffort = fallback.reasoningEffort?.trim()
+    if (fallback.reasoningEffort !== undefined && fallbackEffort === '') {
+      throw new Error('fallback reasoning effort must not be empty')
+    }
+    let fallbackResolved: Awaited<ReturnType<typeof ctx.llm.resolveCallConfig>>
+    try {
+      fallbackResolved = await ctx.llm.resolveCallConfig({
+        provider: fallback.provider,
+        model: fallback.model,
+        ...fallbackEffort === undefined || fallbackEffort === 'default'
+          ? {}
+          : { reasoningEffort: ReasoningEffortId(fallbackEffort) },
+      }, signal)
+    } catch (error: unknown) {
+      throw new Error(describeMemberRouteFailure(fallback.provider, fallback.model, error), { cause: error })
+    }
+    resolvedFallback = {
+      provider: fallbackResolved.provider,
+      model: fallbackResolved.model,
+      ...fallbackEffort === undefined || fallbackEffort === 'default'
+        ? {}
+        : { reasoningEffort: String(fallbackResolved.reasoningEffort ?? fallbackEffort) },
+    }
+  }
   return {
     provider: resolved.provider,
     model: resolved.model,
     ...resolved.reasoningEffort === undefined
       ? {}
       : { reasoningEffort: String(resolved.reasoningEffort) },
-    ...fallback === undefined ? {} : { fallback },
+    ...resolvedFallback === undefined ? {} : { fallback: resolvedFallback },
   }
 }
 
@@ -651,6 +686,7 @@ export function installMemberSelectionRuntime(
   onFailureSettled?: (workspace: string, teamId: string, memberName: string) => Promise<void>,
 ): MemberSelectionRuntime {
   const pending = new Map<string, MemberLlmSelection>()
+  const residentSelections = new Map<string, (selection: MemberLlmSelection, routeRevision: number) => void>()
   const pendingSetup = new Map<string, NonNullable<TeamMember['runtimeSetup']>>()
   installContinuableMemberSetup(ctx, (childCtx, child) => {
     const descriptor = foldSubagentDescriptor(sessionOwnEvents(child.session))
@@ -802,6 +838,7 @@ export function installMemberSelectionRuntime(
     const cleanupFailure = (): void => { disposeOutputLimit(); disposeFailure(); cleanupAdmission() }
     // Legacy teams still need failure reporting even without a saved route.
     if (selection === undefined) return cleanupFailure
+    let routeRevision = savedMember?.routeRevision ?? 0
     const selectionRef = { current: modelSelection(selection), assembled: undefined as ModelSelection | undefined }
     // Newer Harness owns the next-step selection in the Agent's durable model
     // API. Its installModelSelection hook now only contributes switch notices.
@@ -809,24 +846,39 @@ export function installMemberSelectionRuntime(
     const nativeModel = typeof model?.select === 'function' ? model : undefined
     nativeModel?.select(selectionRef.current)
     const disposeSelection = installModelSelection(childCtx, selectionRef)
-    const fallback = selection.fallback
     let switched = false
+    const updateSelection = (next: MemberLlmSelection, nextRouteRevision: number): void => {
+      routeRevision = nextRouteRevision
+      // A captain-directed route change starts a fresh fallback opportunity.
+      switched = false
+      const nextModel = modelSelection(next)
+      selectionRef.current = nextModel
+      selectionRef.assembled = undefined
+      nativeModel?.select(nextModel)
+    }
+    residentSelections.set(child.id, updateSelection)
+    const fallback = selection.fallback
     const recoveryLifetime = new AbortController()
     const disposeFallback = childCtx.on('agent/request-error', async (payload, next) => {
       if (payload.agent.id !== child.id) return next()
       const transition = selectFallbackRoute(selectionRef.current, fallback, payload.failure.code, switched)
       if (fallback === undefined || !transition.retry) return next()
+      const fallbackSelection: MemberLlmSelection = {
+        ...transition.selection,
+        ...fallback.reasoningEffort === undefined ? {} : { reasoningEffort: fallback.reasoningEffort },
+      }
       // The turn can survive plugin unload. Stop any queued recovery when
       // this child setup is disposed while waiting for the team lock.
       const signal = AbortSignal.any([payload.signal, recoveryLifetime.signal])
       if (signal.aborted) return next()
-      const committed = await commitFallbackRoute(stateRoot, teamId, memberName, child, fallback, signal, ctx, () => {
+      const expectedRouteRevision = routeRevision
+      const committed = await commitFallbackRoute(stateRoot, teamId, memberName, child, fallback, expectedRouteRevision, signal, ctx, () => {
         switched = transition.switched
-        selectionRef.current = transition.selection
+        selectionRef.current = modelSelection(fallbackSelection)
         ctx.logger.warn(`agent-teams: member ${child.id} switching to fallback ${fallback.provider}/${fallback.model} after ${payload.failure.code}`)
         if (nativeModel === undefined) {
           // Legacy recovery rebuilds the request without rerunning assembly.
-          selectionRef.assembled = transition.selection
+          selectionRef.assembled = selectionRef.current
           return
         }
 
@@ -834,7 +886,7 @@ export function installMemberSelectionRuntime(
         // Close that step without failing its task, then wake the same member in
         // a new turn. The assignment and any completed calls are already in its
         // session history, so there is no task retry or replay of input.
-        nativeModel.select(transition.selection)
+        nativeModel.select(selectionRef.current)
         const continuation = createUserMessage({
           content: [{ type: 'text', text: 'AgentTeams switched to the configured fallback model. Continue the current work from the conversation history and recorded task state.' }],
           source: agentTeamsSource({ kind: 'agent-teams' }, observedSessionFormatVersion(child)),
@@ -857,12 +909,22 @@ export function installMemberSelectionRuntime(
     return () => {
       recoveryLifetime.abort()
       disposeFallback()
+      residentSelections.delete(child.id)
       disposeSelection()
       cleanupFailure()
     }
   })
 
   return {
+    canUpdateResident(memberId) {
+      return residentSelections.has(memberId)
+    },
+    updateResident(memberId, selection, routeRevision) {
+      const update = residentSelections.get(memberId)
+      if (update === undefined) return false
+      update(selection, routeRevision)
+      return true
+    },
     isPendingMember(agent) {
       const parent = agent.session.header.parentSession
       const descriptor = foldSubagentDescriptor(sessionOwnEvents(agent.session))

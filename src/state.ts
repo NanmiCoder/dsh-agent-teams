@@ -800,9 +800,11 @@ function isTeamMember(value: unknown): value is TeamMember {
     && isOptionalString(value['reasoningEffort'])
     && isOptionalString(value['activeProvider'])
     && isOptionalString(value['activeModel'])
+    && isOptionalString(value['activeReasoningEffort'])
+    && (value['routeRevision'] === undefined || (Number.isSafeInteger(value['routeRevision']) && (value['routeRevision'] as number) >= 0))
     && isOptionalString(value['spawnError'])
     && (value['executionPrompt'] === undefined || typeof value['executionPrompt'] === 'string')
-    && (value['fallback'] === undefined || (isRecord(value['fallback']) && typeof value['fallback']['provider'] === 'string' && typeof value['fallback']['model'] === 'string'))
+    && (value['fallback'] === undefined || (isRecord(value['fallback']) && typeof value['fallback']['provider'] === 'string' && typeof value['fallback']['model'] === 'string' && isOptionalString(value['fallback']['reasoningEffort'])))
     && (value['fallbackActive'] === undefined || typeof value['fallbackActive'] === 'boolean')
     // A member without a policy keeps the legacy shape: both fields stay absent.
     && isOptionalNonBlankString(value['toolPolicy'])
@@ -822,7 +824,7 @@ function isTeamProfileSnapshot(value: unknown): value is TeamProfileSnapshot {
     && isOptionalString(value['description'])
     && isOptionalString(value['protocol'])
     && (value['executionPrompt'] === undefined || typeof value['executionPrompt'] === 'string')
-    && (value['fallback'] === undefined || (isRecord(value['fallback']) && typeof value['fallback']['provider'] === 'string' && typeof value['fallback']['model'] === 'string'))
+    && (value['fallback'] === undefined || (isRecord(value['fallback']) && typeof value['fallback']['provider'] === 'string' && typeof value['fallback']['model'] === 'string' && isOptionalString(value['fallback']['reasoningEffort'])))
     && (value['taskPlanning'] === undefined || value['taskPlanning'] === 'captain' || value['taskPlanning'] === 'seed')
     && (value['reviewPolicy'] === undefined || isReviewPolicy(value['reviewPolicy']))
 }

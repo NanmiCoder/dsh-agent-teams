@@ -48,6 +48,15 @@ export type StagedPlanMutation = {
     executionPrompt?: string | null;
     /** Selected tool-policy id; an empty string clears it back to no policy. */
     toolPolicy?: string;
+    /** Fields explicitly supplied by the caller; used to distinguish route-only edits. */
+    touched?: {
+        provider?: boolean;
+        model?: boolean;
+        reasoningEffort?: boolean;
+        role?: boolean;
+        executionPrompt?: boolean;
+        toolPolicy?: boolean;
+    };
 } | {
     action: 'update_task';
     taskId: string;

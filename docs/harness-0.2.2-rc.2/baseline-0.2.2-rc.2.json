@@ -1,0 +1,65 @@
+{
+  "passed": false,
+  "version": "0.2.2-rc.2",
+  "artifactSha256": "3e528d0b3e9d00c3e93fe8c6eb062e1b390b42c4327be84d94bc98858c820192",
+  "pluginVersion": "0.1.29",
+  "testFiles": {
+    "compatibility.mjs": "7671a6174bb8098b1f9081facfec5452331ef7660f880d93a95c901de27bc32e",
+    "../compatibility.json": "5b421fffeff45061cf3c94c4bea92ed47da89bb07c613424e95479ba3316eef2",
+    "harness-validation.mjs": "cd31589d19c1bb5e1971319b65ce54d4b49173d000b662dac8647ed2adfc723f",
+    "harness-runtime-verify.mjs": "0be6e0efa09812e4b04b206772695ab59fcf10942c9e8294d4892e94b77907bf",
+    "harness-runtime-scenarios.mjs": "fd9b801616e1c40b8217f81ea78af21aa4214e9a0febce1c394c4c01cf2dacb6",
+    "fixtures/harness-runtime-llm.mjs": "ae41e2b8dcfb31524f3de24f8f341d55ed733e7574a0033adf80ff93f766ad2a",
+    "fixtures/harness-runtime-resume.mjs": "17f8be68c143a2f49e0c45de90665c4cf24aac2f06d8a415db062e71424b10a7",
+    "fixtures/harness-runtime-idle.mjs": "508f2437610624aaf5196c66c533a0f7b1da021343b1534c1a60818cca54bc72",
+    "fixtures/harness-runtime-entry.mjs": "7ee40d7b5cb83540c28862d0e6dcc0a22723d3b8b2621746e4d952498199aa97",
+    "fixtures/harness-runtime-web-approval.mjs": "983fb20addd90a9b36998fc8f662c4d394beb1ccba2adfc5068d9b2f41417897",
+    "fixtures/harness-runtime-protocol.mjs": "c57470d742efe94f4d0c97068d9e6dc6e4ea74f6f9155c49a72be031349fd746",
+    "fixtures/harness-runtime-stability.mjs": "209fc1684a4c00cdb0cddd7ce18940e25ac67011ab22c90e6617bef0c812fe8e",
+    "fixtures/harness-runtime-tools.mjs": "da1e77c81b5dfe08558ec5171d0f6dbf3aabae7edfca65b8e77698fb1980ba1b"
+  },
+  "node": "v26.7.0",
+  "platform": "darwin",
+  "arch": "arm64",
+  "cohortCount": 327,
+  "runs": [
+    {
+      "scenario": "lifecycle",
+      "passed": false,
+      "exit": {
+        "code": 1,
+        "signal": null,
+        "timedOut": false
+      },
+      "assertions": {
+        "exit0": false,
+        "productMarker": false,
+        "pluginToolsVisible": false,
+        "memberExecuted": false,
+        "memberToolsRestricted": false,
+        "explicitReasoning": false,
+        "taskTerminal": false,
+        "secondWake": false,
+        "fifoMessageOrder": false,
+        "messagesSentWhileBusy": false
+      },
+      "requests": 1,
+      "memberRequests": 0
+    },
+    {
+      "scenario": "plugin-manager-install",
+      "passed": true,
+      "assertions": {
+        "exit0": true,
+        "exactPluginVersion": true
+      }
+    }
+  ],
+  "unverified": [
+    "real provider APIs and credentials",
+    "browser interaction",
+    "other operating systems",
+    "native terminal execution",
+    "live user-data migration"
+  ]
+}

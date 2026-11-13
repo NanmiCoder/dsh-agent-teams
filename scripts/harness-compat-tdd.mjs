@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import { SubagentRuntime } from '@deepseek-ai/dsh-subagent'
-import { guardSubagentDelivery, installContinuableMemberSetup, memberToolFilter, queueMemberPrompt, restrictableToolNames, sessionOwnEvents } from '../lib/harness-compat.js'
+import { drainMemberChildren, guardSubagentCreation, guardSubagentDelivery, installContinuableMemberSetup, memberToolFilter, queueMemberPrompt, restrictableToolNames, sessionOwnEvents, startMember, steerMemberPrompt } from '../lib/harness-compat.js'
 import { installMemberSelectionRuntime, spawnMember } from '../lib/members.js'
 import { createTeamDir } from '../lib/state.js'
 import { CAPTAIN_TOOL_NAMES } from '../lib/tool-names.js'
@@ -42,6 +42,93 @@ function scope(extra = {}) {
 function modernRuntime() {
   return { [deliverKey]() {}, sendMessage() {} }
 }
+
+function treeRuntime() {
+  const accepted = []
+  const root = { id: 'captain', session: { header: {} } }
+  const manager = {
+    resident: new Map(),
+    async deliverToMember(owner, id, body, options) {
+      assert.equal(this, manager)
+      options.signal.throwIfAborted()
+      options.authorize?.()
+      accepted.push({ owner, id, body, ...options })
+      return 'accepted'
+    },
+    async dispose(activation) { assert.equal(this, manager); manager.resident.delete(activation.childId) },
+  }
+  const runtime = {
+    manager,
+    rootOf(agent) { assert.equal(this, runtime); if (agent !== root) throw Error('unavailable caller'); return root },
+    async startActivation(spec) { assert.equal(this, runtime); assert.equal(spec.parent, root); assert.ok(!('request' in spec)); return { childId: 'child', result: Promise.resolve({}) } },
+    sendMessage(sender, id, body, options) { return manager.deliverToMember(runtime.rootOf(sender), id, body, { ...options, delivery: 'steer', source: { kind: 'agent', sessionId: sender.id } }) },
+    prompt(request, signal) { return manager.deliverToMember(root, request.childSessionId, request.content, { signal, delivery: request.delivery, source: { kind: 'user', rpcId: request.requestId } }) },
+  }
+  return { runtime, root, manager, accepted }
+}
+
+await test('0.2.2-rc.2 tree ABI activates setup, flattens creation and preserves host FIFO provenance', async () => {
+  const { runtime, root, accepted } = treeRuntime()
+  const ctx = scope({ subagents: runtime })
+  installContinuableMemberSetup(ctx, () => () => {})
+  guardSubagentCreation(ctx, parent => assert.equal(parent, root))
+  const spec = { provider: 'spawn', label: 'worker', signal, request: { parent: root, prompt: content, persona: 'role', toolFilter: { deny: [] }, agentOptions: { model: 'chosen' } } }
+  assert.equal((await startMember(runtime, spec)).childId, 'child')
+  await queueMemberPrompt(runtime, root, 'child', content, signal)
+  await steerMemberPrompt(runtime, root, 'child', content, signal)
+  assert.deepEqual(accepted.map(item => [item.delivery, item.source]), [['queue', source], ['steer', source]])
+  ctx.dispose()
+})
+
+await test('0.2.2-rc.2 retirement guard covers host, model and browser delivery, survives HMR and preserves attribution', async () => {
+  const { runtime, root, manager, accepted } = treeRuntime()
+  const before = Object.getOwnPropertyDescriptor(manager, 'deliverToMember')
+  const first = scope({ subagents: runtime }), second = scope({ subagents: runtime })
+  guardSubagentDelivery(first, async (owner, id) => { assert.equal(owner, root); return id === 'retired-first' })
+  guardSubagentDelivery(second, async (_owner, id) => id === 'retired-second')
+  for (const id of ['retired-first', 'retired-second']) {
+    await assert.rejects(queueMemberPrompt(runtime, root, id, content, signal), { code: 'NOT_RESUMABLE' })
+    await assert.rejects(steerMemberPrompt(runtime, root, id, content, signal), { code: 'NOT_RESUMABLE' })
+    await assert.rejects(runtime.sendMessage(root, id, content, { signal }), { code: 'NOT_RESUMABLE' })
+    await assert.rejects(runtime.prompt({ childSessionId: id, content, delivery: 'queue', requestId: 'browser-id' }, signal), { code: 'NOT_RESUMABLE' })
+  }
+  assert.equal(accepted.length, 0)
+  await runtime.prompt({ childSessionId: 'unrelated', content, delivery: 'queue', requestId: 'browser-id' }, signal)
+  assert.deepEqual(accepted[0].source, { kind: 'user', rpcId: 'browser-id' })
+  first.dispose()
+  await queueMemberPrompt(runtime, root, 'retired-first', content, signal)
+  await assert.rejects(queueMemberPrompt(runtime, root, 'retired-second', content, signal), { code: 'NOT_RESUMABLE' })
+  second.dispose()
+  await queueMemberPrompt(runtime, root, 'retired-second', content, signal)
+  assert.notEqual(manager.deliverToMember, undefined)
+  // Out-of-order HMR may retain an inactive outer wrapper; it must be inert.
+  assert.equal(accepted.length, 3)
+  assert.ok(before.value)
+})
+
+await test('0.2.2-rc.2 targeted drain stops only the selected member branch and awaits in-flight creation', async () => {
+  const { runtime, root, manager } = treeRuntime()
+  const other = { id: 'other-root' }
+  for (const [id, owner, ancestors] of [['worker', root, ['captain']], ['grandchild', root, ['captain', 'worker']], ['sibling', root, ['captain']], ['outsider', other, ['other-root']]]) {
+    manager.resident.set(id, { childId: id, root: owner, ancestors })
+  }
+  let childSignal
+  const parent = { id: 'worker' }
+  runtime.rootOf = () => root
+  runtime.startActivation = async spec => {
+    childSignal = spec.signal
+    await new Promise((resolve, reject) => spec.signal.addEventListener('abort', () => reject(spec.signal.reason), { once: true }))
+  }
+  const ctx = scope({ subagents: runtime })
+  guardSubagentCreation(ctx, () => {})
+  const pending = runtime.startActivation({ parent, provider: 'spawn', label: 'pending', prompt: content, signal, delivery: 'parent' })
+  const rejected = assert.rejects(pending, error => error.name === 'AbortError')
+  await drainMemberChildren(runtime, root, ['worker'])
+  await rejected
+  assert.equal(childSignal.aborted, true)
+  assert.deepEqual([...manager.resident.keys()], ['sibling', 'outsider'])
+  ctx.dispose()
+})
 
 function child({ workspace = process.cwd(), effort, inherited = false } = {}) {
   const descriptor = { type: 'subagent/descriptor', data: {

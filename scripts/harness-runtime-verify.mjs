@@ -5,6 +5,7 @@
  * Optional: --runtime-dir <already prepared directory> --prepare-only
  */
 import { runRuntimeScenarios, runtimeScenarios, runPluginInstallation } from './harness-runtime-scenarios.mjs';
+import { inspectRuntimeCohort } from './harness-runtime-cohort.mjs';
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync, readFileSync, existsSync, copyFileSync } from 'node:fs';
 import { resolve, join, dirname } from 'node:path';
@@ -110,22 +111,11 @@ async function collectCohort() {
     return packages;
 }
 function verifyCohort() {
-    const lock = JSON.parse(readFileSync(join(runtime, 'package-lock.json'), 'utf8')), cohort = [];
-    for (const [path, entry] of Object.entries(lock.packages)) {
-        if (!/node_modules\/@deepseek-ai\/dsh(?:-[^/]+)?$/.test(path))
-            continue;
-        const installed = JSON.parse(readFileSync(join(runtime, path, 'package.json'), 'utf8'));
-        if (entry.version !== version || installed.version !== version)
-            throw Error(`Mixed host cohort ${path}: lock ${entry.version}, disk ${installed.version}, expected ${version}`);
-        cohort.push({ path, name: installed.name, version: entry.version, integrity: entry.integrity });
-    }
-    if (!cohort.some(x => x.name === '@deepseek-ai/dsh'))
-        throw Error('No actual Harness installation');
-    const result = { version, count: cohort.length, lockSha256: hash(join(runtime, 'package-lock.json')), cohort };
+    const result = inspectRuntimeCohort(runtime, version);
     json(join(report, 'cohort.json'), result);
     return result;
 }
-const testFiles = Object.fromEntries(['compatibility.mjs', '../compatibility.json', 'harness-validation.mjs', 'harness-runtime-verify.mjs', 'harness-runtime-scenarios.mjs', 'fixtures/harness-runtime-llm.mjs', 'fixtures/harness-runtime-resume.mjs', 'fixtures/harness-runtime-idle.mjs', 'fixtures/harness-runtime-entry.mjs', 'fixtures/harness-runtime-web-approval.mjs', 'fixtures/harness-runtime-protocol.mjs', 'fixtures/harness-runtime-stability.mjs', 'fixtures/harness-runtime-tools.mjs'].map(path => [path, hash(join(dirname(fileURLToPath(import.meta.url)), path))]));
+const testFiles = Object.fromEntries(['compatibility.mjs', '../compatibility.json', 'harness-validation.mjs', 'harness-runtime-verify.mjs', 'harness-runtime-cohort.mjs', 'harness-runtime-scenarios.mjs', 'fixtures/harness-runtime-llm.mjs', 'fixtures/harness-runtime-resume.mjs', 'fixtures/harness-runtime-idle.mjs', 'fixtures/harness-runtime-entry.mjs', 'fixtures/harness-runtime-web-approval.mjs', 'fixtures/harness-runtime-protocol.mjs', 'fixtures/harness-runtime-stability.mjs', 'fixtures/harness-runtime-tools.mjs'].map(path => [path, hash(join(dirname(fileURLToPath(import.meta.url)), path))]));
 let artifactSha;
 const manifestPath = join(runtime, 'package.json');
 let manifest = existsSync(manifestPath) ? JSON.parse(readFileSync(manifestPath, 'utf8')) : undefined;

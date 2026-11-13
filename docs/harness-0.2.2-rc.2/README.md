@@ -35,6 +35,8 @@ agent-teams: unsupported Harness subagent contract (cannot install complete reti
 
 用户随后授权提交并发布 `0.1.30`。该候选把 `0.2.2-rc.2` 加入 preview 矩阵，推荐宿主和开发闭包保持 `0.2.1-rc.2`；发布要求全部 13 个宿主、17 个 Ubuntu/Windows 目标通过同一份候选归档的完整兼容性门禁。此处的本机 `0.1.29` 报告不替代最终版本的 CI 证据。
 
+首次 CI 在 Linux/Windows 上暴露检查器的问题：npm lockfile 保留 `dsh-experimental-cua-macos`，但该包声明 `optional: true`、`os: [darwin]`，npm 在其他系统上正确地不安装它。原校验器在运行场景前就读取这个不存在的文件。新的 cohort 检查仅跳过被 `os`/`cpu` 明确排除的可选缺失包，并在 `cohort.json` 的 `skipped` 记录；锁文件版本仍必须一致，适用平台的可选缺失包、必需缺失包和磁盘版本混装仍拒绝通过。平台回归覆盖 Linux、Windows、macOS 和 CPU 约束。
+
 仓库 `publish.yml` 已通过 npm OIDC trusted publishing 发布 `0.1.29`，未读取 `NPM_TOKEN`，仓库 Actions Secrets 为空。npm 通知中的 `aa` Token 已过期，但不属于这条工作流的认证依赖。本次继续使用既有可信发布关系，不创建或上传不需要的长期 Token。发布结果及最终归档摘要以对应 Actions run 和 GitHub Release 为准。
 
 最终包 SHA-256：`2d3500f3ee3e60713cc6e4784eec7e15c644d11d9a47b0c8f0b6ba5b97970013`。可按以下命令重跑精确宿主验证，报告目录应使用新的隔离路径：

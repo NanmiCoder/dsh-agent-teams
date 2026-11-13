@@ -4,6 +4,47 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { linkDirectory } from './harness-runtime-scenarios.mjs';
+import { inspectRuntimeCohort } from './harness-runtime-cohort.mjs';
+
+test('cohort inspection admits only platform-excluded optional omissions and still rejects missing or mixed packages', t => {
+    const root = mkdtempSync(join(tmpdir(), 'runtime-cohort-'));
+    t.after(() => rmSync(root, { recursive: true, force: true }));
+    const version = '0.2.2-rc.2';
+    const host = 'node_modules/@deepseek-ai/dsh';
+    const macos = 'node_modules/@deepseek-ai/dsh-experimental-cua-macos';
+    const cpu = 'node_modules/@deepseek-ai/dsh-native-fixture';
+    const packages = {
+        [host]: { version },
+        [macos]: { version, optional: true, os: ['darwin'] },
+        [cpu]: { version, optional: true, cpu: ['arm64'] },
+    };
+    mkdirSync(join(root, host), { recursive: true });
+    writeFileSync(join(root, host, 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh', version }));
+    const inspect = (platform = 'linux', arch = 'x64') => {
+        writeFileSync(join(root, 'package-lock.json'), JSON.stringify({ packages }));
+        return inspectRuntimeCohort(root, version, { platform, arch });
+    };
+    for (const platform of ['linux', 'win32']) {
+        const result = inspect(platform);
+        assert.equal(result.count, 1);
+        assert.deepEqual(result.skipped.map(entry => entry.path), [macos, cpu]);
+    }
+    assert.throws(() => inspect('darwin'), /Missing host package.*cua-macos/);
+    assert.throws(() => inspect('linux', 'arm64'), /Missing host package.*native-fixture/);
+    packages[macos].optional = false;
+    assert.throws(() => inspect(), /Missing host package.*cua-macos/);
+    packages[macos].optional = true;
+    packages[macos].version = '0.2.2-rc.1';
+    assert.throws(() => inspect(), /Mixed host cohort.*lock/);
+    packages[macos].version = version;
+    packages[macos].os = ['!linux'];
+    assert.equal(inspect().skipped.length, 2);
+    packages[macos].os = ['any'];
+    assert.throws(() => inspect(), /Missing host package.*cua-macos/);
+    mkdirSync(join(root, macos), { recursive: true });
+    writeFileSync(join(root, macos, 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh-experimental-cua-macos', version: '0.2.2-rc.1' }));
+    assert.throws(() => inspect(), /Mixed host cohort.*disk/);
+});
 
 test('fixture package links work without Windows symlink privileges and replace stale links', t => {
     const root = mkdtempSync(join(tmpdir(), 'runtime link test '));

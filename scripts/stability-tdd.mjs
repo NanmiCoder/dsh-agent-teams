@@ -83,6 +83,9 @@ await test('reported completion suppresses only redundant native success settlem
   assert.equal((await admit([notice])).messages.length, 1, 'unaccepted mailbox report must not hide the fallback')
   await markMailboxDelivered(h.root, 'team', 'captain', [report.id])
   assert.equal((await admit([notice])).kind, 'reject', 'duplicate settlement must spend no model request')
+  const namedNotice = { ...notice, source: { ...notice.source, stopReason: 'completed', summary: 'Background subagent agent-3 finished and will do no further work unless you send it more.' } }
+  assert.equal((await admit([namedNotice])).kind, 'reject', '0.2.2-rc.2 names must not bypass successful settlement deduplication')
+  assert.equal((await admit([{ ...namedNotice, source: { ...namedNotice.source, stopReason: 'error' } }])).messages.length, 1, 'structured failure takes precedence over success-shaped prose')
   const user = { source: { kind: 'user' }, content: [{ type: 'text', text: 'Continue with new work' }] }
   assert.deepEqual((await admit([notice, user])).messages, [user], 'unrelated input must survive deduplication')
   for (const altered of [

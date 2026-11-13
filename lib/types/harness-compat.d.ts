@@ -113,6 +113,10 @@ export declare function onAgentReady(ctx: Context, listener: (agent: Agent, veto
 export declare function sessionOwnEvents(session: Session): readonly SessionEvent[];
 /** Legacy hosts log each chunk separately; current hosts embed the committed stream. */
 export declare function outputLimitTurn(event: SessionEvent): number | undefined;
+/** rc.2 summaries use tree names; the new structured reason owns the outcome. */
+export declare function successfulSubagentSettlement(source: MessageSource | undefined): source is Extract<MessageSource, {
+    kind: 'subagent-settled';
+}>;
 /** Install before the first request, including cold resume, with HMR cleanup. */
 export declare function installContinuableMemberSetup(ctx: Context, setup: Setup): void;
 /** Queue a distinct host-authored turn; never substitute model-message steer. */

@@ -3,7 +3,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { join } from 'node:path'
 import { acknowledgeMailbox, CAPTAIN_KEY, discardMailboxMessages, findTeamByCaptain, readMailbox, readUnreadMailbox, readTeam, sanitizeKey, withTeamLock } from './state.ts'
 import type { TeamMessage, TeamState } from './types.ts'
-import { sessionOwnEvents } from './harness-compat.ts'
+import { sessionOwnEvents, successfulSubagentSettlement } from './harness-compat.ts'
 import { leadIdentityOfAsync, sessionLeadsTeamAsync } from './lineage.ts'
 
 const PREFIX = 'AgentTeams inbox receipt: '
@@ -80,8 +80,7 @@ export function installMailboxAdmission(ctx: Context, stateDir: string): void {
     // result. Keep abnormal endings and missing reports as fallback signals.
     const successfulSettlements = new Set(decision.messages.flatMap(input => {
       const source = input.source
-      return source?.kind === 'subagent-settled'
-        && source.summary === `Background subagent ${source.senderSessionId} finished and will do no further work unless you send it more.`
+      return successfulSubagentSettlement(source)
         ? [source.senderSessionId as string] : []
     }))
     const redundantSettlements = new Set<string>()
@@ -155,8 +154,7 @@ export function installMailboxAdmission(ctx: Context, stateDir: string): void {
     }
     const admitted = []
     for (const { input, receipt, batch } of inputs) {
-      if (input.source?.kind === 'subagent-settled' && redundantSettlements.has(input.source.senderSessionId)
-        && input.source.summary === `Background subagent ${input.source.senderSessionId} finished and will do no further work unless you send it more.`) continue
+      if (successfulSubagentSettlement(input.source) && redundantSettlements.has(input.source.senderSessionId)) continue
       if (receipt === undefined || batch === undefined || batch.failed === true) { admitted.push(input); continue }
       const messages = []
       for (const id of receipt.ids) {

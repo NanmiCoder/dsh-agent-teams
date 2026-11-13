@@ -43,6 +43,85 @@ interface RuntimeBoundary {
   [hostPromptDeliver]?: Deliver
 }
 
+/**
+ * Audited 0.2.2-rc.2 tree manager seam. Upstream removed the symbol adapter
+ * without a public host-authored FIFO replacement. All native model/browser
+ * delivery converges on deliverToMember; keep that receiver, authorization,
+ * cancellation, provenance and wake/restore transaction intact.
+ * Source: dsh-v0.2.2-rc.2 subagent/src/{index,manager}.ts.
+ */
+interface TreeActivation {
+  childId: SessionId
+  root: Agent
+  ancestors: readonly SessionId[]
+}
+interface TreeDeliveryOptions {
+  source: MessageSource
+  signal: AbortSignal
+  delivery: 'queue' | 'steer'
+  authorize?: () => void
+}
+type TreeDeliver = (root: Agent, childId: SessionId, content: ContentBlock[], options: TreeDeliveryOptions) => Promise<MessageId>
+interface TreeManager {
+  deliverToMember: TreeDeliver
+  resident: ReadonlyMap<SessionId, TreeActivation>
+  dispose: (activation: TreeActivation) => Promise<void>
+}
+interface TreeBoundary {
+  rootOf: (caller: Agent) => Agent
+  manager: TreeManager
+}
+interface TreeWork {
+  root: Agent
+  branch: readonly SessionId[]
+  controller: AbortController
+  settled: Promise<void>
+}
+const treeWork = new WeakMap<TreeManager, Set<TreeWork>>()
+
+function treeBoundary(runtime: Context['subagents']): TreeBoundary | undefined {
+  const tree = runtime as unknown as TreeBoundary & { prompt?: unknown }
+  if (typeof tree.rootOf !== 'function' || typeof tree.prompt !== 'function') return undefined
+  if (typeof tree.manager?.deliverToMember !== 'function' || typeof tree.manager.dispose !== 'function'
+      || !(tree.manager.resident instanceof Map)) return unsupported('missing audited tree delivery manager')
+  return tree
+}
+
+/** Track exact branch work before its first await so a targeted stop can join it. */
+function trackTreeWork<T>(
+  manager: TreeManager, root: Agent, branch: readonly SessionId[], signal: AbortSignal,
+  operation: (signal: AbortSignal) => Promise<T>,
+): Promise<T> {
+  const pending = treeWork.get(manager) ?? new Set<TreeWork>()
+  treeWork.set(manager, pending)
+  const controller = new AbortController()
+  let finish!: () => void
+  const settled = new Promise<void>(resolve => { finish = resolve })
+  const work = { root, branch, controller, settled }
+  pending.add(work)
+  try {
+    return operation(AbortSignal.any([signal, controller.signal])).finally(() => { pending.delete(work); finish() })
+  } catch (error) {
+    pending.delete(work)
+    finish()
+    throw error
+  }
+}
+
+function deliverTreePrompt(
+  runtime: Context['subagents'], tree: TreeBoundary, parent: Agent, childId: SessionId,
+  content: ContentBlock[], source: MessageSource, signal: AbortSignal, delivery: 'queue' | 'steer',
+): Promise<MessageId> {
+  const root = tree.rootOf.call(runtime, parent)
+  return tree.manager.deliverToMember.call(tree.manager, root, childId, content, {
+    source, signal, delivery,
+    // Recheck the exact live caller immediately before native inbox acceptance.
+    authorize: () => {
+      if (tree.rootOf.call(runtime, parent) !== root) throw new SubagentError('AgentTeams caller left its subagent tree', 'UNAUTHORIZED')
+    },
+  })
+}
+
 /** Version-independent creation contract; legacy-only options stay at this seam. */
 export interface MemberStartSpec {
   provider: string
@@ -72,7 +151,9 @@ export async function startMember(runtime: Context['subagents'], spec: MemberSta
   const host = runtime as unknown as CreationBoundary
   if (typeof host.startActivation === 'function') {
     const { persona: _persona, toolFilter: _filter, ...request } = spec.request
-    const activation = await host.startActivation.call(runtime, { ...spec, request, delivery: 'parent' })
+    const activation = await Reflect.apply(host.startActivation, runtime, [treeBoundary(runtime) === undefined
+      ? { ...spec, request, delivery: 'parent' }
+      : { provider: spec.provider, label: spec.label, ...request, signal: spec.signal, delivery: 'parent' }]) as { childId: SessionId; result: Promise<unknown> }
     // Preserve native settlement as the missing-report/error fallback on both
     // fresh and resumed activations. mailbox.ts deduplicates successful reports.
     void activation.result.catch(() => undefined)
@@ -85,6 +166,7 @@ export async function startMember(runtime: Context['subagents'], spec: MemberSta
 /** Wrap every available creation API, restoring only this plugin's own methods. */
 export function guardSubagentCreation(ctx: Context, check: (parent: Agent) => void): void {
   const runtime = ctx.subagents as unknown as CreationBoundary
+  const tree = treeBoundary(ctx.subagents)
   ctx.effect(() => {
     const disposers: (() => void)[] = []
     for (const key of ['start', 'startContinuable', 'startActivation'] as const) {
@@ -92,8 +174,17 @@ export function guardSubagentCreation(ctx: Context, check: (parent: Agent) => vo
       if (typeof original !== 'function') continue
       const descriptor = Object.getOwnPropertyDescriptor(runtime, key)
       const guarded = async (...args: unknown[]): Promise<unknown> => {
-        const request = key === 'start' ? args[1] : (args[0] as MemberStartSpec).request
-        check((request as MemberStartSpec['request']).parent)
+        const request = key === 'start' ? args[1] : key === 'startActivation' && tree !== undefined
+          ? args[0] : (args[0] as MemberStartSpec).request
+        const parent = (request as MemberStartSpec['request']).parent
+        check(parent)
+        if (key === 'startActivation' && tree !== undefined) {
+          const spec = args[0] as { signal: AbortSignal }
+          const root = tree.rootOf.call(ctx.subagents, parent)
+          const branch = [parent.id, ...tree.manager.resident.get(parent.id)?.ancestors ?? []]
+          return trackTreeWork(tree.manager, root, branch, spec.signal, signal =>
+            Reflect.apply(original, ctx.subagents, [{ ...spec, signal }]) as Promise<unknown>)
+        }
         return Reflect.apply(original, ctx.subagents, args)
       }
       Object.defineProperty(runtime, key, { value: guarded, writable: true, configurable: true })
@@ -239,6 +330,15 @@ export function outputLimitTurn(event: SessionEvent): number | undefined {
   }
 }
 
+/** rc.2 summaries use tree names; the new structured reason owns the outcome. */
+export function successfulSubagentSettlement(source: MessageSource | undefined): source is Extract<MessageSource, { kind: 'subagent-settled' }> {
+  if (source?.kind !== 'subagent-settled') return false
+  const current = source as typeof source & { stopReason?: string }
+  return current.stopReason === undefined
+    ? source.summary === `Background subagent ${source.senderSessionId} finished and will do no further work unless you send it more.`
+    : current.stopReason === 'completed'
+}
+
 /** Install before the first request, including cold resume, with HMR cleanup. */
 export function installContinuableMemberSetup(ctx: Context, setup: Setup): void {
   const runtime = boundary(ctx.subagents)
@@ -252,7 +352,7 @@ export function installContinuableMemberSetup(ctx: Context, setup: Setup): void 
     })
     return
   }
-  if ((typeof runtime[hostPromptQueue] !== 'function' && typeof runtime[hostPromptDeliver] !== 'function') || typeof runtime.sendMessage !== 'function') {
+  if (treeBoundary(ctx.subagents) === undefined && ((typeof runtime[hostPromptQueue] !== 'function' && typeof runtime[hostPromptDeliver] !== 'function') || typeof runtime.sendMessage !== 'function')) {
     return unsupported('missing continuable setup and modern host queue')
   }
   const installed = new WeakSet<Agent>()
@@ -316,6 +416,8 @@ export async function queueMemberPrompt(
 ): Promise<MessageId> {
   const host = boundary(runtime)
   const source = agentTeamsSource({ kind: 'agent-teams' }, observedSessionFormatVersion(parent))
+  const tree = treeBoundary(runtime)
+  if (tree !== undefined) return deliverTreePrompt(runtime, tree, parent, childId, content, source, signal, 'queue')
   if (typeof host.followup === 'function') {
     return host.followup.call(runtime, parent, childId, content, { source, signal })
   }
@@ -333,6 +435,8 @@ export async function steerMemberPrompt(
 ): Promise<MessageId> {
   const host = boundary(runtime)
   const source = agentTeamsSource({ kind: 'agent-teams' }, observedSessionFormatVersion(live ?? parent))
+  const tree = treeBoundary(runtime)
+  if (tree !== undefined) return deliverTreePrompt(runtime, tree, parent, childId, content, source, signal, 'steer')
   const deliver = host[hostPromptDeliver]
   if (typeof deliver === 'function') return deliver.call(runtime, parent, childId, content, source, signal, 'steer')
   if (typeof host.sendMessage === 'function') return host.sendMessage.call(runtime, parent, childId, content, { signal })
@@ -352,6 +456,35 @@ export function guardSubagentDelivery(
   ctx: Context, isRetired: (sender: Agent, targetId: SessionId) => Promise<boolean>,
 ): void {
   const runtime = ctx.subagents
+  const tree = treeBoundary(runtime)
+  if (tree !== undefined) {
+    const manager = tree.manager
+    ctx.effect(() => {
+      const original = manager.deliverToMember
+      const descriptor = Object.getOwnPropertyDescriptor(manager, 'deliverToMember')
+      let active = true
+      const guarded: TreeDeliver = async (root, childId, content, options) => {
+        if (!active) return original.call(manager, root, childId, content, options)
+        const branch = [childId, ...manager.resident.get(childId)?.ancestors ?? []]
+        return trackTreeWork(manager, root, branch, options.signal, async signal => {
+          signal.throwIfAborted()
+          if (await isRetired(root, childId)) {
+            throw new SubagentError(`AgentTeams member "${childId}" was retired and cannot be resumed`, 'NOT_RESUMABLE')
+          }
+          signal.throwIfAborted()
+          return original.call(manager, root, childId, content, { ...options, signal })
+        })
+      }
+      manager.deliverToMember = guarded
+      return () => {
+        active = false
+        if (Object.getOwnPropertyDescriptor(manager, 'deliverToMember')?.value !== guarded) return
+        if (descriptor === undefined) Reflect.deleteProperty(manager, 'deliverToMember')
+        else Object.defineProperty(manager, 'deliverToMember', descriptor)
+      }
+    }, 'agent-teams: tree retired member guard')
+    return
+  }
   const host = boundary(runtime)
   const legacy = host.followup
   const queue = host[hostPromptQueue]
@@ -514,6 +647,22 @@ export async function startMemberWithLenientFilter<T>(
 
 /** Targeted recursive cancellation renamed with the unified activation manager. */
 export async function drainMemberChildren(runtime: Context['subagents'], parent: Agent, ids: readonly SessionId[]): Promise<void> {
+  const tree = treeBoundary(runtime)
+  if (tree !== undefined) {
+    const root = tree.rootOf.call(runtime, parent)
+    const selected = new Set(ids)
+    // The native tree-wide drain also stops unrelated siblings and permanently
+    // closes the captain. Join only work in the selected creation branches.
+    const pending = [...treeWork.get(tree.manager) ?? []].filter(work => work.root === root && work.branch.some(id => selected.has(id)))
+    for (const work of pending) work.controller.abort()
+    await Promise.all(pending.map(work => work.settled))
+    const targets = [...tree.manager.resident.values()].filter(item => item.root === root
+      && item.ancestors.includes(parent.id) && (selected.has(item.childId) || item.ancestors.some(id => selected.has(id))))
+    const results = await Promise.allSettled(targets.map(item => tree.manager.dispose.call(tree.manager, item)))
+    const failures = results.flatMap(result => result.status === 'rejected' ? [result.reason as unknown] : [])
+    if (failures.length) throw new AggregateError(failures, 'AgentTeams member teardown failed')
+    return
+  }
   const host = runtime as unknown as {
     drainChildren?: (parent: Agent, ids: readonly SessionId[]) => Promise<void>
     drainContinuableChildren?: (parent: Agent, ids: readonly SessionId[]) => Promise<void>

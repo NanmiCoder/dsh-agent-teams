@@ -1,0 +1,109 @@
+name: Harness RC audit
+on:
+  push:
+    branches: [codex/windows-harness-rc-audit]
+permissions:
+  contents: read
+jobs:
+  npm-host:
+    name: npm Harness (${{ matrix.os }}, ${{ matrix.version }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 22
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, version: '0.2.2-rc.3', scenario: web-approval }
+          - { os: windows-latest, version: '0.2.2-rc.5', scenario: all }
+          - { os: ubuntu-latest, version: '0.2.2-rc.5', scenario: all }
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Prepare exact AgentTeams tarball
+        env:
+          TARGET: ${{ matrix.version }}
+        run: |
+          npm install --global pnpm@10.33.0
+          if [ "$TARGET" = '0.2.2-rc.3' ]; then
+            curl --fail --silent --show-error --retry 4 https://registry.npmjs.org/@nanmicoder/dsh-agent-teams/-/dsh-agent-teams-0.1.30.tgz -o "$RUNNER_TEMP/candidate.tgz"
+          else
+            node scripts/git-artifacts.mjs
+            pnpm pack --out "$RUNNER_TEMP/candidate.tgz"
+          fi
+      - name: Run real host acceptance
+        env:
+          TARGET: ${{ matrix.version }}
+          SCENARIO: ${{ matrix.scenario }}
+        run: |
+          args=()
+          if [ "$SCENARIO" != all ]; then args=(--scenario "$SCENARIO"); fi
+          node scripts/harness-runtime-verify.mjs --host-version "$TARGET" --artifact "$RUNNER_TEMP/candidate.tgz" --report-dir "$RUNNER_TEMP/harness" "${args[@]}"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: npm-${{ matrix.os }}-${{ matrix.version }}
+          path: |
+            ${{ runner.temp }}/harness/result.json
+            ${{ runner.temp }}/harness/cohort.json
+            ${{ runner.temp }}/harness/*.stdout.log
+            ${{ runner.temp }}/harness/*.stderr.log
+            ${{ runner.temp }}/harness/web-approval/trace.jsonl
+  desktop:
+    name: Official Windows Desktop (${{ matrix.version }})
+    runs-on: windows-latest
+    timeout-minutes: 16
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ['0.2.2-rc.3', '0.2.2-rc.5']
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Download and install exact official Desktop
+        env:
+          TARGET: ${{ matrix.version }}
+        shell: pwsh
+        run: |
+          $root = Join-Path $env:RUNNER_TEMP "dsh"
+          $report = Join-Path $env:RUNNER_TEMP "evidence"
+          New-Item -ItemType Directory -Path $report | Out-Null
+          $installer = Join-Path $env:RUNNER_TEMP "harness.exe"
+          $url = "https://download.deepseek.com/dsh-desk/bin/win-x64/deepseek-harness-$env:TARGET-win-x64.exe"
+          curl.exe --fail --silent --show-error --retry 4 --max-time 300 $url --output $installer
+          if ($LASTEXITCODE -ne 0) { throw "Desktop download failed" }
+          $signature = Get-AuthenticodeSignature $installer
+          [ordered]@{ url = $url; sha256 = (Get-FileHash $installer).Hash; signature = "$($signature.Status)"; signer = $signature.SignerCertificate.Subject } | ConvertTo-Json | Set-Content -Path (Join-Path $report "installer.json")
+          if ($null -eq $signature.SignerCertificate -or $signature.Status -in @('NotSigned', 'HashMismatch', 'NotTrusted')) { throw "Desktop signature: $($signature.Status)" }
+          $install = Start-Process -FilePath $installer -ArgumentList "/S /D=$root" -Wait -PassThru
+          if ($install.ExitCode -ne 0) { throw "Desktop installer exited $($install.ExitCode)" }
+      - name: Install published AgentTeams and exercise two dependent members
+        env:
+          TARGET: ${{ matrix.version }}
+        shell: pwsh
+        run: |
+          $report = Join-Path $env:RUNNER_TEMP "evidence"
+          $artifact = Join-Path $env:RUNNER_TEMP "published.tgz"
+          curl.exe --fail --silent --show-error --retry 4 https://registry.npmjs.org/@nanmicoder/dsh-agent-teams/-/dsh-agent-teams-0.1.30.tgz --output $artifact
+          if ($LASTEXITCODE -ne 0) { throw "AgentTeams download failed" }
+          node scripts/harness-desktop-audit.mjs (Join-Path $env:RUNNER_TEMP "dsh") $env:TARGET $artifact $report
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: desktop-windows-${{ matrix.version }}
+          path: |
+            ${{ runner.temp }}/evidence/*.json
+            ${{ runner.temp }}/evidence/*.log

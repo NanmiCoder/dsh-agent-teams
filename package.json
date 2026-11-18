@@ -18,6 +18,7 @@
     "./package.json": "./package.json"
   },
   "files": [
+    "dsh-plugin.json",
     "lib",
     "assets/agent-teams",
     "assets/readme",

@@ -105,20 +105,15 @@ jobs:
           import { readFileSync } from 'node:fs'
           import { createHash } from 'node:crypto'
           import { join } from 'node:path'
-          import { policy, validatePackageCompatibility } from './scripts/compatibility.mjs'
+          import { policy } from './scripts/compatibility.mjs'
+          import { releaseMetadata } from './scripts/release-metadata.mjs'
           const pkg = JSON.parse(readFileSync('package.json', 'utf8'))
-          const hosts = validatePackageCompatibility(pkg)
+          assert.equal(releaseMetadata(pkg).dist_tag, process.env.NPM_DIST_TAG)
+          const hosts = policy.supportedHosts.map(host => host.version)
           // A prior main run must have passed its report/digest gate above.
           if (!process.env.VERIFIED_RUN_ID) assert.deepEqual(hosts, JSON.parse(process.env.VERIFIED_HOSTS))
           const artifact = readFileSync(join(process.env.RUNNER_TEMP, 'candidate/candidate.tgz'))
           assert.equal(createHash('sha256').update(artifact).digest('hex'), process.env.EXPECTED_SHA256)
-          if (process.env.NPM_DIST_TAG === 'latest') {
-            assert.equal(pkg.devDependencies['@deepseek-ai/dsh'], policy.recommendedHost)
-            assert.ok(hosts.includes(policy.recommendedHost))
-            assert.ok(!/-(alpha|beta)\./.test(policy.recommendedHost))
-          } else {
-            assert.equal(process.env.NPM_DIST_TAG, policy.previewTag)
-          }
           JS
 
       - name: Verify release version
@@ -237,7 +232,8 @@ jobs:
           import { readFileSync, writeFileSync } from 'node:fs'
           const path = `release-notes/v${process.env.PACKAGE_VERSION}.md`
           if (!['true', 'not_applicable'].includes(process.env.NPM_READY)) {
-            const notice = '**Desktop npm channel readiness was not confirmed at publication verification.** pnpm 11 may still select an older version during its default 24-hour waiting period, or registry checks may be unavailable/incomplete. For immediate installation use `github:NanmiCoder/dsh-agent-teams` in Plugins → Add plugin (requires GitHub access). Do not disable compatibility or global release-age checks.\n\n**桌面端 npm 渠道在发布验收时尚未确认就绪。** pnpm 11 的 24 小时等待期或注册表可用性可能影响版本选择；立即安装可在「添加插件」输入 `github:NanmiCoder/dsh-agent-teams`，需要能访问 GitHub，无需手改配置。\n\n'
+            const exact = `@nanmicoder/dsh-agent-teams@${process.env.PACKAGE_VERSION}`
+            const notice = `**Fresh Desktop installs by package name may select the previous version.** pnpm 11 applies a default 24-hour release-age rule. Use \`${exact}\` in Plugins → Add plugin to request the exact version. The Plugins page's update action for an existing npm installation requests the selected exact version.\n\n**桌面端首次安装时，只输入包名可能选到上一版。** pnpm 11 默认有 24 小时发布等待期。「添加插件」可输入 \`${exact}\` 指定版本。已从 npm 安装的用户可在插件页选择确切版本更新。\n\n`
             writeFileSync(path, notice + readFileSync(path, 'utf8'))
           }
           JS

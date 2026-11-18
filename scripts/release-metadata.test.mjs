@@ -9,19 +9,20 @@ const fixture = (version, tag) => ({
   version, publishConfig: { tag },
 })
 
-test('stable latest requires the recommended host and bounded compatibility', () => {
+test('stable latest permits a fully tested development host distinct from the user recommendation', () => {
   assert.deepEqual(releaseMetadata(fixture('0.1.16', 'latest')), {
     value: '0.1.16', dist_tag: 'latest', prerelease: false,
   })
-  const alphaOnly = fixture('0.1.16', 'latest')
-  for (const name of Object.keys(alphaOnly.devDependencies)) {
-    if (name === '@deepseek-ai/dsh' || name.startsWith('@deepseek-ai/dsh-')) alphaOnly.devDependencies[name] = '0.1.2-alpha.2'
+  for (const version of ['0.1.2-alpha.2', '0.2.1-rc.1']) {
+    const older = fixture('0.1.16', 'latest')
+    const workspace = structuredClone(workspacePolicy)
+    for (const dependencies of [older.devDependencies, workspace.overrides]) {
+      for (const name of Object.keys(dependencies)) {
+        if (name === '@deepseek-ai/dsh' || name.startsWith('@deepseek-ai/dsh-')) dependencies[name] = version
+      }
+    }
+    assert.throws(() => releaseMetadata(older, policy, workspace), /development host with full Ubuntu and Windows coverage/)
   }
-  const workspace = structuredClone(workspacePolicy)
-  for (const name of Object.keys(workspace.overrides)) {
-    if (name === '@deepseek-ai/dsh' || name.startsWith('@deepseek-ai/dsh-')) workspace.overrides[name] = '0.1.2-alpha.2'
-  }
-  assert.throws(() => releaseMetadata(alphaOnly, policy, workspace), /recommended host/)
   assert.throws(() => releaseMetadata(fixture('0.1.16', 'latest'), {
     ...policy, recommendedHost: '0.1.2-alpha.2',
     supportedHosts: [{ version: '0.1.2-alpha.2', track: 'recommended' }],

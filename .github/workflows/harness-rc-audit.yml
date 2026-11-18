@@ -5,8 +5,30 @@ on:
 permissions:
   contents: read
 jobs:
+  candidate:
+    name: Pack one AgentTeams candidate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - run: |
+          npm install --global pnpm@10.33.0
+          node scripts/git-artifacts.mjs
+          pnpm pack --out "$RUNNER_TEMP/candidate.tgz"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rc-audit-candidate
+          path: ${{ runner.temp }}/candidate.tgz
+          if-no-files-found: error
   npm-host:
     name: npm Harness (${{ matrix.os }}, ${{ matrix.version }})
+    needs: candidate
     runs-on: ${{ matrix.os }}
     timeout-minutes: 22
     defaults:
@@ -27,16 +49,18 @@ jobs:
         with:
           node-version: '24'
           package-manager-cache: false
-      - name: Prepare exact AgentTeams tarball
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        if: matrix.version == '0.2.2-rc.5'
+        with:
+          name: rc-audit-candidate
+          path: ${{ runner.temp }}
+      - name: Prepare runtime package manager and published baseline
         env:
           TARGET: ${{ matrix.version }}
         run: |
           npm install --global pnpm@10.33.0
           if [ "$TARGET" = '0.2.2-rc.3' ]; then
             curl --fail --silent --show-error --retry 4 https://registry.npmjs.org/@nanmicoder/dsh-agent-teams/-/dsh-agent-teams-0.1.30.tgz -o "$RUNNER_TEMP/candidate.tgz"
-          else
-            node scripts/git-artifacts.mjs
-            pnpm pack --out "$RUNNER_TEMP/candidate.tgz"
           fi
       - name: Run real host acceptance
         env:
@@ -58,6 +82,7 @@ jobs:
             ${{ runner.temp }}/harness/web-approval/trace.jsonl
   desktop:
     name: Official Windows Desktop (${{ matrix.version }})
+    needs: candidate
     runs-on: windows-latest
     timeout-minutes: 16
     strategy:
@@ -89,15 +114,22 @@ jobs:
           if ($null -eq $signature.SignerCertificate -or $signature.Status -in @('NotSigned', 'HashMismatch', 'NotTrusted')) { throw "Desktop signature: $($signature.Status)" }
           $install = Start-Process -FilePath $installer -ArgumentList "/S /D=$root" -Wait -PassThru
           if ($install.ExitCode -ne 0) { throw "Desktop installer exited $($install.ExitCode)" }
-      - name: Install published AgentTeams and exercise two dependent members
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        if: matrix.version == '0.2.2-rc.5'
+        with:
+          name: rc-audit-candidate
+          path: ${{ runner.temp }}
+      - name: Install AgentTeams and exercise two dependent members
         env:
           TARGET: ${{ matrix.version }}
         shell: pwsh
         run: |
           $report = Join-Path $env:RUNNER_TEMP "evidence"
-          $artifact = Join-Path $env:RUNNER_TEMP "published.tgz"
-          curl.exe --fail --silent --show-error --retry 4 https://registry.npmjs.org/@nanmicoder/dsh-agent-teams/-/dsh-agent-teams-0.1.30.tgz --output $artifact
-          if ($LASTEXITCODE -ne 0) { throw "AgentTeams download failed" }
+          $artifact = Join-Path $env:RUNNER_TEMP "candidate.tgz"
+          if ($env:TARGET -eq '0.2.2-rc.3') {
+            curl.exe --fail --silent --show-error --retry 4 https://registry.npmjs.org/@nanmicoder/dsh-agent-teams/-/dsh-agent-teams-0.1.30.tgz --output $artifact
+            if ($LASTEXITCODE -ne 0) { throw "AgentTeams download failed" }
+          }
           node scripts/harness-desktop-audit.mjs (Join-Path $env:RUNNER_TEMP "dsh") $env:TARGET $artifact $report
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

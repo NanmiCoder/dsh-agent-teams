@@ -36,7 +36,7 @@ Ask in natural language. The plugin provides the team protocol, 14 coordination 
 
 ## Releases
 
-[Latest release](https://github.com/NanmiCoder/dsh-agent-teams/releases/latest) restores plugin activation on Harness `0.2.2-rc.2`, adapts member creation and messaging, and prevents duplicate completion wakeups. Harness `0.2.2-rc.5` is the recommended host. See the [tested matrix](./compatibility.json) and [release notes](./release-notes/v0.1.30.md).
+[Latest release](https://github.com/NanmiCoder/dsh-agent-teams/releases/latest) fixes repeated task dispatch after guidance, preserves member prompts in inline plans, and bounds session history reads. Harness `0.2.2-rc.5` is the recommended host. See the [tested matrix](./compatibility.json) and [release notes](./release-notes/v0.1.31.md).
 
 ## Why AgentTeams?
 
@@ -55,18 +55,18 @@ The conversation card and activity panel use Harness's official locale service. 
 
 ## Install and choose versions
 
-**Recommended pair: DeepSeek Harness `0.2.2-rc.5` + AgentTeams `0.1.30`.**
+**Recommended pair: DeepSeek Harness `0.2.2-rc.5` + AgentTeams `0.1.31`.**
 
 | Use case | DeepSeek Harness | AgentTeams plugin |
 | --- | --- | --- |
-| **Recommended** | **`0.2.2-rc.5`** | **`0.1.30`** |
-| Other tested RCs | `0.2.2-rc.2`, `0.2.2-rc.1`, `0.2.1-rc.3`, `0.2.1-rc.2` | `0.1.30` |
-| Previous recommended RC | `0.2.1-rc.1`, `0.2.0-rc.2`, `0.1.7-rc.2` | `0.1.30` |
-| Legacy RC | `0.1.5-rc.1`, `0.1.5-rc.2`, `0.1.5-rc.3` | `0.1.30` |
-| Retaining an older RC | `0.1.2-rc.1` | `0.1.30` |
-| Developer Alpha testing | `0.1.2-alpha.5` | `0.1.30` |
-| Retaining an older Alpha | `0.1.2-alpha.2` | `0.1.30` |
-| Other installable hosts | At or above `0.1.2-alpha.2` | `0.1.30` |
+| **Recommended** | **`0.2.2-rc.5`** | **`0.1.31`** |
+| Other tested RCs | `0.2.2-rc.2`, `0.2.2-rc.1`, `0.2.1-rc.3`, `0.2.1-rc.2` | `0.1.31` |
+| Previous recommended RC | `0.2.1-rc.1`, `0.2.0-rc.2`, `0.1.7-rc.2` | `0.1.31` |
+| Legacy RC | `0.1.5-rc.1`, `0.1.5-rc.2`, `0.1.5-rc.3` | `0.1.31` |
+| Retaining an older RC | `0.1.2-rc.1` | `0.1.31` |
+| Developer Alpha testing | `0.1.2-alpha.5` | `0.1.31` |
+| Retaining an older Alpha | `0.1.2-alpha.2` | `0.1.31` |
+| Other installable hosts | At or above `0.1.2-alpha.2` | `0.1.31` |
 
 CI verifies the exact hosts listed above the last row. The installer accepts other hosts at or above the minimum version.
 
@@ -84,11 +84,13 @@ This installs from the default branch and is available immediately after release
 github:NanmiCoder/dsh-agent-teams
 ```
 
-For npm installation, enter the versioned spec `@nanmicoder/dsh-agent-teams@0.1.30`. Desktop's pnpm 11 defaults to a 24-hour minimum release age: for 24 hours after a release, a bare package name or `@latest` installs the previous version even when the preview shows the newest one, and the installation fails if that version is incompatible with your host. An exact version installs immediately. Changing registry mirrors does not remove this policy. GitHub access is required for the Git route; it may contain newer code than npm.
+For npm installation, enter the versioned spec `@nanmicoder/dsh-agent-teams@0.1.31`. Desktop's pnpm 11 defaults to a 24-hour minimum release age: for 24 hours after a release, a bare package name or `@latest` installs the previous version even when the preview shows the newest one, and the installation fails if that version is incompatible with your host. An exact version installs immediately. Changing registry mirrors does not remove this policy. GitHub access is required for the Git route; it may contain newer code than npm.
+
+For an existing npm installation, open **Plugins**, check for updates, then select **0.1.31** and confirm **Update**. The desktop updater requests the selected exact plugin version.
 
 Install it, then choose **Enable now**. If the host asks for a restart, restart the desktop app. Do not disable compatibility checks or the global release-age policy to install the plugin.
 
-Use the desktop app's built-in updater when it offers `0.2.2-rc.5`. AgentTeams `0.1.30` supports that host through the ordinary plugin channel. Desktop manages its bundled Harness independently of the global CLI. Use the CLI shipped with Desktop when managing its profile from a terminal.
+Use the desktop app's built-in updater when it offers `0.2.2-rc.5`. AgentTeams `0.1.31` supports that host through the ordinary plugin channel. Desktop manages its bundled Harness independently of the global CLI. Use the CLI shipped with Desktop when managing its profile from a terminal.
 
 ### CLI / Web: 1. Install DeepSeek Harness
 
@@ -101,10 +103,10 @@ The command selects the host's npm `latest`. To install the recommended host exp
 
 ### CLI / Web: 2. Install the AgentTeams plugin
 
-Install or upgrade from npm with an exact version (currently `0.1.30`):
+Install or upgrade from npm with an exact version (currently `0.1.31`):
 
 ```sh
-dsh plugin --profile web add --save-exact @nanmicoder/dsh-agent-teams@0.1.30
+dsh plugin --profile web add --save-exact @nanmicoder/dsh-agent-teams@0.1.31
 ```
 
 For a CLI-managed installation, replace `web` with your active CLI profile. **Stop and restart that profile's Harness process, then refresh the browser.** Installing the plugin does not upgrade Harness; the host and plugin have independent `latest` channels.

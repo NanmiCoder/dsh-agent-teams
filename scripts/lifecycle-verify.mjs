@@ -981,6 +981,25 @@ try {
       && deliveries.length === deliveriesBeforeDisposedParkedKicks)
   liveAgents.set(alpha.id, alpha)
 
+  // A guidance turn resumes this same attempt. Harness becomes idle before
+  // the plugin's asynchronous idle listener has necessarily finished (#103).
+  await call('agent_teams_send_message', { to: 'alpha', content: 'Continue the current attempt.' })
+  publishStatus(alpha, 'running')
+  const deadline = Date.now() + 5_000
+  while ((await state()).members.find(member => member.id === alpha.id)?.status !== 'working') {
+    if (Date.now() >= deadline) throw new Error('alpha did not enter the guidance turn')
+    await new Promise(resolve => setTimeout(resolve, 5))
+  }
+  const alphaDeliveries = () => deliveries.filter(delivery => delivery.childId === alpha.id).length
+  const beforeGuidancePoll = alphaDeliveries()
+  alpha.status = 'idle'
+  await call('agent_teams_status', {})
+  const afterGuidance = await task(t1.task_id)
+  check('poll before guidance idle is recorded keeps the open attempt without redelivery (#103)',
+    afterGuidance?.status === 'in_progress' && afterGuidance.attempt === alphaClaim.attempt
+      && afterGuidance.attemptId === alphaClaim.attempt_id && alphaDeliveries() === beforeGuidancePoll)
+  publishStatus(alpha, 'idle')
+
   // Unobserved recovery whose followup fails must restore the original open
   // capability and consume that generation's budget. Later status kicks must
   // not recast it into pending or a new attempt.

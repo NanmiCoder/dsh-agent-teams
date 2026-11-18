@@ -530,12 +530,11 @@ export function installTeamScheduler(ctx: Context, config: SchedulerConfig): Tea
       const current = fresh?.members.find(candidate => candidate.id === agent.id && candidate.status !== 'removed')
       if (fresh === undefined || current === undefined) return
       const next = status === 'running' ? 'working' : 'idle'
+      // Guidance can wake the member without replacing its parked attempt.
       if (next === 'idle') {
         const owned = ownedOpenTask(fresh.tasks, current.name)
         if (owned?.attemptId === undefined) parkedAttempts.delete(agent.id)
         else parkedAttempts.set(agent.id, owned.attemptId)
-      } else {
-        parkedAttempts.delete(agent.id)
       }
       if (current.status === next) return
       current.status = next

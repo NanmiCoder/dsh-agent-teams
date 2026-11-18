@@ -36,7 +36,7 @@
 
 ## 版本更新
 
-[最新发布](https://github.com/NanmiCoder/dsh-agent-teams/releases/latest) 修复 Harness `0.2.2-rc.2` 的插件启用失败，适配成员创建与消息，并避免完成通知重复唤醒队长。推荐宿主为 Harness `0.2.1-rc.2`。详见[测试矩阵](./compatibility.json)和[发布说明](./release-notes/v0.1.30.md)。
+[最新发布](https://github.com/NanmiCoder/dsh-agent-teams/releases/latest) 修复 Harness `0.2.2-rc.2` 的插件启用失败，适配成员创建与消息，并避免完成通知重复唤醒队长。推荐宿主为 Harness `0.2.2-rc.5`。详见[测试矩阵](./compatibility.json)和[发布说明](./release-notes/v0.1.30.md)。
 
 ## 为什么需要 AgentTeams？
 
@@ -54,12 +54,12 @@
 
 ## 安装与版本选择
 
-**推荐组合：DeepSeek Harness `0.2.1-rc.2` + AgentTeams `0.1.30`。宿主仍为 RC 版本。**
+**推荐组合为 DeepSeek Harness `0.2.2-rc.5` 和 AgentTeams `0.1.30`。**
 
 | 使用场景 | DeepSeek Harness | AgentTeams 插件 |
 | --- | --- | --- |
-| **推荐版本** | **`0.2.1-rc.2`** | **`0.1.30`** |
-| 预览宿主 | `0.2.2-rc.2`、`0.2.2-rc.1`、`0.2.1-rc.3` | `0.1.30` |
+| **推荐版本** | **`0.2.2-rc.5`** | **`0.1.30`** |
+| 其他已测 RC | `0.2.2-rc.2`、`0.2.2-rc.1`、`0.2.1-rc.3`、`0.2.1-rc.2` | `0.1.30` |
 | 上一推荐 RC | `0.2.1-rc.1`, `0.2.0-rc.2`, `0.1.7-rc.2` | `0.1.30` |
 | 保留旧 RC | `0.1.5-rc.1`, `0.1.5-rc.2`, `0.1.5-rc.3` | `0.1.30` |
 | 保留旧 RC | `0.1.2-rc.1` | `0.1.30` |
@@ -87,7 +87,7 @@ github:NanmiCoder/dsh-agent-teams
 
 安装完成后点击「立即启用」；宿主提示需要重启时，重启桌面应用。无需关闭兼容检查或全局发布等待期规则。
 
-桌面端自带 Harness 内核与包管理器，升级全局 CLI 不会升级桌面端；普通独立 CLI 不能管理桌面 profile，桌面端自带的 CLI carrier 在此版本可以管理。当前精确目标是已发布的 `0.2.1-rc.2`，仍属于 RC；此前源码预测的 `0.2.0` 已退出支持声明。详见[迁移验收记录](./docs/harness-0.2.1-rc.2/README.md)。
+桌面端提示可升级到 `0.2.2-rc.5` 时，直接在应用内升级即可。普通渠道的 AgentTeams `0.1.30` 支持该宿主。桌面端自带独立的 Harness 内核，需要从终端管理桌面 profile 时使用桌面端自带的 CLI。
 
 ### CLI / Web：1. 安装 DeepSeek Harness
 
@@ -96,7 +96,7 @@ npm install --global @deepseek-ai/dsh
 dsh --version
 ```
 
-此命令安装宿主的 npm `latest`；升级后请用 `dsh --version` 对照兼容清单。Alpha 仅供主动测试：手动指定表中的 Alpha 版本，并按[维护指南](./docs/maintenance-workflow.md)锁定整组宿主依赖。
+此命令安装宿主的 npm `latest`。若要精确安装推荐宿主，运行 `npm install --global @deepseek-ai/dsh@0.2.2-rc.5`。升级后用 `dsh --version` 对照兼容清单。测试 Alpha 时，请选用精确版本，并按[维护指南](./docs/maintenance-workflow.md)锁定整组宿主依赖。
 
 ### CLI / Web：2. 安装 AgentTeams 插件
 

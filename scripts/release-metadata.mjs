@@ -12,8 +12,14 @@ export function releaseMetadata(pkg, support = policy, workspace) {
   if (pkg.publishConfig?.tag !== distTag) {
     throw new Error(`publishConfig.tag must be "${distTag}" for ${pkg.version}`)
   }
-  if (!match[4] && pkg.devDependencies['@deepseek-ai/dsh'] !== support.recommendedHost) {
-    throw new Error('latest must use the recommended host as its development baseline')
+  if (!match[4]) {
+    const version = pkg.devDependencies['@deepseek-ai/dsh']
+    const baseline = support.supportedHosts.find(host => host.version === version)
+    if (baseline === undefined || /-(alpha|beta)\./.test(version)
+        || baseline.legacyDirectInstallReason !== undefined
+        || baseline.platforms?.includes('windows-latest') === false) {
+      throw new Error('latest requires a non-Alpha/Beta development host with full Ubuntu and Windows coverage')
+    }
   }
   return { value: pkg.version, dist_tag: distTag, prerelease: Boolean(match[4]) }
 }

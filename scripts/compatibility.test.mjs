@@ -299,8 +299,9 @@ test('doctor detects peer-only drift and a mismatched installed plugin', t => {
   assert.match(inspectInstallation(root, profile).problems.join(), /0\.1\.15/)
 })
 
-test('released target enters the download matrix and replaces the old source prediction', () => {
-  assert.equal(policy.recommendedHost, '0.2.1-rc.2')
+test('the Desktop upgrade target is recommended alongside previously tested hosts', () => {
+  assert.equal(policy.recommendedHost, '0.2.2-rc.5')
+  assert.ok(validatePolicy(policy).includes('0.2.2-rc.5'))
   assert.ok(validatePolicy(policy).includes('0.2.1-rc.3'))
   assert.ok(validatePolicy(policy).includes('0.2.1-rc.2'))
   assert.ok(validatePolicy(policy).includes('0.2.1-rc.1'))

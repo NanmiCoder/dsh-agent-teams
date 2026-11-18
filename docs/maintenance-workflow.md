@@ -24,10 +24,11 @@
 
 | 当前候选宿主 | 定位 | 安装与支持边界 |
 | --- | --- | --- |
+| `0.2.2-rc.5` | recommended | 正常桌面升级目标。Ubuntu 和 Windows 跑完同一候选的全部场景，官方 Windows Desktop 验证了双成员审批与执行。[验收记录](https://github.com/NanmiCoder/dsh-agent-teams/actions/runs/44355732336) |
 | `0.2.2-rc.2` | preview | 适配具名子代理树；在 Ubuntu 和 Windows 验证精确 CLI 分包、安装和运行场景 |
 | `0.2.2-rc.1` | preview | 在 Ubuntu 和 Windows 验证精确 CLI 分包、安装和运行场景 |
-| `0.2.1-rc.3` | preview | 已发布 npm 精确目标；先进入矩阵，推荐宿主与开发基线仍为 rc.2 |
-| `0.2.1-rc.2` | recommended | 已发布 npm 精确目标；RC 不是 GA |
+| `0.2.1-rc.3` | preview | 在 Ubuntu 和 Windows 验证精确 CLI 分包、安装和运行场景 |
+| `0.2.1-rc.2` | legacy | 上一推荐宿主，继续作为固定开发基线并执行 Ubuntu 和 Windows 全量测试 |
 | `0.2.1-rc.1` | legacy | 保留上一推荐 RC |
 | `0.2.0-rc.2` / `0.1.7-rc.2` | legacy | 保留此前推荐版本 |
 | `0.1.5-rc.3` / `0.1.5-rc.2` / `0.1.5-rc.1` | legacy | 保留旧 RC；每个精确版本独立验证完整依赖闭包 |
@@ -116,7 +117,7 @@ runner 为 `scripts/harness-runtime-verify.mjs --host-version <exact> --artifact
 
 CI 仅上传报告、日志和 fixture 状态，不上传 runtime 的 node_modules、缓存、隔离 HOME 或整份 profile 存储。报告保留 14 天；发布维护者应将关键版本、摘要、结果和限制归档到发布记录，不能只留下会过期的临时目录。
 
-当前候选自动矩阵包括全部 13 个目标的 Ubuntu runtime，以及 `0.2.1-rc.2`、`0.2.1-rc.3`、`0.2.2-rc.1`、`0.2.2-rc.2` 的 Windows runtime，共 17 个宿主/平台目标。真实模型 API、原生 Desktop 交互和用户数据迁移仍需要额外证据。UI 改动按 Ego Lite 规则验证真实宿主挂载和交互；有凭据的 provider 验证记录结果，不在仓库保存凭据。跳过、不适用和失败应分别记录，不能统一写“全部通过”。
+当前候选自动矩阵包括全部 14 个目标的 Ubuntu runtime，以及 `0.2.1-rc.2`、`0.2.1-rc.3`、`0.2.2-rc.1`、`0.2.2-rc.2`、`0.2.2-rc.5` 的 Windows runtime，共 19 个宿主/平台目标。真实模型 API、原生 Desktop 交互和用户数据迁移仍需要额外证据。UI 改动按 Ego Lite 规则验证真实宿主挂载和交互；有凭据的 provider 验证记录结果，不在仓库保存凭据。跳过、不适用和失败应分别记录，不能统一写“全部通过”。
 
 ## 发布同一份验收产物
 
@@ -125,7 +126,7 @@ CI 仅上传报告、日志和 fixture 状态，不上传 runtime 的 node_modul
 如果已实装验证主分支 Verify 生成的归档，从 `main` 手动运行 Publish Package，填写 `version`、`verified_run_id` 和实装归档的 `candidate_sha256`。工作流要求 Verify 与发布提交一致，并确认完整兼容性门禁成功。npm 发布成功后，GitHub Release 使用同一提交创建标签。
 
 - 新的预发布插件版本（alpha / beta / rc）首次发布进入项目的 `next` 渠道；已验收的 RC 产物可经维护者明确决定，用 `npm dist-tag add` 将同一不可变版本提升为 `latest`，不重新打包。
-- 无后缀插件首次发布及 RC 产物提升到 `latest` 时，开发基线必须是清单中的 recommended 宿主，全部支持目标都要通过。当前 recommended 为 `0.2.1-rc.2`，不得把只在 Alpha 通过的包提升为普通用户默认版本。
+- 无后缀插件首次发布及 RC 产物提升到 `latest` 时，全部支持目标须通过同一候选包的验证。固定开发基线须为有完整 Ubuntu 和 Windows 验收的 RC 或正式宿主。当前开发基线为 `0.2.1-rc.2`，普通用户推荐宿主为 `0.2.2-rc.5`。
 - 发版 tag 必须等于 `v<package.version>`，GitHub prerelease 标志与插件版本后缀一致；将 RC 提升到 npm `latest` 不会改变其 GitHub 预发布身份。稳定发布前查询 npm 当前 latest，拒绝倒退。
 - 准备 PR、版本或产物不表示已经发布。发布后读取 registry 的版本、integrity 与 dist-tag，并从 registry 再安装精确版本做消费者复验，记录与候选是否一致。
 - **已发布不等于桌面端 npm 入口已就绪。** 桌面端实际观察到 pnpm 11.28.5；默认 `minimumReleaseAge=1440` 分钟可能把 `@latest` 解析为旧版。精确版本、tgz 和 pnpm 10 的成功不能代替这个入口。CI 在 Ubuntu/Windows 用真实 pnpm 11 和临时 registry 验证“新发布回退旧版 / 满等待期选择新版 / registry 错误不能报成功”。

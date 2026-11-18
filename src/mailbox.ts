@@ -3,7 +3,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { join } from 'node:path'
 import { acknowledgeMailbox, CAPTAIN_KEY, discardMailboxMessages, findTeamByCaptain, readMailbox, readUnreadMailbox, readTeam, sanitizeKey, withTeamLock } from './state.ts'
 import type { TeamMessage, TeamState } from './types.ts'
-import { sessionOwnEvents, successfulSubagentSettlement } from './harness-compat.ts'
+import { findOwnSessionEvent, successfulSubagentSettlement } from './harness-compat.ts'
 import { leadIdentityOfAsync, sessionLeadsTeamAsync } from './lineage.ts'
 
 const PREFIX = 'AgentTeams inbox receipt: '
@@ -169,14 +169,10 @@ export function installMailboxAdmission(ctx: Context, stateDir: string): void {
     // existing turn, a status tool may have consumed this same mail already;
     // dropping its duplicate must not block the pending tool-result response.
     if (decision.messages.length > 0 && admitted.length === 0) {
-      const events = sessionOwnEvents(payload.agent.session)
-      let continuing = false
-      for (let i = events.length - 1; i >= 0; i--) {
-        const event = events[i]!
-        if (event.type === 'step/start' && event.data.turn === payload.turn) { continuing = true; break }
-        if (event.type === 'turn/start') break
-      }
-      if (!continuing) return { kind: 'reject' }
+      const boundary = findOwnSessionEvent(payload.agent.session, event =>
+        event.type === 'turn/start' || (event.type === 'step/start' && event.data.turn === payload.turn),
+      { order: 'newest' })
+      if (boundary?.type !== 'step/start') return { kind: 'reject' }
     }
     return { ...decision, messages: admitted }
   })

@@ -688,6 +688,14 @@ try {
     let rejected = false; try { await call('agent_teams_edit_plan', { operations: [operation] }) } catch { rejected = true }
     check('running edits reject active attempts, cycles and roster changes: ' + JSON.stringify(operation), rejected)
   }
+  let runningRosterError = ''
+  try {
+    await call('agent_teams_edit_plan', { operations: [{ action: 'remove_member', member_name: 'implementer' }] })
+  } catch (error) { runningRosterError = String(error) }
+  check('running edit_plan directs the captain to the live tools (#348)',
+    /agent_teams_edit_plan.*running/.test(runningRosterError)
+      && ['create_task', 'add_member', 'remove_member', 'reassign_task', 'update_task']
+        .every(tool => runningRosterError.includes('agent_teams_' + tool)))
   const abandoned = await call('agent_teams_create_task', { subject: 'Cancelled planning mistake', assignee: 'implementer', dependencies: [dynamicFirst.task_id] })
   const cancelledPending = await call('agent_teams_update_task', { task_id: abandoned.task_id, status: 'cancelled', output: 'No execution began; captain corrected the plan.' })
   check('captain can cancel dependency-blocked member work before its first attempt', cancelledPending.status === 'cancelled' && cancelledPending.attempt === 0)

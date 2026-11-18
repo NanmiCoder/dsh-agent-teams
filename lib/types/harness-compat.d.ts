@@ -109,8 +109,14 @@ export declare function agentTeamsSource(modern: AgentTeamsSource, observed?: nu
  * Keep the removed event's type confined to this audited compatibility seam.
  */
 export declare function onAgentReady(ctx: Context, listener: (agent: Agent, vetoable: boolean) => void): () => void;
-/** Read child-owned history, excluding any descriptor inherited from a parent. */
-export declare function sessionOwnEvents(session: Session): readonly SessionEvent[];
+/**
+ * Search child-owned history in bounded reads on hosts with ranged snapshots.
+ * Stop at the first match in the requested direction without copying the full log.
+ */
+export declare function findOwnSessionEvent(session: Session, matches: (event: SessionEvent) => boolean, options?: {
+    order?: 'oldest' | 'newest';
+    fromSeq?: number;
+}): SessionEvent | undefined;
 /** Legacy hosts log each chunk separately; current hosts embed the committed stream. */
 export declare function outputLimitTurn(event: SessionEvent): number | undefined;
 /** rc.2 summaries use tree names; the new structured reason owns the outcome. */

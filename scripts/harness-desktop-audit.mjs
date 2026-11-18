@@ -39,14 +39,14 @@ writeFileSync(join(profile, 'package.json'), JSON.stringify({
 }));
 writeFileSync(join(profile, 'pnpm-workspace.yaml'), 'packages:\n  - .\nnodeLinker: hoisted\nautoInstallPeers: false\n');
 try {
-    const installOutput = cli(['plugin', '--profile', 'desktop', 'add', '--save-exact', resolve(archive)]);
+    const installOutput = cli(['plugin', '--profile', 'desktop', 'add', '--save-exact', '@nanmicoder/dsh-agent-teams@0.1.31']);
     writeFileSync(join(report, 'plugin-install.log'), installOutput);
 } catch (error) {
     writeFileSync(join(report, 'plugin-install.log'), String(error.stdout ?? '') + String(error.stderr ?? ''));
     throw error;
 }
 const packagePath = join(profile, 'node_modules', '@nanmicoder', 'dsh-agent-teams', 'package.json');
-assert.equal(JSON.parse(readFileSync(packagePath, 'utf8')).version, '0.1.30');
+assert.equal(JSON.parse(readFileSync(packagePath, 'utf8')).version, '0.1.31');
 copyFileSync(new URL('./fixtures/harness-desktop-approval.mjs', import.meta.url), join(profile, 'fixture-desktop.mjs'));
 writeFileSync(join(profile, 'cordis.patch.yml'), `- id: llm-deepseek
   disabled: true

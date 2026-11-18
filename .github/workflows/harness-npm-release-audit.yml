@@ -1,0 +1,51 @@
+name: Published AgentTeams 0.1.31 Desktop smoke
+on:
+  push:
+    branches: [codex/verify-agentteams-031-registry]
+permissions:
+  contents: read
+jobs:
+  windows:
+    name: Install published AgentTeams on official Windows Stable Desktop
+    runs-on: windows-latest
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Fetch and verify official Desktop and npm latest
+        shell: pwsh
+        run: |
+          $root = Join-Path $env:RUNNER_TEMP dsh
+          $report = Join-Path $env:RUNNER_TEMP evidence
+          New-Item -ItemType Directory -Path $report | Out-Null
+          $installer = Join-Path $env:RUNNER_TEMP harness.exe
+          $url = 'https://download.deepseek.com/dsh-desk/bin/win-x64/stable/deepseek-harness-0.2.2-rc.5-win-x64.exe'
+          curl.exe --fail --silent --show-error --retry 3 --max-time 240 $url --output $installer
+          if ($LASTEXITCODE -ne 0) { throw "Desktop download failed" }
+          $signature = Get-AuthenticodeSignature $installer
+          $hash = (Get-FileHash $installer).Hash.ToLowerInvariant()
+          if ($signature.Status -ne 'Valid' -or $hash -ne '6482e4cab56c389c9dfa643a8e1dbc8c051d8e73944c6fca4a649234de4a5a2d') { throw 'Unexpected Windows Stable installer' }
+          $tags = npm view @nanmicoder/dsh-agent-teams dist-tags --json --registry=https://registry.npmjs.org --prefer-online | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or $tags.latest -ne '0.1.31') { throw "Expected npm latest 0.1.31, saw $($tags.latest)" }
+          $archive = Join-Path $env:RUNNER_TEMP published.tgz
+          curl.exe --fail --silent --show-error --retry 4 https://registry.npmjs.org/@nanmicoder/dsh-agent-teams/-/dsh-agent-teams-0.1.31.tgz --output $archive
+          if ($LASTEXITCODE -ne 0) { throw "AgentTeams download failed" }
+          $digest = (Get-FileHash $archive).Hash.ToLowerInvariant()
+          if ($digest -ne '35d1afb5857ab06561800173945f14da3a5a018c9bc2de48590d3c52f5d25336') { throw 'Registry bytes differ from the verified candidate' }
+          [ordered]@{ latest = $tags.latest; tarball_sha256 = $digest; desktop_sha256 = $hash } | ConvertTo-Json | Set-Content -Path (Join-Path $report registry.json)
+          $install = Start-Process -FilePath $installer -ArgumentList "/S /D=$root" -Wait -PassThru
+          if ($install.ExitCode -ne 0) { throw "Desktop installer exited $($install.ExitCode)" }
+          node scripts/harness-desktop-audit.mjs $root 0.2.2-rc.5 $archive $report
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: agentteams-031-windows-desktop
+          path: |
+            ${{ runner.temp }}/evidence/*.json
+            ${{ runner.temp }}/evidence/*.log

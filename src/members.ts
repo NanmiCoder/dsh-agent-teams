@@ -20,7 +20,7 @@ import { createUserMessage, LlmError, ReasoningEffortId } from '@deepseek-ai/dsh
 import type { Session, SessionId } from '@deepseek-ai/dsh-session'
 import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
-import { agentTeamsSource, observedSessionFormatVersion, outputLimitTurn, type SessionFormatBearer, guardSubagentCreation, startMember, usesManagedActivations, guardSubagentDelivery, installContinuableMemberSetup, memberToolFilter, queueMemberPrompt, restrictableToolNames, startMemberWithLenientFilter, steerMemberPrompt, sessionOwnEvents } from './harness-compat.ts'
+import { agentTeamsSource, observedSessionFormatVersion, outputLimitTurn, type SessionFormatBearer, guardSubagentCreation, startMember, usesManagedActivations, guardSubagentDelivery, installContinuableMemberSetup, memberToolFilter, queueMemberPrompt, restrictableToolNames, startMemberWithLenientFilter, steerMemberPrompt, findOwnSessionEvent } from './harness-compat.ts'
 import { markMailboxDelivered, appendMailbox, CAPTAIN_KEY, createMessage, readRetiredMemberIds, readTeamSync, readTeam, releaseMailboxDelivery, withTeamLock, writeTeam } from './state.ts'
 import { mailboxPrompt } from './mailbox.ts'
 import { nearestLiveLead } from './lineage.ts'
@@ -653,13 +653,13 @@ export function installMemberSelectionRuntime(
   const pending = new Map<string, MemberLlmSelection>()
   const pendingSetup = new Map<string, NonNullable<TeamMember['runtimeSetup']>>()
   installContinuableMemberSetup(ctx, (childCtx, child) => {
-    const descriptor = foldSubagentDescriptor(sessionOwnEvents(child.session))
+    const parentSessionId = child.session.header.parentSession
+    if (parentSessionId === undefined) return () => undefined
+    const descriptor = ownSubagentDescriptor(child)
     if (descriptor?.mode !== 'continuable' || !descriptor.label.startsWith(MEMBER_LABEL_PREFIX)) {
       return () => undefined
     }
 
-    const parentSessionId = child.session.header.parentSession
-    if (parentSessionId === undefined) return () => undefined
     const identity = descriptor.label.slice(MEMBER_LABEL_PREFIX.length)
     const separator = identity.indexOf(':')
     if (separator < 1 || separator === identity.length - 1) return () => undefined
@@ -865,8 +865,9 @@ export function installMemberSelectionRuntime(
   return {
     isPendingMember(agent) {
       const parent = agent.session.header.parentSession
-      const descriptor = foldSubagentDescriptor(sessionOwnEvents(agent.session))
-      return parent !== undefined && descriptor?.mode === 'continuable'
+      if (parent === undefined || pending.size === 0) return false
+      const descriptor = ownSubagentDescriptor(agent)
+      return descriptor?.mode === 'continuable'
         && pending.has(pendingSelectionKey(parent, descriptor.label))
     },
     async withPending<T>(
@@ -1143,6 +1144,22 @@ export function installRetiredMemberGuard(ctx: Context, stateDir: string): void 
   })
 }
 
+const subagentDescriptorScan = new WeakMap<Agent['session'], {
+  through: number
+  event: ReturnType<typeof findOwnSessionEvent>
+}>()
+
+/** Harness treats the first descriptor in the child's own log as authoritative. */
+function ownSubagentDescriptor(agent: Agent) {
+  const { session } = agent
+  const prior = subagentDescriptorScan.get(session)
+  const event = prior?.event ?? findOwnSessionEvent(session, entry => entry.type === 'subagent/descriptor', { fromSeq: prior?.through })
+  // Session history is append-only. After exhausting an own prefix, resume the
+  // scan at newly appended events, and retain the first descriptor once seen.
+  if (typeof session.seq === 'number') subagentDescriptorScan.set(session, { through: session.seq, event })
+  return event === undefined ? undefined : foldSubagentDescriptor([event])
+}
+
 /** Bound all descendant creation, including renamed tools and code-runtime calls. */
 export function installMemberDelegationGuard(ctx: Context, stateDir: string, maxDepth: number): void {
   let active = true
@@ -1151,7 +1168,7 @@ export function installMemberDelegationGuard(ctx: Context, stateDir: string, max
     let ancestor: Agent | undefined = parent
     let depth = 1
     while (ancestor !== undefined) {
-      const descriptor = foldSubagentDescriptor(sessionOwnEvents(ancestor.session))
+      const descriptor = ownSubagentDescriptor(ancestor)
       if (descriptor?.label?.startsWith(MEMBER_LABEL_PREFIX)) {
         const identity = descriptor.label.slice(MEMBER_LABEL_PREFIX.length)
         const separator = identity.indexOf(':')

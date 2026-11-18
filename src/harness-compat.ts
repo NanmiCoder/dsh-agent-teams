@@ -12,7 +12,7 @@ import type { Agent, AgentOptions } from '@deepseek-ai/dsh-agent'
 import type { ContentBlock, MessageId, MessageSource, StreamChunk } from '@deepseek-ai/dsh-llm'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import * as dshSession from '@deepseek-ai/dsh-session'
-import type { Session, SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
+import type { Session, SessionEvent, SessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
 import { SubagentError } from '@deepseek-ai/dsh-subagent'
 import { BUILTIN_DENY_TOOLS, resolveMemberToolFilter, type MemberToolFilter } from './tool-policies.ts'
 
@@ -305,13 +305,45 @@ export function onAgentReady(ctx: Context, listener: (agent: Agent, vetoable: bo
   return () => { stopCreated(); stopLegacy() }
 }
 
-/** Read child-owned history, excluding any descriptor inherited from a parent. */
-export function sessionOwnEvents(session: Session): readonly SessionEvent[] {
+function legacyOwnSessionEvents(session: Session): readonly SessionEvent[] {
   const current = session as unknown as { ownEvents?: () => readonly SessionEvent[] }
   if (typeof current.ownEvents === 'function') return current.ownEvents.call(session)
   const legacy = session as unknown as { events?: readonly SessionEvent[]; header: { seedLength?: number } }
   if (!Array.isArray(legacy.events)) return unsupported('missing ownEvents/legacy session log')
   return legacy.events.slice(legacy.header.seedLength ?? 0)
+}
+
+/**
+ * Search child-owned history in bounded reads on hosts with ranged snapshots.
+ * Stop at the first match in the requested direction without copying the full log.
+ */
+export function findOwnSessionEvent(
+  session: Session,
+  matches: (event: SessionEvent) => boolean,
+  options: { order?: 'oldest' | 'newest'; fromSeq?: number } = {},
+): SessionEvent | undefined {
+  const { order = 'oldest', fromSeq = 0 } = options
+  const start = Math.max(session.inheritedEventCount, fromSeq)
+  const end = session.seq
+  const search = (events: readonly SessionEvent[]) => {
+    if (order === 'oldest') return events.find(matches)
+    for (let i = events.length - 1; i >= 0; i--) {
+      const event = events[i]!
+      if (matches(event)) return event
+    }
+  }
+  if (typeof session.snapshotEvents !== 'function' || !Number.isSafeInteger(start) || !Number.isSafeInteger(end)) {
+    return search(legacyOwnSessionEvents(session))
+  }
+  const batchSize = 256
+  let cursor: number = order === 'oldest' ? start : end
+  while (order === 'oldest' ? cursor < end : cursor > start) {
+    const from = order === 'oldest' ? cursor : Math.max(start, cursor - batchSize)
+    const to = order === 'oldest' ? Math.min(end, cursor + batchSize) : cursor
+    const event = search(session.snapshotEvents(from as SessionLogOffset, to as SessionLogOffset))
+    if (event !== undefined) return event
+    cursor = order === 'oldest' ? to : from
+  }
 }
 
 /** Legacy hosts log each chunk separately; current hosts embed the committed stream. */

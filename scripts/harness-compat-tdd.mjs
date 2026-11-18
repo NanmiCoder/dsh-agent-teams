@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import { SubagentRuntime } from '@deepseek-ai/dsh-subagent'
-import { drainMemberChildren, guardSubagentCreation, guardSubagentDelivery, installContinuableMemberSetup, memberToolFilter, queueMemberPrompt, restrictableToolNames, sessionOwnEvents, startMember, steerMemberPrompt } from '../lib/harness-compat.js'
+import { drainMemberChildren, guardSubagentCreation, guardSubagentDelivery, installContinuableMemberSetup, memberToolFilter, queueMemberPrompt, restrictableToolNames, findOwnSessionEvent, startMember, steerMemberPrompt } from '../lib/harness-compat.js'
 import { installMemberSelectionRuntime, spawnMember } from '../lib/members.js'
 import { createTeamDir } from '../lib/state.js'
 import { CAPTAIN_TOOL_NAMES } from '../lib/tool-names.js'
@@ -255,15 +255,73 @@ await test('unsupported queue-only or send-only contract fails explicitly', asyn
   assert.throws(() => installContinuableMemberSetup(scope({ subagents: runtime }), () => () => {}), /unsupported Harness/)
   assert.throws(() => guardSubagentDelivery(scope({ subagents: runtime }), async () => false), /unsupported Harness/)
   await assert.rejects(queueMemberPrompt(runtime, {}, 'child', content, signal), /missing host FIFO/)
-  assert.throws(() => sessionOwnEvents({ header: {} }), /missing ownEvents/)
+  assert.throws(() => findOwnSessionEvent({ header: {} }, () => true), /missing ownEvents/)
 })
 
 await test('legacy session history excludes its inherited prefix; modern uses ownEvents receiver', () => {
   const inherited = { type: 'subagent/descriptor', data: { label: 'foreign' } }
   const own = { type: 'subagent/descriptor', data: { label: 'member' } }
-  assert.deepEqual(sessionOwnEvents({ header: { seedLength: 1 }, events: [inherited, own] }), [own])
+  assert.equal(findOwnSessionEvent({ header: { seedLength: 1 }, events: [inherited, own] }, () => true), own)
   const session = { header: {}, ownEvents() { assert.equal(this, session); return [own] } }
-  assert.deepEqual(sessionOwnEvents(session), [own])
+  assert.equal(findOwnSessionEvent(session, () => true), own)
+})
+
+await test('member detection reads a bounded prefix of its own long session (#356)', async () => {
+  const ctx = scope({ subagents: modernRuntime() })
+  const bridge = installMemberSelectionRuntime(ctx, '.agent-teams')
+  const agent = child()
+  const [descriptor] = agent.session.ownEvents()
+  const inheritedEventCount = 12_000
+  const seq = 46_000
+  const ranges = []
+  Object.assign(agent.session, {
+    inheritedEventCount,
+    seq,
+    ownEvents() { assert.fail('member detection must not materialize the whole session') },
+    snapshotEvents(from, to) {
+      assert.equal(this, agent.session)
+      ranges.push([from, to])
+      return Array.from({ length: to - from }, (_, index) =>
+        from + index === inheritedEventCount + 2 ? descriptor : { type: 'turn/start' })
+    },
+  })
+  await bridge.withPending('captain', 'agent-teams:team:worker', {
+    provider: 'primary', model: 'model',
+  }, async () => {
+    assert.equal(bridge.isPendingMember(agent), true)
+    assert.equal(bridge.isPendingMember(agent), true)
+    assert.equal(ranges.length, 1)
+    assert.equal(ranges[0][0], inheritedEventCount)
+    assert.ok(ranges[0][1] - ranges[0][0] <= 256)
+  })
+  ctx.dispose()
+})
+
+await test('reverse history search reaches an older batch and stops at the nearest owned turn boundary (#356)', () => {
+  const inheritedEventCount = 20_000
+  const seq = 46_000
+  const turnStart = { type: 'turn/start' }
+  const stepStart = { type: 'step/start', data: { turn: 42 } }
+  const ranges = []
+  const session = {
+    inheritedEventCount,
+    seq,
+    ownEvents() { assert.fail('mail admission must not copy the whole log') },
+    snapshotEvents(from, to) {
+      assert.ok(from >= inheritedEventCount && to - from <= 256)
+      ranges.push([from, to])
+      return Array.from({ length: to - from }, (_, index) => {
+        const position = from + index
+        if (position === seq - 300) return stepStart
+        if (position === seq - 310) return turnStart
+        return { type: 'assistant/message' }
+      })
+    },
+  }
+  assert.equal(findOwnSessionEvent(session, event =>
+    event.type === 'turn/start' || (event.type === 'step/start' && event.data.turn === 42),
+  { order: 'newest' }), stepStart)
+  assert.deepEqual(ranges, [[seq - 256, seq], [seq - 512, seq - 256]])
 })
 
 await test('synchronous modern setup selects the first request, deduplicates events, and disposes for HMR', async () => {

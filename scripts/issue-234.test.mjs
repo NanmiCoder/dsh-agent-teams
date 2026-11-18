@@ -235,6 +235,28 @@ await test('a real inline plan without a profile still builds the inline roster 
   }
 })
 
+await test('an inline plan persists its member execution prompt (#352)', async () => {
+  const fixture = await mount()
+  try {
+    const captain = fixture.createCaptain('captain-inline-prompt')
+    const executionPrompt = 'Inspect the migration without changing files.'
+    const result = await fixture.execute(captain, {
+      name: 'Inline Prompt',
+      approval: 'required',
+      plan: {
+        ...REAL_PLAN,
+        members: [{ ...REAL_PLAN.members[0], executionPrompt }, { name: 'backup', executionPrompt: '' }],
+      },
+    })
+    assert.equal(result.isError, false, JSON.stringify(result))
+    const team = await fixture.readCreated(result.value.team_id)
+    assert.equal(team.members[0].executionPrompt, executionPrompt)
+    assert.equal(team.members[1].executionPrompt, undefined)
+  } finally {
+    await fixture.dispose()
+  }
+})
+
 await test('a blank profile plus an empty shell equals "neither provided" (issue #234)', async () => {
   const fixture = await mount()
   try {

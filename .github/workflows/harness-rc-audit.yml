@@ -106,7 +106,8 @@ jobs:
           $report = Join-Path $env:RUNNER_TEMP "evidence"
           New-Item -ItemType Directory -Path $report | Out-Null
           $installer = Join-Path $env:RUNNER_TEMP "harness.exe"
-          $url = "https://download.deepseek.com/dsh-desk/bin/win-x64/deepseek-harness-$env:TARGET-win-x64.exe"
+          $feedDirectory = if ($env:TARGET -eq '0.2.2-rc.5') { 'stable/' } else { '' }
+          $url = "https://download.deepseek.com/dsh-desk/bin/win-x64/${feedDirectory}deepseek-harness-$env:TARGET-win-x64.exe"
           curl.exe --fail --silent --show-error --retry 4 --max-time 300 $url --output $installer
           if ($LASTEXITCODE -ne 0) { throw "Desktop download failed" }
           $signature = Get-AuthenticodeSignature $installer

@@ -24,7 +24,7 @@ import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/c
 import { type ActivityTeam } from './activity-monitor.ts';
 import type { AgentTeamsCardData } from './agent-teams-card-definition.ts';
 import type { AgentTeamsTranslate } from './locales.ts';
-export declare function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscarded, onNavigate, t, historic, workspace }: {
+export declare function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscarded, onNavigate, t, historic, workspace, readOnly }: {
     readonly team: ActivityTeam;
     readonly modelDirectory?: ModelDirectory;
     readonly onContinuePlanning?: () => void;
@@ -34,6 +34,8 @@ export declare function TeamSection({ team, modelDirectory, onContinuePlanning, 
     readonly t: AgentTeamsTranslate;
     readonly historic?: boolean;
     readonly workspace?: boolean;
+    /** Console mode: reuse every read surface without stop, edit, or approval. */
+    readonly readOnly?: boolean;
 }): import("react").JSX.Element;
 /** Legacy conversation cards may outlive their host archive. Project their
  * durable roster through the same rebuilt panel instead of a second UI. */

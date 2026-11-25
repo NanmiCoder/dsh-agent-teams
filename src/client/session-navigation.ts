@@ -71,3 +71,52 @@ export async function openAgentTeamMember(
   layout?.selectPanel?.(null)
   return 'subagent'
 }
+
+/** The page a member transcript should offer to restore. */
+export interface ConsoleReturnTarget {
+  /** Main-panel key that was open before entering the member transcript. */
+  readonly panelId: string
+  /** Console identity key (`workspace + captainSessionId + teamId`). */
+  readonly teamKey: string
+  /** Member transcript currently eligible to show the return action. */
+  readonly memberSessionId: string
+}
+
+/** Plugin-instance navigation memory for the console's return action. */
+export interface ConsoleReturnTargetStore {
+  getSnapshot(): ConsoleReturnTarget | undefined
+  subscribe(listener: () => void): () => void
+  remember(target: ConsoleReturnTarget): void
+  clear(): void
+}
+
+/**
+ * Remember the console page while a member transcript is open.
+ *
+ * This is deliberately not browser history: the plugin only needs the exact
+ * panel and team it came from, and restores that selection even after the
+ * member session has replaced the conversation several times.
+ * @returns a small external-store-shaped target.
+ */
+export function createConsoleReturnTarget(): ConsoleReturnTargetStore {
+  let target: ConsoleReturnTarget | undefined
+  const listeners = new Set<() => void>()
+  const publish = (next: ConsoleReturnTarget | undefined): void => {
+    if (target === next) return
+    target = next
+    for (const listener of listeners) listener()
+  }
+  return {
+    getSnapshot: () => target,
+    subscribe(listener: () => void) {
+      listeners.add(listener)
+      return () => { listeners.delete(listener) }
+    },
+    remember(next) {
+      publish(next)
+    },
+    clear() {
+      publish(undefined)
+    },
+  }
+}

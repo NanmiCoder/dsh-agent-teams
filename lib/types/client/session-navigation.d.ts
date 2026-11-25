@@ -38,3 +38,28 @@ export interface AgentTeamsLayoutNavigator {
  * the Conversation panel and cancel catalog refreshes superseded by navigation.
  */
 export declare function openAgentTeamMember(sessions: AgentTeamsSessionNavigator, parentSessionId: SessionId, childSessionId: SessionId, layout?: AgentTeamsLayoutNavigator, workspace?: AgentTeamsWorkspaceNavigator): Promise<'subagent' | 'session' | 'cancelled'>;
+/** The page a member transcript should offer to restore. */
+export interface ConsoleReturnTarget {
+    /** Main-panel key that was open before entering the member transcript. */
+    readonly panelId: string;
+    /** Console identity key (`workspace + captainSessionId + teamId`). */
+    readonly teamKey: string;
+    /** Member transcript currently eligible to show the return action. */
+    readonly memberSessionId: string;
+}
+/** Plugin-instance navigation memory for the console's return action. */
+export interface ConsoleReturnTargetStore {
+    getSnapshot(): ConsoleReturnTarget | undefined;
+    subscribe(listener: () => void): () => void;
+    remember(target: ConsoleReturnTarget): void;
+    clear(): void;
+}
+/**
+ * Remember the console page while a member transcript is open.
+ *
+ * This is deliberately not browser history: the plugin only needs the exact
+ * panel and team it came from, and restores that selection even after the
+ * member session has replaced the conversation several times.
+ * @returns a small external-store-shaped target.
+ */
+export declare function createConsoleReturnTarget(): ConsoleReturnTargetStore;

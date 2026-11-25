@@ -195,6 +195,10 @@ const activityPanelCss = await readFile(new URL('../src/client/ActivityPanel.mod
 const activityPanelSource = await readFile(new URL('../src/client/ActivityPanel.tsx', import.meta.url), 'utf8')
 const stagingPlanSource = await readFile(new URL('../src/client/StagingPlanEditor.tsx', import.meta.url), 'utf8')
 const clientIndexSource = await readFile(new URL('../src/client/index.tsx', import.meta.url), 'utf8')
+const teamConsoleSource = await readFile(new URL('../src/client/TeamConsole.tsx', import.meta.url), 'utf8')
+const teamConsoleStateSource = await readFile(new URL('../src/client/team-console-state.ts', import.meta.url), 'utf8')
+const teamListSource = await readFile(new URL('../src/client/TeamList.tsx', import.meta.url), 'utf8')
+const sessionNavigationSource = await readFile(new URL('../src/client/session-navigation.ts', import.meta.url), 'utf8')
 const agentTeamsCardCss = await readFile(new URL('../src/client/AgentTeamsCard.module.css', import.meta.url), 'utf8')
 const agentTeamsCardSource = await readFile(new URL('../src/client/AgentTeamsCard.tsx', import.meta.url), 'utf8')
 const artworkSource = await readFile(new URL('../src/client/artwork.ts', import.meta.url), 'utf8')
@@ -217,7 +221,56 @@ check(
     && clientIndexSource.includes("'uiConversation', 'slots', 'sessions', 'locale', 'modelDirectories'")
     && clientIndexSource.includes('ctx.uiConversation.events.register(agentTeamsCardDefinition)')
     && clientIndexSource.includes('ctx.locale.register(AGENT_TEAMS_LOCALE_NAMESPACE, { zh, en })')
-    && clientIndexSource.match(/locale:\s*AGENT_TEAMS_LOCALE_NAMESPACE/gu)?.length === 5,
+    && clientIndexSource.match(/locale:\s*AGENT_TEAMS_LOCALE_NAMESPACE/gu)?.length === 7,
+)
+check(
+  'global console registers a sidebar entry and the matching main key',
+  clientIndexSource.includes("ctx.slots.inject('sidebar.panellist'")
+    && clientIndexSource.includes("name: 'sidebar.panellist'")
+    && clientIndexSource.includes('id: CONSOLE_PANEL_ID')
+    && clientIndexSource.includes("ctx.slots.inject('main'")
+    && clientIndexSource.includes("name: 'main'")
+    && clientIndexSource.includes('key: CONSOLE_PANEL_ID')
+    && teamConsoleSource.includes("export const CONSOLE_PANEL_ID = 'agent-teams-console'"),
+)
+check(
+  'console owns an independent cross-workspace snapshot and cadence',
+  teamConsoleStateSource.includes('CONSOLE_LIVE_URL = \'/plugins/dsh-agent-teams/state?summary=1\'')
+    && teamConsoleStateSource.includes('CONSOLE_ARCHIVE_URL = \'/plugins/dsh-agent-teams/state?archived=1\'')
+    && !teamConsoleStateSource.includes('?session=')
+    && !teamConsoleStateSource.includes('updateActivitySnapshots')
+    && teamConsoleStateSource.includes('CONSOLE_ACTIVE_POLL_MS = 1000')
+    && teamConsoleStateSource.includes('CONSOLE_IDLE_POLL_MS = 5000')
+    && teamConsoleStateSource.includes("'if-none-match'"),
+  'the console must not share the conversation snapshot or scan scoped sessions',
+)
+check(
+  'console identity and grouped list include every workspace',
+  teamConsoleStateSource.includes('team.workspace')
+    && teamConsoleStateSource.includes('team.captainSessionId')
+    && teamConsoleStateSource.includes('team.teamId')
+    && teamConsoleStateSource.includes('buildConsoleRows')
+    && teamListSource.includes('groupConsoleRows')
+    && teamListSource.includes('consoleWorkspaceLabel'),
+)
+check(
+  'console details reuse TeamSection in read-only mode',
+  teamConsoleSource.includes('TeamSection')
+    && teamConsoleSource.includes('workspace')
+    && teamConsoleSource.includes('historic={selected.historic}')
+    && teamConsoleSource.includes('readOnly')
+    && activityPanelSource.includes('readonly readOnly?: boolean')
+    && activityPanelSource.includes('!readOnly')
+    && !teamConsoleSource.includes('ACTIVITY_HALT_URL'),
+  'the console MVP must not expose stop, edit, or approval actions',
+)
+check(
+  'member navigation restores the console page instead of browser history',
+  clientIndexSource.includes('createConsoleReturnTarget')
+    && teamConsoleSource.includes('ConsoleReturnButton')
+    && teamConsoleSource.includes('memberSessionId !== sessionId')
+    && sessionNavigationSource.includes('createConsoleReturnTarget')
+    && !sessionNavigationSource.includes('window.history'),
 )
 check(
   'slash command transcript hides the duplicate pre-message result row',

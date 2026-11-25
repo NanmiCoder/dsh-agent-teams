@@ -540,7 +540,7 @@ function DependencyMap({ tasks, members, t, discarded = false, workspace = false
   )
 }
 
-export function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscarded, onNavigate, t, historic = false, workspace = false }: {
+export function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscarded, onNavigate, t, historic = false, workspace = false, readOnly = false }: {
   readonly team: ActivityTeam
   readonly modelDirectory?: ModelDirectory
   readonly onContinuePlanning?: () => void
@@ -550,6 +550,8 @@ export function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscar
   readonly t: AgentTeamsTranslate
   readonly historic?: boolean
   readonly workspace?: boolean
+  /** Console mode: reuse every read surface without stop, edit, or approval. */
+  readonly readOnly?: boolean
 }) {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const selectedAssignee = team.tasks.find(task => task.id === selectedTaskId)?.assignee
@@ -573,7 +575,7 @@ export function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscar
   const unfinishedCount = team.tasks.filter((task) => (
     task.status !== 'completed' && task.status !== 'failed' && task.status !== 'cancelled'
   )).length
-  const canStop = !historic && team.phase === 'running' && team.halted !== true && teamIsActive(team)
+  const canStop = !historic && !readOnly && team.phase === 'running' && team.halted !== true && teamIsActive(team)
   const stopTeam = async (): Promise<void> => {
     if (stopping) return
     setStopping(true)
@@ -625,7 +627,7 @@ export function TeamSection({ team, modelDirectory, onContinuePlanning, onDiscar
           )}
         </header>
 
-        {team.phase === 'staged' && !historic && modelDirectory !== undefined && onContinuePlanning !== undefined && onDiscarded !== undefined && (
+        {team.phase === 'staged' && !historic && !readOnly && modelDirectory !== undefined && onContinuePlanning !== undefined && onDiscarded !== undefined && (
           <StagingPlanEditor
             team={team}
             modelDirectory={modelDirectory}

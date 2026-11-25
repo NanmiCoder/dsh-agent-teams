@@ -6,7 +6,7 @@ import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
-import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
+import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 // Type-only: pulls the official browser locale service into ClientContext.
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 // Conversation folding is target-neutral; keyed Chat rendering is owned by
@@ -14,7 +14,7 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 // The frame-level overlay is declared by ui-layout. This import is type-only;
 // ctx.slots.inject below owns the runtime wait for the declaration.
-import type { UsePanelInfo } from '@deepseek-ai/dsh-client-ui-layout/client'
+import type { MainPanelId, UsePanelInfo } from '@deepseek-ai/dsh-client-ui-layout/client'
 // Official model catalog/directory service. The staged roster reads its
 // provider/model/effort metadata without mutating the captain's own selection.
 import type {} from '@deepseek-ai/dsh-client-ui-model-selection/client'
@@ -24,6 +24,10 @@ import { TeamChatEntry, TeamTurnCard } from './TeamChatEntry.tsx'
 import { createWorkspaceState } from './workspace-state.ts'
 import { AgentTeamsCard, type AgentTeamsCardInjected } from './AgentTeamsCard.tsx'
 import { agentTeamsCardDefinition } from './agent-teams-card-definition.ts'
+import { ConsoleReturnButton, TeamConsole, CONSOLE_PANEL_ID, type ConsoleReturnInjected, type TeamConsoleInjected } from './TeamConsole.tsx'
+import { createTeamConsoleState } from './team-console-state.ts'
+import { createConsoleReturnTarget } from './session-navigation.ts'
+import { IconTeamsConsole } from './icons.tsx'
 import {
   AGENT_TEAMS_LOCALE_NAMESPACE, en, zh, type AgentTeamsLocaleKey,
 } from './locales.ts'
@@ -58,6 +62,8 @@ function HiddenAgentTeamsCommand(): null {
 export function apply(ctx: ClientContext): void {
   const bridge = createWorkspaceBridge()
   const state = createWorkspaceState()
+  const consoleState = createTeamConsoleState()
+  const consoleNavigation = createConsoleReturnTarget()
   ctx.effect(
     () => ctx.locale.register(AGENT_TEAMS_LOCALE_NAMESPACE, { zh, en }),
     'agent-teams: dictionaries',
@@ -67,6 +73,24 @@ export function apply(ctx: ClientContext): void {
       console.warn(`agent-teams: failed to open member transcript ${childId}: ${String(error)}`)
     })
   }
+  const openConsole = (panelId: string): boolean => {
+    try {
+      if (typeof ctx.layout.selectPanel !== 'function') return false
+      ctx.layout.selectPanel(panelId as MainPanelId)
+      return true
+    } catch (error: unknown) {
+      console.warn(`agent-teams: failed to open console panel ${panelId}: ${String(error)}`)
+      return false
+    }
+  }
+  const openConsoleMember = (parentId: SessionId, childId: SessionId, teamKey: string): void => {
+    // Remember the exact console page before navigation replaces the main panel.
+    consoleNavigation.remember({ panelId: CONSOLE_PANEL_ID, teamKey, memberSessionId: childId })
+    openMember(parentId, childId)
+  }
+  const ConsolePanelIcon = ({ size, active }: PropsRuntime<'sidebar.panellist'>) => (
+    <IconTeamsConsole size={size} active={active} />
+  )
   const Panel = ({ t, usePanelInfo }: PropsLocale<'agentTeams'> & PanelNavigationProps) => {
     // A host's standard hook set is fixed for this mounted plugin instance.
     const usePanel = usePanelInfo ?? useLegacyPanelInfo
@@ -118,6 +142,39 @@ export function apply(ctx: ClientContext): void {
     label: 'AgentTeams activity',
     locale: AGENT_TEAMS_LOCALE_NAMESPACE,
   }, Panel))
+
+  // Global console. Both surfaces are gated by the host's sidebar panel list;
+  // older hosts (or a missing main keyed slot) simply keep the existing card,
+  // floater, and right-tab behavior without registering anything here.
+  ctx.slots.inject('sidebar.panellist', () => {
+    const disposeEntry = ctx.slots.register({
+      name: 'sidebar.panellist',
+      id: CONSOLE_PANEL_ID,
+      order: 20,
+      label: () => ctx.locale.bind(AGENT_TEAMS_LOCALE_NAMESPACE)('console.navLabel'),
+    }, ConsolePanelIcon)
+    const disposeMain = ctx.slots.inject('main', () => {
+      const disposePanel = ctx.slots.register({
+        name: 'main',
+        key: CONSOLE_PANEL_ID,
+        locale: AGENT_TEAMS_LOCALE_NAMESPACE,
+        inject: (): TeamConsoleInjected => ({
+          state: consoleState,
+          openMember: openConsoleMember,
+          navigation: consoleNavigation,
+        }),
+      }, TeamConsole)
+      const disposeReturn = ctx.slots.inject('conversation.session.header.actions', () => ctx.slots.register({
+        name: 'conversation.session.header.actions',
+        id: 'agent-teams-console-return',
+        order: 51,
+        locale: AGENT_TEAMS_LOCALE_NAMESPACE,
+        inject: (): ConsoleReturnInjected => ({ navigation: consoleNavigation, openConsole }),
+      }, ConsoleReturnButton))
+      return [disposePanel, disposeReturn]
+    })
+    return [disposeEntry, disposeMain]
+  })
 
   // The host command is only the slash-menu/admission surface. Its input is
   // replayed as the visible user message, so the generic result row would be
